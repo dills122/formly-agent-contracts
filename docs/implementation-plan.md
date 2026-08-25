@@ -277,7 +277,7 @@ the complete contract easy to inspect from the repository root.
 
 ## Checkpoint C: Parser Shipping Gate
 
-- [ ] Fresh-clone install, lint, test, build, and demo commands pass.
+- [x] Fresh-clone install, lint, test, build, and demo commands pass.
 - [x] Contract answers: what fields exist, in what order, at what model paths,
   with what constraints/options, and what known flow/unknowns affect them.
 - [x] Limitations are visible in output and README.
@@ -298,7 +298,7 @@ knowledge.
 
 **Verification:**
 
-- [ ] Follow README instructions in a fresh clone or clean worktree.
+- [x] Follow README instructions in a fresh clone or clean worktree.
 
 **Dependencies:** Task 7
 
@@ -319,14 +319,14 @@ cloned and tested at work. This task does not depend on the optional MCP task.
 **Acceptance criteria:**
 
 - [x] Repository owner, visibility, and license are approved.
-- [ ] The feature branch and its test evidence are available on GitHub.
-- [ ] A clone URL and exact verification commands are ready for the workplace
+- [x] The feature branch and its test evidence are available on GitHub.
+- [x] A clone URL and exact verification commands are ready for the workplace
   test.
 
 **Verification:**
 
-- [ ] Clone into a clean temporary directory.
-- [ ] Run frozen install, lint, test, build, and demo from that clone.
+- [x] Clone into a clean temporary directory.
+- [x] Run frozen install, lint, test, build, and demo from that clone.
 
 **Dependencies:** Task 8 and Checkpoint C
 
@@ -366,11 +366,11 @@ not add compilation, Angular execution, storage, or mutation to MCP requests.
 
 ## Final Release Checkpoint
 
-- [ ] Parser shipping gate remains green.
-- [ ] Repository contains no private or work-derived data.
-- [ ] Approved license and GitHub remote are present.
+- [x] Parser shipping gate remains green.
+- [x] Repository contains no private or work-derived data.
+- [x] Approved license and GitHub remote are present.
 - [ ] Branch and PR metadata include exact test evidence.
-- [ ] Remaining architecture milestones are clearly labeled post-MVP.
+- [x] Remaining architecture milestones are clearly labeled post-MVP.
 - [ ] Publish a pre-1.0 tag only after the user has run the demo successfully.
 
 ## Execution Rules

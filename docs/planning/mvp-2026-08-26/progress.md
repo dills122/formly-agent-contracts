@@ -75,11 +75,14 @@
 - 2026-08-25 19:30 EDT: Completed golden-demo Tasks 7 and 8 with a fully
   invented fixture, deterministic CLI, root `pnpm demo`, built-artifact smoke
   validation, and README setup, API, support, and limitation guidance.
+- 2026-08-25 19:34 EDT: Cloned the pushed demo branch from GitHub into a fresh
+  temporary directory. Frozen install, all 36 tests, lint, four-package demo
+  build, Angular production build, demo smoke validation, documentation checks,
+  and the documented `pnpm demo` command all passed without local artifacts.
 
 ## Next
 
-- Run the full parser shipping gate, verify it from a fresh clone, then publish
-  and merge the final MVP demo PR with exact workplace test commands.
+- Open and merge the final MVP demo PR with exact workplace test commands.
 
 ## Tests
 
