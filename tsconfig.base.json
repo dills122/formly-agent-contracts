@@ -18,6 +18,9 @@
       ],
       "@formly-agent-contracts/formly-adapter": [
         "./packages/formly-adapter/src/index.ts"
+      ],
+      "@formly-agent-contracts/synthetic-form": [
+        "./fixtures/synthetic-form/src/index.ts"
       ]
     },
     "skipLibCheck": false,

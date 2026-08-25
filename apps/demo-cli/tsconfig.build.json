@@ -1,0 +1,22 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "noEmit": false,
+    "outDir": "dist",
+    "paths": {
+      "@formly-agent-contracts/contract-schema": [
+        "../../packages/contract-schema/dist/index.d.ts"
+      ],
+      "@formly-agent-contracts/formly-adapter": [
+        "../../packages/formly-adapter/dist/index.d.ts"
+      ],
+      "@formly-agent-contracts/synthetic-form": [
+        "../../fixtures/synthetic-form/dist/index.d.ts"
+      ]
+    },
+    "rootDir": "src",
+    "types": ["node"]
+  },
+  "exclude": ["src/**/*.test.ts"]
+}

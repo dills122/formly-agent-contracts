@@ -13,9 +13,12 @@
   "scripts": {
     "app:serve": "pnpm --filter @formly-agent-contracts/formly-test-app serve",
     "audit": "pnpm audit --audit-level=high",
-    "build": "pnpm --filter @formly-agent-contracts/contract-schema build && pnpm --filter @formly-agent-contracts/formly-adapter build && pnpm --filter @formly-agent-contracts/synthetic-form build && pnpm --filter @formly-agent-contracts/formly-test-app build",
-    "check": "pnpm lint && pnpm test && pnpm build && pnpm check:docs",
+    "build": "pnpm build:demo && pnpm --filter @formly-agent-contracts/formly-test-app build",
+    "build:demo": "pnpm --filter @formly-agent-contracts/contract-schema build && pnpm --filter @formly-agent-contracts/formly-adapter build && pnpm --filter @formly-agent-contracts/synthetic-form build && pnpm --filter @formly-agent-contracts/demo-cli build",
+    "check": "pnpm lint && pnpm test && pnpm build && pnpm check:demo && pnpm check:docs",
+    "check:demo": "node .github/scripts/check-demo.mjs",
     "check:docs": "node .github/scripts/check-docs.mjs",
+    "demo": "node scripts/run-demo.mjs",
     "lint": "eslint .",
     "test": "vitest run",
     "test:watch": "vitest"

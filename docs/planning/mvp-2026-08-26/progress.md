@@ -70,11 +70,21 @@
   source-path mappings for lint/test, kept adapter emission pointed at the
   already-built contract declarations, and enabled `noEmitOnError` globally.
   The clean-artifact lint/test reproduction and complete local gate now pass.
+- 2026-08-25 19:25 EDT: Merged adapter PR #6 after both required GitHub checks
+  passed and fast-forwarded fresh `main` to `dcf41aa`.
+- 2026-08-25 19:30 EDT: Completed golden-demo Tasks 7 and 8 with a fully
+  invented fixture, deterministic CLI, root `pnpm demo`, built-artifact smoke
+  validation, and README setup, API, support, and limitation guidance.
+- 2026-08-25 19:34 EDT: Cloned the pushed demo branch from GitHub into a fresh
+  temporary directory. Frozen install, all 36 tests, lint, four-package demo
+  build, Angular production build, demo smoke validation, documentation checks,
+  and the documented `pnpm demo` command all passed without local artifacts.
+- 2026-08-25 19:36 EDT: Opened final MVP PR #7 with the clean-clone evidence,
+  exact demo hash, clone URL, and workplace verification commands.
 
 ## Next
 
-- Review and merge the Formly adapter slice, then create the golden synthetic
-  fixture and root `pnpm demo` command for Task 7.
+- Merge final MVP PR #7 after its required GitHub checks pass.
 
 ## Tests
 
@@ -95,3 +105,6 @@
 - Test-app integration passes for all twelve registered synthetic form
   definitions, including stable hashes, representative conditions, array
   templates, and the three opaque behavior classes present in that corpus.
+- Golden demo test and built-artifact smoke check pass; `pnpm demo` emits the
+  valid `demo.golden-form` contract with a stable SHA-256 content hash and an
+  explicit `OPAQUE_FUNCTION` diagnostic.
