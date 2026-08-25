@@ -1,0 +1,32 @@
+{
+  "name": "@formly-agent-contracts/formly-adapter",
+  "version": "0.1.0",
+  "description": "Allowlisted Formly configuration extraction for Formly Agent Contracts.",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm typecheck && tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json"
+  },
+  "engines": {
+    "node": ">=22.13.0 <23"
+  },
+  "dependencies": {
+    "@formly-agent-contracts/contract-schema": "workspace:*"
+  },
+  "peerDependencies": {
+    "@ngx-formly/core": "6.1.8"
+  },
+  "devDependencies": {
+    "@ngx-formly/core": "6.1.8"
+  }
+}

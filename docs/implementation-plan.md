@@ -197,24 +197,24 @@ allowlist into contract nodes.
 
 **Acceptance criteria:**
 
-- [ ] Field order, parent/child structure, key-derived model paths, type, and
+- [x] Field order, parent/child structure, key-derived model paths, type, and
   presentation data are retained.
-- [ ] Required, length/range, pattern, and static options are represented.
-- [ ] Input objects are not mutated.
+- [x] Required, length/range, pattern, and static options are represented.
+- [x] Input objects are not mutated.
 
 **Verification:**
 
-- [ ] Focused parser tests cover leaf and nested fields.
-- [ ] Mutation-safety test passes.
+- [x] Focused parser tests cover leaf and nested fields.
+- [x] Mutation-safety test passes.
 
 **Dependencies:** Tasks 3 and 4
 
 **Files likely touched:**
 
-- `packages/formly-parser/package.json`
-- `packages/formly-parser/src/extract-form.ts`
-- `packages/formly-parser/src/extract-form.test.ts`
-- `packages/formly-parser/src/index.ts`
+- `packages/formly-adapter/package.json`
+- `packages/formly-adapter/src/extract-form.ts`
+- `packages/formly-adapter/src/extract-form.test.ts`
+- `packages/formly-adapter/src/index.ts`
 
 **Estimated scope:** Medium
 
@@ -225,23 +225,23 @@ conditional behavior while producing diagnostics for unsafe values.
 
 **Acceptance criteria:**
 
-- [ ] `fieldArray` template structure is retained without requiring realized
+- [x] `fieldArray` template structure is retained without requiring realized
   model rows.
-- [ ] Safely representable condition metadata is preserved.
-- [ ] Functions, remote/async values, and unsupported constructs produce stable
+- [x] Safely representable condition metadata is preserved.
+- [x] Functions, remote/async values, and unsupported constructs produce stable
   diagnostics instead of disappearing or being evaluated.
 
 **Verification:**
 
-- [ ] Focused tests cover empty arrays, a conditional field, and every MVP
+- [x] Focused tests cover empty arrays, a conditional field, and every MVP
   diagnostic code.
 
 **Dependencies:** Task 5
 
 **Files likely touched:**
 
-- `packages/formly-parser/src/extract-form.ts`
-- `packages/formly-parser/src/extract-form.test.ts`
+- `packages/formly-adapter/src/extract-form.ts`
+- `packages/formly-adapter/src/extract-form.test.ts`
 - `packages/contract-schema/src/contract.ts`
 - `packages/contract-schema/src/contract.test.ts`
 

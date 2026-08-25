@@ -48,10 +48,21 @@
 - Node's supported `crypto.createHash()` API provides the MVP SHA-256 content
   hash without another runtime dependency:
   <https://nodejs.org/api/crypto.html#cryptocreatehashalgorithm-options>.
+- Formly 6.1.8's `getKeyPath` implementation translates bracket notation,
+  splits dotted string keys, and preserves array-form key segments. ADR 0004
+  mirrors that behavior without importing a private helper:
+  <https://github.com/ngx-formly/ngx-formly/blob/v6.1.8/src/core/src/lib/utils.ts>.
+- Vitest aliases are explicitly absolute filesystem paths so workspace
+  integration tests exercise package source while published package exports
+  remain dist-only: <https://vitest.dev/config/alias>.
+- The twelve-form corpus intentionally contains opaque functions, async-like
+  values, and unsupported rules. It does not contain an otherwise completely
+  unknown field shape, so that fourth diagnostic remains covered by the
+  focused adapter unit suite rather than being falsely expected from the app.
 
 ## Open Questions
 
 - No repository-publication questions remain.
-- The component-free builder question is resolved by ADR 0002. The next slice
-  must define which resolved properties enter the v0 allowlist and which remain
-  explicit diagnostics.
+- The v0 projection allowlist and stable identity rule are resolved by Tasks 5
+  and 6 plus ADR 0004. The next slice must prove that output through the small
+  golden form and repository-root demo command.

@@ -20,6 +20,8 @@
   "devDependencies": {
     "@angular/build": "20.3.29",
     "@angular/cli": "20.3.29",
-    "@angular/compiler-cli": "20.3.29"
+    "@angular/compiler-cli": "20.3.29",
+    "@formly-agent-contracts/contract-schema": "workspace:*",
+    "@formly-agent-contracts/formly-adapter": "workspace:*"
   }
 }

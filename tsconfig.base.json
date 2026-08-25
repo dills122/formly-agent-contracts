@@ -10,7 +10,16 @@
     "moduleResolution": "NodeNext",
     "noFallthroughCasesInSwitch": true,
     "noImplicitOverride": true,
+    "noEmitOnError": true,
     "noUncheckedIndexedAccess": true,
+    "paths": {
+      "@formly-agent-contracts/contract-schema": [
+        "./packages/contract-schema/src/index.ts"
+      ],
+      "@formly-agent-contracts/formly-adapter": [
+        "./packages/formly-adapter/src/index.ts"
+      ]
+    },
     "skipLibCheck": false,
     "sourceMap": true,
     "strict": true,
