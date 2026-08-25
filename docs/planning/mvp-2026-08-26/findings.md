@@ -59,6 +59,10 @@
   values, and unsupported rules. It does not contain an otherwise completely
   unknown field shape, so that fourth diagnostic remains covered by the
   focused adapter unit suite rather than being falsely expected from the app.
+- A root demo runner can keep successful stdout machine-readable by building
+  packages with captured output and replaying build logs only when compilation
+  fails. The smoke check independently parses the emitted JSON through the
+  contract package and verifies its content hash and intentional diagnostic.
 
 ## Open Questions
 

@@ -254,14 +254,14 @@ the complete contract easy to inspect from the repository root.
 
 **Acceptance criteria:**
 
-- [ ] Fixture contains no work-derived data.
-- [ ] `pnpm demo` emits valid canonical JSON and its hash.
-- [ ] Two consecutive runs are byte-for-byte identical.
+- [x] Fixture contains no work-derived data.
+- [x] `pnpm demo` emits valid canonical JSON and its hash.
+- [x] Two consecutive runs are byte-for-byte identical.
 
 **Verification:**
 
-- [ ] Demo smoke test passes from a clean build.
-- [ ] Golden contract snapshot is reviewed for agent usability.
+- [x] Demo smoke test passes from a clean build.
+- [x] Golden contract output is reviewed for agent usability.
 
 **Dependencies:** Task 6
 
@@ -278,9 +278,9 @@ the complete contract easy to inspect from the repository root.
 ## Checkpoint C: Parser Shipping Gate
 
 - [ ] Fresh-clone install, lint, test, build, and demo commands pass.
-- [ ] Contract answers: what fields exist, in what order, at what model paths,
+- [x] Contract answers: what fields exist, in what order, at what model paths,
   with what constraints/options, and what known flow/unknowns affect them.
-- [ ] Limitations are visible in output and README.
+- [x] Limitations are visible in output and README.
 - [ ] If time is nearly exhausted, ship here.
 
 ## Phase 3: Package the Proof
@@ -292,9 +292,9 @@ knowledge.
 
 **Acceptance criteria:**
 
-- [ ] README includes exact setup and demo commands.
-- [ ] A minimal API example shows how a host registers and extracts a form.
-- [ ] Supported and unsupported behavior is explicit.
+- [x] README includes exact setup and demo commands.
+- [x] A minimal API example shows how a host registers and extracts a form.
+- [x] Supported and unsupported behavior is explicit.
 
 **Verification:**
 

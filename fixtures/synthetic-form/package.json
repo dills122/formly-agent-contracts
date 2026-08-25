@@ -3,8 +3,15 @@
   "version": "0.0.0",
   "private": true,
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "scripts": {
-    "build": "tsc --project tsconfig.json --noEmit"
+    "build": "pnpm typecheck && tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json"
   },
   "dependencies": {
     "@angular/common": "20.3.29",

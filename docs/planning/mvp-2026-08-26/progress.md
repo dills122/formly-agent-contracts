@@ -70,11 +70,16 @@
   source-path mappings for lint/test, kept adapter emission pointed at the
   already-built contract declarations, and enabled `noEmitOnError` globally.
   The clean-artifact lint/test reproduction and complete local gate now pass.
+- 2026-08-25 19:25 EDT: Merged adapter PR #6 after both required GitHub checks
+  passed and fast-forwarded fresh `main` to `dcf41aa`.
+- 2026-08-25 19:30 EDT: Completed golden-demo Tasks 7 and 8 with a fully
+  invented fixture, deterministic CLI, root `pnpm demo`, built-artifact smoke
+  validation, and README setup, API, support, and limitation guidance.
 
 ## Next
 
-- Review and merge the Formly adapter slice, then create the golden synthetic
-  fixture and root `pnpm demo` command for Task 7.
+- Run the full parser shipping gate, verify it from a fresh clone, then publish
+  and merge the final MVP demo PR with exact workplace test commands.
 
 ## Tests
 
@@ -95,3 +100,6 @@
 - Test-app integration passes for all twelve registered synthetic form
   definitions, including stable hashes, representative conditions, array
   templates, and the three opaque behavior classes present in that corpus.
+- Golden demo test and built-artifact smoke check pass; `pnpm demo` emits the
+  valid `demo.golden-form` contract with a stable SHA-256 content hash and an
+  explicit `OPAQUE_FUNCTION` diagnostic.

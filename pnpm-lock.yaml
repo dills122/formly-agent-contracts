@@ -31,6 +31,18 @@ importers:
         specifier: 4.1.11
         version: 4.1.11(@types/node@22.20.1)(vite@8.2.2(@types/node@22.20.1)(esbuild@0.28.0)(sass@1.90.0))
 
+  apps/demo-cli:
+    dependencies:
+      '@formly-agent-contracts/contract-schema':
+        specifier: workspace:*
+        version: link:../../packages/contract-schema
+      '@formly-agent-contracts/formly-adapter':
+        specifier: workspace:*
+        version: link:../../packages/formly-adapter
+      '@formly-agent-contracts/synthetic-form':
+        specifier: workspace:*
+        version: link:../../fixtures/synthetic-form
+
   apps/formly-test-app:
     dependencies:
       '@angular/common':
