@@ -13,12 +13,12 @@ Testing should protect behavior, contracts, and integration boundaries.
 
 Run the smallest reliable command that validates the changed area:
 
-- Lint: not configured until the initial workspace scaffold
-- Unit tests: not configured until the initial workspace scaffold
-- Integration tests: not configured until the initial workspace scaffold
-- Build/typecheck: not configured until the initial workspace scaffold
-
-Until those commands exist, validate documentation changes by reviewing links, code fences, and Git diffs. Do not claim executable validation for an unscaffolded repository.
+- Documentation: `pnpm check:docs`
+- Lint: `pnpm lint`
+- Unit tests: `pnpm test`
+- Build/typecheck: `pnpm build`
+- Complete local gate: `pnpm check`
+- Dependency audit: `pnpm audit --audit-level=high`
 
 If a command cannot run locally, document why and what risk remains.
 

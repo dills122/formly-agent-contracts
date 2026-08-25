@@ -58,16 +58,16 @@ configuration required to run one package and one fixture.
 
 **Acceptance criteria:**
 
-- [ ] Dependency versions and Node requirement are pinned.
-- [ ] Root lint, test, and build commands exist.
-- [ ] The empty workspace passes all three commands.
+- [x] Dependency versions and Node requirement are pinned.
+- [x] Root lint, test, and build commands exist.
+- [x] The minimal workspace passes all three commands.
 
 **Verification:**
 
-- [ ] `pnpm install --frozen-lockfile`
-- [ ] `pnpm lint`
-- [ ] `pnpm test`
-- [ ] `pnpm build`
+- [x] `pnpm install --frozen-lockfile`
+- [x] `pnpm lint`
+- [x] `pnpm test`
+- [x] `pnpm build`
 
 **Dependencies:** None
 
@@ -90,16 +90,16 @@ builder without a rendered host.
 
 **Acceptance criteria:**
 
-- [ ] `FormlyFieldConfig[]` compiles against the pinned versions.
-- [ ] The experiment records whether `FormlyFormBuilder` is usable in the
+- [x] `FormlyFieldConfig[]` compiles against the pinned versions.
+- [x] The experiment records whether `FormlyFormBuilder` is usable in the
   one-day harness.
-- [ ] Any peer, DI, or runtime incompatibility has a captured error and an
+- [x] Any peer, DI, or runtime incompatibility has a captured error and an
   explicit architecture decision.
 
 **Verification:**
 
-- [ ] Focused compatibility test passes.
-- [ ] Decision is recorded in `docs/decisions/`.
+- [x] Focused compatibility test passes.
+- [x] Decision is recorded in `docs/decisions/`.
 
 **Dependencies:** Task 1
 
@@ -114,10 +114,11 @@ builder without a rendered host.
 
 ## Checkpoint A: Architecture Decision
 
-- [ ] Stop if basic Angular/Formly type compatibility cannot be established.
-- [ ] Choose either controlled post-build extraction or declared-config
+- [x] Basic Angular/Formly type compatibility is established for the exact
+  pinned pair.
+- [x] Choose either controlled post-build extraction or declared-config
   extraction based on executable evidence.
-- [ ] Do not start MCP work.
+- [x] Do not start MCP work.
 
 ## Phase 1: Establish the Contract
 

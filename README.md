@@ -34,10 +34,23 @@ Formly configs and shared fragments
 
 ## Project status
 
-The repository is planning a one-day parser MVP for Angular 20.3 and Formly
-6.1.8. The first product is a reusable contract extractor backed by synthetic
-fixtures. MCP is an optional inspection harness; Playwright and production MCP
-delivery are post-MVP.
+The repository has a pinned pnpm/TypeScript workspace and an executable
+compatibility proof for Angular 20.3.29 with Formly 6.1.8. The first product is
+a reusable contract extractor backed by synthetic fixtures. MCP is an optional
+inspection harness; Playwright and production MCP delivery are post-MVP.
+
+## Development
+
+Prerequisites are Node.js 22.22.1 and pnpm 10.23.0.
+
+```sh
+pnpm install --frozen-lockfile
+pnpm check
+```
+
+The individual gates are `pnpm lint`, `pnpm test`, `pnpm build`, and
+`pnpm check:docs`. The current compatibility test uses Angular's public testing
+platform and `FormlyModule.forRoot()` without mounting a component.
 
 ## Documentation
 
