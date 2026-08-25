@@ -13,7 +13,7 @@ import {
 } from './contract.js';
 import { verifyContentHash } from './canonical-json.js';
 
-const IDENTIFIER_PUNCTUATION = '._:[]*-';
+const IDENTIFIER_PUNCTUATION = '._:[]*-%';
 const CONTENT_HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 
 function isRecord(value: unknown): value is Record<string, unknown> {

@@ -51,11 +51,24 @@
   strict TypeScript checking. Added package-level test-source type-checking,
   fixed immutable negative-test construction, and made runtime parsing reject
   stale content hashes with an eleventh focused test.
+- 2026-08-25 19:02 EDT: Merged the reviewed contract foundation through PR #5
+  after the Documentation and Workspace checks passed, then fast-forwarded
+  local `main` to `f735ebe`.
+- 2026-08-25 19:16 EDT: Completed adapter Tasks 5 and 6 with Formly v6 key-path
+  compatibility, versioned stable node identities, recursive allowlisted
+  projection, array templates, declared conditions, and explicit diagnostics
+  that never execute opaque functions.
+- 2026-08-25 19:16 EDT: Added focused adapter tests plus an integration suite
+  that compiles all twelve synthetic application fixtures into valid,
+  repeatable contracts. Recorded the identity rule in ADR 0004.
+- 2026-08-25 19:20 EDT: Pre-merge review found that a duplicate-key fallback
+  could collide with a legitimate path ending in the same suffix. Proved the
+  failure with a focused test, then added deterministic collision resolution.
 
 ## Next
 
-- Review and merge the contract foundation, then begin Task 5 in
-  `packages/formly-adapter/` as required by the current repository boundary.
+- Review and merge the Formly adapter slice, then create the golden synthetic
+  fixture and root `pnpm demo` command for Task 7.
 
 ## Tests
 
@@ -70,3 +83,9 @@
   documentation-file checks pass.
 - The high-severity audit gate passes; pnpm reports three existing low-severity
   development dependency findings.
+- Adapter-focused tests pass: five unit scenarios cover basic/nested fields,
+  key paths, arrays, conditions, every MVP diagnostic, mutation safety, and
+  non-execution of opaque functions, including adversarial ID collisions.
+- Test-app integration passes for all twelve registered synthetic form
+  definitions, including stable hashes, representative conditions, array
+  templates, and the three opaque behavior classes present in that corpus.

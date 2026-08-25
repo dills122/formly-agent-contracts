@@ -1,0 +1,325 @@
+import type { FormlyFieldConfig } from '@ngx-formly/core';
+import { describe, expect, it } from 'vitest';
+
+import { extractFormContract } from './extract-form.js';
+
+function deepFreeze<T>(value: T): T {
+  if (typeof value !== 'object' || value === null || Object.isFrozen(value)) {
+    return value;
+  }
+
+  for (const child of Object.values(value)) {
+    deepFreeze(child);
+  }
+
+  return Object.freeze(value);
+}
+
+describe('extractFormContract basic projection', () => {
+  it('extracts ordered nested fields, presentation, constraints, and options without mutation', () => {
+    const fields = deepFreeze<FormlyFieldConfig[]>([
+      {
+        key: 'profile',
+        props: { label: 'Profile' },
+        fieldGroup: [
+          {
+            key: 'name',
+            type: 'input',
+            defaultValue: '',
+            wrappers: ['section-card'],
+            props: {
+              label: 'Name',
+              description: 'Synthetic display name.',
+              placeholder: 'Enter a name',
+              required: true,
+              minLength: 2,
+              maxLength: 40,
+              pattern: '^[A-Za-z ]+$',
+            },
+          },
+          {
+            key: 'role',
+            type: 'select',
+            props: {
+              label: 'Role',
+              options: [
+                { label: 'Reviewer', value: { code: 'reviewer' } },
+                { label: 'Author', value: { code: 'author' }, disabled: true },
+              ],
+            },
+          },
+        ],
+      },
+    ]);
+
+    const result = extractFormContract({
+      formId: 'basic.profile',
+      fields,
+    });
+
+    expect(result.contract.nodes.map(({ id }) => id)).toEqual([
+      'basic.profile::path:s_profile',
+    ]);
+    expect(result.contract.nodes[0]?.children).toEqual([
+      expect.objectContaining({
+        id: 'basic.profile::path:s_profile.s_name',
+        kind: 'control',
+        modelPath: ['profile', 'name'],
+        formlyType: 'input',
+        semanticType: 'text',
+        presentation: {
+          label: 'Name',
+          description: 'Synthetic display name.',
+          placeholder: 'Enter a name',
+        },
+        defaultValue: '',
+        wrappers: ['section-card'],
+        constraints: [
+          { kind: 'required' },
+          { kind: 'minLength', value: 2 },
+          { kind: 'maxLength', value: 40 },
+          { kind: 'pattern', value: '^[A-Za-z ]+$' },
+        ],
+      }),
+      expect.objectContaining({
+        id: 'basic.profile::path:s_profile.s_role',
+        modelPath: ['profile', 'role'],
+        options: [
+          { label: 'Reviewer', value: { code: 'reviewer' } },
+          { label: 'Author', value: { code: 'author' }, disabled: true },
+        ],
+      }),
+    ]);
+    expect(result.contract.diagnostics).toEqual([]);
+    expect(result.diagnostics).toBe(result.contract.diagnostics);
+  });
+
+  it('matches Formly v6 key-path semantics and gives keyless groups stable fallback IDs', () => {
+    const createFields = (): FormlyFieldConfig[] => [
+      { key: 0, type: 'input' },
+      { key: 'account.owner.name', type: 'input' },
+      { key: 'items[2].sku', type: 'input' },
+      { key: ['literal.segment', 'value'], type: 'input' },
+      {
+        fieldGroup: [
+          { key: 'insideKeylessGroup', type: 'checkbox' },
+        ],
+      },
+    ];
+
+    const first = extractFormContract({
+      formId: 'edge.key-paths',
+      fields: createFields(),
+    });
+    const second = extractFormContract({
+      formId: 'edge.key-paths',
+      fields: createFields(),
+    });
+
+    expect(first.contract.nodes.map(({ modelPath }) => modelPath)).toEqual([
+      [0],
+      ['account', 'owner', 'name'],
+      ['items', 2, 'sku'],
+      ['literal.segment', 'value'],
+      [],
+    ]);
+    expect(first.contract.nodes.map(({ id }) => id)).toEqual([
+      'edge.key-paths::path:n_0',
+      'edge.key-paths::path:s_account.s_owner.s_name',
+      'edge.key-paths::path:s_items.n_2.s_sku',
+      'edge.key-paths::path:s_literal%2Esegment.s_value',
+      'edge.key-paths::position:4',
+    ]);
+    expect(first.contract.nodes[4]?.children[0]?.modelPath).toEqual([
+      'insideKeylessGroup',
+    ]);
+    expect(second.contract.contentHash).toBe(first.contract.contentHash);
+  });
+
+  it('resolves duplicate-key IDs even when the first suffix is already a real path', () => {
+    const result = extractFormContract({
+      formId: 'edge.duplicate-ids',
+      fields: [
+        { key: 'value-duplicate-2', type: 'input' },
+        { key: 'value', type: 'input' },
+        { key: 'value', type: 'input' },
+      ],
+    });
+
+    expect(result.contract.nodes.map(({ id }) => id)).toEqual([
+      'edge.duplicate-ids::path:s_value-duplicate-2',
+      'edge.duplicate-ids::path:s_value',
+      'edge.duplicate-ids::path:s_value-duplicate-2-collision-1',
+    ]);
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'UNKNOWN_FIELD_SHAPE',
+        nodeId:
+          'edge.duplicate-ids::path:s_value-duplicate-2-collision-1',
+      }),
+    );
+  });
+});
+
+describe('extractFormContract arrays, conditions, and unknowns', () => {
+  it('retains an unrealized array template with wildcard model paths', () => {
+    const fields: FormlyFieldConfig[] = [
+      {
+        key: 'members',
+        type: 'repeat-section',
+        fieldArray: {
+          fieldGroup: [
+            {
+              key: 'name',
+              type: 'input',
+              props: { label: 'Member name', required: true },
+            },
+            {
+              key: 'relationship',
+              type: 'select',
+              props: {
+                label: 'Relationship',
+                options: [
+                  { label: 'Self', value: 'self' },
+                  { label: 'Dependent', value: 'dependent' },
+                ],
+              },
+            },
+          ],
+        },
+      },
+    ];
+
+    const result = extractFormContract({ formId: 'array.example', fields });
+    const arrayNode = result.contract.nodes[0];
+
+    expect(arrayNode).toEqual(
+      expect.objectContaining({
+        kind: 'array',
+        modelPath: ['members'],
+        children: [],
+      }),
+    );
+    expect(arrayNode?.arrayTemplate).toEqual(
+      expect.objectContaining({
+        kind: 'group',
+        modelPath: ['members', '*'],
+        children: [
+          expect.objectContaining({ modelPath: ['members', '*', 'name'] }),
+          expect.objectContaining({
+            modelPath: ['members', '*', 'relationship'],
+            options: [
+              { label: 'Self', value: 'self' },
+              { label: 'Dependent', value: 'dependent' },
+            ],
+          }),
+        ],
+      }),
+    );
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('preserves string conditions and diagnoses every opaque behavior class without evaluating it', () => {
+    let functionWasCalled = false;
+    const opaqueFunction = (): boolean => {
+      functionWasCalled = true;
+      return true;
+    };
+    const fields: FormlyFieldConfig[] = [
+      {
+        key: 'email',
+        type: 'input',
+        expressions: {
+          hide: "model.channel !== 'email'",
+          'props.required': "model.channel === 'email'",
+        },
+        validators: {
+          validation: ['postalCode'],
+        },
+      },
+      {
+        key: 'legacyDetails',
+        type: 'textarea',
+        hideExpression: '!model.legacyName',
+        expressionProperties: {
+          'templateOptions.required': '!!model.legacyName',
+        },
+      },
+      {
+        key: 'opaque',
+        type: 'select',
+        props: { options: { subscribe: opaqueFunction } as never },
+        expressions: { 'props.disabled': opaqueFunction },
+        validators: {
+          even: { expression: opaqueFunction, message: 'Must be even.' },
+        },
+        asyncValidators: {
+          unique: {
+            expression: () => Promise.resolve(true),
+            message: 'Must be unique.',
+          },
+        },
+        parsers: [opaqueFunction],
+        hooks: { onInit: opaqueFunction },
+        modelOptions: { updateOn: 'blur' },
+      },
+      {
+        key: 'generatedRows',
+        type: 'repeat-section',
+        fieldArray: () => ({ type: 'input' }),
+      },
+      {},
+    ];
+
+    const result = extractFormContract({ formId: 'opaque.example', fields });
+
+    expect(result.contract.nodes[0]?.conditions).toEqual([
+      {
+        property: 'hide',
+        expression: "model.channel !== 'email'",
+        evidence: 'declared',
+      },
+      {
+        property: 'props.required',
+        expression: "model.channel === 'email'",
+        evidence: 'declared',
+      },
+    ]);
+    expect(result.contract.nodes[0]?.constraints).toContainEqual({
+      kind: 'named',
+      name: 'postalCode',
+    });
+    expect(result.contract.nodes[1]?.conditions).toEqual([
+      {
+        property: 'hide',
+        expression: '!model.legacyName',
+        evidence: 'declared',
+      },
+      {
+        property: 'templateOptions.required',
+        expression: '!!model.legacyName',
+        evidence: 'declared',
+      },
+    ]);
+    expect(result.contract.nodes[2]?.constraints).toEqual([
+      { kind: 'named', name: 'even' },
+      { kind: 'named', name: 'unique' },
+    ]);
+    expect(new Set(result.diagnostics.map(({ code }) => code))).toEqual(
+      new Set([
+        'OPAQUE_FUNCTION',
+        'ASYNC_VALUE',
+        'UNKNOWN_FIELD_SHAPE',
+        'UNSUPPORTED_RULE',
+      ]),
+    );
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'OPAQUE_FUNCTION',
+        sourcePath: ['fields', 2, 'expressions', 'props.disabled'],
+        nodeId: 'opaque.example::path:s_opaque',
+      }),
+    );
+    expect(functionWasCalled).toBe(false);
+  });
+});
