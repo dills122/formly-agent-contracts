@@ -51,7 +51,7 @@ build, runtime smoke, and documentation
 - [x] Run `pnpm check` and `pnpm audit --audit-level=high`.
 - [x] Review the diff across correctness, readability, architecture, security,
   and performance; address required findings.
-- [ ] Commit, push, and open a PR with branch, summary, and test evidence.
+- [x] Commit, push, and open a PR with branch, summary, and test evidence.
 
 ## Checkpoints
 

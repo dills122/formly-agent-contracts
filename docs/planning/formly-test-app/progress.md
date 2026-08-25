@@ -24,6 +24,8 @@
 - 2026-08-25: Scoped Angular's build-only Piscina and Vite dependencies to
   their first patched releases after the audit reported two high-severity
   advisories. The high-severity audit now passes with three low findings.
+- 2026-08-25: Published branch `codex/formly-fixture-test-app` and opened
+  pull request #4.
 
 ## Tests
 
@@ -37,4 +39,4 @@
 
 ## Next
 
-- Publish the reviewed branch and pull request.
+- Review and merge pull request #4 when its required checks pass.
