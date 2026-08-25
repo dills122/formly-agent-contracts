@@ -50,8 +50,9 @@ delivery are post-MVP.
 
 ## Contributing and Security
 
-Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) before
-opening a pull request, and use the repository's private vulnerability-reporting
-flow described in [SECURITY.md](SECURITY.md) for security issues.
+Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the
+[Code of Conduct](CODE_OF_CONDUCT.md) before participating, and use the
+repository's private vulnerability-reporting flow described in
+[SECURITY.md](SECURITY.md) for security issues.
 
 This project is available under the [MIT License](LICENSE).
