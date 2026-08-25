@@ -79,10 +79,12 @@
   temporary directory. Frozen install, all 36 tests, lint, four-package demo
   build, Angular production build, demo smoke validation, documentation checks,
   and the documented `pnpm demo` command all passed without local artifacts.
+- 2026-08-25 19:36 EDT: Opened final MVP PR #7 with the clean-clone evidence,
+  exact demo hash, clone URL, and workplace verification commands.
 
 ## Next
 
-- Open and merge the final MVP demo PR with exact workplace test commands.
+- Merge final MVP PR #7 after its required GitHub checks pass.
 
 ## Tests
 

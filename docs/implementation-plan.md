@@ -369,7 +369,7 @@ not add compilation, Angular execution, storage, or mutation to MCP requests.
 - [x] Parser shipping gate remains green.
 - [x] Repository contains no private or work-derived data.
 - [x] Approved license and GitHub remote are present.
-- [ ] Branch and PR metadata include exact test evidence.
+- [x] Branch and PR metadata include exact test evidence.
 - [x] Remaining architecture milestones are clearly labeled post-MVP.
 - [ ] Publish a pre-1.0 tag only after the user has run the demo successfully.
 
