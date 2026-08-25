@@ -9,6 +9,11 @@ a stretch task and cannot delay that gate.
 
 The controlling requirements are in [the MVP specification](mvp-spec.md).
 
+The separately requested modular browser fixture harness is specified in
+[the Formly test application specification](formly-test-app-spec.md) and tracked
+in [its task plan](planning/formly-test-app/task_plan.md). It remains test
+infrastructure and does not change the parser dependency order below.
+
 ## Dependency Order
 
 ```text

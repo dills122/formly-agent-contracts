@@ -1,0 +1,226 @@
+:root {
+  color-scheme: light;
+  font-family:
+    Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI",
+    sans-serif;
+  color: #17221c;
+  background: #f3f1e9;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+.app-header {
+  padding: 2.5rem clamp(1.25rem, 5vw, 5rem) 2rem;
+  color: #f7f4e8;
+  background: #193c2d;
+}
+
+.app-header h1 {
+  max-width: 18ch;
+  margin: 0.25rem 0 0.75rem;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(2rem, 5vw, 4.5rem);
+  font-weight: 500;
+  line-height: 0.98;
+  letter-spacing: -0.035em;
+}
+
+.app-header > p:last-child {
+  max-width: 60rem;
+  margin-bottom: 0;
+  color: #c7d7cc;
+}
+
+.app-eyebrow,
+.catalog-label,
+.form-id {
+  margin: 0;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.app-layout {
+  display: grid;
+  grid-template-columns: minmax(14rem, 20rem) minmax(0, 1fr);
+  gap: clamp(1.5rem, 4vw, 4rem);
+  max-width: 90rem;
+  margin: 0 auto;
+  padding: clamp(1.25rem, 4vw, 4rem);
+}
+
+.form-catalog {
+  display: flex;
+  flex-direction: column;
+  align-self: start;
+  gap: 0.4rem;
+  position: sticky;
+  top: 1rem;
+}
+
+.catalog-label {
+  margin-bottom: 0.5rem;
+  color: #617167;
+}
+
+.form-catalog button {
+  display: grid;
+  gap: 0.2rem;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #c9cec6;
+  border-radius: 0.35rem;
+  color: #273b31;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+}
+
+.form-catalog button:hover,
+.form-catalog button.is-active {
+  border-color: #b87534;
+  background: #fffaf0;
+}
+
+.form-catalog button.is-active {
+  box-shadow: inset 0.25rem 0 #b87534;
+}
+
+.form-catalog small {
+  color: #69766f;
+}
+
+.form-workbench {
+  min-width: 0;
+  padding: clamp(1.25rem, 4vw, 3rem);
+  border: 1px solid #d4d3c9;
+  background: #fffdf7;
+  box-shadow: 0 1.2rem 3rem rgb(27 44 34 / 8%);
+}
+
+.form-heading h2 {
+  margin: 0.3rem 0;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: clamp(1.8rem, 3vw, 3rem);
+  font-weight: 500;
+}
+
+.feature-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  padding: 0;
+  list-style: none;
+}
+
+.feature-list li {
+  padding: 0.25rem 0.45rem;
+  border-radius: 999px;
+  color: #315844;
+  background: #dfede5;
+  font-size: 0.75rem;
+}
+
+.rendered-form {
+  display: grid;
+  gap: 1rem;
+  margin-top: 2rem;
+}
+
+formly-field {
+  display: block;
+  margin-bottom: 1rem;
+}
+
+.test-control {
+  width: 100%;
+  min-height: 2.7rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #aeb8b1;
+  border-radius: 0.25rem;
+  background: white;
+}
+
+.test-control:focus {
+  outline: 3px solid rgb(184 117 52 / 25%);
+  border-color: #985d27;
+}
+
+.test-checkbox,
+.test-radio-group label,
+.test-rating label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin-right: 1rem;
+}
+
+.test-currency {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.test-section {
+  margin: 1rem 0;
+  padding: 1rem;
+  border: 1px solid #d8d5ca;
+  background: #faf7ee;
+}
+
+.test-section h3 {
+  margin-top: 0;
+}
+
+.test-repeat__row {
+  margin-bottom: 0.75rem;
+  padding: 0.8rem;
+  border-left: 3px solid #b87534;
+  background: #f7f5ee;
+}
+
+.test-repeat button {
+  padding: 0.45rem 0.7rem;
+  border: 1px solid #8e9c93;
+  border-radius: 0.25rem;
+  color: #213c2e;
+  background: white;
+  cursor: pointer;
+}
+
+.model-inspector {
+  margin-top: 2rem;
+  border-top: 1px solid #d7d6cf;
+  padding-top: 1rem;
+}
+
+.model-inspector pre {
+  overflow: auto;
+  padding: 1rem;
+  color: #dce9e1;
+  background: #1b2c22;
+}
+
+@media (max-width: 800px) {
+  .app-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .form-catalog {
+    position: static;
+  }
+}

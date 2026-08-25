@@ -47,6 +47,18 @@ or customer data. It should exercise the smallest useful difficult set:
 - one intentionally opaque function or async-like value that produces a
   diagnostic
 
+## Companion Integration Test Application
+
+A modular browser-rendered test application complements the small golden form.
+It exercises full root and child Formly registration, custom fields, wrappers,
+validators, presets, extensions, and a broad synthetic corpus contributed by
+multiple Angular feature modules. Its contract and boundaries are defined in
+[the modular Formly test application specification](formly-test-app-spec.md).
+
+The application is test infrastructure for realistic registration and runtime
+parity. It does not move browser rendering into the compiler or MCP request
+path, and it contains no workplace-derived data.
+
 ## Technology Baseline
 
 - TypeScript with strict checking
@@ -96,6 +108,7 @@ packages/
   formly-parser/     Recursive allowlist extraction and diagnostics
 apps/
   demo-cli/          Synthetic form registration and human-readable demo
+  formly-test-app/    Modular browser-rendered synthetic fixture harness
   mcp-inspector/     Optional read-only inspection harness
 fixtures/
   synthetic-form/    Invented representative Formly configuration
@@ -192,7 +205,7 @@ The tomorrow build is successful when a fresh clone can:
 
 - parsing arbitrary TypeScript source or discovering forms automatically
 - reproducing all `FormlyFormBuilder` runtime behavior
-- mounting or inspecting a browser-rendered form
+- using browser rendering as the contract compiler's extraction boundary
 - generating or executing Playwright tests
 - inferring opaque functions, Observables, hooks, remote options, or validators
 - production MCP packaging, transport hardening, authentication, or hosting

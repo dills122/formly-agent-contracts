@@ -2,3 +2,20 @@ packages:
   - apps/*
   - fixtures/*
   - packages/*
+
+# @angular/build exposes an optional test builder with a Vitest 3 peer. This
+# workspace uses only its application builder and keeps the repository-wide
+# Vitest 4 pin for unit tests, so allow that one reviewed peer mismatch without
+# weakening strict peer checks for the rest of the dependency graph.
+# Source: https://pnpm.io/settings/peer-dependencies#peerdependencyrulesallowedversions
+peerDependencyRules:
+  allowedVersions:
+    "@angular/build@20.3.29>vitest": "4.1.11"
+
+# Angular 20.3.29 pins two build-only dependencies below their first patched
+# releases. Keep the overrides scoped to that builder so the runtime dependency
+# graph and Vitest's independent Vite version remain untouched.
+# Advisories: GHSA-x9g3-xrwr-cwfg and GHSA-fx2h-pf6j-xcff.
+overrides:
+  "@angular/build@20.3.29>piscina": "5.2.0"
+  "@angular/build@20.3.29>vite": "7.3.5"
