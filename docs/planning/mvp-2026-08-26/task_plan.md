@@ -34,5 +34,5 @@ on Angular 20 into a deterministic, agent-readable contract.
 
 ## Current Gate
 
-Planning is ready for human review. Implementation must not proceed until the
-MVP specification and ordered task plan are approved.
+Planning and repository setup are approved and complete. Begin implementation
+with the pinned workspace scaffold and Angular/Formly compatibility proof.

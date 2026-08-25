@@ -13,13 +13,16 @@
   `codex/mvp-delivery-plan`.
 - 2026-08-25: Added the MIT license, Git hygiene, contribution and security
   guidance, issue/PR templates, and a dependency-free documentation workflow.
-- 2026-08-25: Created the public GitHub repository at
-  `dills122/formly-agent-contracts`; initial commit and push are in progress.
+- 2026-08-25: Published the initial commit to the public GitHub repository at
+  `dills122/formly-agent-contracts` under the MIT License.
+- 2026-08-25: Protected `main`, required the passing documentation check and
+  pull requests, enabled secret scanning and push protection, enabled
+  Dependabot security updates, and restricted default Actions permissions to
+  read-only.
 
 ## Next
 
-- Review and approve `docs/mvp-spec.md` and `docs/implementation-plan.md`.
-- Begin Task 1 only after approval.
+- Begin implementation-plan Task 1 on a new feature branch.
 
 ## Tests
 
@@ -29,3 +32,4 @@
 - GitHub template and workflow YAML parses successfully.
 - No common credential patterns, staged symlinks, or machine-local paths were
   found.
+- A fresh public clone checked out cleanly and passed the documentation check.
