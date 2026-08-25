@@ -134,15 +134,15 @@ ordered form tree, model paths, constraints, options, evidence, and unknowns.
 
 **Acceptance criteria:**
 
-- [ ] Runtime validation accepts a complete representative contract.
-- [ ] Malformed node identity, paths, and diagnostic values are rejected.
-- [ ] Diagnostic codes cover functions, async/Observable-like values, unknown
+- [x] Runtime validation accepts a complete representative contract.
+- [x] Malformed node identity, paths, and diagnostic values are rejected.
+- [x] Diagnostic codes cover functions, async/Observable-like values, unknown
   field shapes, and unsupported rules.
 
 **Verification:**
 
-- [ ] Focused schema tests pass.
-- [ ] TypeScript strict build passes.
+- [x] Focused schema tests pass.
+- [x] TypeScript strict build passes.
 
 **Dependencies:** Task 2
 
@@ -162,13 +162,13 @@ on object insertion order or environment-specific values.
 
 **Acceptance criteria:**
 
-- [ ] Equivalent contracts serialize to identical bytes.
-- [ ] Meaningful contract changes alter the content hash.
-- [ ] Hash input excludes the hash field itself and volatile timestamps.
+- [x] Equivalent contracts serialize to identical bytes.
+- [x] Meaningful contract changes alter the content hash.
+- [x] Hash input excludes the hash field itself and volatile timestamps.
 
 **Verification:**
 
-- [ ] Determinism tests pass twice in separate processes.
+- [x] Determinism tests pass twice in separate processes.
 
 **Dependencies:** Task 3
 
@@ -183,9 +183,9 @@ on object insertion order or environment-specific values.
 
 ## Checkpoint B: Contract Foundation
 
-- [ ] Schema tests pass.
-- [ ] Canonical output is readable and deterministic.
-- [ ] Public v0 fields are sufficient for the golden form; additions require a
+- [x] Schema tests pass.
+- [x] Canonical output is readable and deterministic.
+- [x] Public v0 fields are sufficient for the golden form; additions require a
   spec update.
 
 ## Phase 2: Deliver One Complete Parser Slice

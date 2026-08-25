@@ -35,6 +35,19 @@
   loaded for this Node-based JIT harness.
 - The public Angular 20 browser testing package is sufficient; the deprecated
   `@angular/platform-browser-dynamic` package is not needed.
+- Fresh `main` contains twelve synthetic forms spanning ordinary controls,
+  nested groups, path edge cases, repeaters, string and function expressions,
+  synchronous and asynchronous validation, observable options, hooks, parsers,
+  presets, wrappers, custom types, and legacy v6 aliases.
+- Formly v6 documents `fieldGroup`, `fieldArray`, `expressions`, validators,
+  async validators, parsers, and `modelOptions` as public field configuration
+  properties: <https://v6.formly.dev/docs/guide/properties-options/>.
+- Formly v6 documents string and function expression values separately, which
+  supports preserving strings while diagnosing functions as opaque:
+  <https://v6.formly.dev/docs/guide/expression-properties/>.
+- Node's supported `crypto.createHash()` API provides the MVP SHA-256 content
+  hash without another runtime dependency:
+  <https://nodejs.org/api/crypto.html#cryptocreatehashalgorithm-options>.
 
 ## Open Questions
 
