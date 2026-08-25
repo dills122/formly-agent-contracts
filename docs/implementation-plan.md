@@ -312,7 +312,7 @@ cloned and tested at work. This task does not depend on the optional MCP task.
 
 **Acceptance criteria:**
 
-- [ ] Repository owner, visibility, and license are approved.
+- [x] Repository owner, visibility, and license are approved.
 - [ ] The feature branch and its test evidence are available on GitHub.
 - [ ] A clone URL and exact verification commands are ready for the workplace
   test.

@@ -202,9 +202,9 @@ The tomorrow build is successful when a fresh clone can:
 
 ## Open Questions
 
-Two publication decisions remain: the GitHub owner/visibility and the
-open-source license. The recommended defaults are the existing repository name,
-public visibility after the synthetic-data check, and the MIT license.
+Publication is configured at
+<https://github.com/dills122/formly-agent-contracts> as a public repository
+under the MIT License.
 
 Implementation may reveal that Angular 20.3.29 and Formly 6.1.8 cannot be used
 together in the intended harness. If so, retain Formly 6.1.8 compatibility as

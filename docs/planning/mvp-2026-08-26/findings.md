@@ -22,7 +22,10 @@
 - The existing architecture is intentionally broader than the tomorrow MVP.
   Parser output remains compatible with that direction if evidence and unknowns
   stay explicit.
-- No Git remote is configured yet.
+- The public repository is configured at
+  <https://github.com/dills122/formly-agent-contracts> with an MIT license,
+  protected `main`, secret scanning, push protection, Dependabot security
+  updates, and read-only default Actions permissions.
 
 ## Open Questions
 
@@ -31,5 +34,4 @@
 - If not, which properties can be safely extracted from declared
   `FormlyFieldConfig[]` while clearly distinguishing them from runtime-resolved
   state?
-- Which GitHub owner and initial visibility should be used?
-- Which open-source license should be applied? MIT is the recommended default.
+- No repository-publication questions remain.
