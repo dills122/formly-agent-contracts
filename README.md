@@ -49,8 +49,29 @@ pnpm check
 ```
 
 The individual gates are `pnpm lint`, `pnpm test`, `pnpm build`, and
-`pnpm check:docs`. The current compatibility test uses Angular's public testing
-platform and `FormlyModule.forRoot()` without mounting a component.
+`pnpm check:docs`.
+
+## Formly test application
+
+The workspace includes a browser-rendered Angular application with twelve
+synthetic Formly 6.1 fixtures. It exercises root and child module registration,
+three fixture-provider modules, native and custom field types, a wrapper,
+validator, extension, preset, expressions, validation, repeaters, opaque
+behavior, and isolated legacy-v6 aliases.
+
+```sh
+pnpm app:serve
+```
+
+Open <http://127.0.0.1:4200/> and select a fixture from the catalog. The
+production AOT build is part of `pnpm build`; registry and Formly integration
+coverage is part of `pnpm test`.
+
+Workplace-only forms should remain in a private repository on the work
+computer. They can implement the `TestFormDefinition` shape from
+`apps/formly-test-app/src/app/form-registry/form-definition.ts` and provide a
+group through `TEST_FORM_GROUPS`, without copying workplace labels, options,
+models, identifiers, or rules into this public repository.
 
 ## Documentation
 
@@ -58,7 +79,8 @@ platform and `FormlyModule.forRoot()` without mounting a component.
 - [MVP specification](docs/mvp-spec.md)
 - [Implementation plan](docs/implementation-plan.md)
 - [Project delivery process](docs/project-process.md)
-- [Current task plan](docs/planning/mvp-2026-08-26/task_plan.md)
+- [Parser MVP task plan](docs/planning/mvp-2026-08-26/task_plan.md)
+- [Formly test application plan](docs/planning/formly-test-app/task_plan.md)
 - [Architecture decisions](docs/decisions/)
 
 ## Contributing and Security

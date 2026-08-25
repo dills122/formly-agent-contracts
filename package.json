@@ -11,8 +11,9 @@
     "pnpm": "10.23.0"
   },
   "scripts": {
+    "app:serve": "pnpm --filter @formly-agent-contracts/formly-test-app serve",
     "audit": "pnpm audit --audit-level=high",
-    "build": "pnpm --filter @formly-agent-contracts/synthetic-form build",
+    "build": "pnpm --filter @formly-agent-contracts/synthetic-form build && pnpm --filter @formly-agent-contracts/formly-test-app build",
     "check": "pnpm lint && pnpm test && pnpm build && pnpm check:docs",
     "check:docs": "node .github/scripts/check-docs.mjs",
     "lint": "eslint .",
