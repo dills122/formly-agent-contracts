@@ -1,0 +1,66 @@
+name: Bug report
+description: Report reproducible behavior that differs from the documentation.
+title: "bug: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a problem. Use invented or sanitized examples only.
+        Never include workplace code, customer data, credentials, or secrets.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Problem
+      description: What happened, and what did you expect instead?
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Minimal reproduction
+      description: Provide the smallest synthetic Formly configuration and commands that reproduce the problem.
+      render: typescript
+    validations:
+      required: true
+  - type: input
+    id: package-version
+    attributes:
+      label: Formly Agent Contracts version or commit
+      placeholder: 0.x.y or commit SHA
+    validations:
+      required: true
+  - type: input
+    id: angular-version
+    attributes:
+      label: Angular version
+      placeholder: 20.3.29
+    validations:
+      required: true
+  - type: input
+    id: formly-version
+    attributes:
+      label: Formly version
+      placeholder: 6.1.8
+    validations:
+      required: true
+  - type: input
+    id: node-pnpm-version
+    attributes:
+      label: Node.js and pnpm versions
+      placeholder: Node.js 22.22.1, pnpm 10.23.0
+    validations:
+      required: true
+  - type: textarea
+    id: additional-context
+    attributes:
+      label: Additional context
+      description: Add diagnostics, contract output, or other relevant details after checking that they are safe to publish.
+  - type: checkboxes
+    id: safety
+    attributes:
+      label: Public-data check
+      options:
+        - label: I confirm this report contains no secrets, customer data, workplace code, or proprietary information.
+          required: true
