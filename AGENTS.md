@@ -49,10 +49,12 @@ If behavior changes, update the relevant contract and docs in the same change.
 
 ## Useful Commands
 
-- Install dependencies: not configured until the Milestone 0 package-manager decision
-- Lint: not configured until the initial workspace scaffold
-- Test: not configured until the initial workspace scaffold
-- Build: not configured until the initial workspace scaffold
+- Install dependencies: `pnpm install --frozen-lockfile`
+- Run all local checks: `pnpm check`
+- Lint: `pnpm lint`
+- Test: `pnpm test`
+- Build/type-check: `pnpm build`
+- Audit dependencies: `pnpm audit --audit-level=high`
 
 ## Branch And PR Metadata
 

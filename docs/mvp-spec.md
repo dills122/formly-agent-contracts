@@ -54,16 +54,17 @@ or customer data. It should exercise the smallest useful difficult set:
 - Angular `20.3.29`
 - `@ngx-formly/core` `6.1.8`
 - JSON as the portable contract representation
-- a lightweight TypeScript test runner selected during scaffold and pinned in
-  the lockfile
+- Vitest `4.1.11`, pinned in the lockfile
 - Node.js `22.22.1` for development, with a package engine range compatible with
   Angular 20's supported Node 22 releases
 
 Formly 6.1.8 declares `@angular/forms >=13.2.0`, which includes Angular 20, but
 current Formly guidance recommends Formly 7 for Angular 18 and newer. Therefore
 this exact pairing is a validated project requirement, not a general support
-claim. The first implementation checkpoint must prove that it installs,
-type-checks, and can process the synthetic fixture.
+claim. The first implementation checkpoint proved that it installs,
+type-checks, and can process a nested synthetic fixture through a controlled,
+component-free Formly builder harness. This is evidence for the exact pinned
+pair, not a broad compatibility claim.
 
 Sources:
 
@@ -206,8 +207,9 @@ Publication is configured at
 <https://github.com/dills122/formly-agent-contracts> as a public repository
 under the MIT License.
 
-Implementation may reveal that Angular 20.3.29 and Formly 6.1.8 cannot be used
-together in the intended harness. If so, retain Formly 6.1.8 compatibility as
-the product constraint, record the failing evidence, and choose the smallest
-parser architecture that can consume its public field configuration shape
-without claiming runtime-builder parity.
+The controlled builder boundary for Angular 20.3.29 and Formly 6.1.8 is recorded
+in [ADR 0002](decisions/0002-controlled-formly-builder-boundary.md). It resolves
+registered defaults, controls, and parent links without mounting a component.
+Component-, view-, lifecycle-, and browser-dependent behavior remains outside
+that evidence boundary and must be represented as unknown until separately
+observed.

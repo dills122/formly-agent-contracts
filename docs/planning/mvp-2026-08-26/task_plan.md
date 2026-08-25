@@ -8,7 +8,7 @@ on Angular 20 into a deterministic, agent-readable contract.
 - [x] Confirm the first-delivery objective, stack, data boundary, and tracking
   preference.
 - [x] Write the MVP specification, delivery process, and implementation tasks.
-- [ ] Prove the pinned Angular/Formly compatibility and choose the extraction
+- [x] Prove the pinned Angular/Formly compatibility and choose the extraction
   boundary.
 - [ ] Implement and test the v0 contract foundation.
 - [ ] Implement and test the parser vertical slice.
@@ -34,5 +34,6 @@ on Angular 20 into a deterministic, agent-readable contract.
 
 ## Current Gate
 
-Planning and repository setup are approved and complete. Begin implementation
-with the pinned workspace scaffold and Angular/Formly compatibility proof.
+The pinned workspace and exact-version compatibility proof pass. ADR 0002
+selects a controlled, component-free Formly builder boundary. Begin the v0
+contract and diagnostics slice; MCP remains deferred.

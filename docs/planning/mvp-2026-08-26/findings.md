@@ -26,12 +26,19 @@
   <https://github.com/dills122/formly-agent-contracts> with an MIT license,
   protected `main`, secret scanning, push protection, Dependabot security
   updates, and read-only default Actions permissions.
+- A controlled Angular TestBed using `BrowserTestingModule`,
+  `platformBrowserTesting`, and `FormlyModule.forRoot()` can inject and run
+  `FormlyFormBuilder` without mounting a component.
+- The builder produces nested controls and parent links and applies registered
+  field-type defaults in the synthetic proof.
+- Partially compiled Angular libraries require the Angular compiler to be
+  loaded for this Node-based JIT harness.
+- The public Angular 20 browser testing package is sufficient; the deprecated
+  `@angular/platform-browser-dynamic` package is not needed.
 
 ## Open Questions
 
-- Can the useful post-build Formly tree be obtained in a small Angular test
-  harness without mounting a full form component?
-- If not, which properties can be safely extracted from declared
-  `FormlyFieldConfig[]` while clearly distinguishing them from runtime-resolved
-  state?
 - No repository-publication questions remain.
+- The component-free builder question is resolved by ADR 0002. The next slice
+  must define which resolved properties enter the v0 allowlist and which remain
+  explicit diagnostics.

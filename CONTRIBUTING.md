@@ -13,15 +13,16 @@ Thanks for helping make Formly Agent Contracts useful and trustworthy.
 
 ## Development Environment
 
-The initial baseline is Node.js 22.22.1 and pnpm 10.23.0. Package scripts will
-be added with the workspace scaffold. Until then, validate documentation with:
+The initial baseline is Node.js 22.22.1 and pnpm 10.23.0. Install the pinned
+workspace and run its complete local gate with:
 
 ```sh
-node .github/scripts/check-docs.mjs
+pnpm install --frozen-lockfile
+pnpm check
 ```
 
-Once the workspace exists, every pull request is expected to pass the root
-lint, test, and build commands documented in the README.
+For a smaller documentation-only change, run `pnpm check:docs`. Every pull
+request is expected to pass the relevant focused check and the complete gate.
 
 ## Making a Change
 
