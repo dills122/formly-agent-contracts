@@ -64,6 +64,12 @@
 - 2026-08-25 19:20 EDT: Pre-merge review found that a duplicate-key fallback
   could collide with a legitimate path ending in the same suffix. Proved the
   failure with a focused test, then added deterministic collision resolution.
+- 2026-08-25 19:23 EDT: PR #6 exposed a clean-checkout-only lint failure:
+  workspace package types resolved locally through stale build output, while
+  CI correctly had no `dist` directories before lint. Added root TypeScript
+  source-path mappings for lint/test, kept adapter emission pointed at the
+  already-built contract declarations, and enabled `noEmitOnError` globally.
+  The clean-artifact lint/test reproduction and complete local gate now pass.
 
 ## Next
 

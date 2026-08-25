@@ -1,8 +1,14 @@
 {
   "extends": "./tsconfig.json",
   "compilerOptions": {
+    "baseUrl": ".",
     "noEmit": false,
     "outDir": "dist",
+    "paths": {
+      "@formly-agent-contracts/contract-schema": [
+        "../contract-schema/dist/index.d.ts"
+      ]
+    },
     "rootDir": "src",
     "types": ["node"]
   },
