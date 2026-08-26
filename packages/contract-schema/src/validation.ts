@@ -6,6 +6,8 @@ import {
   type ContractDiagnostic,
   type ContractDisplay,
   type ContractDynamicRule,
+  type ContractFieldTypeProfileRegistryIdentity,
+  type ContractInteractionProfile,
   type ContractLocator,
   type ContractNode,
   type ContractNodeState,
@@ -17,6 +19,13 @@ import {
   type ModelPathSegment,
 } from './contract.js';
 import { verifyContentHash } from './canonical-json.js';
+import {
+  FIELD_TYPE_PROFILE_SCHEMA_VERSION,
+  parseContractValueDomain,
+  type FieldTypeProfileInteraction,
+  type FieldTypeProfileOperation,
+  type FieldTypeProfilePart,
+} from './field-type-profile.js';
 
 const IDENTIFIER_PUNCTUATION = '._:[]*-%';
 const CONTENT_HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
@@ -88,12 +97,39 @@ function assertStableIdentifier(
   }
 }
 
-function assertStringArray(value: unknown, path: string): void {
+function assertStringArray(
+  value: unknown,
+  path: string,
+): asserts value is readonly string[] {
   if (!Array.isArray(value)) {
     throw new TypeError(`${path} must be an array`);
   }
 
   value.forEach((item, index) => assertString(item, `${path}[${index}]`));
+}
+
+function assertPositiveVersion(value: unknown, path: string): void {
+  if (!Number.isSafeInteger(value) || Number(value) <= 0) {
+    throw new TypeError(`${path} must be a positive safe integer`);
+  }
+}
+
+function assertNamespacedIdentifier(value: unknown, path: string): void {
+  if (
+    typeof value !== 'string' ||
+    !/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$/u.test(value)
+  ) {
+    throw new TypeError(`${path} must be a stable namespaced identifier`);
+  }
+}
+
+function assertToken(value: unknown, path: string): asserts value is string {
+  if (
+    typeof value !== 'string' ||
+    !/^[A-Za-z0-9][A-Za-z0-9._:-]*$/u.test(value)
+  ) {
+    throw new TypeError(`${path} must be a stable token`);
+  }
 }
 
 function assertPathSegment(value: unknown, path: string): void {
@@ -397,6 +433,445 @@ function assertCondition(
   assertEvidence(value.evidence, `${path}.evidence`);
 }
 
+function assertValueDomain(value: unknown, path: string): void {
+  try {
+    parseContractValueDomain(value);
+  } catch (error) {
+    if (error instanceof TypeError) {
+      throw new TypeError(error.message.replace(/^valueDomain/u, path));
+    }
+    throw error;
+  }
+}
+
+const PROFILE_OPERATIONS = [
+  'fill',
+  'check',
+  'select-option',
+  'select-from-overlay',
+  'type-and-pick',
+  'select-row',
+  'add-item',
+  'expand-item',
+] as const satisfies readonly FieldTypeProfileOperation[];
+
+const PROFILE_UNKNOWN_ASPECTS = [
+  'semantic-role',
+  'model-codec',
+  'runtime-states',
+  'locator-scope',
+  'interaction-sequence',
+] as const;
+
+const CONTRACT_INTERACTION_KEYS = {
+  fill: new Set(['kind', 'operation', 'controlPart']),
+  choice: new Set([
+    'kind',
+    'operation',
+    'optionPart',
+    'triggerPart',
+    'popupPart',
+  ]),
+  autocomplete: new Set([
+    'kind',
+    'operation',
+    'queryPart',
+    'popupPart',
+    'optionPart',
+  ]),
+  'row-selection': new Set([
+    'kind',
+    'operation',
+    'rowPart',
+    'selectionPart',
+  ]),
+  repeater: new Set([
+    'kind',
+    'operation',
+    'addPart',
+    'itemPart',
+    'expandPart',
+  ]),
+} as const;
+
+const GENERIC_DRIVER_BY_INTERACTION = {
+  fill: 'generic.fill',
+  choice: 'generic.choice',
+  autocomplete: 'generic.autocomplete',
+  'row-selection': 'generic.row-selection',
+  repeater: 'generic.repeater',
+} as const;
+
+const GENERIC_DRIVER_CAPABILITIES = {
+  'generic.fill': new Set<FieldTypeProfileOperation>(['fill']),
+  'generic.choice': new Set<FieldTypeProfileOperation>([
+    'check',
+    'select-option',
+    'select-from-overlay',
+  ]),
+  'generic.autocomplete': new Set<FieldTypeProfileOperation>([
+    'type-and-pick',
+  ]),
+  'generic.row-selection': new Set<FieldTypeProfileOperation>(['select-row']),
+  'generic.repeater': new Set<FieldTypeProfileOperation>([
+    'add-item',
+    'expand-item',
+  ]),
+} as const;
+
+function assertProfileIdentity(value: unknown, path: string): void {
+  assertRecord(value, path);
+  assertExactProperties(value, new Set(['id', 'version']), path);
+  assertNamespacedIdentifier(value.id, `${path}.id`);
+  assertPositiveVersion(value.version, `${path}.version`);
+}
+
+function assertInteractionParts(
+  value: unknown,
+  path: string,
+): readonly FieldTypeProfilePart[] {
+  if (!Array.isArray(value) || value.length === 0) {
+    throw new TypeError(`${path} must contain at least one part`);
+  }
+  const names = new Set<string>();
+  const parts: FieldTypeProfilePart[] = [];
+  value.forEach((entry, index) => {
+    const itemPath = `${path}[${index}]`;
+    assertRecord(entry, itemPath);
+    assertExactProperties(
+      entry,
+      new Set(['name', 'role', 'cardinality', 'evidence']),
+      itemPath,
+    );
+    assertToken(entry.name, `${itemPath}.name`);
+    if (names.has(entry.name)) {
+      throw new TypeError(
+        `${itemPath}.name duplicates part name "${entry.name}"`,
+      );
+    }
+    names.add(entry.name);
+    assertToken(entry.role, `${itemPath}.role`);
+    if (entry.cardinality !== 'one' && entry.cardinality !== 'many') {
+      throw new TypeError(`${itemPath}.cardinality is unsupported`);
+    }
+    if (entry.evidence !== 'declared') {
+      throw new TypeError(`${itemPath}.evidence must be "declared"`);
+    }
+    parts.push({
+      name: entry.name,
+      role: entry.role,
+      cardinality: entry.cardinality,
+      evidence: entry.evidence,
+    });
+  });
+  return parts;
+}
+
+function assertPartReference(
+  value: unknown,
+  path: string,
+  partNames: ReadonlySet<string>,
+): void {
+  assertToken(value, path);
+  if (!partNames.has(value)) {
+    throw new TypeError(`${path} references missing part "${value}"`);
+  }
+}
+
+function assertInteraction(
+  value: unknown,
+  path: string,
+  partNames: ReadonlySet<string>,
+): asserts value is FieldTypeProfileInteraction {
+  assertRecord(value, path);
+  assertString(value.kind, `${path}.kind`);
+  if (!(value.kind in CONTRACT_INTERACTION_KEYS)) {
+    throw new TypeError(`${path}.kind is unsupported`);
+  }
+  assertExactProperties(
+    value,
+    CONTRACT_INTERACTION_KEYS[
+      value.kind as keyof typeof CONTRACT_INTERACTION_KEYS
+    ],
+    path,
+  );
+  if (
+    !PROFILE_OPERATIONS.includes(
+      value.operation as FieldTypeProfileOperation,
+    )
+  ) {
+    throw new TypeError(`${path}.operation is unsupported`);
+  }
+
+  switch (value.kind) {
+    case 'fill':
+      if (value.operation !== 'fill') {
+        throw new TypeError(`${path}.operation is unsupported for fill`);
+      }
+      assertPartReference(value.controlPart, `${path}.controlPart`, partNames);
+      return;
+    case 'choice':
+      if (
+        value.operation !== 'check' &&
+        value.operation !== 'select-option' &&
+        value.operation !== 'select-from-overlay'
+      ) {
+        throw new TypeError(`${path}.operation is unsupported for choice`);
+      }
+      assertPartReference(value.optionPart, `${path}.optionPart`, partNames);
+      if (value.triggerPart !== undefined) {
+        assertPartReference(value.triggerPart, `${path}.triggerPart`, partNames);
+      }
+      if (value.popupPart !== undefined) {
+        assertPartReference(value.popupPart, `${path}.popupPart`, partNames);
+      }
+      if (
+        value.operation === 'select-from-overlay' &&
+        (value.triggerPart === undefined || value.popupPart === undefined)
+      ) {
+        throw new TypeError(
+          `${path} select-from-overlay requires triggerPart and popupPart`,
+        );
+      }
+      return;
+    case 'autocomplete':
+      if (value.operation !== 'type-and-pick') {
+        throw new TypeError(
+          `${path}.operation is unsupported for autocomplete`,
+        );
+      }
+      for (const property of [
+        'queryPart',
+        'popupPart',
+        'optionPart',
+      ] as const) {
+        assertPartReference(value[property], `${path}.${property}`, partNames);
+      }
+      return;
+    case 'row-selection':
+      if (value.operation !== 'select-row') {
+        throw new TypeError(
+          `${path}.operation is unsupported for row-selection`,
+        );
+      }
+      for (const property of ['rowPart', 'selectionPart'] as const) {
+        assertPartReference(value[property], `${path}.${property}`, partNames);
+      }
+      return;
+    case 'repeater':
+      if (value.operation !== 'add-item' && value.operation !== 'expand-item') {
+        throw new TypeError(`${path}.operation is unsupported for repeater`);
+      }
+      for (const property of ['addPart', 'itemPart'] as const) {
+        assertPartReference(value[property], `${path}.${property}`, partNames);
+      }
+      if (value.expandPart !== undefined) {
+        assertPartReference(value.expandPart, `${path}.expandPart`, partNames);
+      }
+      if (value.operation === 'expand-item' && value.expandPart === undefined) {
+        throw new TypeError(`${path} expand-item requires expandPart`);
+      }
+      return;
+  }
+}
+
+function assertInteractionProfile(
+  value: unknown,
+  path: string,
+): asserts value is ContractInteractionProfile {
+  assertRecord(value, path);
+  assertExactProperties(
+    value,
+    new Set([
+      'profile',
+      'semanticType',
+      'valueShape',
+      'evidence',
+      'parts',
+      'interaction',
+      'driver',
+      'preconditions',
+      'unknowns',
+      'provenance',
+    ]),
+    path,
+  );
+  assertProfileIdentity(value.profile, `${path}.profile`);
+  assertToken(value.semanticType, `${path}.semanticType`);
+  if (
+    value.valueShape !== 'scalar' &&
+    value.valueShape !== 'array' &&
+    value.valueShape !== 'object'
+  ) {
+    throw new TypeError(`${path}.valueShape is unsupported`);
+  }
+  if (value.evidence !== 'declared') {
+    throw new TypeError(`${path}.evidence must be "declared"`);
+  }
+
+  const parts = assertInteractionParts(value.parts, `${path}.parts`);
+  const partNames = new Set(parts.map(({ name }) => name));
+  assertInteraction(value.interaction, `${path}.interaction`, partNames);
+
+  assertRecord(value.driver, `${path}.driver`);
+  assertExactProperties(
+    value.driver,
+    new Set(['kind', 'id', 'version', 'capabilities']),
+    `${path}.driver`,
+  );
+  if (value.driver.kind !== 'generic' && value.driver.kind !== 'application') {
+    throw new TypeError(`${path}.driver.kind is unsupported`);
+  }
+  assertNamespacedIdentifier(value.driver.id, `${path}.driver.id`);
+  assertPositiveVersion(value.driver.version, `${path}.driver.version`);
+  if (
+    !Array.isArray(value.driver.capabilities) ||
+    value.driver.capabilities.length === 0
+  ) {
+    throw new TypeError(
+      `${path}.driver.capabilities must contain at least one entry`,
+    );
+  }
+  const capabilities = new Set<FieldTypeProfileOperation>();
+  value.driver.capabilities.forEach((capability, index) => {
+    const capabilityPath = `${path}.driver.capabilities[${index}]`;
+    if (!PROFILE_OPERATIONS.includes(capability as FieldTypeProfileOperation)) {
+      throw new TypeError(`${capabilityPath} is unsupported`);
+    }
+    if (capabilities.has(capability as FieldTypeProfileOperation)) {
+      throw new TypeError(
+        `${capabilityPath} duplicates capability "${String(capability)}"`,
+      );
+    }
+    capabilities.add(capability as FieldTypeProfileOperation);
+  });
+  if (!capabilities.has(value.interaction.operation)) {
+    throw new TypeError(
+      `${path}.driver.capabilities must include interaction operation "${value.interaction.operation}"`,
+    );
+  }
+  if (value.driver.kind === 'generic') {
+    const expected = GENERIC_DRIVER_BY_INTERACTION[value.interaction.kind];
+    if (value.driver.id !== expected) {
+      throw new TypeError(
+        `${path}.driver.id must be "${expected}" for ${value.interaction.kind}`,
+      );
+    }
+    if (value.driver.version !== 1) {
+      throw new TypeError(`${path}.driver.version must be 1 for ${expected}`);
+    }
+    const supported = GENERIC_DRIVER_CAPABILITIES[expected];
+    for (const capability of capabilities) {
+      if (!supported.has(capability)) {
+        throw new TypeError(
+          `${path}.driver.capabilities contains unsupported capability "${capability}" for ${expected}`,
+        );
+      }
+    }
+  } else if ((value.driver.id as string).startsWith('generic.')) {
+    throw new TypeError(
+      `${path}.driver.id reserves the "generic." prefix for generic drivers`,
+    );
+  }
+
+  if (!Array.isArray(value.preconditions)) {
+    throw new TypeError(`${path}.preconditions must be an array`);
+  }
+  const partsByName = new Map(parts.map((part) => [part.name, part]));
+  value.preconditions.forEach((entry, index) => {
+    const itemPath = `${path}.preconditions[${index}]`;
+    assertRecord(entry, itemPath);
+    assertExactProperties(
+      entry,
+      new Set(['kind', 'part', 'operation', 'evidence']),
+      itemPath,
+    );
+    if (entry.kind !== 'activate') {
+      throw new TypeError(`${itemPath}.kind is unsupported`);
+    }
+    assertPartReference(entry.part, `${itemPath}.part`, partNames);
+    if (entry.operation !== 'click' && entry.operation !== 'check') {
+      throw new TypeError(`${itemPath}.operation is unsupported`);
+    }
+    if (entry.evidence !== 'declared') {
+      throw new TypeError(`${itemPath}.evidence must be "declared"`);
+    }
+    const part = partsByName.get(entry.part as string)!;
+    const allowedRoles =
+      entry.operation === 'click' ? ['button'] : ['checkbox', 'radio'];
+    if (!allowedRoles.includes(part.role)) {
+      throw new TypeError(
+        `${itemPath}.operation cannot drive part role "${part.role}"`,
+      );
+    }
+    if (part.cardinality !== 'one') {
+      throw new TypeError(`${itemPath}.part must have cardinality one`);
+    }
+  });
+
+  if (!Array.isArray(value.unknowns)) {
+    throw new TypeError(`${path}.unknowns must be an array`);
+  }
+  value.unknowns.forEach((entry, index) => {
+    const itemPath = `${path}.unknowns[${index}]`;
+    assertRecord(entry, itemPath);
+    assertExactProperties(
+      entry,
+      new Set(['scope', 'source', 'aspect', 'reason', 'evidence']),
+      itemPath,
+    );
+    if (entry.scope !== 'profile' && entry.scope !== 'wrapper') {
+      throw new TypeError(`${itemPath}.scope is unsupported`);
+    }
+    assertString(entry.source, `${itemPath}.source`);
+    if (
+      !PROFILE_UNKNOWN_ASPECTS.includes(
+        entry.aspect as (typeof PROFILE_UNKNOWN_ASPECTS)[number],
+      )
+    ) {
+      throw new TypeError(`${itemPath}.aspect is unsupported`);
+    }
+    assertString(entry.reason, `${itemPath}.reason`);
+    assertEvidence(entry.evidence, `${itemPath}.evidence`);
+  });
+  assertStringArray(value.provenance, `${path}.provenance`);
+  if (value.provenance.length === 0) {
+    throw new TypeError(`${path}.provenance must contain at least one entry`);
+  }
+}
+
+function assertFieldTypeProfileRegistryIdentity(
+  value: unknown,
+  path: string,
+): asserts value is ContractFieldTypeProfileRegistryIdentity {
+  assertRecord(value, path);
+  assertExactProperties(
+    value,
+    new Set(['schemaVersion', 'id', 'version', 'contentHash']),
+    path,
+  );
+  if (value.schemaVersion !== FIELD_TYPE_PROFILE_SCHEMA_VERSION) {
+    throw new TypeError(`${path}.schemaVersion is unsupported`);
+  }
+  assertNamespacedIdentifier(value.id, `${path}.id`);
+  assertPositiveVersion(value.version, `${path}.version`);
+  if (
+    typeof value.contentHash !== 'string' ||
+    !CONTENT_HASH_PATTERN.test(value.contentHash)
+  ) {
+    throw new TypeError(`${path}.contentHash must be a sha256 digest`);
+  }
+}
+
+function nodeHasInteractionProfile(node: ContractNode): boolean {
+  return (
+    node.interactionProfile !== undefined ||
+    node.children.some(nodeHasInteractionProfile) ||
+    (node.arrayTemplate !== undefined &&
+      nodeHasInteractionProfile(node.arrayTemplate))
+  );
+}
+
 function assertNode(
   value: unknown,
   path: string,
@@ -419,6 +894,8 @@ function assertNode(
       'constraints',
       'options',
       'optionSource',
+      'valueDomain',
+      'interactionProfile',
       'conditions',
       'dynamicRules',
       'state',
@@ -474,6 +951,25 @@ function assertNode(
 
   if (value.optionSource !== undefined) {
     assertOptionSource(value.optionSource, `${path}.optionSource`);
+  }
+  if (value.valueDomain !== undefined) {
+    assertValueDomain(value.valueDomain, `${path}.valueDomain`);
+  }
+  if (value.interactionProfile !== undefined) {
+    assertInteractionProfile(
+      value.interactionProfile,
+      `${path}.interactionProfile`,
+    );
+    if (value.semanticType === undefined) {
+      throw new TypeError(
+        `${path}.semanticType is required with interactionProfile`,
+      );
+    }
+    if (value.semanticType !== value.interactionProfile.semanticType) {
+      throw new TypeError(
+        `${path}.semanticType must match interactionProfile.semanticType`,
+      );
+    }
   }
   if (value.state !== undefined) {
     assertNodeState(value.state, `${path}.state`);
@@ -534,7 +1030,14 @@ export function parseFormContract(input: unknown): FormContract {
   assertRecord(input, 'contract');
   assertExactProperties(
     input,
-    new Set(['schemaVersion', 'formId', 'contentHash', 'nodes', 'diagnostics']),
+    new Set([
+      'schemaVersion',
+      'formId',
+      'fieldTypeProfileRegistry',
+      'contentHash',
+      'nodes',
+      'diagnostics',
+    ]),
     'contract',
   );
 
@@ -542,6 +1045,12 @@ export function parseFormContract(input: unknown): FormContract {
     throw new TypeError('contract.schemaVersion is unsupported');
   }
   assertStableIdentifier(input.formId, 'contract.formId');
+  if (input.fieldTypeProfileRegistry !== undefined) {
+    assertFieldTypeProfileRegistryIdentity(
+      input.fieldTypeProfileRegistry,
+      'contract.fieldTypeProfileRegistry',
+    );
+  }
   if (
     typeof input.contentHash !== 'string' ||
     !CONTENT_HASH_PATTERN.test(input.contentHash)
@@ -565,6 +1074,14 @@ export function parseFormContract(input: unknown): FormContract {
   );
 
   const contract = input as unknown as FormContract;
+  if (
+    contract.fieldTypeProfileRegistry === undefined &&
+    contract.nodes.some(nodeHasInteractionProfile)
+  ) {
+    throw new TypeError(
+      'contract.fieldTypeProfileRegistry is required when a node has interactionProfile',
+    );
+  }
   if (!verifyContentHash(contract)) {
     throw new TypeError('contract.contentHash does not match contract content');
   }

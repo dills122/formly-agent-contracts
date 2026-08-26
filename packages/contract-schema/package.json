@@ -1,6 +1,6 @@
 {
   "name": "@formly-contract/contract-schema",
-  "version": "0.3.0",
+  "version": "0.4.0",
   "description": "Versioned Formly Contract types, validation, canonical JSON, and hashing.",
   "author": "Dylan Steele <dylansteele57@gmail.com>",
   "license": "MIT",

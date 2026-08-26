@@ -18,6 +18,9 @@ export type {
   ContractDynamicRule,
   ContractDynamicRuleSource,
   ContractEvidence,
+  ContractFieldTypeProfileRegistryIdentity,
+  ContractInteractionProfile,
+  ContractInteractionProfileUnknown,
   ContractLocator,
   ContractLocatorConfidence,
   ContractLocatorStrategy,
@@ -27,6 +30,7 @@ export type {
   ContractOption,
   ContractOptionSource,
   ContractPresentation,
+  ContractValueDomain,
   FormContract,
   FormContractDraft,
   JsonPrimitive,
@@ -42,7 +46,6 @@ export {
   parseFieldTypeProfileRegistry,
 } from './field-type-profile.js';
 export type {
-  ContractValueDomain,
   FieldTypeProfile,
   FieldTypeProfileDriver,
   FieldTypeProfileIdentity,

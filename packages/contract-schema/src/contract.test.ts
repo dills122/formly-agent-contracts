@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FORM_CONTRACT_SCHEMA_VERSION,
   type FormContract,
+  type FormContractDraft,
 } from './contract.js';
 import { createFormContract } from './canonical-json.js';
 import { parseFormContract } from './validation.js';
@@ -10,6 +11,12 @@ import { parseFormContract } from './validation.js';
 const completeContract: FormContract = createFormContract({
   schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
   formId: 'applicant.profile',
+  fieldTypeProfileRegistry: {
+    schemaVersion: '0.4.0',
+    id: 'acme.formly-fields',
+    version: 2,
+    contentHash: `sha256:${'a'.repeat(64)}`,
+  },
   nodes: [
     {
       id: 'applicant.profile::identity.legalName',
@@ -28,6 +35,66 @@ const completeContract: FormContract = createFormContract({
         property: 'props.options',
         source: 'function',
         evidence: 'resolved',
+      },
+      valueDomain: {
+        kind: 'enumerated',
+        source: 'adapter',
+        completeness: 'complete',
+        evidence: 'declared',
+        values: [{ code: 'EXAMPLE' }],
+      },
+      interactionProfile: {
+        profile: { id: 'acme.legal-name', version: 3 },
+        semanticType: 'text',
+        valueShape: 'scalar',
+        evidence: 'declared',
+        parts: [
+          {
+            name: 'control',
+            role: 'textbox',
+            cardinality: 'one',
+            evidence: 'declared',
+          },
+          {
+            name: 'section-toggle',
+            role: 'button',
+            cardinality: 'one',
+            evidence: 'declared',
+          },
+        ],
+        interaction: {
+          kind: 'fill',
+          operation: 'fill',
+          controlPart: 'control',
+        },
+        driver: {
+          kind: 'generic',
+          id: 'generic.fill',
+          version: 1,
+          capabilities: ['fill'],
+        },
+        preconditions: [
+          {
+            kind: 'activate',
+            part: 'section-toggle',
+            operation: 'click',
+            evidence: 'declared',
+          },
+        ],
+        unknowns: [
+          {
+            scope: 'profile',
+            source: 'acme.legal-name@3',
+            aspect: 'runtime-states',
+            reason: 'Application validation states are not declared.',
+            evidence: 'declared',
+          },
+        ],
+        provenance: [
+          'registry:acme.formly-fields@2',
+          'type:input',
+          'wrapper:section-card',
+        ],
       },
       conditions: [
         {
@@ -79,8 +146,202 @@ const completeContract: FormContract = createFormContract({
 });
 
 describe('parseFormContract', () => {
-  it('accepts a complete representative v0.3 contract', () => {
+  it('accepts a complete representative v0.4 contract', () => {
     expect(parseFormContract(completeContract)).toEqual(completeContract);
+  });
+
+  it('accepts every value-domain branch', () => {
+    const domains = [
+      {
+        kind: 'enumerated',
+        source: 'static-options',
+        completeness: 'complete',
+        evidence: 'declared',
+        values: [false, true],
+      },
+      { kind: 'dynamic', source: 'async', evidence: 'declared' },
+      { kind: 'unknown', evidence: 'declared' },
+    ] as const;
+
+    for (const valueDomain of domains) {
+      const draft: FormContractDraft = {
+        schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
+        formId: `domain.${valueDomain.kind}`,
+        fieldTypeProfileRegistry: completeContract.fieldTypeProfileRegistry!,
+        nodes: [{ ...completeContract.nodes[0]!, valueDomain }],
+        diagnostics: [],
+      };
+      expect(parseFormContract(createFormContract(draft))).toEqual(
+        createFormContract(draft),
+      );
+    }
+  });
+
+  it.each([
+    [
+      'registry hash',
+      {
+        ...completeContract,
+        fieldTypeProfileRegistry: {
+          ...completeContract.fieldTypeProfileRegistry,
+          contentHash: 'not-a-hash',
+        },
+      },
+      'contract.fieldTypeProfileRegistry.contentHash',
+    ],
+    [
+      'registry schema',
+      {
+        ...completeContract,
+        fieldTypeProfileRegistry: {
+          ...completeContract.fieldTypeProfileRegistry,
+          schemaVersion: '0.3.0',
+        },
+      },
+      'contract.fieldTypeProfileRegistry.schemaVersion',
+    ],
+    [
+      'registry identity',
+      {
+        ...completeContract,
+        fieldTypeProfileRegistry: {
+          ...completeContract.fieldTypeProfileRegistry,
+          id: 'not_namespaced',
+        },
+      },
+      'contract.fieldTypeProfileRegistry.id',
+    ],
+    [
+      'registry version',
+      {
+        ...completeContract,
+        fieldTypeProfileRegistry: {
+          ...completeContract.fieldTypeProfileRegistry,
+          version: 0,
+        },
+      },
+      'contract.fieldTypeProfileRegistry.version',
+    ],
+    [
+      'profile evidence',
+      {
+        ...completeContract,
+        nodes: [
+          {
+            ...completeContract.nodes[0],
+            interactionProfile: {
+              ...completeContract.nodes[0]!.interactionProfile,
+              evidence: 'resolved',
+            },
+          },
+        ],
+      },
+      'nodes[0].interactionProfile.evidence',
+    ],
+    [
+      'profile semantic type',
+      {
+        ...completeContract,
+        nodes: [
+          {
+            ...completeContract.nodes[0],
+            interactionProfile: {
+              ...completeContract.nodes[0]!.interactionProfile,
+              semanticType: 'different-type',
+            },
+          },
+        ],
+      },
+      'nodes[0].semanticType must match interactionProfile.semanticType',
+    ],
+    [
+      'generic driver identity',
+      {
+        ...completeContract,
+        nodes: [
+          {
+            ...completeContract.nodes[0],
+            interactionProfile: {
+              ...completeContract.nodes[0]!.interactionProfile,
+              driver: {
+                ...completeContract.nodes[0]!.interactionProfile!.driver,
+                id: 'generic.choice',
+              },
+            },
+          },
+        ],
+      },
+      'nodes[0].interactionProfile.driver.id must be "generic.fill"',
+    ],
+    [
+      'unknown profile property',
+      {
+        ...completeContract,
+        nodes: [
+          {
+            ...completeContract.nodes[0],
+            interactionProfile: {
+              ...completeContract.nodes[0]!.interactionProfile,
+              component: 'UnsafeAngularComponent',
+            },
+          },
+        ],
+      },
+      'nodes[0].interactionProfile contains unknown property component',
+    ],
+    [
+      'non-JSON domain value',
+      {
+        ...completeContract,
+        nodes: [
+          {
+            ...completeContract.nodes[0],
+            valueDomain: {
+              kind: 'enumerated',
+              source: 'adapter',
+              completeness: 'complete',
+              evidence: 'declared',
+              values: [Number.NaN],
+            },
+          },
+        ],
+      },
+      'nodes[0].valueDomain.values[0]',
+    ],
+  ])('rejects malformed v0.4 %s metadata', (_label, draft, expectedPath) => {
+    expect(() => parseFormContract(createFormContract(draft as FormContractDraft))).toThrow(
+      expectedPath,
+    );
+  });
+
+  it('requires form-level registry provenance for resolved node profiles', () => {
+    const withoutRegistry = Object.fromEntries(
+      Object.entries(completeContract).filter(
+        ([key]) => key !== 'fieldTypeProfileRegistry',
+      ),
+    );
+
+    expect(() => parseFormContract(withoutRegistry)).toThrow(
+      'contract.fieldTypeProfileRegistry is required when a node has interactionProfile',
+    );
+  });
+
+  it('changes the content hash when resolved interaction metadata changes', () => {
+    const changed = createFormContract({
+      ...completeContract,
+      nodes: [
+        {
+          ...completeContract.nodes[0]!,
+          interactionProfile: {
+            ...completeContract.nodes[0]!.interactionProfile!,
+            profile: { id: 'acme.legal-name', version: 4 },
+          },
+        },
+      ],
+    });
+
+    expect(changed.contentHash).not.toBe(completeContract.contentHash);
+    expect(parseFormContract(changed)).toEqual(changed);
   });
 
   it('accepts a display-only node with declared template content', () => {

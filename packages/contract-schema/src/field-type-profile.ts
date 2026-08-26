@@ -4,95 +4,37 @@ import {
   canonicalStringify,
   parseArrayIndexProperty,
 } from './canonical-json.js';
-import type { ContractEvidence, JsonValue } from './contract.js';
+import type {
+  ContractEvidence,
+  ContractValueDomain,
+  JsonValue,
+} from './contract.js';
+import type {
+  FieldTypeProfileDriver,
+  FieldTypeProfileIdentity,
+  FieldTypeProfileInteraction,
+  FieldTypeProfileOperation,
+  FieldTypeProfilePart,
+  FieldTypeProfileReference,
+  FieldTypeProfileUnknownAspect,
+  FieldTypeWrapperPrecondition,
+  GenericFieldTypeDriverId,
+} from './field-type-interaction.js';
+
+export type { ContractValueDomain } from './contract.js';
+export type {
+  FieldTypeProfileDriver,
+  FieldTypeProfileIdentity,
+  FieldTypeProfileInteraction,
+  FieldTypeProfileOperation,
+  FieldTypeProfilePart,
+  FieldTypeProfileReference,
+  FieldTypeProfileUnknownAspect,
+  FieldTypeWrapperPrecondition,
+  GenericFieldTypeDriverId,
+} from './field-type-interaction.js';
 
 export const FIELD_TYPE_PROFILE_SCHEMA_VERSION = '0.4.0' as const;
-
-export type ContractValueDomain =
-  | {
-      readonly kind: 'enumerated';
-      readonly source:
-        | 'static-options'
-        | 'resolved-options'
-        | 'semantic-type'
-        | 'adapter';
-      readonly completeness: 'complete' | 'scenario';
-      readonly evidence: ContractEvidence;
-      readonly values: readonly JsonValue[];
-    }
-  | {
-      readonly kind: 'dynamic';
-      readonly source: 'string' | 'function' | 'async';
-      readonly evidence: ContractEvidence;
-    }
-  | {
-      readonly kind: 'unknown';
-      readonly evidence: ContractEvidence;
-    };
-
-export interface FieldTypeProfileIdentity {
-  readonly id: string;
-  readonly version: number;
-}
-
-export interface FieldTypeProfileReference {
-  readonly id: string;
-  readonly version: number;
-}
-
-export interface FieldTypeProfilePart {
-  readonly name: string;
-  readonly role: string;
-  readonly cardinality: 'one' | 'many';
-  readonly evidence: 'declared';
-}
-
-export type FieldTypeProfileOperation =
-  | 'fill'
-  | 'check'
-  | 'select-option'
-  | 'select-from-overlay'
-  | 'type-and-pick'
-  | 'select-row'
-  | 'add-item'
-  | 'expand-item';
-
-export type FieldTypeProfileInteraction =
-  | {
-      readonly kind: 'fill';
-      readonly operation: 'fill';
-      readonly controlPart: string;
-    }
-  | {
-      readonly kind: 'choice';
-      readonly operation:
-        | 'check'
-        | 'select-option'
-        | 'select-from-overlay';
-      readonly optionPart: string;
-      readonly triggerPart?: string;
-      readonly popupPart?: string;
-    }
-  | {
-      readonly kind: 'autocomplete';
-      readonly operation: 'type-and-pick';
-      readonly queryPart: string;
-      readonly popupPart: string;
-      readonly optionPart: string;
-    }
-  | {
-      readonly kind: 'row-selection';
-      readonly operation: 'select-row';
-      readonly rowPart: string;
-      readonly selectionPart: string;
-    }
-  | {
-      readonly kind: 'repeater';
-      readonly operation: 'add-item' | 'expand-item';
-      readonly addPart: string;
-      readonly itemPart: string;
-      readonly expandPart?: string;
-    };
 
 export type FieldTypeProfileValueDomain =
   | {
@@ -126,34 +68,6 @@ export type FieldTypeProfileValueDomain =
       readonly evidence: 'declared';
     };
 
-export type GenericFieldTypeDriverId =
-  | 'generic.fill'
-  | 'generic.choice'
-  | 'generic.autocomplete'
-  | 'generic.row-selection'
-  | 'generic.repeater';
-
-export type FieldTypeProfileDriver =
-  | {
-      readonly kind: 'generic';
-      readonly id: GenericFieldTypeDriverId;
-      readonly version: number;
-      readonly capabilities: readonly FieldTypeProfileOperation[];
-    }
-  | {
-      readonly kind: 'application';
-      readonly id: string;
-      readonly version: number;
-      readonly capabilities: readonly FieldTypeProfileOperation[];
-    };
-
-export type FieldTypeProfileUnknownAspect =
-  | 'semantic-role'
-  | 'model-codec'
-  | 'runtime-states'
-  | 'locator-scope'
-  | 'interaction-sequence';
-
 export interface FieldTypeProfileUnknown {
   readonly aspect: FieldTypeProfileUnknownAspect;
   readonly reason: string;
@@ -181,13 +95,6 @@ export interface FieldTypeProfileRegistration {
   readonly formlyType: string;
   readonly defaultProfile: FieldTypeProfileReference;
   readonly variants: readonly FieldTypeProfileVariantRegistration[];
-}
-
-export interface FieldTypeWrapperPrecondition {
-  readonly kind: 'activate';
-  readonly part: string;
-  readonly operation: 'click' | 'check';
-  readonly evidence: 'declared';
 }
 
 export interface FieldTypeWrapperProfile {

@@ -1,4 +1,13 @@
-export const FORM_CONTRACT_SCHEMA_VERSION = '0.3.0' as const;
+import type {
+  FieldTypeProfileDriver,
+  FieldTypeProfileIdentity,
+  FieldTypeProfileInteraction,
+  FieldTypeProfilePart,
+  FieldTypeProfileUnknownAspect,
+  FieldTypeWrapperPrecondition,
+} from './field-type-interaction.js';
+
+export const FORM_CONTRACT_SCHEMA_VERSION = '0.4.0' as const;
 
 export const CONTRACT_DIAGNOSTIC_CODES = [
   'OPAQUE_FUNCTION',
@@ -21,6 +30,28 @@ export type JsonValue =
   | JsonPrimitive
   | readonly JsonValue[]
   | { readonly [key: string]: JsonValue };
+
+export type ContractValueDomain =
+  | {
+      readonly kind: 'enumerated';
+      readonly source:
+        | 'static-options'
+        | 'resolved-options'
+        | 'semantic-type'
+        | 'adapter';
+      readonly completeness: 'complete' | 'scenario';
+      readonly evidence: ContractEvidence;
+      readonly values: readonly JsonValue[];
+    }
+  | {
+      readonly kind: 'dynamic';
+      readonly source: 'string' | 'function' | 'async';
+      readonly evidence: ContractEvidence;
+    }
+  | {
+      readonly kind: 'unknown';
+      readonly evidence: ContractEvidence;
+    };
 
 export interface ContractPresentation {
   readonly label?: string;
@@ -80,6 +111,34 @@ export interface ContractNodeState {
   readonly disabled?: boolean;
 }
 
+export interface ContractFieldTypeProfileRegistryIdentity {
+  readonly schemaVersion: '0.4.0';
+  readonly id: string;
+  readonly version: number;
+  readonly contentHash: string;
+}
+
+export interface ContractInteractionProfileUnknown {
+  readonly scope: 'profile' | 'wrapper';
+  readonly source: string;
+  readonly aspect: FieldTypeProfileUnknownAspect;
+  readonly reason: string;
+  readonly evidence: ContractEvidence;
+}
+
+export interface ContractInteractionProfile {
+  readonly profile: FieldTypeProfileIdentity;
+  readonly semanticType: string;
+  readonly valueShape: 'scalar' | 'array' | 'object';
+  readonly evidence: 'declared';
+  readonly parts: readonly FieldTypeProfilePart[];
+  readonly interaction: FieldTypeProfileInteraction;
+  readonly driver: FieldTypeProfileDriver;
+  readonly preconditions: readonly FieldTypeWrapperPrecondition[];
+  readonly unknowns: readonly ContractInteractionProfileUnknown[];
+  readonly provenance: readonly string[];
+}
+
 export type ContractLocatorConfidence = 'exact' | 'derived';
 export type ContractLocatorStrategy =
   | 'testId'
@@ -128,6 +187,8 @@ export interface ContractNode {
   readonly constraints: readonly ContractConstraint[];
   readonly options: readonly ContractOption[];
   readonly optionSource?: ContractOptionSource;
+  readonly valueDomain?: ContractValueDomain;
+  readonly interactionProfile?: ContractInteractionProfile;
   readonly conditions: readonly ContractCondition[];
   readonly dynamicRules: readonly ContractDynamicRule[];
   readonly state?: ContractNodeState;
@@ -148,6 +209,7 @@ export interface ContractDiagnostic {
 export interface FormContractDraft {
   readonly schemaVersion: typeof FORM_CONTRACT_SCHEMA_VERSION;
   readonly formId: string;
+  readonly fieldTypeProfileRegistry?: ContractFieldTypeProfileRegistryIdentity;
   readonly nodes: readonly ContractNode[];
   readonly diagnostics: readonly ContractDiagnostic[];
 }

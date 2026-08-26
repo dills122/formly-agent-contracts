@@ -22,7 +22,7 @@ is not a dump of Formly's live runtime objects.
 
 ## What exists today
 
-This repository currently provides schema v0.3 and three packages:
+This repository currently provides schema v0.4 and three packages:
 
 | Package | Purpose |
 | --- | --- |
@@ -398,7 +398,7 @@ opaque or asynchronous behavior is reported rather than guessed.
 
 ## Supported contract information
 
-Schema v0.3 can represent:
+Schema v0.4 can represent:
 
 - ordered controls, groups, display-only nodes, and array templates;
 - stable semantic node IDs and cumulative model paths;
@@ -406,6 +406,8 @@ Schema v0.3 can represent:
 - labels, descriptions, placeholders, JSON-safe defaults, and wrappers;
 - required, min/max, length, string-pattern, and named constraints;
 - static and resolved public options plus dynamic/async option-source metadata;
+- explicit finite, dynamic, and unknown value domains plus resolved
+  interaction-profile metadata;
 - string/boolean conditions and callback/async dynamic-rule metadata;
 - resolved hidden, readonly, and disabled state;
 - exact and derived locator candidates, including multiple named targets; and
@@ -418,8 +420,9 @@ Schema v0.3 can represent:
 - Declared extraction never evaluates functions or function source.
 - The scenario compiler performs the initial controlled Formly build but does
   not wait for remote options or lifecycle-driven browser behavior.
-- Formly `RegExp` patterns are diagnosed; v0.3 represents string patterns only.
-- Custom widget actions and value codecs are not yet modeled.
+- Formly `RegExp` patterns are diagnosed; v0.4 represents string patterns only.
+- Custom widget interaction metadata can be represented, but profile-aware
+  extraction and executable application drivers are not implemented yet.
 - The project does not currently generate or execute Cypress/Playwright tests.
 - No production MCP server or browser-observation layer is included.
 - The supported usage target is Angular 20 or newer with Formly 6.x, but

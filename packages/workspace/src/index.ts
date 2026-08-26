@@ -49,6 +49,7 @@ export {
   parseFormContractSource,
 } from './source.js';
 export type {
+  DeclaredFormContractInstance,
   FormContractDefinition,
   FormContractScenario,
   FormContractSource,

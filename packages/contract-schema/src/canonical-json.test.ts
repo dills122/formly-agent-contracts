@@ -132,4 +132,27 @@ describe('contract content hashing', () => {
       verifyContentHash({ ...contract, formId: 'determinism.tampered' }),
     ).toBe(false);
   });
+
+  it('includes v0.4 profile provenance and interaction metadata in the hash', () => {
+    const base = {
+      ...draft,
+      fieldTypeProfileRegistry: {
+        schemaVersion: '0.4.0' as const,
+        id: 'acme.fields',
+        version: 1,
+        contentHash: `sha256:${'a'.repeat(64)}`,
+      },
+    };
+    const changedRegistry = {
+      ...base,
+      fieldTypeProfileRegistry: {
+        ...base.fieldTypeProfileRegistry,
+        version: 2,
+      },
+    };
+
+    expect(computeContentHash(changedRegistry)).not.toBe(
+      computeContentHash(base),
+    );
+  });
 });
