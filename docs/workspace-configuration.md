@@ -101,6 +101,13 @@ export default defineFormContractProject({
 });
 ```
 
+Each definition factory returns a fresh, framework-neutral declared instance:
+`fields` is an array of configuration objects, with optional `model` and
+`formState` records. Application adapters normalize their registries or factory
+maps to that shape. Scalar field entries and arbitrary opaque instance return
+types are not part of the source contract; Formly-specific structural handling
+belongs to the adapter during artifact generation.
+
 The root and project descriptors can be loaded as one deterministic inventory:
 
 ```ts

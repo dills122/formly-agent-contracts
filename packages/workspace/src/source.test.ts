@@ -3,14 +3,15 @@ import { describe, expect, expectTypeOf, it } from 'vitest';
 import {
   defineFormContractSource,
   parseFormContractSource,
+  type DeclaredFormContractInstance,
   type FormContractDefinition,
 } from './source.js';
 
 describe('FormContractSource', () => {
   it('preserves a typed source without executing it', () => {
-    const definition: FormContractDefinition<{ readonly fields: string[] }> = {
+    const definition: FormContractDefinition<{ readonly product: string }> = {
       id: 'claims.create',
-      create: () => ({ fields: ['product'] }),
+      create: () => ({ fields: [{ key: 'product', type: 'input' }] }),
       scenarios: [
         {
           id: 'new-claim',
@@ -24,12 +25,23 @@ describe('FormContractSource', () => {
     });
 
     expect(parseFormContractSource(source)).toBe(source);
+    expectTypeOf(definition.create).returns.toEqualTypeOf<DeclaredFormContractInstance>();
     expectTypeOf(source.list).returns.toMatchTypeOf<
-      | readonly FormContractDefinition<{ readonly fields: string[] }>[]
+      | readonly FormContractDefinition<{ readonly product: string }>[]
       | Promise<
-          readonly FormContractDefinition<{ readonly fields: string[] }>[]
+          readonly FormContractDefinition<{ readonly product: string }>[]
         >
     >();
+  });
+
+  it('does not type arbitrary source instances as declared Formly input', () => {
+    const definition: FormContractDefinition = {
+      id: 'claims.invalid',
+      // @ts-expect-error source adapters must normalize to Formly field configs
+      create: () => ({ fields: ['product'] }),
+    };
+
+    expect(definition.id).toBe('claims.invalid');
   });
 
   it.each([

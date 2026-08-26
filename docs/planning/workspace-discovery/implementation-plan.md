@@ -1,8 +1,9 @@
 # Implementation Plan: Distributed Workspace Form Discovery
 
 Status: in progress; Tasks 1–4, including project-owned field-type profile
-registries, the deep Task 6B consumer fixture, and a real Nx integration anchor
-are implemented; Task 5 is the next generic vertical slice
+registries, the deep Task 6B consumer fixture, a real Nx integration anchor,
+and the Task 5.0 artifact/source contracts are implemented; Task 5.1
+profile-aware extraction is the next generic vertical slice
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)
@@ -116,8 +117,8 @@ contains explicit effects only.
 
 | Requirement | Decision | Tasks | Verification | Status |
 | --- | --- | --- | --- | --- |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery tests plus 2 consumer fixture tests; runner and CLI fixture assertions remain | Tasks 1–4 and Task 6B fixture shell implemented; Tasks 5–6A and remaining 6B assertions planned |
-| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, and canonical-hash tests | Tasks 3A–3B implemented; node/artifact projection follows in Task 5 |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery tests plus 2 consumer fixture tests; runner and CLI fixture assertions remain | Tasks 1–4, Task 5.0, and Task 6B fixture shell implemented; Tasks 5.1–6A and remaining 6B assertions planned |
+| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Task 5.0 artifact DTO implemented; profile-aware node projection follows in Task 5.1 |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | Inventory and scaffolds are build-time evidence only | Tasks 7A–8B | Angular inventory, negative inference, and scenario tests | Planned; prototype complete |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Planned; architecture researched |
 
@@ -370,6 +371,20 @@ provenance. Discovery must not import arbitrary files outside matched configs.
 validates stable form IDs, invokes declared extraction, writes canonical form
 contracts under project-scoped output directories, and produces a deterministic
 workspace index.
+
+Implement this vertical slice in three reviewable increments:
+
+1. **[x] Task 5.0 — artifact and declared-source contracts:** bump the form artifact
+   to v0.4, add value-domain and resolved interaction-profile DTOs with strict
+   validation/hashing, and require source factories to return the normalized
+   declared Formly extraction input.
+2. **[ ] Task 5.1 — profile-aware extraction:** resolve the configured project
+   registry during declared extraction and project registry identity,
+   interaction metadata, value domains, provenance, and stable unmapped-type
+   diagnostics into contracts.
+3. **[ ] Task 5.2 — runner and workspace index:** enumerate normalized sources,
+   enforce global identities/output containment, write canonical artifacts,
+   and emit the deterministic index.
 
 **Acceptance criteria:**
 
