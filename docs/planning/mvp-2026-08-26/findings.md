@@ -23,7 +23,7 @@
   Parser output remains compatible with that direction if evidence and unknowns
   stay explicit.
 - The public repository is configured at
-  <https://github.com/dills122/formly-agent-contracts> with an MIT license,
+  <https://github.com/dills122/formly-contract> with an MIT license,
   protected `main`, secret scanning, push protection, Dependabot security
   updates, and read-only default Actions permissions.
 - A controlled Angular TestBed using `BrowserTestingModule`,

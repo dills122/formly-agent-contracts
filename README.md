@@ -1,6 +1,6 @@
-# Formly Agent Contracts
+# Formly Contract
 
-Formly Agent Contracts turns Angular Formly field configuration into stable,
+Formly Contract turns Angular Formly field configuration into stable,
 versioned JSON that an E2E test author or coding agent can understand without
 guessing how a form is structured.
 
@@ -26,8 +26,8 @@ This repository currently provides schema v0.3 and two workspace packages:
 
 | Package | Purpose |
 | --- | --- |
-| `@formly-agent-contracts/contract-schema` | Contract DTOs, runtime validation, canonical JSON, and SHA-256 content hashing |
-| `@formly-agent-contracts/formly-adapter` | Safe declared extraction and trusted scenario compilation for Formly 6.1 |
+| `@formly-contract/contract-schema` | Contract DTOs, runtime validation, canonical JSON, and SHA-256 content hashing |
+| `@formly-contract/formly-adapter` | Safe declared extraction and trusted scenario compilation for Formly 6.1 |
 
 It also includes:
 
@@ -63,11 +63,11 @@ The packages are not published to npm yet. Until the first release, clone this
 repository next to the consuming application and build the two packages:
 
 ```sh
-git clone https://github.com/dills122/formly-agent-contracts.git
-cd formly-agent-contracts
+git clone https://github.com/dills122/formly-contract.git
+cd formly-contract
 pnpm install --frozen-lockfile
-pnpm --filter @formly-agent-contracts/contract-schema build
-pnpm --filter @formly-agent-contracts/formly-adapter build
+pnpm --filter @formly-contract/contract-schema build
+pnpm --filter @formly-contract/formly-adapter build
 ```
 
 Then link them from the consuming application's `package.json` (adjust the
@@ -76,8 +76,8 @@ relative path for your checkout):
 ```json
 {
   "devDependencies": {
-    "@formly-agent-contracts/contract-schema": "link:../formly-agent-contracts/packages/contract-schema",
-    "@formly-agent-contracts/formly-adapter": "link:../formly-agent-contracts/packages/formly-adapter"
+    "@formly-contract/contract-schema": "link:../formly-contract/packages/contract-schema",
+    "@formly-contract/formly-adapter": "link:../formly-contract/packages/formly-adapter"
   }
 }
 ```
@@ -123,8 +123,8 @@ Add a build-time script in the application repository:
 // tools/generate-form-contracts.ts
 import { mkdir, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { canonicalStringify } from '@formly-agent-contracts/contract-schema';
-import { extractFormContract } from '@formly-agent-contracts/formly-adapter';
+import { canonicalStringify } from '@formly-contract/contract-schema';
+import { extractFormContract } from '@formly-contract/formly-adapter';
 import { contractForms } from './contract-forms';
 
 const outputDirectory = resolve('artifacts/form-contracts');
@@ -168,7 +168,7 @@ import {
   parseFormContract,
   type ContractNode,
   type ModelPathSegment,
-} from '@formly-agent-contracts/contract-schema';
+} from '@formly-contract/contract-schema';
 
 function findNodeByPath(
   nodes: readonly ContractNode[],
@@ -288,7 +288,7 @@ Use `extractFormContract` when you have Formly configuration and want to inspect
 it without running callbacks:
 
 ```ts
-import { extractFormContract } from '@formly-agent-contracts/formly-adapter';
+import { extractFormContract } from '@formly-contract/formly-adapter';
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 
 const fields: FormlyFieldConfig[] = [
@@ -324,7 +324,7 @@ options, or locator attributes depend on Formly expression callbacks:
 ```ts
 import { inject } from '@angular/core';
 import { FormlyFormBuilder } from '@ngx-formly/core';
-import { compileFormContractScenario } from '@formly-agent-contracts/formly-adapter';
+import { compileFormContractScenario } from '@formly-contract/formly-adapter';
 
 const builder = inject(FormlyFormBuilder);
 const { contract, diagnostics } = compileFormContractScenario({

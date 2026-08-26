@@ -33,13 +33,13 @@ importers:
 
   apps/demo-cli:
     dependencies:
-      '@formly-agent-contracts/contract-schema':
+      '@formly-contract/contract-schema':
         specifier: workspace:*
         version: link:../../packages/contract-schema
-      '@formly-agent-contracts/formly-adapter':
+      '@formly-contract/formly-adapter':
         specifier: workspace:*
         version: link:../../packages/formly-adapter
-      '@formly-agent-contracts/synthetic-form':
+      '@formly-contract/synthetic-form':
         specifier: workspace:*
         version: link:../../fixtures/synthetic-form
 
@@ -82,10 +82,10 @@ importers:
       '@angular/compiler-cli':
         specifier: 20.3.29
         version: 20.3.29(@angular/compiler@20.3.29)(typescript@5.9.3)
-      '@formly-agent-contracts/contract-schema':
+      '@formly-contract/contract-schema':
         specifier: workspace:*
         version: link:../../packages/contract-schema
-      '@formly-agent-contracts/formly-adapter':
+      '@formly-contract/formly-adapter':
         specifier: workspace:*
         version: link:../../packages/formly-adapter
 
@@ -106,7 +106,7 @@ importers:
       '@angular/platform-browser':
         specifier: 20.3.29
         version: 20.3.29(@angular/common@20.3.29(@angular/core@20.3.29(@angular/compiler@20.3.29)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@20.3.29(@angular/compiler@20.3.29)(rxjs@7.8.2)(zone.js@0.15.1))
-      '@formly-agent-contracts/formly-adapter':
+      '@formly-contract/formly-adapter':
         specifier: workspace:*
         version: link:../../packages/formly-adapter
       '@ngx-formly/core':
@@ -126,7 +126,7 @@ importers:
 
   packages/formly-adapter:
     dependencies:
-      '@formly-agent-contracts/contract-schema':
+      '@formly-contract/contract-schema':
         specifier: workspace:*
         version: link:../contract-schema
     devDependencies:

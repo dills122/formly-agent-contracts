@@ -27,7 +27,7 @@ body:
   - type: input
     id: package-version
     attributes:
-      label: Formly Agent Contracts version or commit
+      label: Formly Contract version or commit
       placeholder: 0.x.y or commit SHA
     validations:
       required: true

@@ -227,7 +227,7 @@ The tomorrow build is successful when a fresh clone can:
 ## Open Questions
 
 Publication is configured at
-<https://github.com/dills122/formly-agent-contracts> as a public repository
+<https://github.com/dills122/formly-contract> as a public repository
 under the MIT License.
 
 The controlled builder boundary for Angular 20.3.29 and Formly 6.1.8 is recorded

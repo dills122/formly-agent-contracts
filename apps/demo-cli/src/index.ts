@@ -1,4 +1,4 @@
-import { canonicalStringify } from '@formly-agent-contracts/contract-schema';
+import { canonicalStringify } from '@formly-contract/contract-schema';
 
 import { createGoldenContract } from './create-golden-contract.js';
 

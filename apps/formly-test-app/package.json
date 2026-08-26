@@ -1,5 +1,5 @@
 {
-  "name": "@formly-agent-contracts/formly-test-app",
+  "name": "@formly-contract/formly-test-app",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -21,7 +21,7 @@
     "@angular/build": "20.3.29",
     "@angular/cli": "20.3.29",
     "@angular/compiler-cli": "20.3.29",
-    "@formly-agent-contracts/contract-schema": "workspace:*",
-    "@formly-agent-contracts/formly-adapter": "workspace:*"
+    "@formly-contract/contract-schema": "workspace:*",
+    "@formly-contract/formly-adapter": "workspace:*"
   }
 }

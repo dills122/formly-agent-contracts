@@ -4,7 +4,7 @@ AI coding guidance for this repository.
 
 ## Purpose
 
-This repository builds Formly Agent Contracts: a compiler, MCP query surface, and Playwright integration for turning Angular Formly forms into reliable agent-readable E2E contracts.
+This repository builds Formly Contract: a compiler, MCP query surface, and Playwright integration for turning Angular Formly forms into reliable agent-readable E2E contracts.
 
 Optimize for:
 

@@ -14,7 +14,7 @@
 - 2026-08-25: Added the MIT license, Git hygiene, contribution and security
   guidance, issue/PR templates, and a dependency-free documentation workflow.
 - 2026-08-25: Published the initial commit to the public GitHub repository at
-  `dills122/formly-agent-contracts` under the MIT License.
+  `dills122/formly-contract` under the MIT License.
 - 2026-08-25: Protected `main`, required the passing documentation check and
   pull requests, enabled secret scanning and push protection, enabled
   Dependabot security updates, and restricted default Actions permissions to
@@ -43,7 +43,7 @@
   `codex/mvp-contract-foundation` before any adapter or MCP implementation.
 - 2026-08-25 18:56 EDT: Defined schema version `0.1.0` in ADR 0003 and added
   typed DTOs, strict runtime validation, canonical JSON, SHA-256 hashing, and a
-  publishable `@formly-agent-contracts/contract-schema` package boundary.
+  publishable `@formly-contract/contract-schema` package boundary.
 - 2026-08-25 18:56 EDT: Completed the contract TDD cycle: the two focused test
   files first failed on missing implementation modules, then passed all ten
   schema and determinism behaviors.

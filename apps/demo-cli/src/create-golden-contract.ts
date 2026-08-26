@@ -1,6 +1,6 @@
-import type { FormContract } from '@formly-agent-contracts/contract-schema';
-import { extractFormContract } from '@formly-agent-contracts/formly-adapter';
-import { createGoldenFormFields } from '@formly-agent-contracts/synthetic-form';
+import type { FormContract } from '@formly-contract/contract-schema';
+import { extractFormContract } from '@formly-contract/formly-adapter';
+import { createGoldenFormFields } from '@formly-contract/synthetic-form';
 
 export function createGoldenContract(): FormContract {
   return extractFormContract({

@@ -1,6 +1,6 @@
 # Repository Scope And Priorities
 
-This repository builds Formly Agent Contracts, a semantic compilation and E2E automation layer for Angular Formly applications.
+This repository builds Formly Contract, a semantic compilation and E2E automation layer for Angular Formly applications.
 
 Primary deliverables:
 

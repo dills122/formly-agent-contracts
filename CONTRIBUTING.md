@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping make Formly Agent Contracts useful and trustworthy.
+Thanks for helping make Formly Contract useful and trustworthy.
 
 ## Before You Start
 
