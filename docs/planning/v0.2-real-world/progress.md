@@ -10,3 +10,7 @@
 - Added declared dynamic rules, option-source metadata, and resolved node state.
 - Added a trusted Formly scenario compiler and component-free integration test.
 - Updated the golden demo and README for the new public behavior.
+- Passed `pnpm check` in the workspace and after a frozen offline install in a
+  fresh local clone: 41 tests, lint, all package builds, the Angular production
+  build, demo determinism, and documentation checks.
+- Completed the five-axis pre-merge review with no remaining blockers.

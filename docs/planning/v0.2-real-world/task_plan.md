@@ -14,7 +14,7 @@ preserving a deterministic, safe contract boundary.
 - [x] Implement declared extraction without callback execution.
 - [x] Add and test trusted Formly scenario compilation with synthetic inputs.
 - [x] Update the golden fixture, docs, and demo output.
-- [ ] Run focused tests, all checks, clean-clone verification, and review.
+- [x] Run focused tests, all checks, clean-clone verification, and review.
 
 ## Constraints
 
