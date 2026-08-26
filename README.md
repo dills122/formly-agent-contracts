@@ -1,80 +1,102 @@
 # Formly Agent Contracts
 
-Formly Agent Contracts turns Angular Formly configuration into a deterministic,
-agent-readable contract for reliable end-to-end test authoring.
+Formly Agent Contracts turns Angular Formly field configuration into stable,
+versioned JSON that an E2E test author or coding agent can understand without
+guessing how a form is structured.
 
-The central idea is to compile Formly configuration once and query it many times. Formly and application code run in a controlled build process; the MCP server reads versioned semantic artifacts instead of evaluating arbitrary Angular code for every agent request.
+Given a `FormlyFieldConfig[]`, the adapter describes:
 
-## Intended flow
+- the controls, display content, groups, and repeatable templates in the form;
+- each field's model path, Formly type, label, constraints, and choices;
+- known visibility, required, readonly, disabled, and dynamic-option behavior;
+- exact or application-derived test locators such as `data-testid`,
+  `data-test-id`, and `data-cy`;
+- what came directly from configuration, what was resolved by a controlled
+  Formly build, and what remains unknown; and
+- stable diagnostics for behavior that cannot be represented safely.
+
+The result is a deterministic **Form Contract** with strict runtime validation,
+canonical serialization, and a content hash. The contract is intended to be a
+reliable input for Cypress/Playwright test planning and future agent tooling. It
+is not a dump of Formly's live runtime objects.
+
+## What exists today
+
+This repository currently provides schema v0.3 and two workspace packages:
+
+| Package | Purpose |
+| --- | --- |
+| `@formly-agent-contracts/contract-schema` | Contract DTOs, runtime validation, canonical JSON, and SHA-256 content hashing |
+| `@formly-agent-contracts/formly-adapter` | Safe declared extraction and trusted scenario compilation for Formly 6.1 |
+
+It also includes:
+
+- a deterministic CLI demo using a synthetic golden form;
+- a browser-rendered Angular test application with twelve synthetic Formly
+  fixtures; and
+- compatibility coverage for the pinned Angular `20.3.29` and Formly `6.1.8`
+  combination.
+
+The parser and contract are the current product. A production MCP server,
+automatic Playwright generation, browser observation, and application-source
+discovery are future layers and are not shipped by this MVP.
+
+## Why this is useful
+
+Large Formly forms are often assembled from nested groups, shared fragments,
+custom field types, expressions, dynamic choices, and application conventions.
+Reading that source repeatedly is slow, and guessing from a rendered page leads
+to brittle tests.
+
+This project creates a small, explicit boundary:
 
 ```text
-Formly configs and shared fragments
+Formly fields + synthetic scenario
                 |
-       contract compiler
+       safe contract projection
                 |
-     versioned form bundle
+   deterministic versioned JSON
                 |
-          MCP queries
-                |
-       typed E2E intent
-                |
-      Playwright compiler
-                |
-       runtime verification
+ E2E planning / agent inspection
 ```
 
-## Principles
+Consumers can inspect one contract to answer questions such as:
 
-- Treat the output as an E2E contract, not as a serialization of Formly internals.
-- Keep declared, scenario-resolved, and browser-observed form state distinct.
-- Address controls by stable semantic IDs rather than model-generated selectors.
-- Represent dynamic conditions declaratively when possible and explicitly mark opaque behavior.
-- Let custom field adapters own widget-specific actions, value codecs, and locators.
-- Have agents produce typed test intent; compile that intent deterministically into Playwright.
-- Run application and Formly code in a controlled compiler or verification process, never inside routine MCP queries.
+- Which controls exist, and in what order?
+- What model value does each control edit?
+- Which values and validation boundaries are known?
+- Is a choice list empty, static, dynamic, or asynchronous?
+- Which fields may be hidden, required, readonly, or disabled?
+- Which `data-*`, role, label, placeholder, or DOM-ID locator candidates are
+  available?
+- Which facts are exact, derived, resolved for one scenario, or still unknown?
 
-## MVP status
+## Quick start
 
-The repository now contains the first real-world parser slice: a versioned
-contract schema, strict runtime validation, canonical serialization and
-hashing, a Formly 6.1 adapter, twelve synthetic integration forms, and a
-runnable golden-contract demo. Angular 20.3.29 and Formly 6.1.8 are pinned and
-tested together. Contract schema v0.3 adds structural keyless-group identity,
-display nodes, dynamic-rule and option-source metadata, trusted synthetic
-scenario resolution, and evidence-tagged locators for Cypress and Playwright.
-Playwright generation and a production MCP server remain post-MVP work.
+Prerequisites:
 
-## Development
-
-Prerequisites are Node.js 22.22.1 and pnpm 10.23.0.
+- Node.js `22.22.1`
+- pnpm `10.23.0`
 
 ```sh
 pnpm install --frozen-lockfile
-pnpm check
-```
-
-The individual gates are `pnpm lint`, `pnpm test`, `pnpm build`, and
-`pnpm check:demo`. Documentation checks are available as `pnpm check:docs`.
-
-## Run the golden demo
-
-```sh
 pnpm demo
 ```
 
-The command builds the four demo packages and prints one deterministic JSON
-contract. Its `contentHash` covers the contract content excluding the hash
-property itself. The synthetic form includes nested text, number, checkbox,
-and select controls; constraints and static options; an unrealized array
-template; a declared visibility condition; a display-only node; callback-driven
-state and options represented as dynamic rules; and one deliberately opaque
-lifecycle hook reported as `OPAQUE_FUNCTION`.
-The demo also includes exact `data-testid` and `data-cy` locator metadata.
+`pnpm demo` builds the package slice and prints one canonical JSON contract.
+Run the complete repository gate with:
 
-## Extract a form
+```sh
+pnpm check
+```
 
-Install the future published packages in a Formly 6.1 host, or use their
-workspace names inside this repository:
+That command runs lint, all tests, package and Angular production builds, the
+demo smoke test, and documentation checks.
+
+## Extract declared form structure
+
+Use `extractFormContract` when you have Formly configuration and want to inspect
+it without running callbacks:
 
 ```ts
 import { extractFormContract } from '@formly-agent-contracts/formly-adapter';
@@ -98,55 +120,17 @@ const { contract, diagnostics } = extractFormContract({
 });
 ```
 
-The adapter retains declaration order, nested groups, Formly v6 key paths,
-stable semantic IDs, types, labels and hints, JSON-safe defaults, wrappers,
-ordinary and named constraints, static options, array templates, and string or
-boolean conditions. Recognized expression callbacks are recorded as dynamic
-rules without being called. Output is validated and hashed before it is
-returned.
+This path is pure and non-mutating. It does not call expression functions,
+subscribe to Observables, run validators, or render Angular components.
+Recognized callbacks become dynamic-rule metadata; unsupported behavior becomes
+an explicit diagnostic. The returned node has the stable ID
+`example.profile::path:s_profile.s_name`, model path `['profile', 'name']`, its
+required constraint, and an exact `data-testid` locator.
 
-Every node has a `locators` array. The adapter reads common dedicated test
-attributes from `props.attributes`; exact values retain their attribute name so
-both Cypress selectors and Playwright's configurable `getByTestId` convention
-can consume them. An empty array means no reliable locator was found.
+## Resolve a synthetic scenario
 
-Applications with a derived convention can opt in without hardcoding that
-convention into the package. A deriver receives only frozen identity data and
-may return several named targets for a composite widget:
-
-```ts
-const { contract } = extractFormContract({
-  formId: 'coverage.form',
-  fields,
-  locatorOptions: {
-    testIdAttributes: ['data-test-id'],
-    deriveLocators: ({ modelPath, formlyType }) =>
-      formlyType === 'date-range'
-        ? [
-            {
-              target: 'start',
-              strategy: 'testId',
-              attribute: 'data-test-id',
-              value: `${modelPath.join('-')}-start`,
-            },
-            {
-              target: 'end',
-              strategy: 'testId',
-              attribute: 'data-test-id',
-              value: `${modelPath.join('-')}-end`,
-            },
-          ]
-        : [],
-  },
-});
-```
-
-Derived entries are marked `confidence: "derived"`. Configuration read before
-a build is `declared`; values from the controlled Formly build are `resolved`.
-Only a future browser observer may emit `observed` evidence.
-
-For a named synthetic scenario, use the trusted compiler with the application's
-configured Formly builder and a fresh field factory:
+Use `compileFormContractScenario` when required, readonly, disabled, hidden,
+options, or locator attributes depend on Formly expression callbacks:
 
 ```ts
 import { inject } from '@angular/core';
@@ -154,7 +138,7 @@ import { FormlyFormBuilder } from '@ngx-formly/core';
 import { compileFormContractScenario } from '@formly-agent-contracts/formly-adapter';
 
 const builder = inject(FormlyFormBuilder);
-const { contract } = compileFormContractScenario({
+const { contract, diagnostics } = compileFormContractScenario({
   formId: 'example.profile',
   builder,
   createFields: () => createProfileFields(),
@@ -163,52 +147,135 @@ const { contract } = compileFormContractScenario({
 });
 ```
 
-This API runs Formly callbacks and therefore belongs only in a trusted build or
-CI process with synthetic inputs. MCP/query handlers read the resulting
-artifact and never invoke it. The model and form state must be
-structured-cloneable; both are deep-cloned before Formly runs so builder
-mutations cannot escape into caller-owned test data.
+This is a trusted build/CI API. It uses the application's configured
+`FormlyFormBuilder`, so application and Formly callbacks may run. The model and
+form state must be structured-cloneable; both are cloned before the field
+factory or builder runs.
 
-Current limitations are intentional:
+The built field tree still passes through the same allowlist as declared
+extraction. For example, dynamic options are reduced to public
+`label`/`value`/`disabled` records rather than copying arbitrary properties from
+application objects.
 
-- The adapter accepts explicitly supplied Formly configuration; it does not
-  discover or evaluate arbitrary application source.
-- Declared extraction does not execute functions. Expression callbacks become
-  structured dynamic rules; validators, hooks, parsers, function array
-  templates, and unsupported model rules remain stable diagnostics.
-- Async option sources are identified, but remote values and lifecycle-driven
-  changes are not awaited by the initial scenario compiler.
-- Resolved expression values are retained only for contract-supported targets.
-  Options are projected to public label/value/disabled records; unsupported
-  targets stay declared and receive an `UNSUPPORTED_RULE` diagnostic.
-- Formly `RegExp` patterns are diagnosed rather than silently discarded; v0.3
-  represents string patterns only.
-- Custom widget semantics, rendered DOM evidence, Playwright actions, and MCP
-  transport are not part of this MVP.
-- The compatibility claim is the exact pinned Angular 20.3.29 and Formly 6.1.8
-  pairing, not all Angular or Formly versions.
+Do not expose this compiler directly from an MCP or other untrusted request
+handler. Query layers should read previously generated contract artifacts.
 
-## Formly test application
+## Test locators
 
-The workspace includes a browser-rendered Angular application with twelve
-synthetic Formly 6.1 fixtures. It exercises root and child module registration,
-three fixture-provider modules, native and custom field types, a wrapper,
-validator, extension, preset, expressions, validation, repeaters, opaque
-behavior, and isolated legacy-v6 aliases.
+Every node has an ordered `locators` array. The adapter automatically reads
+these common attributes from `props.attributes`:
+
+- `data-testid`
+- `data-test-id`
+- `data-test`
+- `data-cy`
+- `data-pw`
+
+It can also retain explicit role, accessible name, placeholder, and Formly
+field-ID candidates. An empty array means no reliable locator was found; the
+adapter never invents CSS or XPath.
+
+Applications with their own naming convention can set `testIdAttributes` and
+provide a deterministic `deriveLocators` callback. The callback receives only
+frozen identity data, not the live Formly field. It may return several named
+targets for a composite widget such as a date range; its output is marked
+`confidence: "derived"`. See the
+[v0.3 locator specification](docs/v0.3-test-locators-spec.md) for the complete
+contract and example.
+
+## Evidence model
+
+The contract keeps three evidence levels separate:
+
+| Evidence | Meaning | Available now? |
+| --- | --- | --- |
+| `declared` | Read safely from supplied Formly configuration | Yes |
+| `resolved` | Read from a controlled Formly build for one synthetic scenario | Yes |
+| `observed` | Seen in a real rendered browser DOM | Schema-ready; capture layer not implemented |
+
+A resolved locator is not silently presented as browser-observed. Likewise,
+opaque or asynchronous behavior is reported rather than guessed.
+
+## Supported contract information
+
+Schema v0.3 can represent:
+
+- ordered controls, groups, display-only nodes, and array templates;
+- stable semantic node IDs and cumulative model paths;
+- Formly and common semantic control types;
+- labels, descriptions, placeholders, JSON-safe defaults, and wrappers;
+- required, min/max, length, string-pattern, and named constraints;
+- static and resolved public options plus dynamic/async option-source metadata;
+- string/boolean conditions and callback/async dynamic-rule metadata;
+- resolved hidden, readonly, and disabled state;
+- exact and derived locator candidates, including multiple named targets; and
+- deterministic diagnostics, canonical JSON, and content hashing.
+
+## Intentional limitations
+
+- Forms must be supplied explicitly; the adapter does not discover arbitrary
+  TypeScript exports or application routes.
+- Declared extraction never evaluates functions or function source.
+- The scenario compiler performs the initial controlled Formly build but does
+  not wait for remote options or lifecycle-driven browser behavior.
+- Formly `RegExp` patterns are diagnosed; v0.3 represents string patterns only.
+- Custom widget actions and value codecs are not yet modeled.
+- The project does not currently generate or execute Cypress/Playwright tests.
+- No production MCP server or browser-observation layer is included.
+- Compatibility is proven for Angular `20.3.29` with Formly `6.1.8`, not for
+  every Angular/Formly combination.
+- npm publication and release automation are not included yet.
+
+## Synthetic test application
+
+The Angular test application contains twelve invented forms covering native
+and custom fields, wrappers, validators, extensions, presets, expressions,
+validation, repeaters, opaque behavior, and legacy Formly v6 aliases.
 
 ```sh
 pnpm app:serve
 ```
 
-Open <http://127.0.0.1:4200/> and select a fixture from the catalog. The
-production AOT build is part of `pnpm build`; registry and Formly integration
-coverage is part of `pnpm test`.
+Open <http://127.0.0.1:4200/> and choose a fixture from the catalog.
 
-Workplace-only forms should remain in a private repository on the work
-computer. They can implement the `TestFormDefinition` shape from
-`apps/formly-test-app/src/app/form-registry/form-definition.ts` and provide a
-group through `TEST_FORM_GROUPS`, without copying workplace labels, options,
-models, identifiers, or rules into this public repository.
+Workplace forms and data should remain in a private work repository. A private
+fixture module can implement `TestFormDefinition` and register a group through
+`TEST_FORM_GROUPS` without copying workplace labels, identifiers, options, or
+rules into this public project.
+
+## Repository layout
+
+```text
+packages/
+  contract-schema/   Versioned DTOs, validation, canonical JSON, and hashing
+  formly-adapter/     Declared extraction and trusted Formly scenario builds
+fixtures/
+  synthetic-form/    Public golden form and real-builder compatibility fixture
+apps/
+  demo-cli/          Prints the deterministic golden contract
+  formly-test-app/   Browser-rendered Angular/Formly fixture catalog
+docs/                Specifications, ADRs, delivery plans, and evidence
+```
+
+## Roadmap
+
+The intended delivery path is:
+
+```text
+Form Contract packages (current)
+              |
+      read-only MCP queries
+              |
+        typed E2E intent
+              |
+ deterministic Playwright/Cypress drivers
+              |
+ browser observation and parity checks
+```
+
+Future layers should consume immutable contracts. They should not move Angular
+execution, arbitrary callback evaluation, or selector invention into routine
+agent requests.
 
 ## Documentation
 
@@ -216,17 +283,14 @@ models, identifiers, or rules into this public repository.
 - [MVP specification](docs/mvp-spec.md)
 - [v0.2 real-world semantics specification](docs/v0.2-real-world-semantics-spec.md)
 - [v0.3 test locator specification](docs/v0.3-test-locators-spec.md)
+- [Formly test application specification](docs/formly-test-app-spec.md)
 - [Implementation plan](docs/implementation-plan.md)
-- [Project delivery process](docs/project-process.md)
-- [Parser MVP task plan](docs/planning/mvp-2026-08-26/task_plan.md)
-- [Formly test application plan](docs/planning/formly-test-app/task_plan.md)
 - [Architecture decisions](docs/decisions/)
 
-## Contributing and Security
+## Contributing and security
 
 Contributions are welcome. Read [CONTRIBUTING.md](CONTRIBUTING.md) and the
-[Code of Conduct](CODE_OF_CONDUCT.md) before participating, and use the
-repository's private vulnerability-reporting flow described in
-[SECURITY.md](SECURITY.md) for security issues.
+[Code of Conduct](CODE_OF_CONDUCT.md) before participating. Report security
+issues through the private process described in [SECURITY.md](SECURITY.md).
 
 This project is available under the [MIT License](LICENSE).
