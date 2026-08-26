@@ -55,6 +55,22 @@ describe('canonicalStringify', () => {
       'Circular value at $[0]',
     );
   });
+
+  it('rejects sparse arrays instead of colliding with dense canonical JSON', () => {
+    const leadingHole = new Array(1);
+    const nestedHole = { values: [1, , 2] };
+
+    expect(canonicalStringify([])).toBe('[]');
+    expect(() => canonicalStringify(leadingHole)).toThrow(
+      'Sparse array element at $[0]',
+    );
+    expect(() => canonicalStringify(nestedHole)).toThrow(
+      'Sparse array element at $.values[1]',
+    );
+    expect(() => canonicalStringify([undefined])).toThrow(
+      'Unsupported value at $[0]: undefined',
+    );
+  });
 });
 
 describe('contract content hashing', () => {

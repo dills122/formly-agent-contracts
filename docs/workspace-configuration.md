@@ -1,12 +1,14 @@
 # Workspace Configuration
 
-Status: experimental configuration bedrock; discovery and artifact generation
-are not implemented yet
+Status: experimental configuration bedrock; deterministic project discovery and
+project-owned field-type profile registries are implemented, while artifact
+generation remains planned
 
 `@formly-agent-contracts/workspace` is the framework-neutral configuration
 layer for repository-aware Formly Contract tooling. It provides trusted config
 loading, strict root/project descriptors, source catalogs, deterministic policy
-resolution, and stable plugin identities.
+resolution, stable plugin identities, and serializable custom-field interaction
+profiles.
 
 Angular, Formly, Nx, Playwright, and application-specific packages should build
 convenience helpers and presets on these contracts. They must not create
@@ -30,6 +32,17 @@ The loader returns stable error codes:
 
 This follows Jiti's documented async `import` and opt-in `tsconfigPaths`
 interfaces: <https://github.com/unjs/jiti>.
+
+Project discovery expands only the root config's declared project patterns. It
+does not follow directory symlinks, and a matching project-config symlink is
+rejected with `PROJECT_CONFIG_SYMLINK_UNSUPPORTED`. This keeps configuration
+identity and exclusion behavior independent of filesystem aliases.
+
+Discovery also prunes dependency trees (`node_modules`), Git metadata (`.git`),
+and the root config's artifact output directory (or `dist/formly-contracts` when
+no output is configured) before matching files or checking for config symlinks.
+Other directories named `dist` are not implicitly excluded because they may
+contain project-owned source; exclude them explicitly when appropriate.
 
 ## Root and project ownership
 
@@ -88,6 +101,23 @@ export default defineFormContractProject({
 });
 ```
 
+The root and project descriptors can be loaded as one deterministic inventory:
+
+```ts
+import { discoverWorkspaceProjects } from '@formly-agent-contracts/workspace';
+
+const discovered = await discoverWorkspaceProjects({
+  workspaceRoot: process.cwd(),
+  rootConfigPath: 'formly-contracts.config.ts',
+});
+```
+
+Projects are ordered by normalized config path and project ID. Duplicate
+project or source IDs fail during discovery, before a source list or form
+factory is executed. The inventory contains plugin identity (`id`, `version`,
+and `configSchemaVersion`) but intentionally omits plugin options; execution
+still receives options through the trusted loaded root configuration.
+
 `sources` is optional. Applications and infrastructure libraries may declare a
 project boundary now and add sources later, or contribute future profile and
 integration configuration without pretending to own form roots:
@@ -98,10 +128,93 @@ export default defineFormContractProject({
 });
 ```
 
-The source interface is intentionally framework-neutral. A later Angular or
-Formly integration can produce a source descriptor around application-specific
+The source interface is intentionally framework-neutral. Angular and Formly
+integrations can produce source descriptors around application-specific
 factories while the workspace runner continues to operate on stable source and
 form identities.
+
+## Project-owned custom-field profiles
+
+A project may declare a versioned `fieldTypeProfiles` registry. The registry
+maps an exact Formly type string, such as `cool-radio-btn-grp`, to reviewed
+semantic parts, ARIA roles, an interaction operation, a possible-value domain,
+and a stable driver identity. Named variants and wrapper profiles are explicit;
+there is no fuzzy matching or silent last-write-wins behavior.
+
+```ts
+import {
+  FIELD_TYPE_PROFILE_SCHEMA_VERSION,
+  type FieldTypeProfileRegistry,
+} from '@formly-contract/contract-schema';
+import { defineFormContractProject } from '@formly-agent-contracts/workspace';
+
+const fieldTypeProfiles: FieldTypeProfileRegistry = {
+  schemaVersion: FIELD_TYPE_PROFILE_SCHEMA_VERSION,
+  id: 'claims.field-types',
+  version: 1,
+  profiles: [
+    {
+      identity: { id: 'claims.radio-group', version: 1 },
+      semanticType: 'single-choice',
+      valueShape: 'scalar',
+      evidence: 'declared',
+      parts: [
+        {
+          name: 'option',
+          role: 'radio',
+          cardinality: 'many',
+          evidence: 'declared',
+        },
+      ],
+      interaction: {
+        kind: 'choice',
+        operation: 'check',
+        optionPart: 'option',
+      },
+      valueDomain: {
+        kind: 'projected',
+        source: 'adapter',
+        completeness: 'complete',
+        collectionPath: 'props.options',
+        labelPath: 'label',
+        valuePath: 'value',
+        evidence: 'declared',
+      },
+      driver: {
+        kind: 'generic',
+        id: 'generic.choice',
+        version: 1,
+        capabilities: ['check'],
+      },
+      unknowns: [],
+    },
+  ],
+  registrations: [
+    {
+      formlyType: 'cool-radio-btn-grp',
+      defaultProfile: { id: 'claims.radio-group', version: 1 },
+      variants: [],
+    },
+  ],
+  wrappers: [],
+};
+
+export default defineFormContractProject({
+  projectId: 'claims/forms',
+  fieldTypeProfiles,
+});
+```
+
+The resolved project configuration carries a canonical registry copy plus its
+schema version, registry ID/version, and content hash. Reordering set-like
+registry input does not change that identity; changing semantic content or a
+profile version does. Registry data cannot contain Angular components,
+callbacks, Playwright locators, or executable drivers.
+
+`resolveFieldTypeProfile` in `@formly-contract/formly-adapter` resolves an exact
+type/default or named variant and composes explicitly requested wrapper parts
+in request order. An unmapped custom type remains an explicit diagnostic, not
+an invitation to guess how its DOM works.
 
 ### Keep discovery entry points out of browser barrels
 
@@ -154,7 +267,10 @@ configuration.
 
 ## Current boundary
 
-This first slice does not discover project configs, execute source catalogs,
-write contract artifacts, define value domains, or register custom-field
-profiles and effects. Those layers will use the same project descriptor after
-their versioned contracts are implemented.
+Discovery loads and inventories project descriptors but does not execute source
+catalogs or write contract artifacts. Field-type profiles are validated and
+resolvable, but are not yet projected onto generated Form Contract nodes, and
+application driver identities do not execute code. Cross-field effects,
+workspace artifact generation, CLI execution, Angular-assisted inventory, and
+observed runtime capture remain later increments on the same configuration
+bedrock.

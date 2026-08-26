@@ -47,9 +47,36 @@ function canonicalize(
 
   try {
     if (Array.isArray(value)) {
-      return `[${value
-        .map((item, index) => canonicalize(item, `${path}[${index}]`, ancestors))
-        .join(',')}]`;
+      if (Object.getOwnPropertySymbols(value).length > 0) {
+        throw new TypeError(`Symbol-keyed property at ${path}`);
+      }
+
+      const descriptors = Object.getOwnPropertyDescriptors(value);
+      const items: string[] = [];
+      for (let index = 0; index < value.length; index += 1) {
+        const descriptor = descriptors[String(index)];
+        if (descriptor === undefined) {
+          throw new TypeError(`Sparse array element at ${path}[${index}]`);
+        }
+        if (!('value' in descriptor)) {
+          throw new TypeError(`Accessor property at ${path}[${index}]`);
+        }
+        items.push(
+          canonicalize(descriptor.value, `${path}[${index}]`, ancestors),
+        );
+      }
+
+      for (const [key, descriptor] of Object.entries(descriptors)) {
+        if (
+          key !== 'length' &&
+          !/^(?:0|[1-9][0-9]*)$/u.test(key) &&
+          descriptor.enumerable
+        ) {
+          throw new TypeError(`Unsupported array property at ${path}.${key}`);
+        }
+      }
+
+      return `[${items.join(',')}]`;
     }
 
     const prototype = Object.getPrototypeOf(value) as unknown;

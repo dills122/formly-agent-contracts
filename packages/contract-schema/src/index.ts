@@ -33,4 +33,31 @@ export type {
   JsonValue,
   ModelPathSegment,
 } from './contract.js';
+export {
+  FIELD_TYPE_PROFILE_SCHEMA_VERSION,
+  GENERIC_DRIVER_BLOCKING_UNKNOWN_ASPECTS,
+  canonicalizeFieldTypeProfileRegistry,
+  computeFieldTypeProfileRegistryHash,
+  parseContractValueDomain,
+  parseFieldTypeProfileRegistry,
+} from './field-type-profile.js';
+export type {
+  ContractValueDomain,
+  FieldTypeProfile,
+  FieldTypeProfileDriver,
+  FieldTypeProfileIdentity,
+  FieldTypeProfileInteraction,
+  FieldTypeProfileOperation,
+  FieldTypeProfilePart,
+  FieldTypeProfileReference,
+  FieldTypeProfileRegistration,
+  FieldTypeProfileRegistry,
+  FieldTypeProfileUnknown,
+  FieldTypeProfileUnknownAspect,
+  FieldTypeProfileValueDomain,
+  FieldTypeProfileVariantRegistration,
+  FieldTypeWrapperPrecondition,
+  FieldTypeWrapperProfile,
+  GenericFieldTypeDriverId,
+} from './field-type-profile.js';
 export { isModelPathSegment, parseFormContract } from './validation.js';
