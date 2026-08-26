@@ -1,7 +1,7 @@
 {
-  "name": "@formly-agent-contracts/contract-schema",
+  "name": "@formly-contract/contract-schema",
   "version": "0.3.0",
-  "description": "Versioned Formly Agent Contract types, validation, canonical JSON, and hashing.",
+  "description": "Versioned Formly Contract types, validation, canonical JSON, and hashing.",
   "license": "MIT",
   "type": "module",
   "exports": {

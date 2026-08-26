@@ -1,5 +1,5 @@
 {
-  "name": "formly-agent-contracts",
+  "name": "formly-contract",
   "version": "0.0.0",
   "private": true,
   "description": "Compile Angular Formly configurations into deterministic, agent-readable contracts.",
@@ -11,10 +11,10 @@
     "pnpm": "10.23.0"
   },
   "scripts": {
-    "app:serve": "pnpm --filter @formly-agent-contracts/formly-test-app serve",
+    "app:serve": "pnpm --filter @formly-contract/formly-test-app serve",
     "audit": "pnpm audit --audit-level=high",
-    "build": "pnpm build:demo && pnpm --filter @formly-agent-contracts/formly-test-app build",
-    "build:demo": "pnpm --filter @formly-agent-contracts/contract-schema build && pnpm --filter @formly-agent-contracts/formly-adapter build && pnpm --filter @formly-agent-contracts/synthetic-form build && pnpm --filter @formly-agent-contracts/demo-cli build",
+    "build": "pnpm build:demo && pnpm --filter @formly-contract/formly-test-app build",
+    "build:demo": "pnpm --filter @formly-contract/contract-schema build && pnpm --filter @formly-contract/formly-adapter build && pnpm --filter @formly-contract/synthetic-form build && pnpm --filter @formly-contract/demo-cli build",
     "check": "pnpm lint && pnpm test && pnpm build && pnpm check:demo && pnpm check:docs",
     "check:demo": "node .github/scripts/check-demo.mjs",
     "check:docs": "node .github/scripts/check-docs.mjs",

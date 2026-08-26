@@ -7,7 +7,7 @@ import { FormGroup } from '@angular/forms';
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 import { describe, expect, it } from 'vitest';
 
-import { compileFormContractScenario } from '@formly-agent-contracts/formly-adapter';
+import { compileFormContractScenario } from '@formly-contract/formly-adapter';
 
 import {
   buildSyntheticForm,

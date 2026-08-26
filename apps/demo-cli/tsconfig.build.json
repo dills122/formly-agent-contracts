@@ -5,13 +5,13 @@
     "noEmit": false,
     "outDir": "dist",
     "paths": {
-      "@formly-agent-contracts/contract-schema": [
+      "@formly-contract/contract-schema": [
         "../../packages/contract-schema/dist/index.d.ts"
       ],
-      "@formly-agent-contracts/formly-adapter": [
+      "@formly-contract/formly-adapter": [
         "../../packages/formly-adapter/dist/index.d.ts"
       ],
-      "@formly-agent-contracts/synthetic-form": [
+      "@formly-contract/synthetic-form": [
         "../../fixtures/synthetic-form/dist/index.d.ts"
       ]
     },

@@ -1,5 +1,5 @@
 {
-  "name": "@formly-agent-contracts/demo-cli",
+  "name": "@formly-contract/demo-cli",
   "version": "0.0.0",
   "private": true,
   "description": "Runnable golden-contract inspection demo.",
@@ -10,8 +10,8 @@
     "typecheck": "tsc --project tsconfig.json"
   },
   "dependencies": {
-    "@formly-agent-contracts/contract-schema": "workspace:*",
-    "@formly-agent-contracts/formly-adapter": "workspace:*",
-    "@formly-agent-contracts/synthetic-form": "workspace:*"
+    "@formly-contract/contract-schema": "workspace:*",
+    "@formly-contract/formly-adapter": "workspace:*",
+    "@formly-contract/synthetic-form": "workspace:*"
   }
 }

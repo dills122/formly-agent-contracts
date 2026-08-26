@@ -10,7 +10,7 @@ published.
 
 Do not report security vulnerabilities in a public issue.
 
-Use [GitHub private vulnerability reporting](https://github.com/dills122/formly-agent-contracts/security/advisories/new)
+Use [GitHub private vulnerability reporting](https://github.com/dills122/formly-contract/security/advisories/new)
 to share the affected version or commit, impact, reproduction details, and any
 suggested mitigation. Remove secrets, customer data, and workplace code from
 all examples.

@@ -59,7 +59,7 @@ representative at an online or offline event.
 ## Enforcement
 
 Report abusive, harassing, or otherwise unacceptable behavior confidentially
-through [GitHub private reporting](https://github.com/dills122/formly-agent-contracts/security/advisories/new).
+through [GitHub private reporting](https://github.com/dills122/formly-contract/security/advisories/new).
 Start the report title with `Code of Conduct` so it can be routed correctly. Do
 not open a public issue containing private or sensitive conduct details.
 

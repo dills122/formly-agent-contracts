@@ -8,7 +8,7 @@ import { TestFormRegistry } from './form-registry/form-registry.js';
   standalone: false,
   template: `
     <header class="app-header">
-      <p class="app-eyebrow">Formly Agent Contracts</p>
+      <p class="app-eyebrow">Formly Contract</p>
       <h1>Formly 6.1 synthetic fixture laboratory</h1>
       <p>
         Twelve invented forms exercising module registration, custom controls,

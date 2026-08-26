@@ -1,7 +1,7 @@
 {
-  "name": "@formly-agent-contracts/formly-adapter",
+  "name": "@formly-contract/formly-adapter",
   "version": "0.3.0",
-  "description": "Allowlisted Formly configuration extraction for Formly Agent Contracts.",
+  "description": "Allowlisted Formly configuration extraction for Formly Contract.",
   "license": "MIT",
   "type": "module",
   "exports": {
@@ -21,7 +21,7 @@
     "node": ">=22.13.0 <23"
   },
   "dependencies": {
-    "@formly-agent-contracts/contract-schema": "workspace:*"
+    "@formly-contract/contract-schema": "workspace:*"
   },
   "peerDependencies": {
     "@ngx-formly/core": "6.1.8"
