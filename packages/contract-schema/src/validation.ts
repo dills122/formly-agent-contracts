@@ -858,16 +858,34 @@ function assertGenericDriverValueMapping(
     );
   }
 
-  const optionCounts = new Map<string, number>();
+  const optionsByValue = new Map<
+    string,
+    { readonly count: number; readonly label: string }
+  >();
+  const optionCountsByLabel = new Map<string, number>();
   for (const option of options) {
     const key = canonicalStringify(option.value);
-    optionCounts.set(key, (optionCounts.get(key) ?? 0) + 1);
+    const existing = optionsByValue.get(key);
+    optionsByValue.set(key, {
+      count: (existing?.count ?? 0) + 1,
+      label: existing?.label ?? option.label,
+    });
+    optionCountsByLabel.set(
+      option.label,
+      (optionCountsByLabel.get(option.label) ?? 0) + 1,
+    );
   }
 
   valueDomain.values.forEach((domainValue, index) => {
-    if (optionCounts.get(canonicalStringify(domainValue)) !== 1) {
+    const mapping = optionsByValue.get(canonicalStringify(domainValue));
+    if (mapping?.count !== 1) {
       throw new TypeError(
         `${path}.options must contain exactly one label mapping for valueDomain.values[${index}]`,
+      );
+    }
+    if (optionCountsByLabel.get(mapping.label) !== 1) {
+      throw new TypeError(
+        `${path}.options label ${JSON.stringify(mapping.label)} must identify exactly one value`,
       );
     }
   });

@@ -669,6 +669,40 @@ describe('parseFormContract', () => {
   });
 
   it.each([
+    ['choice', genericProfileFixtures[1]],
+    ['autocomplete', genericProfileFixtures[4]],
+    ['row-selection', genericProfileFixtures[5]],
+  ] as const)(
+    'rejects generic %s execution when one visible label maps to distinct values',
+    (_kind, profile) => {
+      const contract = contractWithInteractionProfile(profile);
+      const malformed = createFormContract({
+        ...contract,
+        nodes: [
+          {
+            ...contract.nodes[0]!,
+            options: [
+              { label: 'Same label', value: 'A' },
+              { label: 'Same label', value: 'B' },
+            ],
+            valueDomain: {
+              kind: 'enumerated',
+              source: 'adapter',
+              completeness: 'complete',
+              evidence: 'declared',
+              values: ['A', 'B'],
+            },
+          },
+        ],
+      });
+
+      expect(() => parseFormContract(malformed)).toThrow(
+        'options label "Same label" must identify exactly one value',
+      );
+    },
+  );
+
+  it.each([
     ['fill', genericProfileFixtures[0]],
     ['repeater', genericProfileFixtures[6]],
   ] as const)(
