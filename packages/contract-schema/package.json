@@ -2,7 +2,30 @@
   "name": "@formly-contract/contract-schema",
   "version": "0.3.0",
   "description": "Versioned Formly Contract types, validation, canonical JSON, and hashing.",
+  "author": "Dylan Steele <dylansteele57@gmail.com>",
   "license": "MIT",
+  "homepage": "https://github.com/dills122/formly-contract#readme",
+  "bugs": {
+    "url": "https://github.com/dills122/formly-contract/issues"
+  },
+  "keywords": [
+    "angular",
+    "formly",
+    "contract",
+    "e2e",
+    "playwright",
+    "testing",
+    "agents"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dills122/formly-contract.git",
+    "directory": "packages/contract-schema"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "module",
   "exports": {
     ".": {

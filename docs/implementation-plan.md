@@ -432,7 +432,7 @@ not add compilation, Angular execution, storage, or mutation to MCP requests.
 
 | Risk | Impact | Mitigation |
 | --- | --- | --- |
-| Formly 6.1 behaves incorrectly with Angular 20 despite its broad peer range | High | Run Task 2 first and publish the exact supported pairing only after an executable proof. |
+| Formly 6.x behaves incorrectly with an Angular 20+ combination despite its broad Angular peer range | High | Publish the broader usage target with the exact Angular `20.3.29` and Formly `6.1.8` reference pairing identified as the strongest executable evidence, and require consuming applications to validate other combinations. |
 | `FormlyFormBuilder` requires more Angular runtime setup than fits in one day | High | Fall back to a declared-config extractor and label runtime defaults/expressions unknown. |
 | “Understand flow” expands into full rule evaluation | High | Represent ordering, hierarchy, arrays, declarations, and unknowns; defer witness solving and runtime parity. |
 | MCP work consumes the delivery window | Medium | MCP starts only after Checkpoint C and remains removable. |

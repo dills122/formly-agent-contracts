@@ -27,15 +27,16 @@ This repository currently provides schema v0.3 and two workspace packages:
 | Package | Purpose |
 | --- | --- |
 | `@formly-contract/contract-schema` | Contract DTOs, runtime validation, canonical JSON, and SHA-256 content hashing |
-| `@formly-contract/formly-adapter` | Safe declared extraction and trusted scenario compilation for Formly 6.1 |
+| `@formly-contract/formly-adapter` | Safe declared extraction and trusted scenario compilation for Formly 6.x |
 
 It also includes:
 
 - a deterministic CLI demo using a synthetic golden form;
 - a browser-rendered Angular test application with twelve synthetic Formly
   fixtures; and
-- compatibility coverage for the pinned Angular `20.3.29` and Formly `6.1.8`
-  combination.
+- a supported usage target of Angular 20 or newer with Formly 6.x; and
+- deep compatibility coverage for the pinned Angular `20.3.29` and Formly
+  `6.1.8` reference combination.
 
 The parser and contract are the current product. A production MCP server,
 automatic Playwright generation, browser observation, and application-source
@@ -82,11 +83,13 @@ relative path for your checkout):
 }
 ```
 
-Run `pnpm install` in the consuming application. The application must already
-provide compatible Angular and Formly peer dependencies; the currently tested
-combination is Angular `20.3.29` with Formly `6.1.8`. Once the packages are
-published, normal versioned `pnpm add --save-dev` dependencies will replace
-these local links.
+Run `pnpm install` in the consuming application. The supported usage target is
+Angular 20 or newer with Formly 6.x. The compatibility suite is pinned to
+Angular `20.3.29` with Formly `6.1.8`, so that exact pairing has the strongest
+test evidence. Other Angular major and Formly minor or patch combinations may
+work, but validate them in the consuming application because they are not
+covered to the same depth. Once the packages are published, normal versioned
+`pnpm add --save-dev` dependencies will replace these local links.
 
 ### 2. Select the forms to expose
 
@@ -279,8 +282,10 @@ Run the complete repository gate with:
 pnpm check
 ```
 
-That command runs lint, all tests, package and Angular production builds, the
-demo smoke test, and documentation checks.
+That command runs lint, all tests, package and Angular production builds,
+release metadata and tarball checks, the demo smoke test, and documentation
+checks. Maintainers can find the tag, npm trusted-publishing, and first-release
+procedure in [Releasing](docs/releasing.md).
 
 ## Extract declared form structure
 
@@ -411,9 +416,12 @@ Schema v0.3 can represent:
 - Custom widget actions and value codecs are not yet modeled.
 - The project does not currently generate or execute Cypress/Playwright tests.
 - No production MCP server or browser-observation layer is included.
-- Compatibility is proven for Angular `20.3.29` with Formly `6.1.8`, not for
-  every Angular/Formly combination.
-- npm publication and release automation are not included yet.
+- The supported usage target is Angular 20 or newer with Formly 6.x, but
+  compatibility testing is concentrated on Angular `20.3.29` with Formly
+  `6.1.8`. Mileage may vary across other major, minor, and patch combinations.
+- The packages are not on npm yet. Their final public names and one-time npm
+  bootstrap release still need maintainer approval; the automated release path
+  is ready and documented in [Releasing](docs/releasing.md).
 
 ## Synthetic test application
 

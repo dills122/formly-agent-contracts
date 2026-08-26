@@ -2,7 +2,30 @@
   "name": "@formly-contract/formly-adapter",
   "version": "0.3.0",
   "description": "Allowlisted Formly configuration extraction for Formly Contract.",
+  "author": "Dylan Steele <dylansteele57@gmail.com>",
   "license": "MIT",
+  "homepage": "https://github.com/dills122/formly-contract#readme",
+  "bugs": {
+    "url": "https://github.com/dills122/formly-contract/issues"
+  },
+  "keywords": [
+    "angular",
+    "formly",
+    "contract",
+    "e2e",
+    "playwright",
+    "testing",
+    "agents"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dills122/formly-contract.git",
+    "directory": "packages/formly-adapter"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "module",
   "exports": {
     ".": {
@@ -24,7 +47,7 @@
     "@formly-contract/contract-schema": "workspace:*"
   },
   "peerDependencies": {
-    "@ngx-formly/core": "6.1.8"
+    "@ngx-formly/core": ">=6.0.0 <7.0.0"
   },
   "devDependencies": {
     "@ngx-formly/core": "6.1.8"
