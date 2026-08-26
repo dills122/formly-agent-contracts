@@ -14,6 +14,11 @@ The separately requested modular browser fixture harness is specified in
 in [its task plan](planning/formly-test-app/task_plan.md). It remains test
 infrastructure and does not change the parser dependency order below.
 
+The first workplace integration exposed a focused v0.2 compatibility slice.
+Its contract and execution boundaries are specified in
+[the real-world semantics specification](v0.2-real-world-semantics-spec.md) and
+tracked in [the v0.2 task plan](planning/v0.2-real-world/task_plan.md).
+
 ## Dependency Order
 
 ```text
@@ -217,6 +222,29 @@ allowlist into contract nodes.
 - `packages/formly-adapter/src/index.ts`
 
 **Estimated scope:** Medium
+
+## Phase 4: Real-World Form Semantics
+
+### Task 11: Evolve the contract to v0.2
+
+Add display nodes, dynamic-rule metadata, choice option-source metadata, and
+resolved interaction state with strict runtime validation.
+
+### Task 12: Correct declared extraction
+
+Use structural IDs for every keyless node, classify template-only nodes as
+display, and project recognized expression callbacks without executing them.
+
+### Task 13: Add trusted scenario compilation
+
+Use the caller's configured Formly builder and fresh synthetic inputs to
+produce a resolved initial-state contract outside MCP/query paths.
+
+### Task 14: Prove workplace regressions
+
+Cover keyless horizontal layouts, callback-driven required/readonly/options/
+visibility, display templates, and dynamic-vs-empty choices in focused and
+component-free integration tests.
 
 ### Task 6: Extract arrays, conditions, and unknowns
 

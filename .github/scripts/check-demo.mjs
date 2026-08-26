@@ -36,8 +36,18 @@ const diagnosticCodes = new Set(
 if (!verifyContentHash(contract)) {
   throw new Error('Golden contract content hash is invalid.');
 }
-if (contract.formId !== 'demo.golden-form' || contract.nodes.length !== 3) {
+if (contract.formId !== 'demo.golden-form' || contract.nodes.length !== 4) {
   throw new Error('Golden contract does not contain the expected root nodes.');
+}
+if (!contract.nodes.some(({ kind }) => kind === 'display')) {
+  throw new Error('Golden contract must contain its display-only node.');
+}
+if (
+  !contract.nodes.some(
+    ({ optionSource }) => optionSource?.kind === 'dynamic',
+  )
+) {
+  throw new Error('Golden contract must expose its dynamic option source.');
 }
 if (!diagnosticCodes.has('OPAQUE_FUNCTION')) {
   throw new Error('Golden contract must expose its opaque behavior.');

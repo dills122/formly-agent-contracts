@@ -14,6 +14,7 @@
     "typecheck": "tsc --project tsconfig.json"
   },
   "dependencies": {
+    "@formly-agent-contracts/formly-adapter": "workspace:*",
     "@angular/common": "20.3.29",
     "@angular/compiler": "20.3.29",
     "@angular/core": "20.3.29",

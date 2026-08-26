@@ -1,2 +1,9 @@
-export { extractFormContract } from './extract-form.js';
-export type { ExtractFormInput, ExtractFormResult } from './extract-form.js';
+export {
+  compileFormContractScenario,
+  extractFormContract,
+} from './extract-form.js';
+export type {
+  CompileFormContractScenarioInput,
+  ExtractFormInput,
+  ExtractFormResult,
+} from './extract-form.js';

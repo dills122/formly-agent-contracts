@@ -20,6 +20,7 @@ export interface SyntheticBuildResult {
 }
 
 let testEnvironmentInitialized = false;
+let syntheticBuilder: FormlyFormBuilder | undefined;
 
 function ensureTestEnvironment(): void {
   if (testEnvironmentInitialized) {
@@ -51,7 +52,11 @@ function createSyntheticFields(): FormlyFieldConfig[] {
   ];
 }
 
-export function buildSyntheticForm(): SyntheticBuildResult {
+export function createSyntheticFormBuilder(): FormlyFormBuilder {
+  if (syntheticBuilder !== undefined) {
+    return syntheticBuilder;
+  }
+
   ensureTestEnvironment();
   TestBed.resetTestingModule();
 
@@ -72,12 +77,19 @@ export function buildSyntheticForm(): SyntheticBuildResult {
               },
             },
           },
+          { name: 'select' },
+          { name: 'radio' },
         ],
       }),
     ],
   });
 
-  const builder = TestBed.inject(FormlyFormBuilder);
+  syntheticBuilder = TestBed.inject(FormlyFormBuilder);
+  return syntheticBuilder;
+}
+
+export function buildSyntheticForm(): SyntheticBuildResult {
+  const builder = createSyntheticFormBuilder();
   const root: FormlyFieldConfig = {
     form: new FormGroup({}),
     model: {},

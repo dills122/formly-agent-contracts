@@ -86,8 +86,11 @@ The compiler runs in a controlled build or CI environment. It:
 3. Invokes `FormlyFormBuilder` for named scenarios.
 4. Waits for the initial synchronous expression pass to complete.
 5. Projects the resulting tree through an allowlist serializer.
-6. Retains unresolved functions, Observables, lifecycle hooks, and remote data sources as diagnostics.
-7. Produces a deterministic, content-addressed bundle.
+6. Retains expression callbacks as declared dynamic-rule metadata and records
+   their JSON-safe scenario outcome when the controlled build resolves it.
+7. Retains unresolved Observables, lifecycle hooks, remote data sources, and
+   other executable behavior outside the expression surface as diagnostics.
+8. Produces a deterministic, content-addressed bundle.
 
 The compiler must not serialize live field objects. Built fields contain circular parent references, Angular controls, injectors, functions, subscriptions, and other runtime-only state.
 
@@ -184,6 +187,9 @@ One Formly field may map to multiple interactive controls. For example, a date r
 ### 7. MCP server
 
 The MCP server reads versioned bundles; it does not import Angular or execute application form factories during routine queries.
+
+In particular, the MCP server never invokes expression callbacks. Scenario
+resolution is a trusted build/CI operation whose output is an immutable bundle.
 
 Candidate resources:
 

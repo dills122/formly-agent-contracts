@@ -136,6 +136,35 @@ describe('extractFormContract basic projection', () => {
     expect(second.contract.contentHash).toBe(first.contract.contentHash);
   });
 
+  it('uses structural identity for keyless layout groups under a keyed parent', () => {
+    const result = extractFormContract({
+      formId: 'layout.horizontal',
+      fields: [
+        {
+          key: 'profile',
+          fieldGroup: [
+            {
+              fieldGroupClassName: 'display-flex',
+              fieldGroup: [{ key: 'givenName', type: 'input' }],
+            },
+            {
+              fieldGroupClassName: 'display-flex',
+              fieldGroup: [{ key: 'familyName', type: 'input' }],
+            },
+          ],
+        },
+      ],
+    });
+
+    expect(result.contract.nodes[0]?.children.map(({ id }) => id)).toEqual([
+      'layout.horizontal::position:0.0',
+      'layout.horizontal::position:0.1',
+    ]);
+    expect(
+      result.diagnostics.some(({ message }) => message.includes('Duplicate')),
+    ).toBe(false);
+  });
+
   it('resolves duplicate-key IDs even when the first suffix is already a real path', () => {
     const result = extractFormContract({
       formId: 'edge.duplicate-ids',
@@ -162,6 +191,87 @@ describe('extractFormContract basic projection', () => {
 });
 
 describe('extractFormContract arrays, conditions, and unknowns', () => {
+  it('classifies template-only fields as display nodes', () => {
+    const result = extractFormContract({
+      formId: 'display.review',
+      fields: [{ template: '<p>Review your answers before submitting.</p>' }],
+    });
+
+    expect(result.contract.nodes[0]).toEqual(
+      expect.objectContaining({
+        kind: 'display',
+        display: {
+          format: 'html',
+          content: '<p>Review your answers before submitting.</p>',
+        },
+      }),
+    );
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('represents callback-driven rules and dynamic choices without executing them', () => {
+    let callbackWasCalled = false;
+    const dynamicValue = (): boolean => {
+      callbackWasCalled = true;
+      return true;
+    };
+    const result = extractFormContract({
+      formId: 'dynamic.choice',
+      fields: [
+        {
+          key: 'emptyChoice',
+          type: 'select',
+          props: { options: [] },
+        },
+        {
+          key: 'dependentChoice',
+          type: 'radio',
+          hideExpression: dynamicValue,
+          expressionProperties: {
+            'props.required': dynamicValue,
+            'props.readonly': dynamicValue,
+            'props.options': dynamicValue,
+          },
+        },
+      ],
+    });
+
+    expect(result.contract.nodes[0]?.optionSource).toEqual({
+      kind: 'static',
+      evidence: 'declared',
+    });
+    expect(result.contract.nodes[1]?.optionSource).toEqual({
+      kind: 'dynamic',
+      property: 'props.options',
+      source: 'function',
+      evidence: 'declared',
+    });
+    expect(result.contract.nodes[1]?.dynamicRules).toEqual([
+      { property: 'hide', source: 'function', evidence: 'declared' },
+      {
+        property: 'props.options',
+        source: 'function',
+        evidence: 'declared',
+      },
+      {
+        property: 'props.readonly',
+        source: 'function',
+        evidence: 'declared',
+      },
+      {
+        property: 'props.required',
+        source: 'function',
+        evidence: 'declared',
+      },
+    ]);
+    expect(
+      result.diagnostics.some(({ sourcePath }) =>
+        sourcePath.includes('expressionProperties'),
+      ),
+    ).toBe(false);
+    expect(callbackWasCalled).toBe(false);
+  });
+
   it('retains an unrealized array template with wildcard model paths', () => {
     const fields: FormlyFieldConfig[] = [
       {
@@ -314,12 +424,13 @@ describe('extractFormContract arrays, conditions, and unknowns', () => {
       ]),
     );
     expect(result.diagnostics).toContainEqual(
-      expect.objectContaining({
-        code: 'OPAQUE_FUNCTION',
-        sourcePath: ['fields', 2, 'expressions', 'props.disabled'],
-        nodeId: 'opaque.example::path:s_opaque',
-      }),
+      expect.objectContaining({ code: 'OPAQUE_FUNCTION' }),
     );
+    expect(result.contract.nodes[2]?.dynamicRules).toContainEqual({
+      property: 'props.disabled',
+      source: 'function',
+      evidence: 'declared',
+    });
     expect(functionWasCalled).toBe(false);
   });
 });

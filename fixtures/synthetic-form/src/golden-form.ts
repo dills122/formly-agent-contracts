@@ -1,7 +1,12 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 
 export function createGoldenFormFields(): FormlyFieldConfig[] {
-  const opaqueEligibilityRule = (): boolean => false;
+  const dynamicEligibilityRule = (): boolean => false;
+  const dynamicEligibilityOptions = (): readonly {
+    label: string;
+    value: string;
+  }[] => [{ label: 'Manual review', value: 'manual' }];
+  const opaqueLifecycleHook = (): void => undefined;
 
   return [
     {
@@ -88,11 +93,16 @@ export function createGoldenFormFields(): FormlyFieldConfig[] {
     },
     {
       key: 'eligibilityReview',
-      type: 'input',
-      props: { label: 'Eligibility review' },
+      type: 'select',
+      props: { label: 'Eligibility review', options: [] },
       expressions: {
-        'props.disabled': opaqueEligibilityRule,
+        'props.disabled': dynamicEligibilityRule,
       },
+      expressionProperties: {
+        'props.options': dynamicEligibilityOptions,
+      },
+      hooks: { onInit: opaqueLifecycleHook },
     },
+    { template: '<p>Review this synthetic form before submitting.</p>' },
   ];
 }

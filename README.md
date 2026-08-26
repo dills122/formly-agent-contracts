@@ -35,11 +35,13 @@ Formly configs and shared fragments
 
 ## MVP status
 
-The repository now contains the first complete parser slice: a versioned
+The repository now contains the first real-world parser slice: a versioned
 contract schema, strict runtime validation, canonical serialization and
 hashing, a Formly 6.1 adapter, twelve synthetic integration forms, and a
 runnable golden-contract demo. Angular 20.3.29 and Formly 6.1.8 are pinned and
-tested together. Playwright generation and a production MCP server remain
+tested together. Contract schema v0.2 adds structural keyless-group identity,
+display nodes, dynamic-rule and option-source metadata, and trusted synthetic
+scenario resolution. Playwright generation and a production MCP server remain
 post-MVP work.
 
 ## Development
@@ -64,8 +66,9 @@ The command builds the four demo packages and prints one deterministic JSON
 contract. Its `contentHash` covers the contract content excluding the hash
 property itself. The synthetic form includes nested text, number, checkbox,
 and select controls; constraints and static options; an unrealized array
-template; a declared visibility condition; and one deliberately opaque
-function reported as `OPAQUE_FUNCTION`.
+template; a declared visibility condition; a display-only node; callback-driven
+state and options represented as dynamic rules; and one deliberately opaque
+lifecycle hook reported as `OPAQUE_FUNCTION`.
 
 ## Extract a form
 
@@ -93,17 +96,43 @@ const { contract, diagnostics } = extractFormContract({
 The adapter retains declaration order, nested groups, Formly v6 key paths,
 stable semantic IDs, types, labels and hints, JSON-safe defaults, wrappers,
 ordinary and named constraints, static options, array templates, and string or
-boolean conditions. Output is validated and hashed before it is returned.
+boolean conditions. Recognized expression callbacks are recorded as dynamic
+rules without being called. Output is validated and hashed before it is
+returned.
+
+For a named synthetic scenario, use the trusted compiler with the application's
+configured Formly builder and a fresh field factory:
+
+```ts
+import { inject } from '@angular/core';
+import { FormlyFormBuilder } from '@ngx-formly/core';
+import { compileFormContractScenario } from '@formly-agent-contracts/formly-adapter';
+
+const builder = inject(FormlyFormBuilder);
+const { contract } = compileFormContractScenario({
+  formId: 'example.profile',
+  builder,
+  createFields: () => createProfileFields(),
+  model: { contactMethod: 'email' },
+  formState: { readonly: false },
+});
+```
+
+This API runs Formly callbacks and therefore belongs only in a trusted build or
+CI process with synthetic inputs. MCP/query handlers read the resulting
+artifact and never invoke it.
 
 Current limitations are intentional:
 
 - The adapter accepts explicitly supplied Formly configuration; it does not
   discover or evaluate arbitrary application source.
-- Functions, async validators, Observable-like options, hooks, parsers, and
-  unsupported model rules are not executed or inferred. They produce stable
-  diagnostics beside the usable contract.
-- Custom widget semantics, runtime scenario resolution, rendered DOM evidence,
-  Playwright actions, and MCP transport are not part of this MVP.
+- Declared extraction does not execute functions. Expression callbacks become
+  structured dynamic rules; validators, hooks, parsers, function array
+  templates, and unsupported model rules remain stable diagnostics.
+- Async option sources are identified, but remote values and lifecycle-driven
+  changes are not awaited by the initial scenario compiler.
+- Custom widget semantics, rendered DOM evidence, Playwright actions, and MCP
+  transport are not part of this MVP.
 - The compatibility claim is the exact pinned Angular 20.3.29 and Formly 6.1.8
   pairing, not all Angular or Formly versions.
 
@@ -133,6 +162,7 @@ models, identifiers, or rules into this public repository.
 
 - [Architecture overview](docs/architecture-overview.md)
 - [MVP specification](docs/mvp-spec.md)
+- [v0.2 real-world semantics specification](docs/v0.2-real-world-semantics-spec.md)
 - [Implementation plan](docs/implementation-plan.md)
 - [Project delivery process](docs/project-process.md)
 - [Parser MVP task plan](docs/planning/mvp-2026-08-26/task_plan.md)
