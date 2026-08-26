@@ -7,14 +7,22 @@ import {
   type ContractConstraint,
   type ContractDiagnostic,
   type ContractDiagnosticCode,
+  type ContractDisplay,
+  type ContractDynamicRule,
+  type ContractEvidence,
   type ContractNode,
+  type ContractNodeState,
   type ContractOption,
+  type ContractOptionSource,
   type ContractPresentation,
   type FormContract,
   type JsonValue,
   type ModelPathSegment,
 } from '@formly-agent-contracts/contract-schema';
-import type { FormlyFieldConfig } from '@ngx-formly/core';
+import type {
+  FormlyFieldConfig,
+  FormlyFormBuilder,
+} from '@ngx-formly/core';
 
 export interface ExtractFormInput {
   readonly formId: string;
@@ -28,8 +36,17 @@ export interface ExtractFormResult {
   readonly diagnostics: readonly ContractDiagnostic[];
 }
 
+export interface CompileFormContractScenarioInput {
+  readonly formId: string;
+  readonly builder: Pick<FormlyFormBuilder, 'build'>;
+  readonly createFields: () => FormlyFieldConfig[];
+  readonly model?: Readonly<Record<string, unknown>>;
+  readonly formState?: Readonly<Record<string, unknown>>;
+}
+
 interface ExtractionContext {
   readonly formId: string;
+  readonly evidence: ContractEvidence;
   readonly diagnostics: ContractDiagnostic[];
   readonly nodeIds: Set<string>;
 }
@@ -66,7 +83,7 @@ function addDiagnostic(
     code,
     severity: 'warning',
     message,
-    evidence: 'declared',
+    evidence: context.evidence,
     sourcePath,
     nodeId,
   });
@@ -166,11 +183,12 @@ function pathToken(segment: ModelPathSegment): string {
 function createNodeId(
   context: ExtractionContext,
   modelPath: readonly ModelPathSegment[],
+  hasSemanticKey: boolean,
   position: readonly number[],
   sourcePath: readonly ModelPathSegment[],
 ): string {
   const baseId =
-    modelPath.length > 0
+    hasSemanticKey
       ? `${context.formId}::path:${modelPath.map(pathToken).join('.')}`
       : `${context.formId}::position:${position.join('.')}`;
 
@@ -191,7 +209,7 @@ function createNodeId(
     code: 'UNKNOWN_FIELD_SHAPE',
     severity: 'warning',
     message: `Duplicate semantic node identity ${baseId}.`,
-    evidence: 'declared',
+    evidence: context.evidence,
     sourcePath,
     nodeId: id,
   });
@@ -461,13 +479,64 @@ function readOptions(
   return options;
 }
 
-function readConditions(
+function readPathValue(field: FormlyFieldConfig, property: string): unknown {
+  if (property === 'hide') {
+    return field.hide;
+  }
+
+  const normalized = property.replace(/^templateOptions\./u, 'props.');
+  const segments = normalized.split('.');
+  let current: unknown = field;
+
+  for (const segment of segments) {
+    if (!isRecord(current)) {
+      return undefined;
+    }
+    current = current[segment];
+  }
+
+  return current;
+}
+
+interface RuleProjection {
+  readonly conditions: ContractCondition[];
+  readonly dynamicRules: ContractDynamicRule[];
+}
+
+function readRules(
   field: FormlyFieldConfig,
   sourcePath: readonly ModelPathSegment[],
   nodeId: string,
   context: ExtractionContext,
-): ContractCondition[] {
+): RuleProjection {
   const conditions: ContractCondition[] = [];
+  const dynamicRules: ContractDynamicRule[] = [];
+
+  const addDynamicRule = (
+    property: string,
+    expression: unknown,
+  ): boolean => {
+    const source = isFunction(expression)
+      ? 'function'
+      : isAsyncLike(expression)
+        ? 'async'
+        : undefined;
+    if (source === undefined) {
+      return false;
+    }
+
+    const resolvedValue =
+      context.evidence === 'resolved'
+        ? toJsonValue(readPathValue(field, property))
+        : undefined;
+    dynamicRules.push({
+      property,
+      source,
+      evidence: resolvedValue === undefined ? 'declared' : 'resolved',
+      ...(resolvedValue === undefined ? {} : { resolvedValue }),
+    });
+    return true;
+  };
 
   const readExpressionMap = (
     value: unknown,
@@ -497,7 +566,7 @@ function readConditions(
           expression: String(expression),
           evidence: 'declared',
         });
-      } else {
+      } else if (!addDynamicRule(property, expression)) {
         diagnoseOpaqueValue(
           expression,
           `Expression for ${property}`,
@@ -524,7 +593,10 @@ function readConditions(
       expression: String(hideExpression),
       evidence: 'declared',
     });
-  } else if (hideExpression !== undefined) {
+  } else if (
+    hideExpression !== undefined &&
+    !addDynamicRule('hide', hideExpression)
+  ) {
     diagnoseOpaqueValue(
       hideExpression,
       'Legacy hide expression',
@@ -536,7 +608,125 @@ function readConditions(
 
   readExpressionMap(field.expressionProperties, 'expressionProperties');
 
-  return conditions;
+  return { conditions, dynamicRules };
+}
+
+function findOptionsExpression(
+  field: FormlyFieldConfig,
+): { readonly property: string; readonly expression: unknown } | undefined {
+  for (const expressionMap of [
+    field.expressions,
+    field.expressionProperties,
+  ]) {
+    if (!isRecord(expressionMap)) {
+      continue;
+    }
+    for (const property of ['props.options', 'templateOptions.options']) {
+      if (expressionMap[property] !== undefined) {
+        return { property, expression: expressionMap[property] };
+      }
+    }
+  }
+
+  return undefined;
+}
+
+function readOptionSource(
+  field: FormlyFieldConfig,
+  props: Readonly<Record<string, unknown>>,
+  semanticType: string | undefined,
+  context: ExtractionContext,
+): ContractOptionSource | undefined {
+  if (semanticType !== 'choice') {
+    return undefined;
+  }
+
+  const dynamic = findOptionsExpression(field);
+  if (dynamic !== undefined) {
+    const resolved =
+      context.evidence === 'resolved' && Array.isArray(props.options);
+    if (isAsyncLike(dynamic.expression)) {
+      return {
+        kind: 'async',
+        property: dynamic.property,
+        evidence: resolved ? 'resolved' : 'declared',
+      };
+    }
+    if (
+      typeof dynamic.expression === 'string' ||
+      isFunction(dynamic.expression)
+    ) {
+      return {
+        kind: 'dynamic',
+        property: dynamic.property,
+        source:
+          typeof dynamic.expression === 'string' ? 'string' : 'function',
+        evidence: resolved ? 'resolved' : 'declared',
+      };
+    }
+  }
+
+  if (isAsyncLike(props.options)) {
+    return {
+      kind: 'async',
+      property: 'props.options',
+      evidence: 'declared',
+    };
+  }
+  if (isFunction(props.options)) {
+    return {
+      kind: 'dynamic',
+      property: 'props.options',
+      source: 'function',
+      evidence: 'declared',
+    };
+  }
+
+  return { kind: 'static', evidence: 'declared' };
+}
+
+function readState(
+  field: FormlyFieldConfig,
+  props: Readonly<Record<string, unknown>>,
+): ContractNodeState | undefined {
+  const state: {
+    hidden?: boolean;
+    readonly?: boolean;
+    disabled?: boolean;
+  } = {};
+
+  if (typeof field.hide === 'boolean') {
+    state.hidden = field.hide;
+  }
+  if (typeof props.readonly === 'boolean') {
+    state.readonly = props.readonly;
+  }
+  if (typeof props.disabled === 'boolean') {
+    state.disabled = props.disabled;
+  }
+
+  return Object.keys(state).length > 0 ? state : undefined;
+}
+
+function readDisplay(
+  field: FormlyFieldConfig,
+  sourcePath: readonly ModelPathSegment[],
+  nodeId: string,
+  context: ExtractionContext,
+): ContractDisplay | undefined {
+  if (typeof field.template === 'string' && field.template.length > 0) {
+    return { format: 'html', content: field.template };
+  }
+  if (field.template !== undefined) {
+    diagnoseOpaqueValue(
+      field.template,
+      'Display template',
+      [...sourcePath, 'template'],
+      nodeId,
+      context,
+    );
+  }
+  return undefined;
 }
 
 function diagnoseUnsupportedFieldBehavior(
@@ -587,11 +777,15 @@ function diagnoseUnsupportedFieldBehavior(
     );
   }
 
-  if (field.modelOptions !== undefined) {
+  const modelOptions = field.modelOptions as unknown;
+  if (
+    modelOptions !== undefined &&
+    (!isRecord(modelOptions) || Object.keys(modelOptions).length > 0)
+  ) {
     addDiagnostic(
       context,
       'UNSUPPORTED_RULE',
-      'Model update options are not represented by the v0 contract.',
+      'Model update options are not represented by the v0.2 contract.',
       [...sourcePath, 'modelOptions'],
       nodeId,
     );
@@ -650,13 +844,16 @@ function extractNode(
   location: NodeLocation,
   context: ExtractionContext,
 ): ContractNode {
+  const keyPath = keyToPath(field.key);
   const modelPath = [
     ...location.parentModelPath,
-    ...keyToPath(field.key),
+    ...keyPath,
   ];
+  const hasSemanticKey = keyPath.length > 0;
   const id = createNodeId(
     context,
     modelPath,
+    hasSemanticKey,
     location.position,
     location.sourcePath,
   );
@@ -665,6 +862,7 @@ function extractNode(
   const formlyType = typeof field.type === 'string' ? field.type : undefined;
   const semanticType = readSemanticType(formlyType, props);
   const presentation = readPresentation(props);
+  const display = readDisplay(field, location.sourcePath, id, context);
   const defaultValue = readJsonValue(
     field.defaultValue,
     'Default value',
@@ -711,7 +909,7 @@ function extractNode(
     ...readConstraints(props),
     ...readNamedConstraints(field, location.sourcePath, id, context),
   ];
-  const conditions = readConditions(
+  const { conditions, dynamicRules } = readRules(
     field,
     location.sourcePath,
     id,
@@ -723,6 +921,14 @@ function extractNode(
     id,
     context,
   );
+  const options = readOptions(props, location.sourcePath, id, context);
+  const optionSource = readOptionSource(
+    field,
+    props,
+    semanticType,
+    context,
+  );
+  const state = readState(field, props);
 
   return {
     id,
@@ -731,28 +937,36 @@ function extractNode(
         ? 'array'
         : field.fieldGroup !== undefined
           ? 'group'
-          : 'control',
+          : field.template !== undefined || formlyType === 'formly-template'
+            ? 'display'
+            : 'control',
     modelPath,
     ...(formlyType === undefined ? {} : { formlyType }),
     ...(semanticType === undefined ? {} : { semanticType }),
-    evidence: 'declared',
+    evidence: context.evidence,
     ...(presentation === undefined ? {} : { presentation }),
+    ...(display === undefined ? {} : { display }),
     ...(defaultValue === undefined ? {} : { defaultValue }),
     wrappers: readWrappers(field),
     constraints,
-    options: readOptions(props, location.sourcePath, id, context),
+    options,
+    ...(optionSource === undefined ? {} : { optionSource }),
     conditions,
+    dynamicRules,
+    ...(state === undefined ? {} : { state }),
     children,
     ...(arrayTemplate === undefined ? {} : { arrayTemplate }),
   };
 }
 
-export function extractFormContract(
+function projectFormContract(
   input: ExtractFormInput,
+  evidence: ContractEvidence,
 ): ExtractFormResult {
   const diagnostics: ContractDiagnostic[] = [];
   const context: ExtractionContext = {
     formId: input.formId,
+    evidence,
     diagnostics,
     nodeIds: new Set<string>(),
   };
@@ -777,4 +991,49 @@ export function extractFormContract(
   );
 
   return { contract, diagnostics: contract.diagnostics };
+}
+
+export function extractFormContract(
+  input: ExtractFormInput,
+): ExtractFormResult {
+  return projectFormContract(input, 'declared');
+}
+
+function cloneSyntheticModel(
+  model: Readonly<Record<string, unknown>> | undefined,
+): Record<string, unknown> {
+  try {
+    return structuredClone(model ?? {});
+  } catch (error) {
+    throw new TypeError('Scenario model must be structured-cloneable.', {
+      cause: error,
+    });
+  }
+}
+
+export function compileFormContractScenario(
+  input: CompileFormContractScenarioInput,
+): ExtractFormResult {
+  const fields = input.createFields();
+  if (!Array.isArray(fields)) {
+    throw new TypeError('Scenario field factory must return an array.');
+  }
+
+  const formState = { ...(input.formState ?? {}) };
+  const root: FormlyFieldConfig = {
+    model: cloneSyntheticModel(input.model),
+    options: { formState },
+    fieldGroup: fields,
+  };
+  input.builder.build(root);
+
+  return projectFormContract(
+    {
+      formId: input.formId,
+      fields: root.fieldGroup ?? [],
+      ...(isRecord(root.model) ? { model: root.model } : {}),
+      formState,
+    },
+    'resolved',
+  );
 }

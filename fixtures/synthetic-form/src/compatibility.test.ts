@@ -7,7 +7,12 @@ import { FormGroup } from '@angular/forms';
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 import { describe, expect, it } from 'vitest';
 
-import { buildSyntheticForm } from './compatibility.js';
+import { compileFormContractScenario } from '@formly-agent-contracts/formly-adapter';
+
+import {
+  buildSyntheticForm,
+  createSyntheticFormBuilder,
+} from './compatibility.js';
 
 describe('Angular 20.3 and Formly 6.1 compatibility', () => {
   it('builds a typed Formly configuration with the registered core extensions', () => {
@@ -21,5 +26,74 @@ describe('Angular 20.3 and Formly 6.1 compatibility', () => {
     expect(fields[0]?.formControl).toBeDefined();
     expect(displayName?.formControl).toBeDefined();
     expect(displayName?.props?.type).toBe('text');
+  });
+
+  it('resolves callback-driven initial state through the trusted Formly builder', () => {
+    const builder = createSyntheticFormBuilder();
+    const result = compileFormContractScenario({
+      formId: 'scenario.dynamic-choice',
+      builder,
+      model: { mode: 'advanced' },
+      formState: { readonly: true },
+      createFields: () => [
+        {
+          key: 'choice',
+          type: 'select',
+          props: { label: 'Choice' },
+          hideExpression: (model: Readonly<{ mode?: string }>) =>
+            model.mode !== 'advanced',
+          expressionProperties: {
+            'props.required': (model: Readonly<{ mode?: string }>) =>
+              model.mode === 'advanced',
+            'props.readonly': (
+              _model: unknown,
+              formState: Readonly<{ readonly?: boolean }>,
+            ) => formState.readonly === true,
+            'props.options': (model: Readonly<{ mode?: string }>) =>
+              model.mode === 'advanced'
+                ? [
+                    { label: 'Alpha', value: 'alpha' },
+                    { label: 'Beta', value: 'beta' },
+                  ]
+                : [],
+          },
+        },
+      ],
+    });
+    const choice = result.contract.nodes[0];
+
+    expect(choice).toEqual(
+      expect.objectContaining({
+        evidence: 'resolved',
+        constraints: [{ kind: 'required' }],
+        options: [
+          { label: 'Alpha', value: 'alpha' },
+          { label: 'Beta', value: 'beta' },
+        ],
+        optionSource: {
+          kind: 'dynamic',
+          property: 'props.options',
+          source: 'function',
+          evidence: 'resolved',
+        },
+        state: { hidden: false, readonly: true, disabled: false },
+      }),
+    );
+    expect(choice?.dynamicRules).toContainEqual({
+      property: 'props.required',
+      source: 'function',
+      evidence: 'resolved',
+      resolvedValue: true,
+    });
+    expect(choice?.dynamicRules).toContainEqual({
+      property: 'props.options',
+      source: 'function',
+      evidence: 'resolved',
+      resolvedValue: [
+        { label: 'Alpha', value: 'alpha' },
+        { label: 'Beta', value: 'beta' },
+      ],
+    });
+    expect(result.diagnostics).toEqual([]);
   });
 });

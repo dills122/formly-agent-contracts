@@ -23,6 +23,12 @@ const completeContract: FormContract = createFormContract({
       wrappers: ['section-card'],
       constraints: [{ kind: 'required' }],
       options: [{ label: 'Example', value: { code: 'EXAMPLE' } }],
+      optionSource: {
+        kind: 'dynamic',
+        property: 'props.options',
+        source: 'function',
+        evidence: 'resolved',
+      },
       conditions: [
         {
           property: 'props.disabled',
@@ -30,6 +36,15 @@ const completeContract: FormContract = createFormContract({
           evidence: 'declared',
         },
       ],
+      dynamicRules: [
+        {
+          property: 'props.options',
+          source: 'function',
+          evidence: 'resolved',
+          resolvedValue: [{ label: 'Example', value: { code: 'EXAMPLE' } }],
+        },
+      ],
+      state: { hidden: false, readonly: true, disabled: false },
       children: [],
     },
   ],
@@ -46,8 +61,33 @@ const completeContract: FormContract = createFormContract({
 });
 
 describe('parseFormContract', () => {
-  it('accepts a complete representative v0 contract', () => {
+  it('accepts a complete representative v0.2 contract', () => {
     expect(parseFormContract(completeContract)).toEqual(completeContract);
+  });
+
+  it('accepts a display-only node with declared template content', () => {
+    const displayContract = createFormContract({
+      schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
+      formId: 'display.example',
+      nodes: [
+        {
+          id: 'display.example::position:0',
+          kind: 'display',
+          modelPath: [],
+          evidence: 'declared',
+          display: { format: 'html', content: '<p>Review your answers.</p>' },
+          wrappers: [],
+          constraints: [],
+          options: [],
+          conditions: [],
+          dynamicRules: [],
+          children: [],
+        },
+      ],
+      diagnostics: [],
+    });
+
+    expect(parseFormContract(displayContract)).toEqual(displayContract);
   });
 
   it('rejects malformed node identity', () => {

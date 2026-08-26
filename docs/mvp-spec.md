@@ -13,11 +13,18 @@ The public product direction is a reusable parser and contract package. A small
 CLI and read-only MCP server may be included as inspection harnesses, but they
 are not the MVP product boundary.
 
+The post-MVP workplace compatibility increment is defined separately in the
+[v0.2 real-world semantics specification](v0.2-real-world-semantics-spec.md).
+It preserves this MVP's declared-extraction safety while adding an explicit
+trusted scenario compiler.
+
 ## MVP Input and Output
 
-The extractor accepts an explicitly registered form containing fresh
-`FormlyFieldConfig[]`, plus optional synthetic model and form-state values. It
-does not discover arbitrary exports or execute application source code.
+Declared extraction accepts explicitly supplied `FormlyFieldConfig[]` and does
+not discover arbitrary exports or execute application source code. The v0.2
+trusted compiler separately accepts a fresh field factory, synthetic model and
+form-state values, and the application's configured Formly builder. That API
+runs only during build/CI and is prohibited from MCP/query paths.
 
 The extractor emits a JSON-safe, versioned `FormContract` containing:
 

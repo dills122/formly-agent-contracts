@@ -27,7 +27,7 @@ describe('createGoldenContract', () => {
     expect(verifyContentHash(first)).toBe(true);
     expect(canonicalStringify(second)).toBe(canonicalStringify(first));
     expect(new Set(nodes.map(({ kind }) => kind))).toEqual(
-      new Set(['control', 'group', 'array']),
+      new Set(['control', 'group', 'array', 'display']),
     );
     expect(nodes).toContainEqual(
       expect.objectContaining({
@@ -52,6 +52,29 @@ describe('createGoldenContract', () => {
     );
     expect(first.diagnostics).toContainEqual(
       expect.objectContaining({ code: 'OPAQUE_FUNCTION' }),
+    );
+    const eligibility = nodes.find(
+      ({ modelPath }) => modelPath.join('.') === 'eligibilityReview',
+    );
+    expect(eligibility?.optionSource).toEqual({
+      kind: 'dynamic',
+      property: 'props.options',
+      source: 'function',
+      evidence: 'declared',
+    });
+    expect(eligibility?.dynamicRules).toEqual(
+      expect.arrayContaining([
+        {
+          property: 'props.disabled',
+          source: 'function',
+          evidence: 'declared',
+        },
+        {
+          property: 'props.options',
+          source: 'function',
+          evidence: 'declared',
+        },
+      ]),
     );
   });
 });

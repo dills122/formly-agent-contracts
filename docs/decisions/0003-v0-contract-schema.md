@@ -3,6 +3,10 @@
 - Status: Accepted
 - Date: 2026-08-25
 
+This decision records schema `0.1.0`. Schema `0.2.0` extends it as specified in
+[ADR 0005](0005-trusted-scenario-resolution.md) and the
+[v0.2 specification](../v0.2-real-world-semantics-spec.md).
+
 ## Context
 
 The extractor needs a small, deterministic boundary before Formly-specific

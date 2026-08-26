@@ -4,8 +4,12 @@ import {
   type ContractCondition,
   type ContractConstraint,
   type ContractDiagnostic,
+  type ContractDisplay,
+  type ContractDynamicRule,
   type ContractNode,
+  type ContractNodeState,
   type ContractOption,
+  type ContractOptionSource,
   type ContractPresentation,
   type FormContract,
   type JsonValue,
@@ -231,6 +235,99 @@ function assertOption(
   }
 }
 
+function assertEvidence(value: unknown, path: string): void {
+  if (value !== 'declared' && value !== 'resolved') {
+    throw new TypeError(`${path} is unsupported`);
+  }
+}
+
+function assertDisplay(
+  value: unknown,
+  path: string,
+): asserts value is ContractDisplay {
+  assertRecord(value, path);
+  assertExactProperties(value, new Set(['format', 'content']), path);
+  if (value.format !== 'html') {
+    throw new TypeError(`${path}.format is unsupported`);
+  }
+  assertString(value.content, `${path}.content`);
+}
+
+function assertDynamicRule(
+  value: unknown,
+  path: string,
+): asserts value is ContractDynamicRule {
+  assertRecord(value, path);
+  assertExactProperties(
+    value,
+    new Set(['property', 'source', 'evidence', 'resolvedValue']),
+    path,
+  );
+  assertString(value.property, `${path}.property`);
+  if (value.source !== 'function' && value.source !== 'async') {
+    throw new TypeError(`${path}.source is unsupported`);
+  }
+  assertEvidence(value.evidence, `${path}.evidence`);
+  if (value.resolvedValue !== undefined) {
+    if (value.evidence !== 'resolved') {
+      throw new TypeError(`${path}.resolvedValue requires resolved evidence`);
+    }
+    assertJsonValue(value.resolvedValue, `${path}.resolvedValue`);
+  }
+}
+
+function assertOptionSource(
+  value: unknown,
+  path: string,
+): asserts value is ContractOptionSource {
+  assertRecord(value, path);
+  assertString(value.kind, `${path}.kind`);
+  assertEvidence(value.evidence, `${path}.evidence`);
+
+  if (value.kind === 'static') {
+    assertExactProperties(value, new Set(['kind', 'evidence']), path);
+    return;
+  }
+
+  if (value.kind === 'dynamic') {
+    assertExactProperties(
+      value,
+      new Set(['kind', 'property', 'source', 'evidence']),
+      path,
+    );
+    assertString(value.property, `${path}.property`);
+    if (value.source !== 'string' && value.source !== 'function') {
+      throw new TypeError(`${path}.source is unsupported`);
+    }
+    return;
+  }
+
+  if (value.kind === 'async') {
+    assertExactProperties(
+      value,
+      new Set(['kind', 'property', 'evidence']),
+      path,
+    );
+    assertString(value.property, `${path}.property`);
+    return;
+  }
+
+  throw new TypeError(`${path}.kind is unsupported`);
+}
+
+function assertNodeState(
+  value: unknown,
+  path: string,
+): asserts value is ContractNodeState {
+  assertRecord(value, path);
+  assertExactProperties(value, new Set(['hidden', 'readonly', 'disabled']), path);
+  for (const property of ['hidden', 'readonly', 'disabled'] as const) {
+    if (value[property] !== undefined && typeof value[property] !== 'boolean') {
+      throw new TypeError(`${path}.${property} must be a boolean`);
+    }
+  }
+}
+
 function assertCondition(
   value: unknown,
   path: string,
@@ -243,9 +340,7 @@ function assertCondition(
   );
   assertString(value.property, `${path}.property`);
   assertString(value.expression, `${path}.expression`);
-  if (value.evidence !== 'declared' && value.evidence !== 'resolved') {
-    throw new TypeError(`${path}.evidence is unsupported`);
-  }
+  assertEvidence(value.evidence, `${path}.evidence`);
 }
 
 function assertNode(
@@ -264,11 +359,15 @@ function assertNode(
       'semanticType',
       'evidence',
       'presentation',
+      'display',
       'defaultValue',
       'wrappers',
       'constraints',
       'options',
+      'optionSource',
       'conditions',
+      'dynamicRules',
+      'state',
       'children',
       'arrayTemplate',
     ]),
@@ -281,7 +380,7 @@ function assertNode(
   }
   nodeIds.add(value.id);
 
-  if (!['control', 'group', 'array'].includes(String(value.kind))) {
+  if (!['control', 'group', 'array', 'display'].includes(String(value.kind))) {
     throw new TypeError(`${path}.kind is unsupported`);
   }
   assertPath(value.modelPath, `${path}.modelPath`);
@@ -291,11 +390,12 @@ function assertNode(
   if (value.semanticType !== undefined) {
     assertString(value.semanticType, `${path}.semanticType`);
   }
-  if (value.evidence !== 'declared' && value.evidence !== 'resolved') {
-    throw new TypeError(`${path}.evidence is unsupported`);
-  }
+  assertEvidence(value.evidence, `${path}.evidence`);
   if (value.presentation !== undefined) {
     assertPresentation(value.presentation, `${path}.presentation`);
+  }
+  if (value.display !== undefined) {
+    assertDisplay(value.display, `${path}.display`);
   }
   if (value.defaultValue !== undefined) {
     assertJsonValue(value.defaultValue, `${path}.defaultValue`);
@@ -306,6 +406,7 @@ function assertNode(
     ['constraints', assertConstraint],
     ['options', assertOption],
     ['conditions', assertCondition],
+    ['dynamicRules', assertDynamicRule],
   ] as const) {
     const items = value[property];
     if (!Array.isArray(items)) {
@@ -314,6 +415,13 @@ function assertNode(
     items.forEach((item, index) =>
       assertion(item, `${path}.${property}[${index}]`),
     );
+  }
+
+  if (value.optionSource !== undefined) {
+    assertOptionSource(value.optionSource, `${path}.optionSource`);
+  }
+  if (value.state !== undefined) {
+    assertNodeState(value.state, `${path}.state`);
   }
 
   if (!Array.isArray(value.children)) {
@@ -350,9 +458,7 @@ function assertDiagnostic(
     throw new TypeError(`${path}.severity is unsupported`);
   }
   assertString(value.message, `${path}.message`);
-  if (value.evidence !== 'declared' && value.evidence !== 'resolved') {
-    throw new TypeError(`${path}.evidence is unsupported`);
-  }
+  assertEvidence(value.evidence, `${path}.evidence`);
   assertPath(value.sourcePath, `${path}.sourcePath`);
   if (value.nodeId !== undefined) {
     assertStableIdentifier(value.nodeId, `${path}.nodeId`);
