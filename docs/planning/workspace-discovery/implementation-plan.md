@@ -1,7 +1,8 @@
 # Implementation Plan: Distributed Workspace Form Discovery
 
-Status: in progress; Tasks 1–3 configuration bedrock, the deep Task 6B
-consumer fixture, and a real Nx integration anchor implemented
+Status: in progress; Tasks 1–4, including project-owned field-type profile
+registries, the deep Task 6B consumer fixture, and a real Nx integration anchor
+are implemented; Task 5 is the next generic vertical slice
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)
@@ -54,25 +55,13 @@ roots, serialize model values, or invent selectors.
 ## Dependency graph
 
 ```text
-Task 1: config-loader gate
-       |
-Task 2: workspace package scaffold
-       |
-Task 3: typed config + source contracts
-       |
-Task 3A: versioned field-profile DTO
-       |
-Task 3B: project profile registry integration
-       |
-Task 3C: explicit cross-field effect contract
-       |
-Task 4: root/project discovery
-       |
-Task 5: first artifact-generation vertical slice
-       |
-Task 5A: resolve effects against generated nodes
-       |
-Task 6A: generic CLI
+Task 1 -> Task 2 -> Task 3
+Task 3 -> Task 4: root/project discovery
+Task 3 -> Task 3A -> Task 3B: project profile registry integration
+Tasks 3B + 4 -> Task 5: first artifact-generation vertical slice
+Task 3B -> Task 3C: explicit cross-field effect contract
+Tasks 3C + 5 -> Task 5A: resolve effects against generated nodes
+Task 5A -> Task 6A: generic CLI
        |
 Task 6B: multi-package consumer fixture
        |
@@ -127,8 +116,8 @@ contains explicit effects only.
 
 | Requirement | Decision | Tasks | Verification | Status |
 | --- | --- | --- | --- | --- |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | 32 focused loader/config/source tests plus 2 consumer fixture tests; discovery, runner, and CLI fixture assertions remain | Tasks 1–3 and Task 6B fixture shell implemented; Tasks 4–6A and remaining 6B assertions planned |
-| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, and canonical-hash tests | Planned; architecture researched |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery tests plus 2 consumer fixture tests; runner and CLI fixture assertions remain | Tasks 1–4 and Task 6B fixture shell implemented; Tasks 5–6A and remaining 6B assertions planned |
+| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, and canonical-hash tests | Tasks 3A–3B implemented; node/artifact projection follows in Task 5 |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | Inventory and scaffolds are build-time evidence only | Tasks 7A–8B | Angular inventory, negative inference, and scenario tests | Planned; prototype complete |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Planned; architecture researched |
 
@@ -237,19 +226,24 @@ precedence decision.
 
 **Acceptance criteria:**
 
-- [ ] Runtime validation rejects unknown keys, malformed identities/versions,
+- [x] Runtime validation rejects unknown keys, malformed identities/versions,
       duplicate parts, missing references, invalid value projections, and
       contradictory generic-driver capabilities.
-- [ ] The DTO distinguishes profile data from executable driver
+- [x] The DTO distinguishes profile data from executable driver
       implementations and records stable profile/driver ID plus version.
-- [ ] Canonical serialization and hashing are deterministic and version
+- [x] Canonical serialization and hashing are deterministic and version
       sensitive.
 
 **Verification:**
 
-- [ ] Focused schema tests cover every union branch and negative validation
+- [x] Focused schema tests cover every union branch and negative validation
       category.
-- [ ] Equivalent registries produce byte-identical canonical output and hashes.
+- [x] Contract-domain source/completeness combinations and generic
+      repeater/wrapper role-cardinality surfaces are enforced by regression
+      tests.
+- [x] Strict JSON validation rejects non-index array properties, and generic
+      drivers reject interaction/value-shape combinations they cannot execute.
+- [x] Equivalent registries produce byte-identical canonical output and hashes.
 
 **Dependencies:** Task 3; maintainer approval of the v0.4 profile DTO and
 precedence/conflict rules
@@ -272,18 +266,18 @@ become a central list of application field types.
 
 **Acceptance criteria:**
 
-- [ ] Project profiles resolve deterministically with explicit conflict and
+- [x] Project profiles resolve deterministically with explicit conflict and
       unmapped-type diagnostics; no silent last-write-wins behavior exists.
-- [ ] Resolved configuration contains JSON-safe profile data and stable
+- [x] Resolved configuration contains JSON-safe profile data and stable
       identities only, never Angular components or executable driver functions.
-- [ ] Profile registry identity participates in resolved configuration and
-      artifact provenance.
+- [x] Profile registry identity participates in resolved configuration. Task 5
+      carries that already-resolved identity into artifact provenance.
 
 **Verification:**
 
-- [ ] Focused tests cover multiple projects, duplicate IDs, wrapper/variant
+- [x] Focused tests cover multiple projects, duplicate IDs, wrapper/variant
       conflicts, unmapped types, and changed profile versions.
-- [ ] A profile change changes the resolved hash while reordered equivalent
+- [x] A profile change changes the resolved hash while reordered equivalent
       input does not.
 
 **Dependencies:** Task 3A
@@ -346,19 +340,19 @@ provenance. Discovery must not import arbitrary files outside matched configs.
 
 **Acceptance criteria:**
 
-- [ ] Project configs across `apps`, `libs`, and `packages` are sorted by
+- [x] Project configs across `apps`, `libs`, and `packages` are sorted by
       normalized workspace-relative path and stable project ID.
-- [ ] Duplicate project/source IDs fail before any form factory executes.
-- [ ] Discovery output records config paths and plugin identities without
+- [x] Duplicate project/source IDs fail before any form factory executes.
+- [x] Discovery output records config paths and plugin identities without
       timestamps or environment-dependent ordering.
 
 **Verification:**
 
-- [ ] Focused tests cover globs, exclusions, duplicates, empty workspaces, and
+- [x] Focused tests cover globs, exclusions, duplicates, empty workspaces, and
       paths containing spaces.
-- [ ] Consecutive discovery runs return identical canonical output.
+- [x] Consecutive discovery runs return identical canonical output.
 
-**Dependencies:** Tasks 1 and 3C
+**Dependencies:** Tasks 1 and 3
 
 **Files likely touched:**
 
@@ -396,7 +390,7 @@ workspace index.
 - [ ] A duplicate form ID and a throwing factory leave no falsely successful
       aggregate index.
 
-**Dependencies:** Task 4
+**Dependencies:** Tasks 3B and 4
 
 **Files likely touched:**
 
@@ -432,7 +426,7 @@ only validated declared effects into artifacts and the workspace index.
 - [ ] Golden artifacts distinguish declared effects from dependency candidates,
       opaque signals, and observed scenario deltas.
 
-**Dependencies:** Task 5
+**Dependencies:** Tasks 3C and 5
 
 **Files likely touched:**
 

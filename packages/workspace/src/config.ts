@@ -1,6 +1,10 @@
 import {
   canonicalStringify,
+  canonicalizeFieldTypeProfileRegistry,
+  computeFieldTypeProfileRegistryHash,
+  parseFieldTypeProfileRegistry,
   type ContractDiagnosticSeverity,
+  type FieldTypeProfileRegistry,
   type JsonValue,
 } from '@formly-contract/contract-schema';
 
@@ -56,6 +60,7 @@ export interface WorkspaceRootConfig {
 export interface FormContractProjectConfig {
   readonly projectId: string;
   readonly sources?: readonly FormContractSource[];
+  readonly fieldTypeProfiles?: FieldTypeProfileRegistry;
   readonly output?: WorkspaceOutputConfig;
   readonly locators?: WorkspaceLocatorConfig;
   readonly diagnostics?: WorkspaceDiagnosticConfig;
@@ -74,6 +79,14 @@ export interface ResolvedWorkspacePluginIdentity {
   readonly options?: JsonValue;
 }
 
+export interface ResolvedFieldTypeProfileRegistry {
+  readonly schemaVersion: FieldTypeProfileRegistry['schemaVersion'];
+  readonly id: string;
+  readonly version: number;
+  readonly contentHash: string;
+  readonly registry: FieldTypeProfileRegistry;
+}
+
 export interface ResolvedWorkspaceProjectConfig {
   readonly schemaVersion: typeof WORKSPACE_CONFIG_SCHEMA_VERSION;
   readonly projectId: string;
@@ -84,6 +97,7 @@ export interface ResolvedWorkspaceProjectConfig {
   readonly failOn: readonly ContractDiagnosticSeverity[];
   readonly plugins: readonly ResolvedWorkspacePluginIdentity[];
   readonly sourceIds: readonly string[];
+  readonly fieldTypeProfiles?: ResolvedFieldTypeProfileRegistry;
   readonly tsconfigPath?: string;
 }
 
@@ -111,6 +125,7 @@ const ROOT_KEYS = new Set([
 const PROJECT_KEYS = new Set([
   'projectId',
   'sources',
+  'fieldTypeProfiles',
   'output',
   'locators',
   'diagnostics',
@@ -337,7 +352,30 @@ export function parseProjectConfig(value: unknown): FormContractProjectConfig {
   if (project.diagnostics !== undefined) {
     validateDiagnostics(project.diagnostics, 'project.diagnostics');
   }
+  if (project.fieldTypeProfiles !== undefined) {
+    try {
+      parseFieldTypeProfileRegistry(project.fieldTypeProfiles);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'unknown validation failure';
+      invalid('project.fieldTypeProfiles', `is invalid: ${message}`);
+    }
+  }
   return value as FormContractProjectConfig;
+}
+
+function resolveFieldTypeProfiles(
+  registry: FieldTypeProfileRegistry,
+): ResolvedFieldTypeProfileRegistry {
+  const canonical = canonicalizeFieldTypeProfileRegistry(registry);
+  const normalized = JSON.parse(canonical) as FieldTypeProfileRegistry;
+  return {
+    schemaVersion: normalized.schemaVersion,
+    id: normalized.id,
+    version: normalized.version,
+    contentHash: computeFieldTypeProfileRegistryHash(normalized),
+    registry: normalized,
+  };
 }
 
 function validateCliOverrides(value: WorkspaceCliOverrides): void {
@@ -419,6 +457,13 @@ export function resolveWorkspaceProjectConfig(
     sourceIds: (project.sources ?? [])
       .map((source) => source.sourceId)
       .sort(),
+    ...(project.fieldTypeProfiles === undefined
+      ? {}
+      : {
+          fieldTypeProfiles: resolveFieldTypeProfiles(
+            project.fieldTypeProfiles,
+          ),
+        }),
     ...(root.tsconfigPath === undefined
       ? {}
       : { tsconfigPath: root.tsconfigPath }),

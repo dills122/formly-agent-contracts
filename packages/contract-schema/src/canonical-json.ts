@@ -3,6 +3,38 @@ import { createHash } from 'node:crypto';
 import type { FormContract, FormContractDraft } from './contract.js';
 
 const CONTENT_HASH_PROPERTY = 'contentHash';
+const MAX_ARRAY_INDEX = 2 ** 32 - 2;
+
+/** @internal Shared by strict contract DTO validators; not part of the package barrel. */
+export function parseArrayIndexProperty(
+  key: string,
+  length: number,
+): number | undefined {
+  const index = Number(key);
+  if (
+    !Number.isInteger(index) ||
+    index < 0 ||
+    index > MAX_ARRAY_INDEX ||
+    index >= length ||
+    String(index) !== key
+  ) {
+    return undefined;
+  }
+  return index;
+}
+
+function firstMissingArrayIndex(
+  sortedIndexes: readonly number[],
+): number {
+  let expected = 0;
+  for (const index of sortedIndexes) {
+    if (index !== expected) {
+      return expected;
+    }
+    expected += 1;
+  }
+  return expected;
+}
 
 function describeUnsupportedValue(value: unknown): string {
   if (value === null) {
@@ -47,9 +79,41 @@ function canonicalize(
 
   try {
     if (Array.isArray(value)) {
-      return `[${value
-        .map((item, index) => canonicalize(item, `${path}[${index}]`, ancestors))
-        .join(',')}]`;
+      if (Object.getOwnPropertySymbols(value).length > 0) {
+        throw new TypeError(`Symbol-keyed property at ${path}`);
+      }
+
+      const descriptors = Object.getOwnPropertyDescriptors(value);
+      const indexedDescriptors: [number, PropertyDescriptor][] = [];
+      for (const [key, descriptor] of Object.entries(descriptors)) {
+        if (key === 'length') {
+          continue;
+        }
+        const index = parseArrayIndexProperty(key, value.length);
+        if (index === undefined) {
+          if (descriptor.enumerable) {
+            throw new TypeError(`Unsupported array property at ${path}.${key}`);
+          }
+          continue;
+        }
+        if (!('value' in descriptor)) {
+          throw new TypeError(`Accessor property at ${path}[${index}]`);
+        }
+        indexedDescriptors.push([index, descriptor]);
+      }
+
+      indexedDescriptors.sort(([left], [right]) => left - right);
+      if (indexedDescriptors.length !== value.length) {
+        const missingIndex = firstMissingArrayIndex(
+          indexedDescriptors.map(([index]) => index),
+        );
+        throw new TypeError(`Sparse array element at ${path}[${missingIndex}]`);
+      }
+
+      const items = indexedDescriptors.map(([index, descriptor]) =>
+        canonicalize(descriptor.value, `${path}[${index}]`, ancestors),
+      );
+      return `[${items.join(',')}]`;
     }
 
     const prototype = Object.getPrototypeOf(value) as unknown;

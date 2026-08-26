@@ -7,6 +7,20 @@ export type {
   WorkspaceConfigLoaderOptions,
 } from './config-loader.js';
 export {
+  discoverWorkspaceProjects,
+  WorkspaceDiscoveryError,
+} from './discover-projects.js';
+export type {
+  DiscoveredWorkspace,
+  DiscoveredWorkspaceProject,
+  DiscoverWorkspaceProjectsOptions,
+  LoadedWorkspaceRootConfig,
+  WorkspaceDiscoveryErrorCode,
+  WorkspaceDiscoveryInventory,
+  WorkspacePluginInventoryEntry,
+  WorkspaceProjectInventoryEntry,
+} from './discover-projects.js';
+export {
   defineConfig,
   defineFormContractProject,
   parseProjectConfig,
@@ -16,6 +30,7 @@ export {
 } from './config.js';
 export type {
   FormContractProjectConfig,
+  ResolvedFieldTypeProfileRegistry,
   ResolvedWorkspacePluginIdentity,
   ResolvedWorkspaceProjectConfig,
   WorkspaceCliOverrides,
@@ -25,6 +40,10 @@ export type {
   WorkspacePlugin,
   WorkspaceRootConfig,
 } from './config.js';
+export {
+  loadWorkspaceProjectConfig,
+  loadWorkspaceRootConfig,
+} from './load-config.js';
 export {
   defineFormContractSource,
   parseFormContractSource,

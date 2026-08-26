@@ -55,6 +55,46 @@ describe('canonicalStringify', () => {
       'Circular value at $[0]',
     );
   });
+
+  it('rejects sparse arrays instead of colliding with dense canonical JSON', () => {
+    const leadingHole = new Array(1);
+    const nestedHole = { values: [1, , 2] };
+
+    expect(canonicalStringify([])).toBe('[]');
+    expect(() => canonicalStringify(leadingHole)).toThrow(
+      'Sparse array element at $[0]',
+    );
+    expect(() => canonicalStringify(nestedHole)).toThrow(
+      'Sparse array element at $.values[1]',
+    );
+    expect(() => canonicalStringify([undefined])).toThrow(
+      'Unsupported value at $[0]: undefined',
+    );
+  });
+
+  it('rejects enumerable array properties that are not JavaScript array indexes', () => {
+    const array: unknown[] = [];
+    Object.defineProperty(array, '4294967295', {
+      value: () => 'executable',
+      enumerable: true,
+    });
+
+    expect(() => canonicalStringify(array)).toThrow(
+      'Unsupported array property at $.4294967295',
+    );
+  });
+
+  it('rejects huge sparse arrays without scanning their declared length', () => {
+    const array: unknown[] = [];
+    Object.defineProperty(array, '4294967294', {
+      value: 'last-index',
+      enumerable: true,
+    });
+
+    expect(() => canonicalStringify(array)).toThrow(
+      'Sparse array element at $[0]',
+    );
+  });
 });
 
 describe('contract content hashing', () => {
