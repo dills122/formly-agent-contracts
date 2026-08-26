@@ -237,4 +237,17 @@ describe('parseFormContract', () => {
       'contract.contentHash does not match contract content',
     );
   });
+
+  it('rejects cycles inside contract JSON values', () => {
+    const cyclic: Record<string, unknown> = {};
+    cyclic.self = cyclic;
+    const malformed = structuredClone(completeContract) as unknown as {
+      nodes: { defaultValue?: unknown }[];
+    };
+    malformed.nodes[0]!.defaultValue = cyclic;
+
+    expect(() => parseFormContract(malformed)).toThrow(
+      'nodes[0].defaultValue.self must not contain a cycle',
+    );
+  });
 });
