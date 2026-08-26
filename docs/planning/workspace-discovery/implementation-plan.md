@@ -238,6 +238,9 @@ precedence decision.
 
 - [x] Focused schema tests cover every union branch and negative validation
       category.
+- [x] Contract-domain source/completeness combinations and generic
+      repeater/wrapper role-cardinality surfaces are enforced by regression
+      tests.
 - [x] Equivalent registries produce byte-identical canonical output and hashes.
 
 **Dependencies:** Task 3; maintainer approval of the v0.4 profile DTO and

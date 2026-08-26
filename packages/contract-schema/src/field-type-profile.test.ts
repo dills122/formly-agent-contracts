@@ -353,6 +353,21 @@ describe("parseFieldTypeProfileRegistry", () => {
     });
     expect(
       parseContractValueDomain({
+        kind: "enumerated",
+        source: "adapter",
+        completeness: "scenario",
+        evidence: "declared",
+        values: [{ id: "runtime-visible" }],
+      })
+    ).toEqual({
+      kind: "enumerated",
+      source: "adapter",
+      completeness: "scenario",
+      evidence: "declared",
+      values: [{ id: "runtime-visible" }],
+    });
+    expect(
+      parseContractValueDomain({
         kind: "dynamic",
         source: "async",
         evidence: "declared",
@@ -880,6 +895,11 @@ describe("parseFieldTypeProfileRegistry", () => {
       "add-item",
       "expand-item",
     ];
+    const incompatibleRepeaterItem = structuredClone(registry) as unknown as {
+      profiles: { parts: { role: string; cardinality: string }[] }[];
+    };
+    incompatibleRepeaterItem.profiles[5]!.parts[1]!.role = "textbox";
+    incompatibleRepeaterItem.profiles[5]!.parts[1]!.cardinality = "one";
 
     expect(() => parseFieldTypeProfileRegistry(unsupportedVersion)).toThrow(
       "generic driver generic.fill only supports version 1"
@@ -896,6 +916,40 @@ describe("parseFieldTypeProfileRegistry", () => {
     expect(() => parseFieldTypeProfileRegistry(missingExpandPart)).toThrow(
       'capability "expand-item" requires expandPart'
     );
+    expect(() =>
+      parseFieldTypeProfileRegistry(incompatibleRepeaterItem)
+    ).toThrow('generic.repeater requires part "item" to have role group');
+  });
+
+  it("rejects wrapper activation operations that cannot drive the declared part surface", () => {
+    const checkButton = structuredClone(registry) as unknown as {
+      wrappers: { preconditions: { operation: string }[] }[];
+    };
+    checkButton.wrappers[0]!.preconditions[0]!.operation = "check";
+    const clickMany = structuredClone(registry) as unknown as {
+      wrappers: { parts: { cardinality: string }[] }[];
+    };
+    clickMany.wrappers[0]!.parts[0]!.cardinality = "many";
+
+    expect(() => parseFieldTypeProfileRegistry(checkButton)).toThrow(
+      'wrapper activation operation "check" requires part "wrapper-expand" to have role checkbox or radio'
+    );
+    expect(() => parseFieldTypeProfileRegistry(clickMany)).toThrow(
+      'wrapper activation operation "click" requires part "wrapper-expand" to have cardinality one'
+    );
+  });
+
+  it("accepts a check wrapper precondition for a single checkable part", () => {
+    const checkOne = structuredClone(registry) as unknown as {
+      wrappers: {
+        parts: { role: string }[];
+        preconditions: { operation: string }[];
+      }[];
+    };
+    checkOne.wrappers[0]!.parts[0]!.role = "checkbox";
+    checkOne.wrappers[0]!.preconditions[0]!.operation = "check";
+
+    expect(parseFieldTypeProfileRegistry(checkOne)).toBe(checkOne);
   });
 
   it("blocks generic execution for codec, locator-scope, and sequence unknowns but not runtime-state variability", () => {
@@ -1040,6 +1094,38 @@ describe("parseFieldTypeProfileRegistry", () => {
         values: [Number.NaN],
       })
     ).toThrow("valueDomain.values[0] must be a finite JSON number");
+  });
+
+  it("enforces source-specific contract value-domain completeness", () => {
+    expect(() =>
+      parseContractValueDomain({
+        kind: "enumerated",
+        source: "static-options",
+        completeness: "scenario",
+        evidence: "declared",
+        values: ["one"],
+      })
+    ).toThrow('valueDomain.completeness must be "complete" for static-options');
+    expect(() =>
+      parseContractValueDomain({
+        kind: "enumerated",
+        source: "semantic-type",
+        completeness: "scenario",
+        evidence: "declared",
+        values: [false, true],
+      })
+    ).toThrow('valueDomain.completeness must be "complete" for semantic-type');
+    expect(() =>
+      parseContractValueDomain({
+        kind: "enumerated",
+        source: "resolved-options",
+        completeness: "complete",
+        evidence: "resolved",
+        values: ["one"],
+      })
+    ).toThrow(
+      'valueDomain.completeness must be "scenario" for resolved-options'
+    );
   });
 });
 

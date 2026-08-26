@@ -770,11 +770,18 @@ export function parseContractValueDomain(input: unknown): ContractValueDomain {
     ) {
       throw new TypeError(`${path}.source is unsupported`);
     }
-    const expectedCompleteness =
-      domain.source === 'resolved-options' ? 'scenario' : 'complete';
-    if (domain.completeness !== expectedCompleteness) {
+    const allowedCompleteness: readonly string[] =
+      domain.source === 'resolved-options'
+        ? ['scenario']
+        : domain.source === 'adapter'
+          ? ['complete', 'scenario']
+          : ['complete'];
+    if (!allowedCompleteness.includes(domain.completeness as string)) {
+      const expectedCompleteness = allowedCompleteness
+        .map((value) => `"${value}"`)
+        .join(' or ');
       throw new TypeError(
-        `${path}.completeness must be "${expectedCompleteness}" for ${domain.source}`,
+        `${path}.completeness must be ${expectedCompleteness} for ${domain.source}`,
       );
     }
     const values = requireArray(domain.values, `${path}.values`);
@@ -1107,6 +1114,14 @@ function validateGenericCapabilitySurface(
         ['button'],
         'many',
       );
+      requireGenericPartSurface(
+        parts,
+        interaction.itemPart,
+        driverId,
+        ['group'],
+        'many',
+      );
+      return;
   }
 }
 
@@ -1326,7 +1341,8 @@ function validateWrapper(
   requireToken(wrapper.wrapperName, `${path}.wrapperName`);
   requireDeclaredEvidence(wrapper.evidence, `${path}.evidence`);
   const parts = validateParts(wrapper.parts, `${path}.parts`);
-  const partNames = new Set(parts.map(({ name }) => name));
+  const partsByName = new Map(parts.map((part) => [part.name, part]));
+  const partNames = new Set(partsByName.keys());
   const preconditions = requireArray(
     wrapper.preconditions,
     `${path}.preconditions`,
@@ -1338,12 +1354,31 @@ function validateWrapper(
     if (precondition.kind !== 'activate') {
       throw new TypeError(`${itemPath}.kind is unsupported`);
     }
-    requirePartReference(precondition.part, `${itemPath}.part`, partNames);
+    const partName = requirePartReference(
+      precondition.part,
+      `${itemPath}.part`,
+      partNames,
+    );
     if (
       precondition.operation !== 'click' &&
       precondition.operation !== 'check'
     ) {
       throw new TypeError(`${itemPath}.operation is unsupported`);
+    }
+    const part = partsByName.get(partName)!;
+    const allowedRoles =
+      precondition.operation === 'click'
+        ? (['button'] as const)
+        : (['checkbox', 'radio'] as const);
+    if (!(allowedRoles as readonly string[]).includes(part.role)) {
+      throw new TypeError(
+        `wrapper activation operation "${precondition.operation}" requires part "${partName}" to have role ${allowedRoles.join(' or ')}`,
+      );
+    }
+    if (part.cardinality !== 'one') {
+      throw new TypeError(
+        `wrapper activation operation "${precondition.operation}" requires part "${partName}" to have cardinality one`,
+      );
     }
     requireDeclaredEvidence(precondition.evidence, `${itemPath}.evidence`);
   });
