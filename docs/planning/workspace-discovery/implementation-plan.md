@@ -1,9 +1,13 @@
 # Implementation Plan: Distributed Workspace Form Discovery
 
-Status: draft for maintainer review; implementation has not started
+Status: in progress; Tasks 1–3 configuration bedrock, the deep Task 6B
+consumer fixture, and a real Nx integration anchor implemented
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)
+
+Profile architecture research:
+[v0.4 Field-Type Adapter Research](../../research/v0.4-field-type-adapter.md)
 
 Proposed decision:
 [ADR 0007](../../decisions/0007-distributed-workspace-discovery.md)
@@ -13,9 +17,13 @@ Proposed decision:
 Build a typed workspace layer that discovers project-local Formly contract
 sources across applications, libraries, and packages. The first vertical slice
 must turn one root config and several project configs into deterministic
-contract artifacts without Angular or Nx coupling. Angular and Nx integrations
-then add distributed providers, trusted scenario compilation, inferred tasks,
-and affected execution. Runtime capture remains an optional migration phase.
+contract artifacts without Angular or Nx coupling. The project configuration
+also becomes the ownership boundary for application field-type profile
+registries, while versioned profile DTOs remain in the schema package and
+profile resolution remains in the Formly adapter. Angular and Nx integrations
+then add distributed providers, trusted scenario compilation, adapter
+scaffolding, inferred tasks, and affected execution. Runtime capture remains an
+optional migration phase.
 
 The plan preserves the existing schema and extraction boundaries. No task may
 silently execute application code from an MCP request, infer arbitrary form
@@ -27,6 +35,13 @@ roots, serialize model values, or invent selectors.
 - Keep configuration, discovery, runner, and CLI together in `workspace` until
   independent consumers justify more packages.
 - Use root config for workspace policy and project config for local ownership.
+- Keep global profile policy in root config, but keep application-specific
+  field-type profiles and Angular authoring inputs in project config.
+- Put framework-neutral profile DTOs/validation in `contract-schema`, Formly
+  registration/profile resolution in `formly-adapter`, and Angular inventory
+  and scaffold generation in the optional `angular` package.
+- Store only serializable profiles and stable driver IDs/versions in contracts;
+  executable Playwright drivers remain outside this increment.
 - Treat source catalogs as the unit of integration so one adapter can expose
   many forms.
 - Use Jiti as the leading TypeScript config-loader candidate, subject to an
@@ -45,9 +60,17 @@ Task 2: workspace package scaffold
        |
 Task 3: typed config + source contracts
        |
+Task 3A: versioned field-profile DTO
+       |
+Task 3B: project profile registry integration
+       |
+Task 3C: explicit cross-field effect contract
+       |
 Task 4: root/project discovery
        |
 Task 5: first artifact-generation vertical slice
+       |
+Task 5A: resolve effects against generated nodes
        |
 Task 6A: generic CLI
        |
@@ -60,6 +83,8 @@ Task 7A: Angular package scaffold
 Task 7B: Angular provider bridge
        |
 Task 8: trusted Angular scenario host
+       |
+Task 8B: Angular field-profile authoring
        |
 Checkpoint B: Angular pilot
        |
@@ -92,6 +117,21 @@ Task 15C: package/release smoke
 Task 15D: independent review
 ```
 
+The cross-field effects research item `RS-EFFECTS-01` is complete. It approves
+an explicit application-declared effect graph, conditionally approves derived
+string/scenario evidence as non-authoritative authoring aids, and rejects
+automatic semantic-verb inference. The first production slice therefore
+contains explicit effects only.
+
+## Cross-plan traceability
+
+| Requirement | Decision | Tasks | Verification | Status |
+| --- | --- | --- | --- | --- |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | 32 focused loader/config/source tests plus 2 consumer fixture tests; discovery, runner, and CLI fixture assertions remain | Tasks 1–3 and Task 6B fixture shell implemented; Tasks 4–6A and remaining 6B assertions planned |
+| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, and canonical-hash tests | Planned; architecture researched |
+| `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | Inventory and scaffolds are build-time evidence only | Tasks 7A–8B | Angular inventory, negative inference, and scenario tests | Planned; prototype complete |
+| `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Planned; architecture researched |
+
 ## Phase 0: Fail-fast feasibility and contracts
 
 ### Task 1: Prove the trusted config-loading boundary
@@ -103,16 +143,16 @@ selected loader satisfies the supported Node range.
 
 **Acceptance criteria:**
 
-- [ ] The async loader reads all four representative config/module formats.
-- [ ] Path aliases resolve only when an explicit project `tsconfig` is supplied.
-- [ ] A malformed export and a missing file produce stable, actionable errors.
+- [x] The async loader reads all four representative config/module formats.
+- [x] Path aliases resolve only when an explicit project `tsconfig` is supplied.
+- [x] A malformed export and a missing file produce stable, actionable errors.
 
 **Verification:**
 
-- [ ] Focused loader fixture tests pass on Node `22.22.1`.
-- [ ] CI covers the minimum supported Node version or the engine floor is
+- [x] Focused loader fixture tests pass on Node `22.22.1`.
+- [x] CI covers the minimum supported Node version or the engine floor is
       intentionally raised before publication.
-- [ ] The research document records the observed commands and result.
+- [x] The research document records the observed commands and result.
 
 **Dependencies:** None
 
@@ -131,14 +171,14 @@ this task.
 
 **Acceptance criteria:**
 
-- [ ] `@formly-agent-contracts/workspace` builds as ESM with declarations.
-- [ ] Its dependency graph includes schema/adapter but no Angular or Nx package.
-- [ ] Package metadata and exports follow the two existing public packages.
+- [x] `@formly-agent-contracts/workspace` builds as ESM with declarations.
+- [x] Its dependency graph includes schema/adapter but no Angular or Nx package.
+- [x] Package metadata and exports follow the two existing public packages.
 
 **Verification:**
 
-- [ ] `pnpm --filter @formly-agent-contracts/workspace build`
-- [ ] `pnpm lint`
+- [x] `pnpm --filter @formly-agent-contracts/workspace build`
+- [x] `pnpm lint`
 
 **Dependencies:** Task 1
 
@@ -160,16 +200,20 @@ loading files yet.
 
 **Acceptance criteria:**
 
-- [ ] `defineConfig` and `defineFormContractProject` are typed identity helpers.
-- [ ] Runtime validation rejects unknown keys, duplicate plugin IDs, invalid
+- [x] `defineConfig` and `defineFormContractProject` are typed identity helpers.
+- [x] Runtime validation rejects unknown keys, duplicate plugin IDs, invalid
       globs/paths, unsafe output locations, and malformed source definitions.
-- [ ] Precedence is documented as defaults, root config, project config, then
+- [x] Integration presets can retain JSON-safe plugin options, while executable
+      lifecycle hooks remain outside resolved configuration.
+- [x] Configuration-only project descriptors may omit sources and resolve to an
+      empty source inventory.
+- [x] Precedence is documented as defaults, root config, project config, then
       explicit CLI override; supported arrays replace rather than deep-merge.
 
 **Verification:**
 
-- [ ] Focused config validation tests cover valid and invalid inputs.
-- [ ] Equivalent inputs produce byte-identical resolved JSON-safe config.
+- [x] Focused config validation tests cover valid and invalid inputs.
+- [x] Equivalent inputs produce byte-identical resolved JSON-safe config.
 
 **Dependencies:** Task 2
 
@@ -179,6 +223,116 @@ loading files yet.
 - `packages/workspace/src/config.test.ts`
 - `packages/workspace/src/source.ts`
 - `packages/workspace/src/index.ts`
+
+**Estimated scope:** Medium
+
+### Task 3A: Define the versioned field-type profile contract (`REQ-PROFILE-01`)
+
+**Description:** Promote only the approved, framework-neutral portion of the
+field-type profile spike into a strict runtime DTO. Define semantic parts,
+interaction vocabulary, value-domain projection, wrapper preconditions,
+profile/driver identity, evidence, and unknowns without Angular or Playwright
+types. This task begins only after the maintainer approves the DTO and profile
+precedence decision.
+
+**Acceptance criteria:**
+
+- [ ] Runtime validation rejects unknown keys, malformed identities/versions,
+      duplicate parts, missing references, invalid value projections, and
+      contradictory generic-driver capabilities.
+- [ ] The DTO distinguishes profile data from executable driver
+      implementations and records stable profile/driver ID plus version.
+- [ ] Canonical serialization and hashing are deterministic and version
+      sensitive.
+
+**Verification:**
+
+- [ ] Focused schema tests cover every union branch and negative validation
+      category.
+- [ ] Equivalent registries produce byte-identical canonical output and hashes.
+
+**Dependencies:** Task 3; maintainer approval of the v0.4 profile DTO and
+precedence/conflict rules
+
+**Files likely touched:**
+
+- `packages/contract-schema/src/field-type-profile.ts`
+- `packages/contract-schema/src/field-type-profile.test.ts`
+- `packages/contract-schema/src/index.ts`
+
+**Estimated scope:** Medium
+
+### Task 3B: Integrate project-owned profile registries (`REQ-PROFILE-01`)
+
+**Description:** Let each project descriptor contribute a serializable
+field-type profile registry, resolve it against Formly types/wrappers/approved
+variants, and carry its canonical identity into resolved workspace
+configuration. Root configuration controls policy and defaults but does not
+become a central list of application field types.
+
+**Acceptance criteria:**
+
+- [ ] Project profiles resolve deterministically with explicit conflict and
+      unmapped-type diagnostics; no silent last-write-wins behavior exists.
+- [ ] Resolved configuration contains JSON-safe profile data and stable
+      identities only, never Angular components or executable driver functions.
+- [ ] Profile registry identity participates in resolved configuration and
+      artifact provenance.
+
+**Verification:**
+
+- [ ] Focused tests cover multiple projects, duplicate IDs, wrapper/variant
+      conflicts, unmapped types, and changed profile versions.
+- [ ] A profile change changes the resolved hash while reordered equivalent
+      input does not.
+
+**Dependencies:** Task 3A
+
+**Files likely touched:**
+
+- `packages/workspace/src/config.ts`
+- `packages/workspace/src/config.test.ts`
+- `packages/formly-adapter/src/field-type-profiles.ts`
+- `packages/formly-adapter/src/field-type-profiles.test.ts`
+- affected public indexes
+
+**Estimated scope:** Medium
+
+### Task 3C: Define explicit cross-field effect configuration (`REQ-EFFECTS-01`)
+
+**Description:** Define the smallest strict DTO for application-declared
+cross-field effects and let project/form descriptors contribute those records.
+Each effect identifies a stable trigger node/event, target node/property,
+semantic kind, timing/readiness, optional condition rule, ordering, evidence,
+and opacity. Derived string references, opaque signals, and scenario deltas are
+separate evidence records and are not part of this first actionable slice.
+
+**Acceptance criteria:**
+
+- [ ] Runtime validation rejects unknown keys, malformed identities, missing
+      timing/readiness data, contradictory ordering, and non-declared authority.
+- [ ] Project/form configuration carries serializable effect data only and
+      cannot embed callbacks, services, or executable readiness behavior.
+- [ ] Canonical serialization and hashing include effect identity/version and
+      are stable under equivalent input ordering.
+
+**Verification:**
+
+- [ ] Focused schema/config tests cover sync, async, conditional, invalid,
+      duplicate, and unknown-field branches.
+- [ ] Tests prove derived dependency candidates and scenario deltas cannot be
+      accepted as actionable effects.
+
+**Dependencies:** Task 3B; maintainer approval of the explicit-effect DTO,
+cycle policy, readiness vocabulary, and condition-rule linkage
+
+**Files likely touched:**
+
+- `packages/contract-schema/src/cross-field-effect.ts`
+- `packages/contract-schema/src/cross-field-effect.test.ts`
+- `packages/workspace/src/config.ts`
+- `packages/workspace/src/config.test.ts`
+- affected public indexes
 
 **Estimated scope:** Medium
 
@@ -204,7 +358,7 @@ provenance. Discovery must not import arbitrary files outside matched configs.
       paths containing spaces.
 - [ ] Consecutive discovery runs return identical canonical output.
 
-**Dependencies:** Tasks 1 and 3
+**Dependencies:** Tasks 1 and 3C
 
 **Files likely touched:**
 
@@ -230,7 +384,10 @@ workspace index.
 - [ ] Form IDs are globally unique and output paths cannot escape the configured
       artifact directory.
 - [ ] The workspace index records contract hashes, source/project IDs, evidence,
-      config/plugin identities, and diagnostics without model values.
+      config/plugin/profile-registry identities, and diagnostics without model
+      values.
+- [ ] Unmapped custom field types remain discoverable but non-operable and are
+      reported with stable project/form/type provenance.
 
 **Verification:**
 
@@ -248,6 +405,42 @@ workspace index.
 - `packages/workspace/src/workspace-index.ts`
 - `packages/workspace/src/workspace-index.test.ts`
 - `packages/workspace/src/index.ts`
+
+**Estimated scope:** Medium
+
+### Task 5A: Resolve explicit effects against generated contracts (`REQ-EFFECTS-01`)
+
+**Description:** After form contracts and stable node IDs exist, validate each
+declared effect against the generated node namespace, field-profile target and
+readiness capabilities, condition rules, and deterministic cycle policy. Carry
+only validated declared effects into artifacts and the workspace index.
+
+**Acceptance criteria:**
+
+- [ ] Unknown endpoints, unsupported target/readiness capabilities, duplicate
+      effect IDs, unresolved condition rules, and configured cycle violations
+      fail with stable project/form/effect provenance.
+- [ ] Effect registry identity contributes to contract and workspace hashes;
+      no model value or executable behavior enters artifacts.
+- [ ] Opaque behavior makes analysis completeness explicit; edge absence never
+      proves independence or unreachability when coverage is incomplete.
+
+**Verification:**
+
+- [ ] Focused integration tests cover valid sync/async effects, stable endpoint
+      resolution, readiness/profile linkage, SCC diagnostics, and stale IDs.
+- [ ] Golden artifacts distinguish declared effects from dependency candidates,
+      opaque signals, and observed scenario deltas.
+
+**Dependencies:** Task 5
+
+**Files likely touched:**
+
+- `packages/formly-adapter/src/resolve-effects.ts`
+- `packages/formly-adapter/src/resolve-effects.test.ts`
+- `packages/workspace/src/run-workspace.ts`
+- `packages/workspace/src/run-workspace.test.ts`
+- workspace index/golden fixtures
 
 **Estimated scope:** Medium
 
@@ -269,7 +462,7 @@ workspace index.
 - [ ] CLI unit tests cover parsing and exit behavior.
 - [ ] Focused CLI tests execute all three commands against temporary fixtures.
 
-**Dependencies:** Task 5
+**Dependencies:** Task 5A
 
 **Files likely touched:**
 
@@ -281,15 +474,28 @@ workspace index.
 
 ### Task 6B: Prove the CLI in a consumer-shaped monorepo fixture
 
-**Description:** Add a small synthetic monorepo fixture containing one app, two
-libraries, a root config, and project configs that use a factory map and a
-registry adapter. Keep each fixture module intentionally small.
+**Description:** Add a small synthetic Angular monorepo fixture containing one
+app, a base Formly library, a reusable forms/custom-fields library, a consuming
+feature library, a root config, and local project configs. Extend it with a
+factory map and registry adapter when the CLI runner exists. Keep each fixture
+module intentionally small and keep browser/runtime entry points separate from
+Node-oriented discovery descriptors.
 
 **Acceptance criteria:**
 
-- [ ] The fixture requires one root config and one config per form-owning
-      project, not one root entry per form.
-- [ ] At least six forms are exposed through two bulk source patterns.
+- [x] The fixture requires one root config and one config per project boundary,
+      not one root entry per form.
+- [x] Configuration-only app and base-Formly projects resolve without fake
+      sources.
+- [x] A feature form composes reusable fragments and the
+      `cool-radio-btn-grp` custom field across library boundaries.
+- [x] Angular production compilation proves Node-only discovery dependencies do
+      not leak into the browser graph.
+- [x] At least six forms are exposed through two bulk source patterns.
+- [ ] At least one project config registers one field profile reused by
+      multiple form instances without per-form profile declarations.
+- [ ] At least one form declares an explicit effect whose endpoints resolve to
+      generated stable node IDs and profile capabilities.
 - [ ] Generated artifacts and the workspace index match committed golden files.
 
 **Verification:**
@@ -302,11 +508,12 @@ registry adapter. Keep each fixture module intentionally small.
 
 **Files likely touched:**
 
-- `fixtures/workspace-monorepo/package.json`
-- `fixtures/workspace-monorepo/formly-contracts.config.ts`
-- `fixtures/workspace-monorepo/apps/demo/formly-contracts.project.ts`
-- `fixtures/workspace-monorepo/libs/basic/formly-contracts.project.ts`
-- `fixtures/workspace-monorepo/libs/dynamic/formly-contracts.project.ts`
+- `fixtures/angular-monorepo/package.json`
+- `fixtures/angular-monorepo/formly-contracts.config.ts`
+- `fixtures/angular-monorepo/apps/test-app/formly-contracts.project.ts`
+- `fixtures/angular-monorepo/libs/formly-kit/formly-contracts.project.ts`
+- `fixtures/angular-monorepo/libs/forms-kit/formly-contracts.project.ts`
+- `fixtures/angular-monorepo/libs/feature-lib/formly-contracts.project.ts`
 
 **Estimated scope:** Medium; form definitions may reuse existing synthetic
 fixture exports rather than duplicate files
@@ -315,6 +522,10 @@ fixture exports rather than duplicate files
 
 - [ ] One root config discovers at least three project configs.
 - [ ] Bulk sources generate deterministic declared contracts and a safe index.
+- [ ] Project-owned profile registries resolve deterministically and contribute
+      their identity to the workspace index.
+- [ ] Explicit effects resolve against generated nodes and contribute their
+      validated identity to form and workspace hashes.
 - [ ] Linked or packed packages work from the consumer fixture.
 - [ ] Full lint, tests, builds, demo, and documentation checks pass.
 - [ ] Maintainer reviews the actual config and artifact UX before Angular/Nx API
@@ -417,12 +628,53 @@ adapter without retaining the injector or live field tree.
 
 **Estimated scope:** Medium
 
+### Task 8B: Generate Angular-assisted field-profile inventory and scaffolds (`REQ-AUTHOR-01`)
+
+**Description:** Use the configured Angular generation host to inventory the
+effective Formly type/component/inheritance/default/wrapper surface and produce
+evidence-tagged, review-required profile scaffolds from public Angular
+reflection and optional source-template analysis. The generator must preserve
+unknowns and never approve inferred interaction semantics.
+
+**Acceptance criteria:**
+
+- [ ] Inventory distinguishes raw Formly declarations from effective inherited
+      components, defaults, and wrappers in the configured project injector.
+- [ ] Native-backed candidates are tagged `derived` with explicit unknowns;
+      opaque children, parse failures, dynamic roles, and multi-step widgets do
+      not become actionable profiles automatically.
+- [ ] The report lists registered custom types with missing profiles and lazy
+      feature registrations absent from the configured generation host.
+
+**Verification:**
+
+- [ ] Focused tests retain the native-backed, overlay, autocomplete, table,
+      repeater, opaque-child, wrapper, variant, and inherited-type matrix from
+      the research spike.
+- [ ] Angular production compilation and `pnpm check` pass.
+
+**Dependencies:** Tasks 3B and 8
+
+**Files likely touched:**
+
+- `packages/angular/src/field-type-authoring.ts`
+- `packages/angular/src/field-type-authoring.test.ts`
+- `packages/angular/src/index.ts`
+- synthetic Angular integration fixture
+
+**Estimated scope:** Medium
+
 ## Checkpoint B: Angular consumer pilot
 
 - [ ] Multiple Angular feature sources compile through one project config.
 - [ ] Both NgModule and standalone contribution are documented.
 - [ ] Trusted scenario execution is isolated from CLI/MCP query handling.
 - [ ] A work-like synthetic dynamic form demonstrates locator and state results.
+- [ ] Project configuration supplies a reviewed custom-field profile registry;
+      Angular inventory/scaffolding reports coverage and unmapped types without
+      automatically authorizing derived candidates.
+- [ ] The complex-widget research matrix remains the acceptance fixture for
+      profiles, scenario values, wrappers, and unknowns.
 - [ ] Maintainer approves the Angular host API before Nx packages depend on it.
 
 ## Phase 3: Nx integration
@@ -598,6 +850,10 @@ projects or cache assertions yet.
 
 **Estimated scope:** Medium
 
+**Anchor status:** A real Nx `23.1.1`/Angular `20.3.29` four-project workspace
+is now installed, discoverable through `nx show projects`, and production-build
+capable. Plugin registration remains pending on Tasks 10–11.
+
 ### Task 12B: Add form-owning and unrelated Nx fixture projects
 
 **Description:** Add three minimal projects: one form-owning application, one
@@ -625,6 +881,12 @@ Keep project configs and synthetic forms colocated in one small file per project
 - fixture baseline artifact/index files
 
 **Estimated scope:** Medium
+
+**Anchor status:** The workspace already contains application, feature,
+shared-form, and Formly-base projects with the expected static dependency chain
+and two representative source definitions. Inferred contract targets,
+project-isolated artifacts, and the intentionally unrelated invalidation case
+remain pending on the Nx package.
 
 ### Task 12C: Prove caching and affected execution end to end
 
@@ -654,6 +916,11 @@ artifact outputs.
 - CI workflow for the supported Nx fixture
 
 **Estimated scope:** Medium
+
+**Anchor status:** The ordinary Angular production target is cacheable and a
+second identical run has been demonstrated as a local Nx cache hit. Affected
+contract-target behavior remains pending until the inferred target/executor
+exists.
 
 ## Checkpoint C: Workplace-ready discovery path
 

@@ -1,0 +1,7 @@
+{
+  "name": "fixture-nx-feature-lib",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/feature-lib/src",
+  "tags": ["scope:fixture", "type:feature"]
+}

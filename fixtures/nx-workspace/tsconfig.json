@@ -1,0 +1,33 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": ".",
+    "experimentalDecorators": true,
+    "lib": ["ES2022", "DOM"],
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "noEmit": true,
+    "paths": {
+      "@nx-fixture/feature-lib": ["libs/feature-lib/src/index.ts"],
+      "@nx-fixture/feature-lib/contracts": [
+        "libs/feature-lib/src/contracts.ts"
+      ],
+      "@nx-fixture/formly-kit": ["libs/formly-kit/src/index.ts"],
+      "@nx-fixture/forms-kit": ["libs/forms-kit/src/index.ts"],
+      "@nx-fixture/forms-kit/contracts": ["libs/forms-kit/src/contracts.ts"],
+      "@nx-fixture/forms-kit/forms": ["libs/forms-kit/src/forms.ts"],
+      "@formly-contract/contract-schema": [
+        "../../packages/contract-schema/src/index.ts"
+      ],
+      "@formly-agent-contracts/workspace": [
+        "../../packages/workspace/src/index.ts"
+      ]
+    },
+    "types": ["node", "vitest/globals"]
+  },
+  "angularCompilerOptions": {
+    "strictInjectionParameters": true,
+    "strictTemplates": true
+  },
+  "include": ["apps/**/*.ts", "libs/**/*.ts", "*.ts"]
+}

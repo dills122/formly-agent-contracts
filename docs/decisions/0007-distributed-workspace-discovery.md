@@ -31,27 +31,39 @@ projection packages.
    artifact output, locator defaults, diagnostic policy, privacy policy, and
    explicitly imported plugins.
 2. A `formly-contracts.project.*` file represents an application, library, or
-   package boundary. It exposes one or more sources and can adapt an existing
+   package boundary. Sources are optional so configuration-only applications
+   and infrastructure libraries can participate without claiming form roots.
+   Form-owning projects can expose one or more sources and adapt an existing
    registry, factory map, or feature-owned definition collection.
 3. Source catalogs return stable form IDs, fresh form factories, and optional
    synthetic scenarios. The runner sorts all discovered identities and rejects
    duplicates deterministically.
-4. `@formly-agent-contracts/workspace` owns typed configuration, runtime
+4. Project descriptors may also contribute an application-owned, serializable
+   field-type profile registry and per-form explicit cross-field effects. Root
+   configuration controls global policy; project configuration owns custom-type
+   mappings and application relationships. Resolved profile/effect identity and
+   version enter generation metadata, while executable browser drivers do not
+   enter configuration artifacts.
+5. `@formly-agent-contracts/workspace` owns typed configuration, runtime
    validation, config loading, project discovery, aggregation, artifact output,
    and the CLI. It uses a narrowly configured Jiti async loader after a
    compatibility gate proves ESM, CommonJS, TypeScript, and path-alias behavior.
-5. `@formly-agent-contracts/angular` owns multi-provider helpers,
-   application-equivalent controlled-builder setup, and an optional dev/test
-   capture extension.
-6. `@formly-agent-contracts/nx` is optional. It detects project markers, infers
+6. `@formly-agent-contracts/angular` owns multi-provider helpers,
+   application-equivalent controlled-builder setup, field-type inventory and
+   review-scaffold authoring, and an optional dev/test capture extension.
+7. `@formly-agent-contracts/nx` is optional. It detects project markers, infers
    cacheable targets, supplies an executor and generators, and supports affected
    execution without making Nx a dependency of the core packages.
-7. Plugins are trusted build-time modules that must be explicitly installed and
+8. Plugins are trusted build-time modules that must be explicitly installed and
    imported. Plugin identity and version enter generation metadata. MCP or other
    untrusted requests cannot select or execute plugins or configuration.
-8. Runtime Formly capture is migration and coverage evidence only. It remains
+9. Runtime Formly capture is migration and coverage evidence only. It remains
    distinct from declared inventory and must report that unvisited forms may be
    missing.
+10. Optional integration packages are convenience layers over the workspace
+    contracts. They may provide typed presets and hide routine wiring, but they
+    must resolve through the same generic validation, identity, provenance, and
+    precedence rules rather than creating parallel configuration systems.
 
 The initial package graph is:
 
@@ -76,6 +88,12 @@ increment.
   workplace-specific adapter.
 - New form-owning libraries become discoverable by adding a local project
   marker that matches the root config glob; the root config does not change.
+- Configuration-only application and base-Formly projects can share the same
+  root policy without fake source catalogs.
+- Consumer libraries need separate runtime-safe form/factory and Node-oriented
+  contract entry points when their discovery descriptors import build tooling.
+- One reviewed field-type profile can serve every use of that custom Formly
+  type within a project instead of requiring per-form interaction metadata.
 - The generic workspace runner works without Nx, while Nx users gain inferred,
   cacheable, affected tasks.
 - TypeScript config loading becomes a trusted executable boundary with runtime
@@ -125,17 +143,28 @@ security and determinism surface that form discovery does not require.
 
 The detailed evidence, comparison, unknowns, estimates, and proof-of-concept
 gate are retained in
-[Scalable Form Discovery and Registration](../research/form-discovery-dx.md).
+[Scalable Form Discovery and Registration](../research/form-discovery-dx.md)
+and [v0.4 Field-Type Adapter Research](../research/v0.4-field-type-adapter.md).
 
 This ADR becomes Accepted only after a proof of concept demonstrates:
 
 - root and project config loading across representative module formats;
 - deterministic discovery and duplicate detection across three projects;
 - one bulk factory map and one existing-registry adapter;
+- one project-owned field-type profile reused across multiple form instances,
+  with deterministic identity and unmapped-type diagnostics;
+- one explicit per-form effect resolved against stable generated node IDs and
+  field-profile capabilities, without callback inference;
 - declared and trusted resolved contract generation;
 - Angular feature-provider composition without relying on unloaded lazy DI;
 - Nx cached and affected task behavior for the confirmed supported major; and
 - no model values, credentials, or live Formly objects in artifacts.
+
+Tasks 1–3 now provide the retained configuration bedrock: Jiti compatibility
+fixtures, the ESM workspace package, strict root/project/source validation,
+stable plugin identities, and deterministic policy resolution. Project
+discovery, artifact generation, and integration-package presets remain gates
+before this ADR becomes Accepted.
 
 ## Sources
 

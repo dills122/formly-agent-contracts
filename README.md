@@ -22,25 +22,31 @@ is not a dump of Formly's live runtime objects.
 
 ## What exists today
 
-This repository currently provides schema v0.3 and two workspace packages:
+This repository currently provides schema v0.3 and three packages:
 
 | Package | Purpose |
 | --- | --- |
 | `@formly-contract/contract-schema` | Contract DTOs, runtime validation, canonical JSON, and SHA-256 content hashing |
 | `@formly-contract/formly-adapter` | Safe declared extraction and trusted scenario compilation for Formly 6.x |
+| `@formly-agent-contracts/workspace` | Experimental trusted config loading, strict root/project/source descriptors, and deterministic policy resolution |
 
 It also includes:
 
 - a deterministic CLI demo using a synthetic golden form;
 - a browser-rendered Angular test application with twelve synthetic Formly
-  fixtures; and
+  fixtures;
+- two consumer-shaped monorepo anchors: a deep Angular CLI behavior corpus and
+  a real Nx workspace with an app, base Formly setup, reusable custom-field
+  library, consuming feature library, project graph, and cached build;
 - a supported usage target of Angular 20 or newer with Formly 6.x; and
 - deep compatibility coverage for the pinned Angular `20.3.29` and Formly
   `6.1.8` reference combination.
 
 The parser and contract are the current product. A production MCP server,
-automatic Playwright generation, browser observation, and application-source
-discovery are future layers and are not shipped by this MVP.
+automatic Playwright generation, browser observation, application-source
+discovery, and artifact generation are future layers and are not shipped by
+this MVP. The workspace package currently provides their configuration bedrock,
+not a discovery runner or CLI.
 
 ## Use it in your own Angular/Formly codebase
 
@@ -448,6 +454,8 @@ packages/
   formly-adapter/     Declared extraction and trusted Formly scenario builds
 fixtures/
   synthetic-form/    Public golden form and real-builder compatibility fixture
+  angular-monorepo/  Deep six-form Angular CLI discovery/interaction corpus
+  nx-workspace/      Real four-project Nx graph, build, and cache anchor
 apps/
   demo-cli/          Prints the deterministic golden contract
   formly-test-app/   Browser-rendered Angular/Formly fixture catalog

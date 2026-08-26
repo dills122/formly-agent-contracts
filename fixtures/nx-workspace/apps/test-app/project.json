@@ -1,0 +1,51 @@
+{
+  "name": "fixture-nx-app",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "application",
+  "sourceRoot": "apps/test-app/src",
+  "tags": ["scope:fixture", "type:app"],
+  "targets": {
+    "build": {
+      "executor": "@nx/angular:application",
+      "outputs": ["{options.outputPath}"],
+      "defaultConfiguration": "production",
+      "options": {
+        "browser": "apps/test-app/src/main.ts",
+        "index": "apps/test-app/src/index.html",
+        "outputPath": "dist/apps/test-app",
+        "polyfills": ["zone.js"],
+        "styles": ["apps/test-app/src/styles.css"],
+        "tsConfig": "apps/test-app/tsconfig.app.json"
+      },
+      "configurations": {
+        "production": {
+          "budgets": [
+            {
+              "type": "initial",
+              "maximumWarning": "750kB",
+              "maximumError": "1MB"
+            }
+          ],
+          "outputHashing": "all"
+        },
+        "development": {
+          "optimization": false,
+          "sourceMap": true
+        }
+      }
+    },
+    "serve": {
+      "executor": "@angular/build:dev-server",
+      "defaultConfiguration": "development",
+      "options": { "buildTarget": "fixture-nx-app:build" },
+      "configurations": {
+        "development": {
+          "buildTarget": "fixture-nx-app:build:development"
+        },
+        "production": {
+          "buildTarget": "fixture-nx-app:build:production"
+        }
+      }
+    }
+  }
+}

@@ -18,6 +18,13 @@ import {
   RepeatSectionFieldComponent,
   SectionCardWrapperComponent,
 } from './custom-field-types.js';
+import {
+  AutocompleteFieldComponent,
+  ButtonToggleFieldComponent,
+  ExpandableRepeaterFieldComponent,
+  OverlaySelectFieldComponent,
+  TableSelectFieldComponent,
+} from './interaction-matrix-field-types.js';
 
 const postalCodePattern = /^[A-Z][0-9][A-Z] [0-9][A-Z][0-9]$/;
 
@@ -55,6 +62,11 @@ const stableTestIdExtension: FormlyExtension = {
     RatingFieldComponent,
     RepeatSectionFieldComponent,
     SectionCardWrapperComponent,
+    ButtonToggleFieldComponent,
+    OverlaySelectFieldComponent,
+    AutocompleteFieldComponent,
+    TableSelectFieldComponent,
+    ExpandableRepeaterFieldComponent,
   ],
   imports: [
     CommonModule,
@@ -64,7 +76,26 @@ const stableTestIdExtension: FormlyExtension = {
       types: [
         { name: 'currency', component: CurrencyFieldComponent },
         { name: 'rating', component: RatingFieldComponent },
+        {
+          name: 'rating-base-fixture',
+          component: RatingFieldComponent,
+          wrappers: ['section-card'],
+          defaultOptions: { props: { min: 1, max: 5 } },
+        },
+        {
+          name: 'rating-compact',
+          extends: 'rating-base-fixture',
+          defaultOptions: { props: { max: 3 } },
+        },
         { name: 'repeat-section', component: RepeatSectionFieldComponent },
+        { name: 'button-toggle', component: ButtonToggleFieldComponent },
+        { name: 'overlay-select', component: OverlaySelectFieldComponent },
+        { name: 'autocomplete', component: AutocompleteFieldComponent },
+        { name: 'table-select', component: TableSelectFieldComponent },
+        {
+          name: 'expandable-repeater',
+          component: ExpandableRepeaterFieldComponent,
+        },
       ],
       wrappers: [
         { name: 'section-card', component: SectionCardWrapperComponent },
