@@ -1546,14 +1546,15 @@ function cloneSyntheticFormState(
 export function compileFormContractScenario(
   input: CompileFormContractScenarioInput,
 ): ExtractFormResult {
+  const formState = cloneSyntheticFormState(input.formState);
+  const model = cloneSyntheticModel(input.model);
   const fields = input.createFields();
   if (!Array.isArray(fields)) {
     throw new TypeError('Scenario field factory must return an array.');
   }
 
-  const formState = cloneSyntheticFormState(input.formState);
   const root: FormlyFieldConfig = {
-    model: cloneSyntheticModel(input.model),
+    model,
     options: { formState },
     fieldGroup: fields,
   };

@@ -38,3 +38,14 @@
   patch remains within package ownership, adds no dependencies or dead code,
   bounds retained resolved data to existing contract projections, and has no
   unbounded work beyond the form tree already traversed by extraction.
+- Independent review instance 2 returned `Not ready` with one P2 finding:
+  clone validation ran after `createFields()`. Accepted the finding after the
+  reviewer reproduced one factory call and zero builder calls for invalid form
+  state.
+- Added red call-count regressions for both invalid model and form state, then
+  moved both clones ahead of `createFields()`. The focused adapter suite is
+  green (19/19), proving neither application-controlled entry point runs on
+  either failure path.
+- Re-ran `pnpm check` after the instance-2 remediation: lint, all 57 tests,
+  package/application builds, Angular production build, demo smoke, and
+  documentation checks passed.

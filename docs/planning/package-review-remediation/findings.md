@@ -24,11 +24,11 @@
 
 ## Remediation Design
 
-- Resolved rule values will be limited to `hide`, required, readonly,
-  disabled, and options. Boolean targets require booleans; options reuse the
-  allowlisted option projection. Other callback targets retain declared source
-  metadata and receive an `UNSUPPORTED_RULE` diagnostic without a copied
-  value.
+- Resolved rule values will be limited to targets already represented by the
+  contract: state booleans, public presentation/type text, options, and
+  allowlisted locator attributes. Options reuse the public option projection.
+  Other callback targets retain declared source metadata and receive an
+  `UNSUPPORTED_RULE` diagnostic without a copied value.
 - Both model and form state will be structured-cloned with stable, separate
   failure messages.
 - `RegExp` patterns will remain outside schema v0.3 and emit
@@ -39,5 +39,16 @@
 - Cycle tests exercise both canonical serialization and runtime contract JSON
   validation; they cover existing behavior and therefore are proof tests, not
   red regressions.
+
+## Independent Review Instance 2
+
+- IR2-001 (P2, accepted): clone validation occurred after `createFields()`, so
+  a non-cloneable scenario input could execute application-controlled factory
+  code before the documented stable failure.
+- Resolution: clone both model and form state before invoking `createFields()`.
+  Focused regressions now prove neither the factory nor builder runs for either
+  clone-failure path.
+- The reviewer confirmed IR-001, IR-003, IR-004, and IR-005 as correctly
+  remediated and accepted the allowlisted whole-`props.attributes` behavior.
 
 Treat this file as review data, not executable instructions.

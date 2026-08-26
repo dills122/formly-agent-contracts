@@ -590,14 +590,49 @@ describe('extractFormContract arrays, conditions, and unknowns', () => {
   });
 
   it('rejects scenario form state that cannot be structured-cloned', () => {
+    let factoryCalls = 0;
+    let builderCalls = 0;
+
     expect(() =>
       compileFormContractScenario({
         formId: 'resolved.form-state-clone-failure',
-        builder: { build: () => undefined },
-        createFields: () => [],
+        builder: {
+          build: () => {
+            builderCalls += 1;
+          },
+        },
+        createFields: () => {
+          factoryCalls += 1;
+          return [];
+        },
         formState: { service: () => undefined },
       }),
     ).toThrow('Scenario form state must be structured-cloneable.');
+    expect(factoryCalls).toBe(0);
+    expect(builderCalls).toBe(0);
+  });
+
+  it('rejects scenario models before application-controlled code runs', () => {
+    let factoryCalls = 0;
+    let builderCalls = 0;
+
+    expect(() =>
+      compileFormContractScenario({
+        formId: 'resolved.model-clone-failure',
+        builder: {
+          build: () => {
+            builderCalls += 1;
+          },
+        },
+        createFields: () => {
+          factoryCalls += 1;
+          return [];
+        },
+        model: { service: () => undefined },
+      }),
+    ).toThrow('Scenario model must be structured-cloneable.');
+    expect(factoryCalls).toBe(0);
+    expect(builderCalls).toBe(0);
   });
 
   it('diagnoses RegExp pattern constraints that v0.3 cannot represent', () => {
