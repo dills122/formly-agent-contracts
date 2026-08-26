@@ -73,25 +73,27 @@ path, and it contains no workplace-derived data.
 
 - TypeScript with strict checking
 - pnpm workspace
-- Angular `20.3.29`
-- `@ngx-formly/core` `6.1.8`
+- Angular 20 or newer as the public usage target; `20.3.29` in the reference
+  compatibility harness
+- `@ngx-formly/core` 6.x as the public peer range; `6.1.8` in the reference
+  compatibility harness
 - JSON as the portable contract representation
 - Vitest `4.1.11`, pinned in the lockfile
 - Node.js `22.22.1` for development, with a package engine range compatible with
   Angular 20's supported Node 22 releases
 
-Formly 6.1.8 declares `@angular/forms >=13.2.0`, which includes Angular 20, but
-current Formly guidance recommends Formly 7 for Angular 18 and newer. Therefore
-this exact pairing is a validated project requirement, not a general support
-claim. The first implementation checkpoint proved that it installs,
-type-checks, and can process a nested synthetic fixture through a controlled,
-component-free Formly builder harness. This is evidence for the exact pinned
-pair, not a broad compatibility claim.
+Formly 6.1.8 declares `@angular/forms >=13.2.0`, which includes Angular 20 and
+newer releases. The public package therefore accepts Formly 6.x for Angular 20+
+applications. This is a usage target rather than an exhaustive compatibility
+claim: the first implementation checkpoint proved that Angular `20.3.29` with
+Formly `6.1.8` installs, type-checks, and can process a nested synthetic fixture
+through a controlled, component-free Formly builder harness. That exact pair
+has the strongest evidence; other Angular major and Formly minor or patch
+combinations must be validated in the consuming application.
 
 Sources:
 
 - Angular version compatibility: <https://angular.dev/reference/versions>
-- Formly package and version guidance: <https://www.npmjs.com/package/@ngx-formly/core>
 - Formly 6.1.8 package metadata: <https://registry.npmjs.org/@ngx-formly%2fcore/6.1.8>
 
 ## Commands
