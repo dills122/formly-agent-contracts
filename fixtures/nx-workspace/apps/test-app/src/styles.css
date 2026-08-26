@@ -1,0 +1,46 @@
+:root {
+  color: #17221c;
+  background: #f4f1e8;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+header,
+main {
+  width: min(50rem, calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+header {
+  padding-block: 3rem 1rem;
+}
+
+.eyebrow {
+  color: #8c5527;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.feature-card {
+  padding: 2rem;
+  border: 1px solid #d3cfc2;
+  background: #fffdf7;
+}
+
+formly-field {
+  display: block;
+  margin-block: 1rem;
+}
+
+.fixture-input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem;
+}

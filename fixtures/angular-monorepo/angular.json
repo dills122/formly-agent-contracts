@@ -1,0 +1,61 @@
+{
+  "$schema": "./node_modules/@angular/cli/lib/config/schema.json",
+  "version": 1,
+  "cli": {
+    "cache": {
+      "enabled": false
+    },
+    "packageManager": "pnpm"
+  },
+  "newProjectRoot": "libs",
+  "projects": {
+    "fixture-app": {
+      "projectType": "application",
+      "root": "apps/test-app",
+      "sourceRoot": "apps/test-app/src",
+      "prefix": "fixture",
+      "architect": {
+        "build": {
+          "builder": "@angular/build:application",
+          "options": {
+            "browser": "apps/test-app/src/main.ts",
+            "index": "apps/test-app/src/index.html",
+            "outputPath": "dist/test-app",
+            "polyfills": ["zone.js"],
+            "styles": ["apps/test-app/src/styles.css"],
+            "tsConfig": "apps/test-app/tsconfig.app.json"
+          },
+          "configurations": {
+            "production": {
+              "budgets": [
+                {
+                  "type": "initial",
+                  "maximumWarning": "750kB",
+                  "maximumError": "1MB"
+                }
+              ],
+              "outputHashing": "all"
+            },
+            "development": {
+              "optimization": false,
+              "sourceMap": true
+            }
+          },
+          "defaultConfiguration": "production"
+        },
+        "serve": {
+          "builder": "@angular/build:dev-server",
+          "configurations": {
+            "production": {
+              "buildTarget": "fixture-app:build:production"
+            },
+            "development": {
+              "buildTarget": "fixture-app:build:development"
+            }
+          },
+          "defaultConfiguration": "development"
+        }
+      }
+    }
+  }
+}

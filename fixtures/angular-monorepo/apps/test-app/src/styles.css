@@ -1,0 +1,121 @@
+:root {
+  color: #17221c;
+  background: #f4f1e8;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+}
+
+header,
+main {
+  width: min(54rem, calc(100% - 2rem));
+  margin-inline: auto;
+}
+
+header {
+  padding-block: 3rem 1.5rem;
+}
+
+h1,
+h2 {
+  font-family: Georgia, "Times New Roman", serif;
+  font-weight: 500;
+}
+
+h1 {
+  margin: 0.25rem 0;
+  font-size: clamp(2.25rem, 7vw, 4.5rem);
+  line-height: 1;
+}
+
+.eyebrow {
+  color: #8c5527;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.feature-card {
+  margin-block: 1.5rem;
+  padding: 2rem;
+  border: 1px solid #d3cfc2;
+  background: #fffdf7;
+  box-shadow: 0 1rem 2.5rem rgb(38 48 42 / 8%);
+}
+
+.fixture-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 22rem), 1fr));
+  gap: 1rem;
+}
+
+.fixture-grid .feature-card {
+  margin-block: 0;
+}
+
+select,
+textarea,
+.fixture-overlay-select > button,
+.fixture-autocomplete input,
+.fixture-date-range input {
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #9ba79f;
+}
+
+.fixture-date-range {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 0.5rem;
+}
+
+.fixture-repeater,
+[role="listbox"] {
+  display: grid;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border: 1px solid #d3cfc2;
+}
+
+formly-field {
+  display: block;
+  margin-block: 1rem;
+}
+
+.fixture-input {
+  width: 100%;
+  min-height: 2.75rem;
+  padding: 0.65rem 0.75rem;
+  border: 1px solid #9ba79f;
+}
+
+.cool-radio-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  padding: 0;
+  border: 0;
+}
+
+.cool-radio-group label {
+  display: inline-flex;
+  gap: 0.4rem;
+  align-items: center;
+  padding: 0.55rem 0.75rem;
+  border: 1px solid #b0bab3;
+  border-radius: 0.25rem;
+}
+
+.model-output {
+  overflow: auto;
+  padding: 1rem;
+  color: #e7f0ea;
+  background: #1c3025;
+}

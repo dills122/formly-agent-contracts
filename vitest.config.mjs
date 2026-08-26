@@ -14,6 +14,9 @@ export default defineConfig({
       '@formly-contract/formly-adapter': fileURLToPath(
         new URL('./packages/formly-adapter/src/index.ts', import.meta.url),
       ),
+      '@formly-agent-contracts/workspace': fileURLToPath(
+        new URL('./packages/workspace/src/index.ts', import.meta.url),
+      ),
       '@formly-contract/synthetic-form': fileURLToPath(
         new URL('./fixtures/synthetic-form/src/index.ts', import.meta.url),
       ),

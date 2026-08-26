@@ -1,0 +1,7 @@
+{
+  "name": "fixture-nx-formly-kit",
+  "$schema": "../../../node_modules/nx/schemas/project-schema.json",
+  "projectType": "library",
+  "sourceRoot": "libs/formly-kit/src",
+  "tags": ["scope:fixture", "type:formly-infrastructure"]
+}

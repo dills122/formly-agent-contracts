@@ -12,6 +12,20 @@ function isLockedFormState(formState: unknown): boolean {
   return (formState as Readonly<Record<string, unknown>>).locked === true;
 }
 
+function isBetaInteractionModel(model: unknown): boolean {
+  if (typeof model !== 'object' || model === null) {
+    return false;
+  }
+  const interaction: unknown = (
+    model as Readonly<Record<string, unknown>>
+  ).interaction;
+  return (
+    typeof interaction === 'object' &&
+    interaction !== null &&
+    (interaction as Readonly<Record<string, unknown>>).toggle === 'beta'
+  );
+}
+
 function createKeyPathFields(): FormlyFieldConfig[] {
   return [
     { key: 0, type: 'input', props: { label: 'Numeric key zero' } },
@@ -120,6 +134,82 @@ function createOpaqueBehaviorFields(): FormlyFieldConfig[] {
         props: { label: 'Generated value' },
       }),
     },
+    {
+      key: 'interaction.toggle',
+      type: 'button-toggle',
+      props: {
+        label: 'Synthetic toggle choice',
+        options: [
+          { label: 'Alpha mode', value: 'alpha' },
+          { label: 'Beta mode', value: 'beta' },
+        ],
+      },
+    },
+    {
+      key: 'interaction.overlay',
+      type: 'overlay-select',
+      props: {
+        label: 'Synthetic overlay choice',
+        placeholder: 'Choose a synthetic team',
+        options: [
+          { label: 'North team', value: 'north' },
+          { label: 'South team', value: 'south' },
+        ],
+      },
+      expressions: {
+        'props.options': (field) =>
+          isBetaInteractionModel(field.model as unknown)
+            ? [
+                { label: 'East team', value: 'east' },
+                { label: 'West team', value: 'west' },
+              ]
+            : [
+                { label: 'North team', value: 'north' },
+                { label: 'South team', value: 'south' },
+              ],
+      },
+    },
+    {
+      key: 'interaction.autocomplete',
+      type: 'autocomplete',
+      props: {
+        label: 'Synthetic autocomplete',
+        options: [
+          { label: 'Amber record', value: { id: 'amber' } },
+          { label: 'Blue record', value: { id: 'blue' } },
+          { label: 'Crimson record', value: { id: 'crimson' } },
+        ],
+      },
+    },
+    {
+      key: 'interaction.selectedRows',
+      type: 'table-select',
+      defaultValue: [],
+      props: {
+        label: 'Synthetic row selector',
+        rowOptions: [
+          { id: 'row-a', label: 'Synthetic row A' },
+          { id: 'row-b', label: 'Synthetic row B' },
+        ],
+      },
+    },
+    {
+      key: 'interaction.expandedItems',
+      type: 'expandable-repeater',
+      props: {
+        label: 'Expandable synthetic items',
+        addText: 'Add expandable item',
+      },
+      fieldArray: {
+        fieldGroup: [
+          {
+            key: 'name',
+            type: 'input',
+            props: { label: 'Expandable item name' },
+          },
+        ],
+      },
+    },
   ];
 }
 
@@ -190,10 +280,18 @@ export const EDGE_CASE_TEST_FORMS = [
       'hooks',
       'form-state',
       'opaque-values',
+      'custom-types',
     ],
     create: () => ({
       fields: createOpaqueBehaviorFields(),
-      model: { generatedRows: [] },
+      model: {
+        generatedRows: [],
+        interaction: {
+          toggle: 'alpha',
+          selectedRows: [],
+          expandedItems: [{ name: 'Collapsed synthetic item' }],
+        },
+      },
       formState: { locked: false },
     }),
   },

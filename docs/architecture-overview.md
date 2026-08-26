@@ -180,6 +180,20 @@ const emailSelected = eq(
 
 Legacy string and function expressions can be recognized only when safe. Otherwise the contract records a rule ID, declared dependencies, source provenance, known scenario outcomes, and an opacity diagnostic. Arbitrary expression source is never evaluated by the MCP server.
 
+State rules and operational cross-field effects are separate contracts. A
+state rule says when one property evaluates true/false/unknown. An actionable
+effect is application-declared per form and connects stable trigger and target
+node IDs with a semantic kind, target property, ordering, timing/readiness,
+condition reference, and declared evidence.
+
+Conservative string-expression references, opaque handler/function signals,
+and controlled scenario deltas may help authors review missing declarations,
+but they never become operational verbs automatically. When opaque behavior
+makes analysis coverage incomplete, absence of an effect edge cannot prove
+independence or unreachability. Readiness capabilities remain serializable field
+profile data; trusted drivers implement validated capabilities rather than
+inventing cross-field relationships.
+
 ### 6. Field-type adapter registry
 
 Custom widgets require explicit operational semantics. Each adapter describes:
@@ -192,7 +206,13 @@ Custom widgets require explicit operational semantics. Each adapter describes:
 - Valid, invalid, and boundary value generation.
 - Option-provider and loading states.
 - UI-to-model value codec and parser identity.
-- Playwright driver implementation.
+- Stable Playwright driver ID/version and required interaction capabilities.
+
+The adapter profile is serializable data; it does not contain an executable
+Playwright implementation. Generic driver IDs are resolved by the Playwright
+compiler, while application-specific IDs resolve through a trusted application
+allowlist. Angular reflection and source/render analysis belong to the trusted
+build-time authoring host and do not run in the schema or MCP query path.
 
 One Formly field may map to multiple interactive controls. For example, a date range has start and end parts, while an address lookup may expose a search box, suggestions, and a confirmed structured value.
 

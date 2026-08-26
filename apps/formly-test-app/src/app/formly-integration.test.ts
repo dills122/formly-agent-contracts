@@ -17,6 +17,7 @@ import {
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { TestFormRegistry } from './form-registry/form-registry.js';
+import { inventoryFormlyTypes } from './formly-types/custom-field-introspection.spike.js';
 import { NativeFormlyFieldsModule } from './formly-types/native-formly-fields.module.js';
 import { TestFormlyExtensionsModule } from './formly-types/test-formly-extensions.module.js';
 import { ApplicantFormsModule } from './forms/applicant/applicant-forms.module.js';
@@ -102,13 +103,48 @@ describe('modular Angular and Formly integration', () => {
       'radio',
       'currency',
       'rating',
+      'rating-base-fixture',
+      'rating-compact',
       'repeat-section',
+      'button-toggle',
+      'overlay-select',
+      'autocomplete',
+      'table-select',
+      'expandable-repeater',
     ]) {
       expect(config.getType(typeName).component, typeName).toBeDefined();
     }
 
     expect(config.getWrapper('section-card').component).toBeDefined();
     expect(config.getValidator('postalCode').validation).toBeTypeOf('function');
+  });
+
+  it('can inventory the real Formly registry through Angular public reflection', () => {
+    const inventory = inventoryFormlyTypes(TestBed.inject(FormlyConfig));
+    const currency = inventory.find(({ formlyType }) => formlyType === 'currency');
+    const rating = inventory.find(({ formlyType }) => formlyType === 'rating');
+    const repeat = inventory.find(
+      ({ formlyType }) => formlyType === 'repeat-section',
+    );
+
+    expect(currency?.componentName).toBe('CurrencyFieldComponent');
+    expect(currency?.component?.selector).toBe('test-formly-currency');
+    expect(rating?.componentName).toBe('RatingFieldComponent');
+    expect(rating?.component?.selector).toBe('test-formly-rating');
+    expect(repeat?.componentName).toBe('RepeatSectionFieldComponent');
+    expect(repeat?.component?.selector).toBe('test-formly-repeat-section');
+
+    const compactRating = inventory.find(
+      ({ formlyType }) => formlyType === 'rating-compact',
+    );
+    expect(compactRating?.extends).toBe('rating-base-fixture');
+    expect(compactRating?.componentName).toBe('RatingFieldComponent');
+    expect(compactRating?.component?.selector).toBe('test-formly-rating');
+    expect(compactRating?.wrappers).toEqual(['section-card']);
+    expect(compactRating?.declaredDefaultOptionKeys).toEqual(['props']);
+    expect(compactRating?.effectiveDefaultOptionKeys).toEqual(['props']);
+    expect(compactRating?.declaredDefaultPropKeys).toEqual(['max']);
+    expect(compactRating?.effectiveDefaultPropKeys).toEqual(['max', 'min']);
   });
 
   it('builds every registered fixture through the configured Formly builder', () => {

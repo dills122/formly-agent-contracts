@@ -1,6 +1,6 @@
 # Research: Scalable Form Discovery and Registration
 
-Status: recommendation ready for owner decision; no implementation authorized
+Status: recommendation approved; configuration bedrock implementation in progress
 
 Decision owner: project maintainer
 
@@ -67,7 +67,10 @@ Criteria:
 - compatibility with the current Angular 20/Formly 6.1 package slice; and
 - incremental adoption without forcing a workplace-wide refactor.
 
-No workplace code or data was accessed. No implementation was performed.
+No workplace code or data was accessed. The recommendation was initially
+formed without implementation; after approval, Tasks 1–3 were implemented
+locally as a framework-neutral bedrock. Later integration packages will provide
+typed presets over the same contracts.
 
 ## Evidence
 
@@ -265,6 +268,25 @@ cannot load representative Angular factory imports without application-specific
 transforms, retain it for root/project descriptors and require source adapters
 to expose compiled or directly loadable modules.
 
+#### Config-loader gate result
+
+The retained `@formly-agent-contracts/workspace` loader uses Jiti `2.7.0` with
+filesystem and module caches disabled for the compatibility fixture and
+`tsconfigPaths` disabled unless an explicit path is supplied. The fixture
+covers ESM JavaScript, CommonJS, TypeScript, one TypeScript path alias, a
+missing file, an invalid default export, and a missing default export.
+
+Verification:
+
+```sh
+pnpm vitest run packages/workspace/src/config-loader.test.ts
+pnpm --filter @formly-agent-contracts/workspace build
+```
+
+Result on Node `22.22.1`: eight loader tests passed and the ESM package emitted
+JavaScript plus declarations. CI now repeats the loader test on Node `22.13.0`
+and `22.22.1` so the package engine floor is exercised explicitly.
+
 ### 2. Framework-neutral source contract
 
 The adapter should consume sources rather than requiring one global array:
@@ -385,6 +407,17 @@ export default defineFormContractProject({
   source: CLAIMS_FORM_SOURCE,
 });
 ```
+
+A form-owning project may also attach its reviewed, serializable field-type
+profile registry so one custom-type declaration serves every form instance in
+that project. The exact project-config property remains part of Tasks 3A–3B;
+the root config should carry global policy rather than a central list of
+application field types.
+
+The same project boundary may contribute explicit per-form cross-field effects.
+Those declarations reference stable generated node IDs and profile readiness
+capabilities; configuration must not infer semantic verbs from callbacks or
+scenario timing. Exact effect configuration and resolution are Tasks 3C and 5A.
 
 For a product that already exposes a form registry, adoption should be close to
 one file per Nx project:

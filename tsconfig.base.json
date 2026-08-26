@@ -19,6 +19,9 @@
       "@formly-contract/formly-adapter": [
         "./packages/formly-adapter/src/index.ts"
       ],
+      "@formly-agent-contracts/workspace": [
+        "./packages/workspace/src/index.ts"
+      ],
       "@formly-contract/synthetic-form": [
         "./fixtures/synthetic-form/src/index.ts"
       ]
