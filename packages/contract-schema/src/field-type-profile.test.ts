@@ -566,6 +566,15 @@ describe("parseFieldTypeProfileRegistry", () => {
     expect(() => parseFieldTypeProfileRegistry(sparse)).toThrow(
       "registry.profiles[0] must not be a sparse array element"
     );
+
+    const extraNumericProperty = structuredClone(registry);
+    Object.defineProperty(extraNumericProperty.profiles, "4294967295", {
+      value: () => "executable",
+      enumerable: true,
+    });
+    expect(() => parseFieldTypeProfileRegistry(extraNumericProperty)).toThrow(
+      "registry.profiles.4294967295 must not be an additional array property"
+    );
   });
 
   it("rejects every non-JSON primitive at its exact profile path", () => {
@@ -900,6 +909,18 @@ describe("parseFieldTypeProfileRegistry", () => {
     };
     incompatibleRepeaterItem.profiles[5]!.parts[1]!.role = "textbox";
     incompatibleRepeaterItem.profiles[5]!.parts[1]!.cardinality = "one";
+    const incompatibleFillShape = structuredClone(registry) as unknown as {
+      profiles: { valueShape: string }[];
+    };
+    incompatibleFillShape.profiles[0]!.valueShape = "object";
+    const incompatibleRowSelectionShape = structuredClone(
+      registry
+    ) as unknown as { profiles: { valueShape: string }[] };
+    incompatibleRowSelectionShape.profiles[4]!.valueShape = "scalar";
+    const incompatibleRepeaterShape = structuredClone(registry) as unknown as {
+      profiles: { valueShape: string }[];
+    };
+    incompatibleRepeaterShape.profiles[5]!.valueShape = "scalar";
 
     expect(() => parseFieldTypeProfileRegistry(unsupportedVersion)).toThrow(
       "generic driver generic.fill only supports version 1"
@@ -919,6 +940,17 @@ describe("parseFieldTypeProfileRegistry", () => {
     expect(() =>
       parseFieldTypeProfileRegistry(incompatibleRepeaterItem)
     ).toThrow('generic.repeater requires part "item" to have role group');
+    expect(() => parseFieldTypeProfileRegistry(incompatibleFillShape)).toThrow(
+      "generic driver generic.fill requires valueShape scalar"
+    );
+    expect(() =>
+      parseFieldTypeProfileRegistry(incompatibleRowSelectionShape)
+    ).toThrow(
+      "generic driver generic.row-selection requires valueShape array"
+    );
+    expect(() =>
+      parseFieldTypeProfileRegistry(incompatibleRepeaterShape)
+    ).toThrow("generic driver generic.repeater requires valueShape array");
   });
 
   it("rejects wrapper activation operations that cannot drive the declared part surface", () => {

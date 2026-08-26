@@ -1,6 +1,9 @@
 import { createHash } from 'node:crypto';
 
-import { canonicalStringify } from './canonical-json.js';
+import {
+  canonicalStringify,
+  parseArrayIndexProperty,
+} from './canonical-json.js';
 import type { ContractEvidence, JsonValue } from './contract.js';
 
 export const FIELD_TYPE_PROFILE_SCHEMA_VERSION = '0.4.0' as const;
@@ -422,28 +425,40 @@ function assertCanonicalJsonShape(
   try {
     const descriptors = Object.getOwnPropertyDescriptors(value);
     if (Array.isArray(value)) {
-      for (let index = 0; index < value.length; index += 1) {
-        const itemPath = `${path}[${index}]`;
-        const descriptor = descriptors[String(index)];
-        if (descriptor === undefined) {
-          throw new TypeError(
-            `${itemPath} must not be a sparse array element`,
-          );
+      const indexedDescriptors: [number, PropertyDescriptor][] = [];
+      for (const [key, descriptor] of Object.entries(descriptors)) {
+        if (key === 'length') {
+          continue;
         }
-        if (!('value' in descriptor)) {
-          throw new TypeError(`${itemPath} must not be an accessor property`);
-        }
-        assertCanonicalJsonShape(descriptor.value, itemPath, ancestors);
-      }
-      for (const key of Object.keys(descriptors)) {
-        if (
-          key !== 'length' &&
-          !/^(?:0|[1-9][0-9]*)$/u.test(key)
-        ) {
+        const index = parseArrayIndexProperty(key, value.length);
+        if (index === undefined) {
           throw new TypeError(
             `${path}.${key} must not be an additional array property`,
           );
         }
+        const itemPath = `${path}[${index}]`;
+        if (!('value' in descriptor)) {
+          throw new TypeError(`${itemPath} must not be an accessor property`);
+        }
+        indexedDescriptors.push([index, descriptor]);
+      }
+
+      indexedDescriptors.sort(([left], [right]) => left - right);
+      if (indexedDescriptors.length !== value.length) {
+        let missingIndex = 0;
+        for (const [index] of indexedDescriptors) {
+          if (index !== missingIndex) {
+            break;
+          }
+          missingIndex += 1;
+        }
+        throw new TypeError(
+          `${path}[${missingIndex}] must not be a sparse array element`,
+        );
+      }
+      for (const [index, descriptor] of indexedDescriptors) {
+        const itemPath = `${path}[${index}]`;
+        assertCanonicalJsonShape(descriptor.value, itemPath, ancestors);
       }
       return;
     }
@@ -1129,6 +1144,7 @@ function validateDriver(
   value: unknown,
   path: string,
   interaction: FieldTypeProfileInteraction,
+  valueShape: FieldTypeProfile['valueShape'],
   valueDomain: FieldTypeProfileValueDomain,
   parts: readonly FieldTypeProfilePart[],
   unknowns: readonly FieldTypeProfileUnknown[],
@@ -1176,6 +1192,20 @@ function validateDriver(
     if (driver.version !== 1) {
       throw new TypeError(
         `${path}: generic driver ${expected} only supports version 1`,
+      );
+    }
+    const requiredValueShape =
+      interaction.kind === 'fill'
+        ? 'scalar'
+        : interaction.kind === 'row-selection' || interaction.kind === 'repeater'
+          ? 'array'
+          : undefined;
+    if (
+      requiredValueShape !== undefined &&
+      valueShape !== requiredValueShape
+    ) {
+      throw new TypeError(
+        `${path}: generic driver ${expected} requires valueShape ${requiredValueShape}`,
       );
     }
     const blockingUnknown = unknowns.find(({ aspect }) =>
@@ -1280,6 +1310,7 @@ function validateProfile(value: unknown, path: string): FieldTypeProfile {
     profile.driver,
     `${path}.driver`,
     interaction,
+    profile.valueShape,
     valueDomain,
     parts,
     unknowns,

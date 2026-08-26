@@ -241,6 +241,8 @@ precedence decision.
 - [x] Contract-domain source/completeness combinations and generic
       repeater/wrapper role-cardinality surfaces are enforced by regression
       tests.
+- [x] Strict JSON validation rejects non-index array properties, and generic
+      drivers reject interaction/value-shape combinations they cannot execute.
 - [x] Equivalent registries produce byte-identical canonical output and hashes.
 
 **Dependencies:** Task 3; maintainer approval of the v0.4 profile DTO and
