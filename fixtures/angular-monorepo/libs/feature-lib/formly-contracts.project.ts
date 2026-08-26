@@ -1,4 +1,4 @@
-import { defineFormContractProject } from '@formly-agent-contracts/workspace';
+import { defineFormContractProject } from '@formly-contract/workspace';
 import { CLAIMS_FEATURE_SOURCE } from '@fixture/feature-lib/contracts';
 
 export default defineFormContractProject({

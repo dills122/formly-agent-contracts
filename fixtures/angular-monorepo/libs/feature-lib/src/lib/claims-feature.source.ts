@@ -1,4 +1,4 @@
-import { defineFormContractSource } from '@formly-agent-contracts/workspace';
+import { defineFormContractSource } from '@formly-contract/workspace';
 
 import { createClaimIntakeForm } from './claim-intake.form.js';
 import { createClaimsAssignmentForm } from './claims-assignment.form.js';

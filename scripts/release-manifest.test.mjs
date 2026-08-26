@@ -44,8 +44,8 @@ async function createReleaseWorkspace(overrides = {}) {
     version: '0.0.0',
     private: true,
   });
-  await writePackage(rootDirectory, 'packages/contract-schema', {
-    name: '@formly-contract/contract-schema',
+  await writePackage(rootDirectory, 'packages/schema', {
+    name: '@formly-contract/schema',
     version,
     description: 'Contract schema.',
     license: 'MIT',
@@ -59,7 +59,7 @@ async function createReleaseWorkspace(overrides = {}) {
     repository: {
       type: 'git',
       url: REPOSITORY_URL,
-      directory: 'packages/contract-schema',
+      directory: 'packages/schema',
     },
     publishConfig: {
       access: 'public',
@@ -67,8 +67,8 @@ async function createReleaseWorkspace(overrides = {}) {
     },
     ...overrides.contractSchema,
   });
-  await writePackage(rootDirectory, 'packages/formly-adapter', {
-    name: '@formly-contract/formly-adapter',
+  await writePackage(rootDirectory, 'packages/compiler', {
+    name: '@formly-contract/compiler',
     version,
     description: 'Formly adapter.',
     license: 'MIT',
@@ -82,14 +82,14 @@ async function createReleaseWorkspace(overrides = {}) {
     repository: {
       type: 'git',
       url: REPOSITORY_URL,
-      directory: 'packages/formly-adapter',
+      directory: 'packages/compiler',
     },
     publishConfig: {
       access: 'public',
       registry: 'https://registry.npmjs.org/',
     },
     dependencies: {
-      '@formly-contract/contract-schema': 'workspace:*',
+      '@formly-contract/schema': 'workspace:*',
     },
     peerDependencies: {
       '@ngx-formly/core': '>=6.0.0 <7.0.0',
@@ -106,48 +106,46 @@ async function createReleaseWorkspace(overrides = {}) {
 }
 
 describe('loadReleaseManifest', () => {
-  it('returns the synchronized public package release', async () => {
+  it('returns every publishable package', async () => {
     const rootDirectory = await createReleaseWorkspace();
 
-    const release = await loadReleaseManifest({
-      rootDirectory,
-      tag: 'v0.4.0',
-    });
+    const release = await loadReleaseManifest({ rootDirectory });
 
     expect(release).toEqual({
-      version: '0.4.0',
-      npmTag: 'latest',
       packages: [
         {
-          directory: 'packages/contract-schema',
-          name: '@formly-contract/contract-schema',
+          directory: 'packages/compiler',
+          name: '@formly-contract/compiler',
           version: '0.4.0',
         },
         {
-          directory: 'packages/formly-adapter',
-          name: '@formly-contract/formly-adapter',
+          directory: 'packages/schema',
+          name: '@formly-contract/schema',
           version: '0.4.0',
         },
       ],
     });
   });
 
-  it('rejects package versions that are not synchronized', async () => {
+  it('allows packages to version independently', async () => {
     const rootDirectory = await createReleaseWorkspace({
-      formlyAdapter: { version: '0.4.1' },
+      formlyAdapter: { version: '0.5.0' },
     });
 
-    await expect(loadReleaseManifest({ rootDirectory })).rejects.toThrow(
-      'Published package versions must match',
-    );
-  });
+    const release = await loadReleaseManifest({ rootDirectory });
 
-  it('rejects a tag that does not match the synchronized version', async () => {
-    const rootDirectory = await createReleaseWorkspace();
-
-    await expect(
-      loadReleaseManifest({ rootDirectory, tag: 'v0.4.1' }),
-    ).rejects.toThrow('Release tag v0.4.1 must equal v0.4.0');
+    expect(release.packages).toEqual([
+      {
+        directory: 'packages/compiler',
+        name: '@formly-contract/compiler',
+        version: '0.5.0',
+      },
+      {
+        directory: 'packages/schema',
+        name: '@formly-contract/schema',
+        version: '0.4.0',
+      },
+    ]);
   });
 
   it('rejects incomplete public package metadata', async () => {
@@ -158,7 +156,7 @@ describe('loadReleaseManifest', () => {
     });
 
     await expect(loadReleaseManifest({ rootDirectory })).rejects.toThrow(
-      'packages/contract-schema must publish publicly to the npm registry',
+      'packages/schema must publish publicly to the npm registry',
     );
   });
 
@@ -170,7 +168,7 @@ describe('loadReleaseManifest', () => {
     });
 
     await expect(loadReleaseManifest({ rootDirectory })).rejects.toThrow(
-      'packages/formly-adapter must declare the supported Formly 6.x peer range',
+      'packages/compiler must declare the supported Formly 6.x peer range',
     );
   });
 

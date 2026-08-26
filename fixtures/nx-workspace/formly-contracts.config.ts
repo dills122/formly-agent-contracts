@@ -1,4 +1,4 @@
-import { defineConfig } from '@formly-agent-contracts/workspace';
+import { defineConfig } from '@formly-contract/workspace';
 
 export default defineConfig({
   projectConfigs: [

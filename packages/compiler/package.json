@@ -1,5 +1,5 @@
 {
-  "name": "@formly-contract/formly-adapter",
+  "name": "@formly-contract/compiler",
   "version": "0.4.0",
   "description": "Allowlisted Formly configuration extraction for Formly Contract.",
   "author": "Dylan Steele <dylansteele57@gmail.com>",
@@ -20,7 +20,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dills122/formly-contract.git",
-    "directory": "packages/formly-adapter"
+    "directory": "packages/compiler"
   },
   "publishConfig": {
     "access": "public",
@@ -44,7 +44,7 @@
     "node": ">=22.13.0 <23"
   },
   "dependencies": {
-    "@formly-contract/contract-schema": "workspace:*"
+    "@formly-contract/schema": "workspace:*"
   },
   "peerDependencies": {
     "@ngx-formly/core": ">=6.0.0 <7.0.0"

@@ -1,10 +1,10 @@
-# `@formly-contract/formly-adapter`
+# `@formly-contract/compiler`
 
 Allowlisted extraction of Angular Formly field configuration into deterministic,
 agent-readable Form Contracts.
 
 ```sh
-pnpm add --save-dev @formly-contract/formly-adapter
+pnpm add --save-dev @formly-contract/compiler
 ```
 
 The package declares peer compatibility with `@ngx-formly/core` 6.x and is
@@ -14,7 +14,7 @@ strongest test evidence. Validate other Angular major and Formly minor or patch
 combinations in the consuming application; mileage may vary.
 
 ```ts
-import { extractFormContract } from '@formly-contract/formly-adapter';
+import { extractFormContract } from '@formly-contract/compiler';
 
 const { contract, diagnostics } = extractFormContract({
   formId: 'claims.create',

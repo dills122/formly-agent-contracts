@@ -17,9 +17,6 @@ jobs:
     name: Verify tag and release inputs
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    outputs:
-      npm_tag: ${{ steps.release.outputs.npm_tag }}
-      version: ${{ steps.release.outputs.version }}
 
     steps:
       - name: Check out repository
@@ -54,12 +51,13 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Validate release metadata and tag
-        id: release
-        run: >-
-          node scripts/release-manifest.mjs
-          --tag "$GITHUB_REF_NAME"
-          --github-output "$GITHUB_OUTPUT"
+      # Packages version independently (Changesets owns version selection).
+      # This tag is a release trigger, not a version: it does not need to
+      # equal any package's version. release-manifest.mjs only validates
+      # that every packages/* package eligible to publish has complete,
+      # consistent npm metadata.
+      - name: Validate release metadata
+        run: node scripts/release-manifest.mjs
 
       - name: Run release quality gates
         run: pnpm check
@@ -98,10 +96,12 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build public packages
-        run: |
-          pnpm --dir packages/contract-schema build
-          pnpm --dir packages/formly-adapter build
+      - name: Build workspace packages
+        # Builds every packages/* directory, published or not, in dependency
+        # order. pack-release.mjs decides which built packages are actually
+        # released; adding a new @formly-contract/* package needs no edit
+        # here.
+        run: pnpm --filter "./packages/**" build
 
       - name: Build and verify release tarballs
         run: >-
@@ -111,7 +111,7 @@ jobs:
       - name: Preserve release tarballs
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
-          name: npm-release-${{ needs.verify.outputs.version }}
+          name: npm-release-${{ github.ref_name }}
           path: ${{ runner.temp }}/release-packages/*.tgz
           if-no-files-found: error
           compression-level: 0
@@ -122,18 +122,19 @@ jobs:
 
       - name: Publish tarballs with npm trusted publishing
         shell: bash
-        env:
-          NPM_TAG: ${{ needs.verify.outputs.npm_tag }}
         run: |
           set -euo pipefail
           mapfile -t tarballs < <(
             find "$RUNNER_TEMP/release-packages" -maxdepth 1 -type f -name '*.tgz' | sort
           )
-          if [[ "${#tarballs[@]}" -ne 2 ]]; then
-            echo "Expected exactly two release tarballs, found ${#tarballs[@]}" >&2
+          if [[ "${#tarballs[@]}" -eq 0 ]]; then
+            echo "Expected at least one release tarball, found none" >&2
             exit 1
           fi
-          node scripts/publish-release.mjs --tag "$NPM_TAG" "${tarballs[@]}"
+          # Each tarball's own version decides its npm dist-tag and whether
+          # it is new; publish-release.mjs safely skips a version already on
+          # npm with matching integrity.
+          node scripts/publish-release.mjs "${tarballs[@]}"
 
   github-release:
     name: Create GitHub release
@@ -149,24 +150,17 @@ jobs:
       - name: Download release tarballs
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
         with:
-          name: npm-release-${{ needs.verify.outputs.version }}
+          name: npm-release-${{ github.ref_name }}
           path: ${{ runner.temp }}/release-packages
 
       - name: Create GitHub release with generated notes
         shell: bash
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ needs.verify.outputs.version }}
         run: |
           set -euo pipefail
-          release_args=(
-            "$GITHUB_REF_NAME"
-            "$RUNNER_TEMP"/release-packages/*.tgz
-            --generate-notes
-            --title "$GITHUB_REF_NAME"
+          gh release create "$GITHUB_REF_NAME" \
+            "$RUNNER_TEMP"/release-packages/*.tgz \
+            --generate-notes \
+            --title "$GITHUB_REF_NAME" \
             --verify-tag
-          )
-          if [[ "$VERSION" == *-* ]]; then
-            release_args+=(--prerelease --latest=false)
-          fi
-          gh release create "${release_args[@]}"

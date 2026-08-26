@@ -20,7 +20,7 @@ import {
   type FormContract,
   type JsonValue,
   type ModelPathSegment,
-} from '@formly-contract/contract-schema';
+} from '@formly-contract/schema';
 import type {
   FormlyFieldConfig,
   FormlyFormBuilder,

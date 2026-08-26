@@ -116,8 +116,8 @@ inspector is completed, it additionally exposes `pnpm mcp:inspect`.
 
 ```text
 packages/
-  contract-schema/   Versioned contract types, validation, serialization, hash
-  formly-adapter/    Recursive allowlist extraction and controlled compilation
+  schema/            Versioned contract types, validation, serialization, hash
+  compiler/          Recursive allowlist extraction and controlled compilation
 apps/
   demo-cli/          Synthetic form registration and human-readable demo
   formly-test-app/    Modular browser-rendered synthetic fixture harness

@@ -3,7 +3,7 @@ import { spawnSync } from 'node:child_process';
 import {
   parseFormContract,
   verifyContentHash,
-} from '../../packages/contract-schema/dist/index.js';
+} from '../../packages/schema/dist/index.js';
 
 function runCompiledDemo() {
   const result = spawnSync(process.execPath, ['apps/demo-cli/dist/index.js'], {

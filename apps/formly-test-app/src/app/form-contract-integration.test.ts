@@ -1,5 +1,5 @@
-import { verifyContentHash } from '@formly-contract/contract-schema';
-import { extractFormContract } from '@formly-contract/formly-adapter';
+import { verifyContentHash } from '@formly-contract/schema';
+import { extractFormContract } from '@formly-contract/compiler';
 import { describe, expect, it } from 'vitest';
 
 import { APPLICANT_TEST_FORMS } from './forms/applicant/applicant-forms.js';

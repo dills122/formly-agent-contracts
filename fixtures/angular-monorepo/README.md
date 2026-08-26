@@ -31,7 +31,7 @@ The fixture keeps three concerns separate:
 - `contracts` exports source descriptors for the Node-based config loader.
 
 This arrangement lets project descriptors use application path aliases without
-booting Angular in Jiti, and keeps `@formly-agent-contracts/workspace` and Jiti
+booting Angular in Jiti, and keeps `@formly-contract/workspace` and Jiti
 out of the application bundle.
 
 ## Commands
@@ -40,7 +40,7 @@ From the repository root:
 
 ```sh
 pnpm exec vitest run fixtures/angular-monorepo/workspace-fixture.test.ts
-pnpm --filter @formly-agent-contracts/angular-monorepo-fixture build
+pnpm --filter @formly-contract/angular-monorepo-fixture build
 pnpm fixture:angular:serve
 ```
 

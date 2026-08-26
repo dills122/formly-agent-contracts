@@ -8,13 +8,13 @@ export default defineConfig({
   // Source: https://vitest.dev/config/alias
   resolve: {
     alias: {
-      '@formly-contract/contract-schema': fileURLToPath(
-        new URL('./packages/contract-schema/src/index.ts', import.meta.url),
+      '@formly-contract/schema': fileURLToPath(
+        new URL('./packages/schema/src/index.ts', import.meta.url),
       ),
-      '@formly-contract/formly-adapter': fileURLToPath(
-        new URL('./packages/formly-adapter/src/index.ts', import.meta.url),
+      '@formly-contract/compiler': fileURLToPath(
+        new URL('./packages/compiler/src/index.ts', import.meta.url),
       ),
-      '@formly-agent-contracts/workspace': fileURLToPath(
+      '@formly-contract/workspace': fileURLToPath(
         new URL('./packages/workspace/src/index.ts', import.meta.url),
       ),
       '@formly-contract/synthetic-form': fileURLToPath(

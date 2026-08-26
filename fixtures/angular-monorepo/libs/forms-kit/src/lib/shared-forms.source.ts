@@ -1,4 +1,4 @@
-import { defineFormContractSource } from '@formly-agent-contracts/workspace';
+import { defineFormContractSource } from '@formly-contract/workspace';
 
 import type { FixtureFormInstance } from './fixture-form-instance.js';
 import { createContactFragment } from './fragments/contact.fragment.js';

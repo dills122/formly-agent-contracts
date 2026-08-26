@@ -2,7 +2,7 @@ import {
   canonicalStringify,
   type ContractNode,
   verifyContentHash,
-} from '@formly-contract/contract-schema';
+} from '@formly-contract/schema';
 import { describe, expect, it } from 'vitest';
 
 import { createGoldenContract } from './create-golden-contract.js';

@@ -30,16 +30,16 @@ From the repository root:
 
 ```sh
 pnpm exec vitest run fixtures/nx-workspace/workspace-fixture.test.ts
-pnpm --filter @formly-agent-contracts/nx-workspace-fixture show:projects
-pnpm --filter @formly-agent-contracts/nx-workspace-fixture build
+pnpm --filter @formly-contract/nx-workspace-fixture show:projects
+pnpm --filter @formly-contract/nx-workspace-fixture build
 pnpm fixture:nx:serve
 ```
 
 Run the build command twice to observe the second execution as a local Nx cache
-hit. Run `pnpm --filter @formly-agent-contracts/nx-workspace-fixture graph` to
+hit. Run `pnpm --filter @formly-contract/nx-workspace-fixture graph` to
 inspect the project graph interactively.
 
 This fixture validates the workspace shell, graph, task executor, cache, browser
 composition, and distributed Formly Contract configuration. The future
-`@formly-agent-contracts/nx` plugin will use this same workspace to prove
+`@formly-contract/nx` plugin will use this same workspace to prove
 inferred contract targets and affected execution.

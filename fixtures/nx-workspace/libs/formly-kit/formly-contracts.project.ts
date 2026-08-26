@@ -1,4 +1,4 @@
-import { defineFormContractProject } from '@formly-agent-contracts/workspace';
+import { defineFormContractProject } from '@formly-contract/workspace';
 
 export default defineFormContractProject({
   projectId: 'fixture-nx-formly-kit',
