@@ -38,6 +38,17 @@ describe('createGoldenContract', () => {
         ],
       }),
     );
+    const displayName = nodes.find(
+      ({ modelPath }) => modelPath.join('.') === 'profile.displayName',
+    );
+    expect(displayName?.locators).toContainEqual({
+      target: 'control',
+      strategy: 'testId',
+      attribute: 'data-testid',
+      value: 'profile-display-name',
+      evidence: 'declared',
+      confidence: 'exact',
+    });
     expect(nodes).toContainEqual(
       expect.objectContaining({
         modelPath: ['profile', 'email'],

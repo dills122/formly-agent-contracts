@@ -1,16 +1,17 @@
-export const FORM_CONTRACT_SCHEMA_VERSION = '0.2.0' as const;
+export const FORM_CONTRACT_SCHEMA_VERSION = '0.3.0' as const;
 
 export const CONTRACT_DIAGNOSTIC_CODES = [
   'OPAQUE_FUNCTION',
   'ASYNC_VALUE',
   'UNKNOWN_FIELD_SHAPE',
   'UNSUPPORTED_RULE',
+  'LOCATOR_DERIVATION_FAILED',
 ] as const;
 
 export type ContractDiagnosticCode =
   (typeof CONTRACT_DIAGNOSTIC_CODES)[number];
 
-export type ContractEvidence = 'declared' | 'resolved';
+export type ContractEvidence = 'declared' | 'resolved' | 'observed';
 export type ContractNodeKind = 'control' | 'group' | 'array' | 'display';
 export type ContractDiagnosticSeverity = 'warning' | 'error';
 export type ModelPathSegment = string | number;
@@ -79,6 +80,34 @@ export interface ContractNodeState {
   readonly disabled?: boolean;
 }
 
+export type ContractLocatorConfidence = 'exact' | 'derived';
+export type ContractLocatorStrategy =
+  | 'testId'
+  | 'role'
+  | 'label'
+  | 'placeholder'
+  | 'domId';
+
+interface ContractLocatorBase {
+  readonly target: string;
+  readonly value: string;
+  readonly evidence: ContractEvidence;
+  readonly confidence: ContractLocatorConfidence;
+}
+
+export type ContractLocator =
+  | (ContractLocatorBase & {
+      readonly strategy: 'testId';
+      readonly attribute: string;
+    })
+  | (ContractLocatorBase & {
+      readonly strategy: 'role';
+      readonly accessibleName?: string;
+    })
+  | (ContractLocatorBase & {
+      readonly strategy: 'label' | 'placeholder' | 'domId';
+    });
+
 export interface ContractCondition {
   readonly property: string;
   readonly expression: string;
@@ -102,6 +131,7 @@ export interface ContractNode {
   readonly conditions: readonly ContractCondition[];
   readonly dynamicRules: readonly ContractDynamicRule[];
   readonly state?: ContractNodeState;
+  readonly locators: readonly ContractLocator[];
   readonly children: readonly ContractNode[];
   readonly arrayTemplate?: ContractNode;
 }

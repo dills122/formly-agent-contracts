@@ -16,6 +16,183 @@ function deepFreeze<T>(value: T): T {
 }
 
 describe('extractFormContract basic projection', () => {
+  it('projects exact test attributes and explicit accessibility candidates', () => {
+    const result = extractFormContract({
+      formId: 'locator.declared',
+      fields: [
+        {
+          key: 'email',
+          id: 'applicant-email',
+          type: 'input',
+          props: {
+            placeholder: 'Email address',
+            attributes: {
+              'data-testid': 'applicant-email-control',
+              role: 'textbox',
+              'aria-label': 'Applicant email',
+            },
+          },
+        },
+        { key: 'legacy', type: 'custom-legacy' },
+      ],
+    });
+
+    expect(result.contract.nodes[0]?.locators).toEqual([
+      {
+        target: 'control',
+        strategy: 'testId',
+        attribute: 'data-testid',
+        value: 'applicant-email-control',
+        evidence: 'declared',
+        confidence: 'exact',
+      },
+      {
+        target: 'control',
+        strategy: 'role',
+        value: 'textbox',
+        accessibleName: 'Applicant email',
+        evidence: 'declared',
+        confidence: 'exact',
+      },
+      {
+        target: 'control',
+        strategy: 'label',
+        value: 'Applicant email',
+        evidence: 'declared',
+        confidence: 'exact',
+      },
+      {
+        target: 'control',
+        strategy: 'placeholder',
+        value: 'Email address',
+        evidence: 'declared',
+        confidence: 'exact',
+      },
+      {
+        target: 'control',
+        strategy: 'domId',
+        value: 'applicant-email',
+        evidence: 'declared',
+        confidence: 'derived',
+      },
+    ]);
+    expect(result.contract.nodes[1]?.locators).toEqual([]);
+  });
+
+  it('supports custom test attributes and multi-target derived locators', () => {
+    const result = extractFormContract({
+      formId: 'locator.composite',
+      fields: [
+        {
+          key: 'period',
+          type: 'date-range',
+          props: {
+            attributes: { 'data-qa': 'coverage-period' },
+          },
+        },
+      ],
+      locatorOptions: {
+        testIdAttributes: ['data-qa'],
+        deriveLocators: ({ modelPath }) => {
+          const base = modelPath.join('-');
+          return [
+            {
+              target: 'start',
+              strategy: 'testId',
+              attribute: 'data-qa',
+              value: `${base}-start`,
+            },
+            {
+              target: 'end',
+              strategy: 'testId',
+              attribute: 'data-qa',
+              value: `${base}-end`,
+            },
+            {
+              target: 'start',
+              strategy: 'testId',
+              attribute: 'data-qa',
+              value: `${base}-start`,
+            },
+          ];
+        },
+      },
+    });
+
+    expect(result.contract.nodes[0]?.locators).toEqual([
+      {
+        target: 'control',
+        strategy: 'testId',
+        attribute: 'data-qa',
+        value: 'coverage-period',
+        evidence: 'declared',
+        confidence: 'exact',
+      },
+      {
+        target: 'start',
+        strategy: 'testId',
+        attribute: 'data-qa',
+        value: 'period-start',
+        evidence: 'declared',
+        confidence: 'derived',
+      },
+      {
+        target: 'end',
+        strategy: 'testId',
+        attribute: 'data-qa',
+        value: 'period-end',
+        evidence: 'declared',
+        confidence: 'derived',
+      },
+    ]);
+    expect(result.diagnostics).toEqual([]);
+  });
+
+  it('reports a stable diagnostic when locator derivation fails', () => {
+    const result = extractFormContract({
+      formId: 'locator.failure',
+      fields: [{ key: 'value', type: 'input' }],
+      locatorOptions: {
+        deriveLocators: () => {
+          throw new Error('Workplace details must not leak into diagnostics.');
+        },
+      },
+    });
+
+    expect(result.contract.nodes[0]?.locators).toEqual([]);
+    expect(result.diagnostics).toContainEqual({
+      code: 'LOCATOR_DERIVATION_FAILED',
+      severity: 'warning',
+      message: 'Locator derivation failed or returned malformed data.',
+      evidence: 'declared',
+      sourcePath: ['fields', 0, 'locatorOptions', 'deriveLocators'],
+      nodeId: 'locator.failure::path:s_value',
+    });
+  });
+
+  it('reports the same stable diagnostic for malformed derived locators', () => {
+    const result = extractFormContract({
+      formId: 'locator.malformed',
+      fields: [{ key: 'value', type: 'input' }],
+      locatorOptions: {
+        deriveLocators: () =>
+          [
+            {
+              strategy: 'testId',
+              attribute: 'data-testid',
+              value: 'must-be-discarded',
+            },
+            { strategy: 'testId', value: 'missing-attribute' } as never,
+          ],
+      },
+    });
+
+    expect(result.contract.nodes[0]?.locators).toEqual([]);
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({ code: 'LOCATOR_DERIVATION_FAILED' }),
+    );
+  });
+
   it('extracts ordered nested fields, presentation, constraints, and options without mutation', () => {
     const fields = deepFreeze<FormlyFieldConfig[]>([
       {

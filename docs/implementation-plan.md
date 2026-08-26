@@ -246,6 +246,22 @@ Cover keyless horizontal layouts, callback-driven required/readonly/options/
 visibility, display templates, and dynamic-vs-empty choices in focused and
 component-free integration tests.
 
+## Phase 5: Portable Test Locators
+
+### Task 15: Evolve the contract to v0.3
+
+Add strict, evidence-tagged, multi-target locator DTOs to every node.
+
+### Task 16: Project exact and derived locator candidates
+
+Read configured Formly test attributes and IDs, support an opt-in immutable
+identity deriver, and preserve an honest empty locator array.
+
+### Task 17: Prove resolved evidence and composite widgets
+
+Test expression-resolved test attributes through the real Formly builder and
+multiple named DOM targets under one semantic node.
+
 ### Task 6: Extract arrays, conditions, and unknowns
 
 **Description:** Extend the same vertical slice to array templates and declared

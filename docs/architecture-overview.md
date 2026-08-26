@@ -130,9 +130,16 @@ A representative control node is:
     "label": "Email address",
     "accessibleRole": "textbox"
   },
-  "locator": {
-    "testId": "claimant.email"
-  },
+  "locators": [
+    {
+      "target": "control",
+      "strategy": "testId",
+      "attribute": "data-testid",
+      "value": "claimant.email",
+      "evidence": "declared",
+      "confidence": "exact"
+    }
+  ],
   "constraints": [
     { "id": "required", "kind": "required" },
     { "id": "email-format", "kind": "format", "format": "email" }
@@ -152,6 +159,11 @@ A representative control node is:
 ```
 
 Stable semantic identity is separate from model path, generated Formly ID, label, and layout. Fragment nodes have both a canonical template ID and a namespaced instance ID. Repeated groups retain an item template such as `owners[*].email` as well as scenario-specific row instances.
+
+Locators are ordered, node-local operational facts rather than semantic
+identity. A locator names a node-local target so one field can expose several
+interactive parts. Declared and resolved candidates never claim browser
+observation; only a browser parity layer can emit `observed` evidence.
 
 ### 5. Rule representation
 
