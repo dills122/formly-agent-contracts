@@ -26,6 +26,9 @@ import {
   type FieldTypeProfileOperation,
   type FieldTypeProfilePart,
 } from './field-type-profile.js';
+import {
+  validateGenericDriverSemantics,
+} from './field-type-interaction-validation.js';
 
 const IDENTIFIER_PUNCTUATION = '._:[]*-%';
 const CONTENT_HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
@@ -494,31 +497,6 @@ const CONTRACT_INTERACTION_KEYS = {
   ]),
 } as const;
 
-const GENERIC_DRIVER_BY_INTERACTION = {
-  fill: 'generic.fill',
-  choice: 'generic.choice',
-  autocomplete: 'generic.autocomplete',
-  'row-selection': 'generic.row-selection',
-  repeater: 'generic.repeater',
-} as const;
-
-const GENERIC_DRIVER_CAPABILITIES = {
-  'generic.fill': new Set<FieldTypeProfileOperation>(['fill']),
-  'generic.choice': new Set<FieldTypeProfileOperation>([
-    'check',
-    'select-option',
-    'select-from-overlay',
-  ]),
-  'generic.autocomplete': new Set<FieldTypeProfileOperation>([
-    'type-and-pick',
-  ]),
-  'generic.row-selection': new Set<FieldTypeProfileOperation>(['select-row']),
-  'generic.repeater': new Set<FieldTypeProfileOperation>([
-    'add-item',
-    'expand-item',
-  ]),
-} as const;
-
 function assertProfileIdentity(value: unknown, path: string): void {
   assertRecord(value, path);
   assertExactProperties(value, new Set(['id', 'version']), path);
@@ -750,30 +728,6 @@ function assertInteractionProfile(
       `${path}.driver.capabilities must include interaction operation "${value.interaction.operation}"`,
     );
   }
-  if (value.driver.kind === 'generic') {
-    const expected = GENERIC_DRIVER_BY_INTERACTION[value.interaction.kind];
-    if (value.driver.id !== expected) {
-      throw new TypeError(
-        `${path}.driver.id must be "${expected}" for ${value.interaction.kind}`,
-      );
-    }
-    if (value.driver.version !== 1) {
-      throw new TypeError(`${path}.driver.version must be 1 for ${expected}`);
-    }
-    const supported = GENERIC_DRIVER_CAPABILITIES[expected];
-    for (const capability of capabilities) {
-      if (!supported.has(capability)) {
-        throw new TypeError(
-          `${path}.driver.capabilities contains unsupported capability "${capability}" for ${expected}`,
-        );
-      }
-    }
-  } else if ((value.driver.id as string).startsWith('generic.')) {
-    throw new TypeError(
-      `${path}.driver.id reserves the "generic." prefix for generic drivers`,
-    );
-  }
-
   if (!Array.isArray(value.preconditions)) {
     throw new TypeError(`${path}.preconditions must be an array`);
   }
@@ -834,6 +788,16 @@ function assertInteractionProfile(
     assertString(entry.reason, `${itemPath}.reason`);
     assertEvidence(entry.evidence, `${itemPath}.evidence`);
   });
+
+  validateGenericDriverSemantics({
+    path: `${path}.driver`,
+    driver: value.driver as ContractInteractionProfile['driver'],
+    interaction: value.interaction,
+    valueShape: value.valueShape,
+    parts,
+    unknowns: value.unknowns as ContractInteractionProfile['unknowns'],
+  });
+
   assertStringArray(value.provenance, `${path}.provenance`);
   if (value.provenance.length === 0) {
     throw new TypeError(`${path}.provenance must contain at least one entry`);

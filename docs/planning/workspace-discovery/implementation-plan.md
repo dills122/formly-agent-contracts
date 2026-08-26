@@ -117,8 +117,8 @@ contains explicit effects only.
 
 | Requirement | Decision | Tasks | Verification | Status |
 | --- | --- | --- | --- | --- |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery tests plus 2 consumer fixture tests; runner and CLI fixture assertions remain | Tasks 1–4 and Task 6B fixture shell implemented; Tasks 5–6A and remaining 6B assertions planned |
-| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, and canonical-hash tests | Tasks 3A–3B implemented; node/artifact projection follows in Task 5 |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery tests plus 2 consumer fixture tests; runner and CLI fixture assertions remain | Tasks 1–4, Task 5.0, and Task 6B fixture shell implemented; Tasks 5.1–6A and remaining 6B assertions planned |
+| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Task 5.0 artifact DTO implemented; profile-aware node projection follows in Task 5.1 |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | Inventory and scaffolds are build-time evidence only | Tasks 7A–8B | Angular inventory, negative inference, and scenario tests | Planned; prototype complete |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Planned; architecture researched |
 
