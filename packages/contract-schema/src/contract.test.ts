@@ -45,6 +45,24 @@ const completeContract: FormContract = createFormContract({
         },
       ],
       state: { hidden: false, readonly: true, disabled: false },
+      locators: [
+        {
+          target: 'control',
+          strategy: 'testId',
+          attribute: 'data-pw',
+          value: 'applicant-legal-name',
+          evidence: 'declared',
+          confidence: 'exact',
+        },
+        {
+          target: 'control',
+          strategy: 'role',
+          value: 'textbox',
+          accessibleName: 'Legal name',
+          evidence: 'observed',
+          confidence: 'exact',
+        },
+      ],
       children: [],
     },
   ],
@@ -61,7 +79,7 @@ const completeContract: FormContract = createFormContract({
 });
 
 describe('parseFormContract', () => {
-  it('accepts a complete representative v0.2 contract', () => {
+  it('accepts a complete representative v0.3 contract', () => {
     expect(parseFormContract(completeContract)).toEqual(completeContract);
   });
 
@@ -81,6 +99,7 @@ describe('parseFormContract', () => {
           options: [],
           conditions: [],
           dynamicRules: [],
+          locators: [],
           children: [],
         },
       ],
@@ -88,6 +107,70 @@ describe('parseFormContract', () => {
     });
 
     expect(parseFormContract(displayContract)).toEqual(displayContract);
+  });
+
+  it('accepts multiple named locator targets for one composite field', () => {
+    const compositeContract = createFormContract({
+      schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
+      formId: 'coverage.period',
+      nodes: [
+        {
+          id: 'coverage.period::path:s_period',
+          kind: 'control',
+          modelPath: ['period'],
+          formlyType: 'date-range',
+          evidence: 'declared',
+          wrappers: [],
+          constraints: [],
+          options: [],
+          conditions: [],
+          dynamicRules: [],
+          locators: [
+            {
+              target: 'start',
+              strategy: 'testId',
+              attribute: 'data-testid',
+              value: 'coverage-period-start',
+              evidence: 'declared',
+              confidence: 'derived',
+            },
+            {
+              target: 'end',
+              strategy: 'label',
+              value: 'Coverage end',
+              evidence: 'observed',
+              confidence: 'exact',
+            },
+          ],
+          children: [],
+        },
+      ],
+      diagnostics: [],
+    });
+
+    expect(parseFormContract(compositeContract)).toEqual(compositeContract);
+  });
+
+  it('rejects a test-id locator without its configured attribute', () => {
+    const malformed = structuredClone(completeContract) as unknown as {
+      nodes: { locators: Record<string, unknown>[] }[];
+    };
+    delete malformed.nodes[0]?.locators[0]?.attribute;
+
+    expect(() => parseFormContract(malformed)).toThrow(
+      'nodes[0].locators[0].attribute',
+    );
+  });
+
+  it('rejects test-id-only properties on another locator strategy', () => {
+    const malformed = structuredClone(completeContract) as unknown as {
+      nodes: { locators: Record<string, unknown>[] }[];
+    };
+    malformed.nodes[0]!.locators[1]!.attribute = 'data-testid';
+
+    expect(() => parseFormContract(malformed)).toThrow(
+      'nodes[0].locators[1] contains unknown property attribute',
+    );
   });
 
   it('rejects malformed node identity', () => {

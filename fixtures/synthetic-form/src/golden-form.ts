@@ -25,6 +25,9 @@ export function createGoldenFormFields(): FormlyFieldConfig[] {
             required: true,
             minLength: 2,
             maxLength: 60,
+            attributes: {
+              'data-testid': 'profile-display-name',
+            },
           },
         },
         {
@@ -94,7 +97,11 @@ export function createGoldenFormFields(): FormlyFieldConfig[] {
     {
       key: 'eligibilityReview',
       type: 'select',
-      props: { label: 'Eligibility review', options: [] },
+      props: {
+        label: 'Eligibility review',
+        options: [],
+        attributes: { 'data-cy': 'eligibility-review' },
+      },
       expressions: {
         'props.disabled': dynamicEligibilityRule,
       },

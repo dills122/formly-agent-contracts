@@ -18,6 +18,9 @@ The post-MVP workplace compatibility increment is defined separately in the
 It preserves this MVP's declared-extraction safety while adding an explicit
 trusted scenario compiler.
 
+The next workplace compatibility increment adds portable Cypress/Playwright
+metadata in the [v0.3 test locator specification](v0.3-test-locators-spec.md).
+
 ## MVP Input and Output
 
 Declared extraction accepts explicitly supplied `FormlyFieldConfig[]` and does

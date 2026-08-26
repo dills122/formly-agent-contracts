@@ -49,6 +49,15 @@ if (
 ) {
   throw new Error('Golden contract must expose its dynamic option source.');
 }
+if (
+  !contract.nodes.some((node) =>
+    [node, ...node.children].some(({ locators }) =>
+      locators.some(({ strategy }) => strategy === 'testId'),
+    ),
+  )
+) {
+  throw new Error('Golden contract must expose an exact test locator.');
+}
 if (!diagnosticCodes.has('OPAQUE_FUNCTION')) {
   throw new Error('Golden contract must expose its opaque behavior.');
 }

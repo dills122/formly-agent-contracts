@@ -10,6 +10,8 @@ import {
   type ContractDisplay,
   type ContractDynamicRule,
   type ContractEvidence,
+  type ContractLocator,
+  type ContractLocatorStrategy,
   type ContractNode,
   type ContractNodeState,
   type ContractOption,
@@ -29,6 +31,7 @@ export interface ExtractFormInput {
   readonly fields: readonly FormlyFieldConfig[];
   readonly model?: Readonly<Record<string, unknown>>;
   readonly formState?: Readonly<Record<string, unknown>>;
+  readonly locatorOptions?: LocatorExtractionOptions;
 }
 
 export interface ExtractFormResult {
@@ -42,6 +45,49 @@ export interface CompileFormContractScenarioInput {
   readonly createFields: () => FormlyFieldConfig[];
   readonly model?: Readonly<Record<string, unknown>>;
   readonly formState?: Readonly<Record<string, unknown>>;
+  readonly locatorOptions?: LocatorExtractionOptions;
+}
+
+interface DerivedLocatorBase {
+  readonly target?: string;
+  readonly value: string;
+}
+
+export type DerivedContractLocator =
+  | (DerivedLocatorBase & {
+      readonly strategy: 'testId';
+      readonly attribute: string;
+    })
+  | (DerivedLocatorBase & {
+      readonly strategy: 'role';
+      readonly accessibleName?: string;
+    })
+  | (DerivedLocatorBase & {
+      readonly strategy: 'label' | 'placeholder' | 'domId';
+    });
+
+export interface LocatorDerivationInput {
+  readonly formId: string;
+  readonly nodeId: string;
+  readonly modelPath: readonly ModelPathSegment[];
+  readonly keyPath: readonly ModelPathSegment[];
+  readonly position: readonly number[];
+  readonly evidence: ContractEvidence;
+  readonly fieldId?: string;
+  readonly formlyType?: string;
+  readonly semanticType?: string;
+}
+
+export interface LocatorExtractionOptions {
+  readonly testIdAttributes?: readonly string[];
+  readonly deriveLocators?: (
+    input: LocatorDerivationInput,
+  ) => readonly DerivedContractLocator[];
+}
+
+interface NormalizedLocatorOptions {
+  readonly testIdAttributes: readonly string[];
+  readonly deriveLocators?: LocatorExtractionOptions['deriveLocators'];
 }
 
 interface ExtractionContext {
@@ -49,7 +95,18 @@ interface ExtractionContext {
   readonly evidence: ContractEvidence;
   readonly diagnostics: ContractDiagnostic[];
   readonly nodeIds: Set<string>;
+  readonly locatorOptions: NormalizedLocatorOptions;
 }
+
+const DEFAULT_TEST_ID_ATTRIBUTES = [
+  'data-testid',
+  'data-test-id',
+  'data-test',
+  'data-cy',
+  'data-pw',
+] as const;
+
+const LOCATOR_TARGET_PUNCTUATION = '._:[]*-%';
 
 interface NodeLocation {
   readonly parentModelPath: readonly ModelPathSegment[];
@@ -70,6 +127,35 @@ function isAsyncLike(value: unknown): boolean {
     isRecord(value) &&
     (isFunction(value.then) || isFunction(value.subscribe))
   );
+}
+
+function isAttributeName(value: string): boolean {
+  return /^[A-Za-z_:][A-Za-z0-9:._-]*$/u.test(value);
+}
+
+function normalizeLocatorOptions(
+  options: LocatorExtractionOptions | undefined,
+): NormalizedLocatorOptions {
+  const requested =
+    options?.testIdAttributes ?? DEFAULT_TEST_ID_ATTRIBUTES;
+  const testIdAttributes: string[] = [];
+  for (const attribute of requested) {
+    if (!isAttributeName(attribute)) {
+      throw new TypeError(
+        'locatorOptions.testIdAttributes must contain valid attribute names.',
+      );
+    }
+    if (!testIdAttributes.includes(attribute)) {
+      testIdAttributes.push(attribute);
+    }
+  }
+
+  return {
+    testIdAttributes,
+    ...(options?.deriveLocators === undefined
+      ? {}
+      : { deriveLocators: options.deriveLocators }),
+  };
 }
 
 function addDiagnostic(
@@ -729,6 +815,280 @@ function readDisplay(
   return undefined;
 }
 
+function textAttributeValue(value: unknown): string | undefined {
+  if (typeof value === 'string' && value.length > 0) {
+    return value;
+  }
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return String(value);
+  }
+  return undefined;
+}
+
+function isAsciiLetterOrDigit(value: string): boolean {
+  return /^[A-Za-z0-9]$/u.test(value);
+}
+
+function isLocatorTarget(value: string): boolean {
+  const characters = [...value];
+  return (
+    characters.length > 0 &&
+    isAsciiLetterOrDigit(characters[0] ?? '') &&
+    characters.every(
+      (character) =>
+        isAsciiLetterOrDigit(character) ||
+        LOCATOR_TARGET_PUNCTUATION.includes(character),
+    )
+  );
+}
+
+function isLocatorStrategy(
+  value: unknown,
+): value is ContractLocatorStrategy {
+  return (
+    value === 'testId' ||
+    value === 'role' ||
+    value === 'label' ||
+    value === 'placeholder' ||
+    value === 'domId'
+  );
+}
+
+function hasOnlyProperties(
+  value: Readonly<Record<string, unknown>>,
+  properties: ReadonlySet<string>,
+): boolean {
+  return Object.keys(value).every((key) => properties.has(key));
+}
+
+function normalizeDerivedLocator(
+  value: unknown,
+  evidence: ContractEvidence,
+): ContractLocator | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+
+  const target = value.target === undefined ? 'control' : value.target;
+  if (
+    typeof target !== 'string' ||
+    !isLocatorTarget(target) ||
+    typeof value.value !== 'string' ||
+    value.value.length === 0 ||
+    !isLocatorStrategy(value.strategy)
+  ) {
+    return undefined;
+  }
+
+  const commonProperties = new Set(['target', 'strategy', 'value']);
+  if (value.strategy === 'testId') {
+    if (
+      !hasOnlyProperties(
+        value,
+        new Set([...commonProperties, 'attribute']),
+      ) ||
+      typeof value.attribute !== 'string' ||
+      !isAttributeName(value.attribute)
+    ) {
+      return undefined;
+    }
+    return {
+      target,
+      strategy: 'testId',
+      attribute: value.attribute,
+      value: value.value,
+      evidence,
+      confidence: 'derived',
+    };
+  }
+
+  if (value.strategy === 'role') {
+    if (
+      !hasOnlyProperties(
+        value,
+        new Set([...commonProperties, 'accessibleName']),
+      ) ||
+      (value.accessibleName !== undefined &&
+        (typeof value.accessibleName !== 'string' ||
+          value.accessibleName.length === 0))
+    ) {
+      return undefined;
+    }
+    return {
+      target,
+      strategy: 'role',
+      value: value.value,
+      ...(typeof value.accessibleName === 'string'
+        ? { accessibleName: value.accessibleName }
+        : {}),
+      evidence,
+      confidence: 'derived',
+    };
+  }
+
+  if (
+    (value.strategy !== 'label' &&
+      value.strategy !== 'placeholder' &&
+      value.strategy !== 'domId') ||
+    !hasOnlyProperties(value, commonProperties)
+  ) {
+    return undefined;
+  }
+  return {
+    target,
+    strategy: value.strategy,
+    value: value.value,
+    evidence,
+    confidence: 'derived',
+  };
+}
+
+function locatorIdentity(locator: ContractLocator): string {
+  return [
+    locator.target,
+    locator.strategy,
+    'attribute' in locator ? locator.attribute : '',
+    locator.value,
+    'accessibleName' in locator ? (locator.accessibleName ?? '') : '',
+    locator.evidence,
+    locator.confidence,
+  ].join('\u0000');
+}
+
+function deduplicateLocators(
+  locators: readonly ContractLocator[],
+): ContractLocator[] {
+  const identities = new Set<string>();
+  return locators.filter((locator) => {
+    const identity = locatorIdentity(locator);
+    if (identities.has(identity)) {
+      return false;
+    }
+    identities.add(identity);
+    return true;
+  });
+}
+
+function readLocators(
+  field: FormlyFieldConfig,
+  props: Readonly<Record<string, unknown>>,
+  keyPath: readonly ModelPathSegment[],
+  modelPath: readonly ModelPathSegment[],
+  formlyType: string | undefined,
+  semanticType: string | undefined,
+  location: NodeLocation,
+  nodeId: string,
+  context: ExtractionContext,
+): ContractLocator[] {
+  const exactTestIds: ContractLocator[] = [];
+  const derived: ContractLocator[] = [];
+  const explicitSemantics: ContractLocator[] = [];
+  const domIds: ContractLocator[] = [];
+  const attributes = isRecord(props.attributes) ? props.attributes : {};
+
+  for (const attribute of context.locatorOptions.testIdAttributes) {
+    const value = textAttributeValue(attributes[attribute]);
+    if (value !== undefined) {
+      exactTestIds.push({
+        target: 'control',
+        strategy: 'testId',
+        attribute,
+        value,
+        evidence: context.evidence,
+        confidence: 'exact',
+      });
+    }
+  }
+
+  const deriveLocators = context.locatorOptions.deriveLocators;
+  if (deriveLocators !== undefined) {
+    try {
+      const input: LocatorDerivationInput = Object.freeze({
+        formId: context.formId,
+        nodeId,
+        modelPath: Object.freeze([...modelPath]),
+        keyPath: Object.freeze([...keyPath]),
+        position: Object.freeze([...location.position]),
+        evidence: context.evidence,
+        ...(typeof field.id === 'string' ? { fieldId: field.id } : {}),
+        ...(formlyType === undefined ? {} : { formlyType }),
+        ...(semanticType === undefined ? {} : { semanticType }),
+      });
+      const values = deriveLocators(input);
+      if (!Array.isArray(values)) {
+        throw new TypeError('Malformed locator derivation result.');
+      }
+      const normalizedDerived: ContractLocator[] = [];
+      for (const value of values) {
+        const locator = normalizeDerivedLocator(value, context.evidence);
+        if (locator === undefined) {
+          throw new TypeError('Malformed locator derivation result.');
+        }
+        normalizedDerived.push(locator);
+      }
+      derived.push(...normalizedDerived);
+    } catch {
+      addDiagnostic(
+        context,
+        'LOCATOR_DERIVATION_FAILED',
+        'Locator derivation failed or returned malformed data.',
+        [...location.sourcePath, 'locatorOptions', 'deriveLocators'],
+        nodeId,
+      );
+    }
+  }
+
+  const role = textAttributeValue(attributes.role);
+  const accessibleName = textAttributeValue(attributes['aria-label']);
+  if (role !== undefined) {
+    explicitSemantics.push({
+      target: 'control',
+      strategy: 'role',
+      value: role,
+      ...(accessibleName === undefined ? {} : { accessibleName }),
+      evidence: context.evidence,
+      confidence: 'exact',
+    });
+  }
+  if (accessibleName !== undefined) {
+    explicitSemantics.push({
+      target: 'control',
+      strategy: 'label',
+      value: accessibleName,
+      evidence: context.evidence,
+      confidence: 'exact',
+    });
+  }
+
+  const placeholder = textAttributeValue(props.placeholder);
+  if (placeholder !== undefined) {
+    explicitSemantics.push({
+      target: 'control',
+      strategy: 'placeholder',
+      value: placeholder,
+      evidence: context.evidence,
+      confidence: 'exact',
+    });
+  }
+
+  if (typeof field.id === 'string' && field.id.length > 0) {
+    domIds.push({
+      target: 'control',
+      strategy: 'domId',
+      value: field.id,
+      evidence: context.evidence,
+      confidence: 'derived',
+    });
+  }
+
+  return deduplicateLocators([
+    ...exactTestIds,
+    ...derived,
+    ...explicitSemantics,
+    ...domIds,
+  ]);
+}
+
 function diagnoseUnsupportedFieldBehavior(
   field: FormlyFieldConfig,
   sourcePath: readonly ModelPathSegment[],
@@ -929,17 +1289,29 @@ function extractNode(
     context,
   );
   const state = readState(field, props);
+  const kind: ContractNode['kind'] =
+    field.fieldArray !== undefined
+      ? 'array'
+      : field.fieldGroup !== undefined
+        ? 'group'
+        : field.template !== undefined || formlyType === 'formly-template'
+          ? 'display'
+          : 'control';
+  const locators = readLocators(
+    field,
+    props,
+    keyPath,
+    modelPath,
+    formlyType,
+    semanticType,
+    location,
+    id,
+    context,
+  );
 
   return {
     id,
-    kind:
-      field.fieldArray !== undefined
-        ? 'array'
-        : field.fieldGroup !== undefined
-          ? 'group'
-          : field.template !== undefined || formlyType === 'formly-template'
-            ? 'display'
-            : 'control',
+    kind,
     modelPath,
     ...(formlyType === undefined ? {} : { formlyType }),
     ...(semanticType === undefined ? {} : { semanticType }),
@@ -954,6 +1326,7 @@ function extractNode(
     conditions,
     dynamicRules,
     ...(state === undefined ? {} : { state }),
+    locators,
     children,
     ...(arrayTemplate === undefined ? {} : { arrayTemplate }),
   };
@@ -969,6 +1342,7 @@ function projectFormContract(
     evidence,
     diagnostics,
     nodeIds: new Set<string>(),
+    locatorOptions: normalizeLocatorOptions(input.locatorOptions),
   };
   const nodes = input.fields.map((field, index) =>
     extractNode(
@@ -1033,6 +1407,9 @@ export function compileFormContractScenario(
       fields: root.fieldGroup ?? [],
       ...(isRecord(root.model) ? { model: root.model } : {}),
       formState,
+      ...(input.locatorOptions === undefined
+        ? {}
+        : { locatorOptions: input.locatorOptions }),
     },
     'resolved',
   );

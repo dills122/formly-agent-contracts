@@ -35,11 +35,24 @@ describe('Angular 20.3 and Formly 6.1 compatibility', () => {
       builder,
       model: { mode: 'advanced' },
       formState: { readonly: true },
+      locatorOptions: {
+        deriveLocators: ({ formlyType }) =>
+          formlyType === 'select'
+            ? [
+                {
+                  target: 'menu',
+                  strategy: 'testId',
+                  attribute: 'data-testid',
+                  value: 'advanced-choice-menu',
+                },
+              ]
+            : [],
+      },
       createFields: () => [
         {
           key: 'choice',
           type: 'select',
-          props: { label: 'Choice' },
+          props: { label: 'Choice', attributes: {} },
           hideExpression: (model: Readonly<{ mode?: string }>) =>
             model.mode !== 'advanced',
           expressionProperties: {
@@ -56,6 +69,9 @@ describe('Angular 20.3 and Formly 6.1 compatibility', () => {
                     { label: 'Beta', value: 'beta' },
                   ]
                 : [],
+            'props.attributes.data-testid': (
+              model: Readonly<{ mode?: string }>,
+            ) => `${model.mode ?? 'basic'}-choice`,
           },
         },
       ],
@@ -94,6 +110,25 @@ describe('Angular 20.3 and Formly 6.1 compatibility', () => {
         { label: 'Beta', value: 'beta' },
       ],
     });
+    expect(choice?.locators).toContainEqual({
+      target: 'control',
+      strategy: 'testId',
+      attribute: 'data-testid',
+      value: 'advanced-choice',
+      evidence: 'resolved',
+      confidence: 'exact',
+    });
+    expect(choice?.locators).toContainEqual({
+      target: 'menu',
+      strategy: 'testId',
+      attribute: 'data-testid',
+      value: 'advanced-choice-menu',
+      evidence: 'resolved',
+      confidence: 'derived',
+    });
+    expect(choice?.locators.some(({ evidence }) => evidence === 'observed')).toBe(
+      false,
+    );
     expect(result.diagnostics).toEqual([]);
   });
 });

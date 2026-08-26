@@ -6,6 +6,7 @@ import {
   type ContractDiagnostic,
   type ContractDisplay,
   type ContractDynamicRule,
+  type ContractLocator,
   type ContractNode,
   type ContractNodeState,
   type ContractOption,
@@ -236,8 +237,61 @@ function assertOption(
 }
 
 function assertEvidence(value: unknown, path: string): void {
-  if (value !== 'declared' && value !== 'resolved') {
+  if (
+    value !== 'declared' &&
+    value !== 'resolved' &&
+    value !== 'observed'
+  ) {
     throw new TypeError(`${path} is unsupported`);
+  }
+}
+
+function assertAttributeName(value: unknown, path: string): void {
+  if (
+    typeof value !== 'string' ||
+    !/^[A-Za-z_:][A-Za-z0-9:._-]*$/u.test(value)
+  ) {
+    throw new TypeError(`${path} must be a valid attribute name`);
+  }
+}
+
+function assertLocator(
+  value: unknown,
+  path: string,
+): asserts value is ContractLocator {
+  assertRecord(value, path);
+  assertString(value.strategy, `${path}.strategy`);
+
+  const common = new Set([
+    'target',
+    'strategy',
+    'value',
+    'evidence',
+    'confidence',
+  ]);
+  if (value.strategy === 'testId') {
+    assertExactProperties(value, new Set([...common, 'attribute']), path);
+    assertAttributeName(value.attribute, `${path}.attribute`);
+  } else if (value.strategy === 'role') {
+    assertExactProperties(value, new Set([...common, 'accessibleName']), path);
+    if (value.accessibleName !== undefined) {
+      assertString(value.accessibleName, `${path}.accessibleName`);
+    }
+  } else if (
+    value.strategy === 'label' ||
+    value.strategy === 'placeholder' ||
+    value.strategy === 'domId'
+  ) {
+    assertExactProperties(value, common, path);
+  } else {
+    throw new TypeError(`${path}.strategy is unsupported`);
+  }
+
+  assertStableIdentifier(value.target, `${path}.target`);
+  assertString(value.value, `${path}.value`);
+  assertEvidence(value.evidence, `${path}.evidence`);
+  if (value.confidence !== 'exact' && value.confidence !== 'derived') {
+    throw new TypeError(`${path}.confidence is unsupported`);
   }
 }
 
@@ -368,6 +422,7 @@ function assertNode(
       'conditions',
       'dynamicRules',
       'state',
+      'locators',
       'children',
       'arrayTemplate',
     ]),
@@ -423,6 +478,13 @@ function assertNode(
   if (value.state !== undefined) {
     assertNodeState(value.state, `${path}.state`);
   }
+
+  if (!Array.isArray(value.locators)) {
+    throw new TypeError(`${path}.locators must be an array`);
+  }
+  value.locators.forEach((locator, index) =>
+    assertLocator(locator, `${path}.locators[${index}]`),
+  );
 
   if (!Array.isArray(value.children)) {
     throw new TypeError(`${path}.children must be an array`);
