@@ -13,6 +13,7 @@ requirements.
 | IR-003 | Unsupported form behavior is explicit | Diagnose Formly `RegExp` patterns until a versioned representation exists | RegExp diagnostic test | Complete |
 | IR-004 | Type-valid unsupported keys fail safely and deterministically | Diagnose invalid numeric key segments and use structural identity | Negative/fractional scalar and array-key tests | Complete |
 | IR-005 | Canonical JSON cycle rejection is executable evidence | Add proof tests for existing guards | Canonicalizer and contract-value cycle tests | Complete |
+| IR2-001 | Invalid scenario inputs fail before application-controlled code runs | Clone model and form state before `createFields()` | Model/form-state call-count failure tests | Complete |
 
 ## Phases
 
@@ -21,7 +22,11 @@ requirements.
 - [x] Implement the smallest package fixes and make focused tests green.
 - [x] Update contract/usage documentation and retained traceability.
 - [x] Run package checks, `pnpm check`, and clean-clone verification.
-- [ ] Complete code-quality review and independent review instance 2 of 3.
+- [x] Complete code-quality review and independent review instance 2 of 3.
+- [x] Remediate the instance-2 clone-order finding and rerun repository and
+  clean-clone gates.
+- [x] Complete final independent review instance 3 of 3 and directly reconcile
+  its retained-plan documentation finding.
 - [ ] Publish and merge only after all review blockers are closed.
 
 ## Scope
@@ -47,6 +52,9 @@ Out of scope:
 - IR-004 will preserve extraction with structural fallback rather than throw.
 - Review instance 2 is mandatory because IR-001 and IR-002 change trusted
   scenario compilation behavior.
+- Instance 2's clone-order remediation materially changed reviewed boundary
+  behavior, so instance 3 completed the configured review loop. Its only
+  finding was this plan's stale state; no fourth review may be started.
 
 ## Errors Encountered
 
