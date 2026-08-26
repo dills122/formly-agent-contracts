@@ -20,3 +20,6 @@
   stable diagnostic is emitted.
 - Re-ran `pnpm check`: 48 tests, lint, all package builds, Angular production
   build, deterministic demo, and 32-file documentation validation passed.
+- Cloned commit `fcd1b18` into a fresh temporary checkout, installed with
+  `pnpm install --frozen-lockfile` using the local store, and passed the full
+  `pnpm check` gate again.

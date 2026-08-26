@@ -13,7 +13,7 @@ inventing selectors or rendering workplace data.
 - [x] Implement deterministic locator projection and derivation diagnostics.
 - [x] Add resolved Formly integration coverage.
 - [x] Update the golden demo, README, architecture, and implementation plan.
-- [ ] Run focused tests, all checks, clean-clone verification, and review.
+- [x] Run focused tests, all checks, clean-clone verification, and review.
 - [ ] Open and merge a green pull request.
 
 ## Decisions
