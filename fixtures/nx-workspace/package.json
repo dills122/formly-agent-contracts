@@ -23,6 +23,7 @@
     "@angular/build": "20.3.29",
     "@angular/cli": "20.3.29",
     "@angular/compiler-cli": "20.3.29",
+    "@formly-contract/compiler": "workspace:*",
     "@formly-contract/workspace": "workspace:*",
     "@nx/angular": "23.1.1",
     "@nx/workspace": "23.1.1",

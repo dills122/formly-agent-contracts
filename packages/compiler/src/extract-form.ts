@@ -17,6 +17,7 @@ import {
   type ContractOption,
   type ContractOptionSource,
   type ContractPresentation,
+  type ContractValueDomain,
   type FormContract,
   type JsonValue,
   type ModelPathSegment,
@@ -26,12 +27,24 @@ import type {
   FormlyFormBuilder,
 } from '@ngx-formly/core';
 
+import {
+  prepareFieldTypeProfileExtractionRegistry,
+  projectFieldTypeProfile,
+  type ContractFormlyFieldConfig,
+  type FieldTypeProfileExtractionRegistry,
+  type PreparedFieldTypeProfileExtractionRegistry,
+} from './field-type-profile-projection.js';
+
+export type FormContractFieldConfig = FormlyFieldConfig &
+  ContractFormlyFieldConfig;
+
 export interface ExtractFormInput {
   readonly formId: string;
-  readonly fields: readonly FormlyFieldConfig[];
+  readonly fields: readonly FormContractFieldConfig[];
   readonly model?: Readonly<Record<string, unknown>>;
   readonly formState?: Readonly<Record<string, unknown>>;
   readonly locatorOptions?: LocatorExtractionOptions;
+  readonly fieldTypeProfiles?: FieldTypeProfileExtractionRegistry;
 }
 
 export interface ExtractFormResult {
@@ -42,10 +55,11 @@ export interface ExtractFormResult {
 export interface CompileFormContractScenarioInput {
   readonly formId: string;
   readonly builder: Pick<FormlyFormBuilder, 'build'>;
-  readonly createFields: () => FormlyFieldConfig[];
+  readonly createFields: () => FormContractFieldConfig[];
   readonly model?: Readonly<Record<string, unknown>>;
   readonly formState?: Readonly<Record<string, unknown>>;
   readonly locatorOptions?: LocatorExtractionOptions;
+  readonly fieldTypeProfiles?: FieldTypeProfileExtractionRegistry;
 }
 
 interface DerivedLocatorBase {
@@ -96,6 +110,13 @@ interface ExtractionContext {
   readonly diagnostics: ContractDiagnostic[];
   readonly nodeIds: Set<string>;
   readonly locatorOptions: NormalizedLocatorOptions;
+  readonly fieldTypeProfiles?: PreparedFieldTypeProfileExtractionRegistry;
+}
+
+interface OptionProjection {
+  readonly options: readonly ContractOption[];
+  readonly collection: 'absent' | 'array' | 'opaque';
+  readonly complete: boolean;
 }
 
 const DEFAULT_TEST_ID_ATTRIBUTES = [
@@ -108,6 +129,15 @@ const DEFAULT_TEST_ID_ATTRIBUTES = [
 
 const LOCATOR_TARGET_PUNCTUATION = '._:[]*-%';
 
+const BUILT_IN_FORM_TYPES = new Set([
+  'checkbox',
+  'formly-template',
+  'input',
+  'radio',
+  'select',
+  'textarea',
+]);
+
 interface NodeLocation {
   readonly parentModelPath: readonly ModelPathSegment[];
   readonly position: readonly number[];
@@ -116,6 +146,30 @@ interface NodeLocation {
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function readProfileMappedProps(
+  field: FormContractFieldConfig,
+): Readonly<Record<string, unknown>> {
+  const props = Object.getOwnPropertyDescriptor(field, 'props');
+  if (props !== undefined) {
+    if (!('value' in props)) {
+      return {};
+    }
+    if (props.value !== undefined) {
+      return isRecord(props.value) ? props.value : {};
+    }
+  }
+
+  const templateOptions = Object.getOwnPropertyDescriptor(
+    field,
+    'templateOptions',
+  );
+  return templateOptions !== undefined &&
+    'value' in templateOptions &&
+    isRecord(templateOptions.value)
+    ? templateOptions.value
+    : {};
 }
 
 function isFunction(value: unknown): value is (...args: never[]) => unknown {
@@ -164,10 +218,11 @@ function addDiagnostic(
   message: string,
   sourcePath: readonly ModelPathSegment[],
   nodeId: string,
+  severity: ContractDiagnostic['severity'] = 'warning',
 ): void {
   context.diagnostics.push({
     code,
-    severity: 'warning',
+    severity,
     message,
     evidence: context.evidence,
     sourcePath,
@@ -541,7 +596,7 @@ function readOptions(
   sourcePath: readonly ModelPathSegment[],
   nodeId: string,
   context: ExtractionContext,
-): ContractOption[] {
+): OptionProjection {
   if (!Array.isArray(props.options)) {
     if (props.options !== undefined) {
       diagnoseOpaqueValue(
@@ -552,7 +607,11 @@ function readOptions(
         context,
       );
     }
-    return [];
+    return {
+      options: [],
+      collection: props.options === undefined ? 'absent' : 'opaque',
+      complete: false,
+    };
   }
 
   const labelProperty =
@@ -560,6 +619,7 @@ function readOptions(
   const valueProperty =
     typeof props.valueProp === 'string' ? props.valueProp : 'value';
   const options: ContractOption[] = [];
+  let complete = true;
 
   for (const rawOption of props.options) {
     if (!isRecord(rawOption)) {
@@ -572,6 +632,8 @@ function readOptions(
       );
       if (value !== undefined) {
         options.push({ label: String(rawOption), value });
+      } else {
+        complete = false;
       }
       continue;
     }
@@ -585,6 +647,7 @@ function readOptions(
     );
     const label = rawOption[labelProperty];
     if (value === undefined || (typeof label !== 'string' && typeof label !== 'number')) {
+      complete = false;
       continue;
     }
 
@@ -597,7 +660,114 @@ function readOptions(
     });
   }
 
-  return options;
+  return { options, collection: 'array', complete };
+}
+
+function hasDuplicateCanonicalOptionValues(
+  options: readonly ContractOption[],
+): boolean {
+  const values = new Set<string>();
+  for (const option of options) {
+    const canonical = canonicalStringify(option.value);
+    if (values.has(canonical)) {
+      return true;
+    }
+    values.add(canonical);
+  }
+  return false;
+}
+
+function readBuiltInValueDomain(
+  field: FormlyFieldConfig,
+  formlyType: string | undefined,
+  optionProjection: OptionProjection,
+  optionSource: ContractOptionSource | undefined,
+  sourcePath: readonly ModelPathSegment[],
+  nodeId: string,
+  context: ExtractionContext,
+): ContractValueDomain | undefined {
+  if (formlyType === 'checkbox') {
+    return {
+      kind: 'enumerated',
+      source: 'semantic-type',
+      completeness: 'complete',
+      evidence: 'declared',
+      values: [false, true],
+    };
+  }
+
+  if (formlyType !== 'radio' && formlyType !== 'select') {
+    return undefined;
+  }
+
+  const dynamic = findOptionsExpression(field);
+  if (
+    context.evidence === 'resolved' &&
+    dynamic !== undefined &&
+    optionProjection.collection === 'array' &&
+    optionProjection.complete &&
+    !hasDuplicateCanonicalOptionValues(optionProjection.options)
+  ) {
+    return {
+      kind: 'enumerated',
+      source: 'resolved-options',
+      completeness: 'scenario',
+      evidence: 'resolved',
+      values: optionProjection.options.map(({ value }) => value),
+    };
+  }
+
+  if (dynamic !== undefined && context.evidence === 'declared') {
+    if (isAsyncLike(dynamic.expression)) {
+      return { kind: 'dynamic', source: 'async', evidence: 'declared' };
+    }
+    if (typeof dynamic.expression === 'string') {
+      return { kind: 'dynamic', source: 'string', evidence: 'declared' };
+    }
+    if (isFunction(dynamic.expression)) {
+      return { kind: 'dynamic', source: 'function', evidence: 'declared' };
+    }
+  }
+
+  if (optionProjection.collection === 'array') {
+    if (
+      !optionProjection.complete ||
+      hasDuplicateCanonicalOptionValues(optionProjection.options)
+    ) {
+      addDiagnostic(
+        context,
+        'VALUE_DOMAIN_PROJECTION_FAILED',
+        'Static options could not be projected as one complete value domain.',
+        [...sourcePath, 'props', 'options'],
+        nodeId,
+      );
+      return { kind: 'unknown', evidence: context.evidence };
+    }
+    return {
+      kind: 'enumerated',
+      source: 'static-options',
+      completeness: 'complete',
+      evidence: 'declared',
+      values: optionProjection.options.map(({ value }) => value),
+    };
+  }
+
+  if (optionSource?.kind === 'async') {
+    return {
+      kind: 'dynamic',
+      source: 'async',
+      evidence: optionSource.evidence,
+    };
+  }
+  if (optionSource?.kind === 'dynamic') {
+    return {
+      kind: 'dynamic',
+      source: optionSource.source,
+      evidence: optionSource.evidence,
+    };
+  }
+
+  return undefined;
 }
 
 function readPathValue(field: FormlyFieldConfig, property: string): unknown {
@@ -1334,8 +1504,45 @@ function readSemanticType(
   return formlyType === undefined ? undefined : semanticTypes[formlyType];
 }
 
+function projectConfiguredFieldTypeProfile(
+  field: FormContractFieldConfig,
+  formlyType: string | undefined,
+  sourcePath: readonly ModelPathSegment[],
+  nodeId: string,
+  context: ExtractionContext,
+): ReturnType<typeof projectFieldTypeProfile> | undefined {
+  const preparedRegistry = context.fieldTypeProfiles;
+  if (preparedRegistry === undefined || formlyType === undefined) {
+    return undefined;
+  }
+
+  const isRegistered = preparedRegistry.profiles.registry.registrations.some(
+    (registration) => registration.formlyType === formlyType,
+  );
+  if (!isRegistered && BUILT_IN_FORM_TYPES.has(formlyType)) {
+    return undefined;
+  }
+
+  const projection = projectFieldTypeProfile({
+    preparedRegistry,
+    field,
+    evidence: context.evidence,
+  });
+  for (const diagnostic of projection.diagnostics) {
+    addDiagnostic(
+      context,
+      diagnostic.code,
+      diagnostic.message,
+      [...sourcePath, ...diagnostic.path],
+      nodeId,
+      diagnostic.severity,
+    );
+  }
+  return projection;
+}
+
 function extractNode(
-  field: FormlyFieldConfig,
+  field: FormContractFieldConfig,
   location: NodeLocation,
   context: ExtractionContext,
 ): ContractNode {
@@ -1362,10 +1569,21 @@ function extractNode(
       id,
     );
   }
-  const propsValue = field.props ?? field.templateOptions;
-  const props = isRecord(propsValue) ? propsValue : {};
   const formlyType = typeof field.type === 'string' ? field.type : undefined;
-  const semanticType = readSemanticType(formlyType, props);
+  const profileProjection = projectConfiguredFieldTypeProfile(
+    field,
+    formlyType,
+    location.sourcePath,
+    id,
+    context,
+  );
+  const profileMapped = profileProjection?.semanticType !== undefined;
+  const propsValue = profileMapped
+    ? readProfileMappedProps(field)
+    : field.props ?? field.templateOptions;
+  const props = isRecord(propsValue) ? propsValue : {};
+  const semanticType =
+    profileProjection?.semanticType ?? readSemanticType(formlyType, props);
   const presentation = readPresentation(props);
   const display = readDisplay(field, location.sourcePath, id, context);
   const defaultValue = readJsonValue(
@@ -1414,7 +1632,12 @@ function extractNode(
     ...readConstraints(props, location.sourcePath, id, context),
     ...readNamedConstraints(field, location.sourcePath, id, context),
   ];
-  const options = readOptions(props, location.sourcePath, id, context);
+  const optionProjection: OptionProjection = profileMapped
+    ? { options: [], collection: 'absent', complete: false }
+    : readOptions(props, location.sourcePath, id, context);
+  const options = profileMapped
+    ? profileProjection.options
+    : optionProjection.options;
   const { conditions, dynamicRules } = readRules(
     field,
     options,
@@ -1428,12 +1651,20 @@ function extractNode(
     id,
     context,
   );
-  const optionSource = readOptionSource(
-    field,
-    props,
-    semanticType,
-    context,
-  );
+  const optionSource = profileMapped
+    ? undefined
+    : readOptionSource(field, props, semanticType, context);
+  const valueDomain = profileMapped
+    ? profileProjection.valueDomain
+    : readBuiltInValueDomain(
+        field,
+        formlyType,
+        optionProjection,
+        optionSource,
+        location.sourcePath,
+        id,
+        context,
+      );
   const state = readState(field, props);
   const kind: ContractNode['kind'] =
     field.fieldArray !== undefined
@@ -1469,6 +1700,10 @@ function extractNode(
     constraints,
     options,
     ...(optionSource === undefined ? {} : { optionSource }),
+    ...(valueDomain === undefined ? {} : { valueDomain }),
+    ...(profileProjection?.interactionProfile === undefined
+      ? {}
+      : { interactionProfile: profileProjection.interactionProfile }),
     conditions,
     dynamicRules,
     ...(state === undefined ? {} : { state }),
@@ -1483,12 +1718,17 @@ function projectFormContract(
   evidence: ContractEvidence,
 ): ExtractFormResult {
   const diagnostics: ContractDiagnostic[] = [];
+  const fieldTypeProfiles =
+    input.fieldTypeProfiles === undefined
+      ? undefined
+      : prepareFieldTypeProfileExtractionRegistry(input.fieldTypeProfiles);
   const context: ExtractionContext = {
     formId: input.formId,
     evidence,
     diagnostics,
     nodeIds: new Set<string>(),
     locatorOptions: normalizeLocatorOptions(input.locatorOptions),
+    ...(fieldTypeProfiles === undefined ? {} : { fieldTypeProfiles }),
   };
   const nodes = input.fields.map((field, index) =>
     extractNode(
@@ -1505,6 +1745,9 @@ function projectFormContract(
     createFormContract({
       schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
       formId: input.formId,
+      ...(fieldTypeProfiles === undefined
+        ? {}
+        : { fieldTypeProfileRegistry: fieldTypeProfiles.identity }),
       nodes,
       diagnostics,
     }),
@@ -1569,6 +1812,9 @@ export function compileFormContractScenario(
       ...(input.locatorOptions === undefined
         ? {}
         : { locatorOptions: input.locatorOptions }),
+      ...(input.fieldTypeProfiles === undefined
+        ? {}
+        : { fieldTypeProfiles: input.fieldTypeProfiles }),
     },
     'resolved',
   );

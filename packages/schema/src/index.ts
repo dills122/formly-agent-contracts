@@ -6,6 +6,7 @@ export {
 } from './canonical-json.js';
 export {
   CONTRACT_DIAGNOSTIC_CODES,
+  FIELD_TYPE_PROFILE_RESOLUTION_DIAGNOSTIC_CODES,
   FORM_CONTRACT_SCHEMA_VERSION,
 } from './contract.js';
 export type {

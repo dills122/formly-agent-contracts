@@ -6,7 +6,9 @@ import {
   loadWorkspaceConfigModule,
   parseProjectConfig,
   parseRootConfig,
+  resolveWorkspaceProjectConfig,
 } from '@formly-contract/workspace';
+import { extractFormContract } from '@formly-contract/compiler';
 import { describe, expect, it } from 'vitest';
 
 const fixtureRoot = fileURLToPath(new URL('./', import.meta.url));
@@ -116,5 +118,80 @@ describe('Nx workspace consumer fixture', () => {
         return instance.fields.map((field) => field.type);
       }),
     ).toContain('cool-radio-btn-grp');
+  });
+
+  it('shares one canonical radio profile across source-owning projects', async () => {
+    const root = parseRootConfig(
+      await loadWorkspaceConfigModule(
+        resolve(fixtureRoot, 'formly-contracts.config.ts'),
+        { tsconfigPath: fixtureTsconfig },
+      ),
+    );
+    const formsProject = parseProjectConfig(
+      await loadWorkspaceConfigModule(
+        resolve(fixtureRoot, 'libs/forms-kit/formly-contracts.project.ts'),
+        { tsconfigPath: fixtureTsconfig },
+      ),
+    );
+    const featureProject = parseProjectConfig(
+      await loadWorkspaceConfigModule(
+        resolve(fixtureRoot, 'libs/feature-lib/formly-contracts.project.ts'),
+        { tsconfigPath: fixtureTsconfig },
+      ),
+    );
+    const formsKit = resolveWorkspaceProjectConfig(root, formsProject);
+    const feature = resolveWorkspaceProjectConfig(root, featureProject);
+
+    expect(formsKit.fieldTypeProfiles).toBeDefined();
+    expect(feature.fieldTypeProfiles).toEqual(formsKit.fieldTypeProfiles);
+    expect(
+      formsKit.fieldTypeProfiles?.registry.registrations.map(
+        ({ formlyType }) => formlyType,
+      ),
+    ).toEqual(['cool-radio-btn-grp']);
+
+    if (
+      formsKit.fieldTypeProfiles === undefined ||
+      feature.fieldTypeProfiles === undefined
+    ) {
+      return;
+    }
+    const projects = [
+      { config: formsProject, fieldTypeProfiles: formsKit.fieldTypeProfiles },
+      { config: featureProject, fieldTypeProfiles: feature.fieldTypeProfiles },
+    ];
+    const extracted = await Promise.all(
+      projects.map(async ({ config, fieldTypeProfiles }) => {
+        const definition = (await config.sources?.[0]?.list())?.[0];
+        if (definition === undefined) {
+          throw new Error('Expected one fixture form definition.');
+        }
+        const instance = definition.create();
+        return extractFormContract({
+          formId: definition.id,
+          fields: instance.fields,
+          fieldTypeProfiles,
+        });
+      }),
+    );
+
+    for (const result of extracted) {
+      const radio = result.contract.nodes.find(
+        ({ formlyType }) => formlyType === 'cool-radio-btn-grp',
+      );
+      expect(radio).toMatchObject({
+        semanticType: 'single-choice',
+        valueDomain: {
+          kind: 'enumerated',
+          values: ['email', 'phone'],
+        },
+        interactionProfile: {
+          profile: { id: 'fixture.nx-cool-radio', version: 1 },
+        },
+      });
+    }
+    expect(extracted[0]?.contract.fieldTypeProfileRegistry).toEqual(
+      extracted[1]?.contract.fieldTypeProfileRegistry,
+    );
   });
 });

@@ -223,6 +223,35 @@ type/default or named variant and composes explicitly requested wrapper parts
 in request order. An unmapped custom type remains an explicit diagnostic, not
 an invitation to guess how its DOM works.
 
+The normal adapter extraction APIs accept the resolved registry bundle
+directly. This keeps `formly-adapter` independent of the workspace package
+while allowing the future runner to pass project configuration without
+translating identity claims:
+
+```ts
+const resolvedProject = resolveWorkspaceProjectConfig(root, project);
+const definition = (await project.sources?.[0]?.list())?.[0];
+const instance = definition?.create();
+
+const result = extractFormContract({
+  formId: definition!.id,
+  fields: instance!.fields,
+  fieldTypeProfiles: resolvedProject.fieldTypeProfiles,
+});
+```
+
+Named variants are selected only by root-level field metadata such as
+`formlyContract: { profileVariant: 'portal' }`. Every string wrapper declared
+on a mapped field is resolved in order. Until an explicit transparent-wrapper
+contract exists, an unregistered wrapper blocks interaction projection instead
+of being silently ignored.
+
+Projected collection paths are read through own data properties only. Missing,
+accessor-backed, partial, non-JSON, duplicate-value, or ambiguous-label
+mappings cannot authorize a generic driver. Declared function, string, async,
+or expression-backed collections remain dynamic without being executed; a
+trusted resolved collection is enumerated with scenario completeness.
+
 ### Keep discovery entry points out of browser barrels
 
 Angular libraries should expose browser runtime code and trusted discovery code
@@ -274,10 +303,13 @@ configuration.
 
 ## Current boundary
 
-Discovery loads and inventories project descriptors but does not execute source
-catalogs or write contract artifacts. Field-type profiles are validated and
-resolvable, but are not yet projected onto generated Form Contract nodes, and
-application driver identities do not execute code. Cross-field effects,
-workspace artifact generation, CLI execution, Angular-assisted inventory, and
-observed runtime capture remain later increments on the same configuration
-bedrock.
+Discovery loads and inventories project descriptors but does not yet execute
+source catalogs or write contract artifacts. Direct declared and trusted
+scenario extraction can consume a resolved project field-type profile registry
+and project its identity, interaction metadata, safe value domains, and stable
+diagnostics onto Form Contract nodes. The Task 5.2 workspace runner still needs
+to connect discovered project configuration to that extraction boundary and
+write the deterministic artifact set. Application driver identities remain
+data and do not execute code. Cross-field effects, CLI execution,
+Angular-assisted inventory, and observed runtime capture remain later
+increments on the same configuration bedrock.

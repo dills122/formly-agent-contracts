@@ -1,4 +1,5 @@
 import {
+  FIELD_TYPE_PROFILE_RESOLUTION_DIAGNOSTIC_CODES,
   GENERIC_DRIVER_BLOCKING_UNKNOWN_ASPECTS,
   canonicalizeFieldTypeProfileRegistry,
   computeFieldTypeProfileRegistryHash,
@@ -10,14 +11,7 @@ import {
   type FieldTypeWrapperPrecondition,
 } from '@formly-contract/schema';
 
-export const FIELD_TYPE_PROFILE_RESOLUTION_DIAGNOSTIC_CODES = [
-  'UNMAPPED_FIELD_TYPE',
-  'UNMAPPED_PROFILE_VARIANT',
-  'UNMAPPED_WRAPPER_PROFILE',
-  'DUPLICATE_WRAPPER_REQUEST',
-  'PROFILE_PART_CONFLICT',
-  'WRAPPER_BLOCKS_GENERIC_DRIVER',
-] as const;
+export { FIELD_TYPE_PROFILE_RESOLUTION_DIAGNOSTIC_CODES };
 
 export type FieldTypeProfileResolutionDiagnosticCode =
   typeof FIELD_TYPE_PROFILE_RESOLUTION_DIAGNOSTIC_CODES[number];
@@ -68,6 +62,14 @@ export interface ResolvedFieldTypeProfile {
   readonly provenance: readonly string[];
 }
 
+export interface PreparedFieldTypeProfileRegistry {
+  readonly identity: ResolvedFieldTypeProfileRegistryIdentity;
+  readonly registry: FieldTypeProfileRegistry;
+  readonly resolve: (
+    request: FieldTypeProfileResolutionRequest,
+  ) => ResolvedFieldTypeProfile;
+}
+
 function profileReferenceKey(reference: FieldTypeProfileReference): string {
   return `${reference.id}@${reference.version}`;
 }
@@ -78,6 +80,175 @@ function normalizeRegistry(
   return JSON.parse(
     canonicalizeFieldTypeProfileRegistry(input),
   ) as FieldTypeProfileRegistry;
+}
+
+function deepFreezeRegistryValue<T>(value: T): T {
+  if (typeof value !== 'object' || value === null || Object.isFrozen(value)) {
+    return value;
+  }
+  for (const child of Object.values(value)) {
+    deepFreezeRegistryValue(child);
+  }
+  return Object.freeze(value);
+}
+
+function createPreparedResolver(
+  registry: FieldTypeProfileRegistry,
+  identity: ResolvedFieldTypeProfileRegistryIdentity,
+): PreparedFieldTypeProfileRegistry['resolve'] {
+  const registrations = new Map(
+    registry.registrations.map((registration) => [
+      registration.formlyType,
+      registration,
+    ]),
+  );
+  const profiles = new Map(
+    registry.profiles.map((profile) => [
+      profileReferenceKey(profile.identity),
+      profile,
+    ]),
+  );
+  const wrappers = new Map(
+    registry.wrappers.map((wrapper) => [wrapper.wrapperName, wrapper]),
+  );
+
+  return (request): ResolvedFieldTypeProfile => {
+    const registration = registrations.get(request.formlyType);
+    if (registration === undefined) {
+      fail(
+        'UNMAPPED_FIELD_TYPE',
+        request.formlyType,
+        `No field-type profile is registered for Formly type "${request.formlyType}".`,
+      );
+    }
+
+    const reference =
+      request.variant === undefined
+        ? registration.defaultProfile
+        : registration.variants.find(({ name }) => name === request.variant)
+            ?.profile;
+    if (reference === undefined) {
+      const subject = `${request.formlyType}/${request.variant ?? ''}`;
+      fail(
+        'UNMAPPED_PROFILE_VARIANT',
+        subject,
+        `Formly type "${request.formlyType}" has no declared profile variant "${
+          request.variant ?? ''
+        }".`,
+      );
+    }
+
+    const referenceKey = profileReferenceKey(reference);
+    const profile = profiles.get(referenceKey);
+    if (profile === undefined) {
+      throw new TypeError(
+        `Validated profile registry lost reference "${referenceKey}".`,
+      );
+    }
+
+    const parts = [...profile.parts];
+    const partNames = new Set(parts.map(({ name }) => name));
+    const preconditions: FieldTypeWrapperPrecondition[] = [];
+    const unknowns: ResolvedFieldTypeProfileUnknown[] = profile.unknowns.map(
+      (unknown) => ({
+        scope: 'profile',
+        source: profileReferenceKey(profile.identity),
+        aspect: unknown.aspect,
+        reason: unknown.reason,
+        evidence: unknown.evidence,
+      }),
+    );
+    const provenance = [
+      `registry:${registry.id}@${registry.version}`,
+      `type:${request.formlyType}`,
+      ...(request.variant === undefined ? [] : [`variant:${request.variant}`]),
+    ];
+    const requestedWrappers = new Set<string>();
+
+    for (const wrapperName of request.wrappers) {
+      if (requestedWrappers.has(wrapperName)) {
+        fail(
+          'DUPLICATE_WRAPPER_REQUEST',
+          wrapperName,
+          `Wrapper "${wrapperName}" is requested more than once.`,
+        );
+      }
+      requestedWrappers.add(wrapperName);
+
+      const wrapper = wrappers.get(wrapperName);
+      if (wrapper === undefined) {
+        fail(
+          'UNMAPPED_WRAPPER_PROFILE',
+          wrapperName,
+          `No wrapper profile is registered for "${wrapperName}".`,
+        );
+      }
+
+      if (profile.driver.kind === 'generic') {
+        const blockingUnknown = wrapper.unknowns.find(({ aspect }) =>
+          GENERIC_DRIVER_BLOCKING_UNKNOWN_ASPECTS.includes(aspect),
+        );
+        if (blockingUnknown !== undefined) {
+          const subject = `${wrapperName}/${blockingUnknown.aspect}`;
+          fail(
+            'WRAPPER_BLOCKS_GENERIC_DRIVER',
+            subject,
+            `Wrapper "${wrapperName}" cannot compose with generic driver "${profile.driver.id}" while "${blockingUnknown.aspect}" is unknown.`,
+          );
+        }
+      }
+
+      for (const part of wrapper.parts) {
+        if (partNames.has(part.name)) {
+          fail(
+            'PROFILE_PART_CONFLICT',
+            part.name,
+            `Wrapper "${wrapperName}" contributes duplicate part "${part.name}".`,
+          );
+        }
+        partNames.add(part.name);
+        parts.push(part);
+      }
+      preconditions.push(...wrapper.preconditions);
+      unknowns.push(
+        ...wrapper.unknowns.map((unknown) => ({
+          scope: 'wrapper' as const,
+          source: wrapperName,
+          aspect: unknown.aspect,
+          reason: unknown.reason,
+          evidence: unknown.evidence,
+        })),
+      );
+      provenance.push(`wrapper:${wrapperName}`);
+    }
+
+    return {
+      registry: identity,
+      profile,
+      parts,
+      preconditions,
+      unknowns,
+      provenance,
+    };
+  };
+}
+
+export function prepareFieldTypeProfileRegistry(
+  input: FieldTypeProfileRegistry,
+): PreparedFieldTypeProfileRegistry {
+  const registry = deepFreezeRegistryValue(normalizeRegistry(input));
+  const identity: ResolvedFieldTypeProfileRegistryIdentity = {
+    schemaVersion: registry.schemaVersion,
+    id: registry.id,
+    version: registry.version,
+    contentHash: computeFieldTypeProfileRegistryHash(registry),
+  };
+
+  return Object.freeze({
+    identity: Object.freeze(identity),
+    registry,
+    resolve: createPreparedResolver(registry, identity),
+  });
 }
 
 function fail(
@@ -92,135 +263,5 @@ export function resolveFieldTypeProfile(
   input: FieldTypeProfileRegistry,
   request: FieldTypeProfileResolutionRequest,
 ): ResolvedFieldTypeProfile {
-  const registry = normalizeRegistry(input);
-  const registration = registry.registrations.find(
-    ({ formlyType }) => formlyType === request.formlyType,
-  );
-  if (registration === undefined) {
-    fail(
-      'UNMAPPED_FIELD_TYPE',
-      request.formlyType,
-      `No field-type profile is registered for Formly type "${request.formlyType}".`,
-    );
-  }
-
-  const reference =
-    request.variant === undefined
-      ? registration.defaultProfile
-      : registration.variants.find(({ name }) => name === request.variant)
-          ?.profile;
-  if (reference === undefined) {
-    const subject = `${request.formlyType}/${request.variant ?? ''}`;
-    fail(
-      'UNMAPPED_PROFILE_VARIANT',
-      subject,
-      `Formly type "${request.formlyType}" has no declared profile variant "${
-        request.variant ?? ''
-      }".`,
-    );
-  }
-
-  const referenceKey = profileReferenceKey(reference);
-  const profile = registry.profiles.find(
-    ({ identity }) => profileReferenceKey(identity) === referenceKey,
-  );
-  if (profile === undefined) {
-    // Strict registry parsing checks this invariant. Keep this branch explicit
-    // so future registry composition cannot silently return an empty profile.
-    throw new TypeError(
-      `Validated profile registry lost reference "${referenceKey}".`,
-    );
-  }
-
-  const parts = [...profile.parts];
-  const partNames = new Set(parts.map(({ name }) => name));
-  const preconditions: FieldTypeWrapperPrecondition[] = [];
-  const unknowns: ResolvedFieldTypeProfileUnknown[] = profile.unknowns.map(
-    (unknown) => ({
-      scope: 'profile',
-      source: profileReferenceKey(profile.identity),
-      aspect: unknown.aspect,
-      reason: unknown.reason,
-      evidence: unknown.evidence,
-    }),
-  );
-  const provenance = [
-    `registry:${registry.id}@${registry.version}`,
-    `type:${request.formlyType}`,
-    ...(request.variant === undefined ? [] : [`variant:${request.variant}`]),
-  ];
-  const requestedWrappers = new Set<string>();
-
-  for (const wrapperName of request.wrappers) {
-    if (requestedWrappers.has(wrapperName)) {
-      fail(
-        'DUPLICATE_WRAPPER_REQUEST',
-        wrapperName,
-        `Wrapper "${wrapperName}" is requested more than once.`,
-      );
-    }
-    requestedWrappers.add(wrapperName);
-
-    const wrapper = registry.wrappers.find(
-      (candidate) => candidate.wrapperName === wrapperName,
-    );
-    if (wrapper === undefined) {
-      fail(
-        'UNMAPPED_WRAPPER_PROFILE',
-        wrapperName,
-        `No wrapper profile is registered for "${wrapperName}".`,
-      );
-    }
-
-    if (profile.driver.kind === 'generic') {
-      const blockingUnknown = wrapper.unknowns.find(({ aspect }) =>
-        GENERIC_DRIVER_BLOCKING_UNKNOWN_ASPECTS.includes(aspect),
-      );
-      if (blockingUnknown !== undefined) {
-        const subject = `${wrapperName}/${blockingUnknown.aspect}`;
-        fail(
-          'WRAPPER_BLOCKS_GENERIC_DRIVER',
-          subject,
-          `Wrapper "${wrapperName}" cannot compose with generic driver "${profile.driver.id}" while "${blockingUnknown.aspect}" is unknown.`,
-        );
-      }
-    }
-
-    for (const part of wrapper.parts) {
-      if (partNames.has(part.name)) {
-        fail(
-          'PROFILE_PART_CONFLICT',
-          part.name,
-          `Wrapper "${wrapperName}" contributes duplicate part "${part.name}".`,
-        );
-      }
-      partNames.add(part.name);
-      parts.push(part);
-    }
-    preconditions.push(...wrapper.preconditions);
-    unknowns.push(
-      ...wrapper.unknowns.map((unknown) => ({
-        scope: 'wrapper' as const,
-        source: wrapperName,
-        aspect: unknown.aspect,
-        reason: unknown.reason,
-        evidence: unknown.evidence,
-      })),
-    );
-    provenance.push(`wrapper:${wrapperName}`);
-  }
-
-  return {
-    registry: {
-      schemaVersion: registry.schemaVersion,
-      id: registry.id,
-      version: registry.version,
-      contentHash: computeFieldTypeProfileRegistryHash(registry),
-    },
-    profile,
-    parts,
-    preconditions,
-    unknowns,
-    provenance,
-  };
+  return prepareFieldTypeProfileRegistry(input).resolve(request);
 }

@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 
 import {
   FieldTypeProfileResolutionError,
+  prepareFieldTypeProfileRegistry,
   resolveFieldTypeProfile,
 } from './field-type-profiles.js';
 
@@ -183,6 +184,32 @@ function expectResolutionError(
 }
 
 describe('resolveFieldTypeProfile', () => {
+  it('prepares one canonical registry snapshot for repeated exact resolution', () => {
+    const registry = createRegistry();
+    const prepared = prepareFieldTypeProfileRegistry(registry);
+    (
+      registry.registrations[0]!.variants[0] as { name: string }
+    ).name = 'mutated-after-prepare';
+
+    const defaultProfile = prepared.resolve({
+      formlyType: 'cool-radio-btn-grp',
+      wrappers: [],
+    });
+    const portalProfile = prepared.resolve({
+      formlyType: 'cool-radio-btn-grp',
+      variant: 'portal',
+      wrappers: [],
+    });
+
+    expect(defaultProfile.profile.identity.id).toBe('fixture.radio');
+    expect(portalProfile.profile.identity.id).toBe('fixture.portal-radio');
+    expect(prepared.identity.contentHash).toBe(
+      computeFieldTypeProfileRegistryHash(createRegistry()),
+    );
+    expect(Object.isFrozen(prepared.registry)).toBe(true);
+    expect(Object.isFrozen(prepared.registry.profiles[0])).toBe(true);
+  });
+
   it('selects the exact Formly type default without inventing a variant', () => {
     const registry = createRegistry();
     const resolved = resolveFieldTypeProfile(registry, {

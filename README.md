@@ -327,6 +327,20 @@ an explicit diagnostic. The returned node has the stable ID
 `example.profile::path:s_profile.s_name`, model path `['profile', 'name']`, its
 required constraint, and an exact `data-testid` locator.
 
+For application-owned custom fields, pass the canonical
+`fieldTypeProfiles` bundle from resolved project configuration. Mapped nodes
+then include reviewed roles, parts, interaction operations, driver identity,
+possible values when safely enumerable, and provenance. A custom type or
+wrapper that is not registered remains visible but non-operable and produces a
+stable diagnostic. Named variants use the data-only root field metadata
+`formlyContract: { profileVariant: 'variant-name' }`; fields cannot embed
+arbitrary interaction overrides.
+
+Static radio/select options and boolean controls expose complete value domains.
+Unresolved option functions, expressions, and asynchronous sources remain
+dynamic and are never executed by declared extraction. Trusted scenario
+extraction may expose the scenario-specific resolved domain.
+
 ## Resolve a synthetic scenario
 
 Use `compileFormContractScenario` when required, readonly, disabled, hidden,
@@ -421,8 +435,9 @@ Schema v0.4 can represent:
 - The scenario compiler performs the initial controlled Formly build but does
   not wait for remote options or lifecycle-driven browser behavior.
 - Formly `RegExp` patterns are diagnosed; v0.4 represents string patterns only.
-- Custom widget interaction metadata can be represented, but profile-aware
-  extraction and executable application drivers are not implemented yet.
+- Custom widget interaction metadata requires an application-supplied,
+  serializable field-type profile registry. Profile-aware extraction is
+  implemented; executable application drivers remain a later integration.
 - The project does not currently generate or execute Cypress/Playwright tests.
 - No production MCP server or browser-observation layer is included.
 - The supported usage target is Angular 20 or newer with Formly 6.x, but

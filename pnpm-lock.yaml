@@ -135,6 +135,9 @@ importers:
       '@angular/compiler-cli':
         specifier: 20.3.29
         version: 20.3.29(@angular/compiler@20.3.29)(typescript@5.9.3)
+      '@formly-contract/compiler':
+        specifier: workspace:*
+        version: link:../../packages/compiler
       '@formly-contract/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace
@@ -181,6 +184,9 @@ importers:
       '@angular/compiler-cli':
         specifier: 20.3.29
         version: 20.3.29(@angular/compiler@20.3.29)(typescript@5.9.3)
+      '@formly-contract/compiler':
+        specifier: workspace:*
+        version: link:../../packages/compiler
       '@formly-contract/workspace':
         specifier: workspace:*
         version: link:../../packages/workspace
