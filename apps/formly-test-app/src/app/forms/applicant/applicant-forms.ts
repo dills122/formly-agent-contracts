@@ -14,11 +14,18 @@ function createProfileFields(): FormlyFieldConfig[] {
         { type: '#applicantName' },
         {
           key: 'identity.preferredName',
+          id: 'applicant-preferred-name',
           type: 'input',
           defaultValue: '',
           props: {
             label: 'Preferred name',
+            placeholder: 'Ada Example',
             maxLength: 40,
+            attributes: {
+              'data-testid': 'applicant-preferred-name',
+              role: 'textbox',
+              'aria-label': 'Preferred name',
+            },
           },
         },
         {

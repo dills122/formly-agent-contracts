@@ -2,6 +2,7 @@ import { verifyContentHash } from '@formly-contract/contract-schema';
 import { extractFormContract } from '@formly-contract/formly-adapter';
 import { describe, expect, it } from 'vitest';
 
+import { DEMO_CONTRACTS } from './generated/demo-contracts.js';
 import { APPLICANT_TEST_FORMS } from './forms/applicant/applicant-forms.js';
 import { EDGE_CASE_TEST_FORMS } from './forms/edge-cases/edge-case-forms.js';
 import { OPERATIONS_TEST_FORMS } from './forms/operations/operations-forms.js';
@@ -30,6 +31,9 @@ describe('Formly contract fixture integration', () => {
       expect(verifyContentHash(first.contract), definition.id).toBe(true);
       expect(second.contract.contentHash, definition.id).toBe(
         first.contract.contentHash,
+      );
+      expect(DEMO_CONTRACTS[definition.id], definition.id).toEqual(
+        first.contract,
       );
     }
   });

@@ -1,0 +1,63 @@
+:root {
+  --color-paper: oklch(98.5% 0.004 250);
+  --color-paper-2: oklch(96.5% 0.008 250);
+  --color-surface: oklch(99.4% 0.002 250);
+  --color-surface-raised: oklch(99.6% 0.002 250);
+  --color-ink: oklch(24% 0.02 258);
+  --color-ink-2: oklch(34% 0.018 257);
+  --color-muted: oklch(53% 0.018 257);
+  --color-rule: oklch(89% 0.012 252);
+  --color-rule-strong: oklch(76% 0.02 252);
+  --color-accent: oklch(58% 0.2 256);
+  --color-accent-text: oklch(46% 0.17 256);
+  --color-accent-soft: oklch(94% 0.035 256);
+  --color-accent-ink: oklch(98.5% 0.004 250);
+  --color-graphite: oklch(20% 0.016 260);
+  --color-graphite-2: oklch(25% 0.018 260);
+  --color-code: oklch(91% 0.012 250);
+  --color-code-muted: oklch(68% 0.018 252);
+  --color-shadow: oklch(24% 0.02 258 / 8%);
+  --color-focus: oklch(58% 0.2 256);
+
+  --font-display: "Avenir Next", "Segoe UI Variable Display", ui-sans-serif,
+    system-ui, sans-serif;
+  --font-body: Inter, "Segoe UI Variable Text", ui-sans-serif, system-ui,
+    sans-serif;
+  --font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+
+  --space-3xs: 0.25rem;
+  --space-2xs: 0.5rem;
+  --space-xs: 0.75rem;
+  --space-sm: 1rem;
+  --space-list: 1.25rem;
+  --space-md: 1.5rem;
+  --space-lg: 2rem;
+  --space-xl: 3rem;
+  --space-2xl: 4.5rem;
+  --space-3xl: 7rem;
+
+  --text-xs: 0.72rem;
+  --text-sm: 0.86rem;
+  --text-md: 1rem;
+  --text-lg: 1.25rem;
+  --text-xl: 1.75rem;
+  --text-2xl: 2.35rem;
+  --text-display: clamp(2.6rem, 5.4vw, 5.8rem);
+
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.7, 0, 0.84, 0);
+  --ease-in-out: cubic-bezier(0.65, 0, 0.35, 1);
+  --dur-micro: 120ms;
+  --dur-short: 220ms;
+  --dur-long: 420ms;
+
+  --radius-control: 0.375rem;
+  --radius-panel: 0.625rem;
+  --rule-thin: 1px;
+  --page-gutter: clamp(1rem, 3vw, 3rem);
+  --page-max: 112rem;
+
+  --z-base: 1;
+  --z-raised: 10;
+  --z-sticky: 200;
+}

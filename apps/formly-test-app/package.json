@@ -2,6 +2,7 @@
   "name": "@formly-contract/formly-test-app",
   "version": "0.0.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "build": "ng build --configuration production",
     "serve": "ng serve --host 127.0.0.1 --port 4200"
