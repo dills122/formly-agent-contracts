@@ -41,6 +41,20 @@ describe('canonicalStringify', () => {
       'Non-finite number at $.unsafe',
     );
   });
+
+  it('rejects circular object and array values with their paths', () => {
+    const object: Record<string, unknown> = {};
+    object.self = object;
+    const array: unknown[] = [];
+    array.push(array);
+
+    expect(() => canonicalStringify(object)).toThrow(
+      'Circular value at $.self',
+    );
+    expect(() => canonicalStringify(array)).toThrow(
+      'Circular value at $[0]',
+    );
+  });
 });
 
 describe('contract content hashing', () => {

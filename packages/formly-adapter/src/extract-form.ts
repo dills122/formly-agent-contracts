@@ -224,21 +224,42 @@ function numericPathSegment(segment: string): ModelPathSegment {
   return segment;
 }
 
-function keyToPath(key: FormlyFieldConfig['key']): ModelPathSegment[] {
+interface KeyPathProjection {
+  readonly path: ModelPathSegment[];
+  readonly hasUnsupportedNumericSegment: boolean;
+}
+
+function keyToPath(key: FormlyFieldConfig['key']): KeyPathProjection {
   if (key === undefined || key === null || key === '') {
-    return [];
+    return { path: [], hasUnsupportedNumericSegment: false };
   }
 
   if (Array.isArray(key)) {
-    return key.filter(
-      (segment): segment is string | number =>
-        (typeof segment === 'string' && segment.length > 0) ||
-        (typeof segment === 'number' && Number.isSafeInteger(segment)),
+    const hasUnsupportedNumericSegment = key.some(
+      (segment) =>
+        typeof segment === 'number' &&
+        (!Number.isSafeInteger(segment) || segment < 0),
     );
+    if (hasUnsupportedNumericSegment) {
+      return { path: [], hasUnsupportedNumericSegment: true };
+    }
+
+    return {
+      path: key.filter(
+        (segment): segment is string | number =>
+          (typeof segment === 'string' && segment.length > 0) ||
+          (typeof segment === 'number' &&
+            Number.isSafeInteger(segment) &&
+            segment >= 0),
+      ),
+      hasUnsupportedNumericSegment: false,
+    };
   }
 
   if (typeof key === 'number') {
-    return Number.isSafeInteger(key) && key >= 0 ? [key] : [];
+    return Number.isSafeInteger(key) && key >= 0
+      ? { path: [key], hasUnsupportedNumericSegment: false }
+      : { path: [], hasUnsupportedNumericSegment: true };
   }
 
   // This matches Formly 6.1.8's public field behavior: bracket segments are
@@ -247,10 +268,13 @@ function keyToPath(key: FormlyFieldConfig['key']): ModelPathSegment[] {
   // Source: https://github.com/ngx-formly/ngx-formly/blob/v6.1.8/src/core/src/lib/utils.ts
   const normalized = key.replace(/\[([A-Za-z0-9_]+)\]/gu, '.$1');
 
-  return normalized
-    .split('.')
-    .filter((segment) => segment.length > 0)
-    .map(numericPathSegment);
+  return {
+    path: normalized
+      .split('.')
+      .filter((segment) => segment.length > 0)
+      .map(numericPathSegment),
+    hasUnsupportedNumericSegment: false,
+  };
 }
 
 function strictPercentEncode(value: string): string {
@@ -327,6 +351,9 @@ function readPresentation(
 
 function readConstraints(
   props: Readonly<Record<string, unknown>>,
+  sourcePath: readonly ModelPathSegment[],
+  nodeId: string,
+  context: ExtractionContext,
 ): ContractConstraint[] {
   const constraints: ContractConstraint[] = [];
 
@@ -348,6 +375,14 @@ function readConstraints(
 
   if (typeof props.pattern === 'string' && props.pattern.length > 0) {
     constraints.push({ kind: 'pattern', value: props.pattern });
+  } else if (props.pattern instanceof RegExp) {
+    addDiagnostic(
+      context,
+      'UNSUPPORTED_RULE',
+      'RegExp pattern constraints cannot be represented safely by the v0.3 contract.',
+      [...sourcePath, 'props', 'pattern'],
+      nodeId,
+    );
   }
 
   return constraints;
@@ -589,8 +624,87 @@ interface RuleProjection {
   readonly dynamicRules: ContractDynamicRule[];
 }
 
+interface ResolvedRuleProjection {
+  readonly represented: boolean;
+  readonly resolvedValue?: JsonValue;
+}
+
+const BOOLEAN_RULE_TARGETS = new Set([
+  'hide',
+  'props.required',
+  'props.readonly',
+  'props.disabled',
+]);
+
+const TEXT_RULE_TARGETS = new Set([
+  'props.label',
+  'props.description',
+  'props.placeholder',
+  'props.type',
+]);
+
+function projectResolvedRuleValue(
+  field: FormlyFieldConfig,
+  property: string,
+  options: readonly ContractOption[],
+  context: ExtractionContext,
+): ResolvedRuleProjection {
+  const normalized = property.replace(/^templateOptions\./u, 'props.');
+  const value = readPathValue(field, property);
+
+  if (BOOLEAN_RULE_TARGETS.has(normalized)) {
+    return {
+      represented: true,
+      ...(typeof value === 'boolean' ? { resolvedValue: value } : {}),
+    };
+  }
+
+  if (normalized === 'props.options') {
+    const resolvedValue = Array.isArray(value)
+      ? toJsonValue(options)
+      : undefined;
+    return {
+      represented: true,
+      ...(resolvedValue === undefined ? {} : { resolvedValue }),
+    };
+  }
+
+  if (TEXT_RULE_TARGETS.has(normalized)) {
+    const resolvedValue =
+      typeof value === 'string' && value.length > 0 ? value : undefined;
+    return {
+      represented: true,
+      ...(resolvedValue === undefined ? {} : { resolvedValue }),
+    };
+  }
+
+  if (normalized === 'props.attributes') {
+    return { represented: true };
+  }
+
+  const attributePrefix = 'props.attributes.';
+  if (normalized.startsWith(attributePrefix)) {
+    const attribute = normalized.slice(attributePrefix.length);
+    const supportedAttributes = new Set([
+      ...context.locatorOptions.testIdAttributes,
+      'role',
+      'aria-label',
+    ]);
+    if (supportedAttributes.has(attribute)) {
+      const resolvedValue = textAttributeValue(value);
+      return {
+        represented: true,
+        ...(resolvedValue === undefined ? {} : { resolvedValue }),
+      };
+    }
+  }
+
+  return { represented: false };
+}
+
 function readRules(
   field: FormlyFieldConfig,
+  options: readonly ContractOption[],
   sourcePath: readonly ModelPathSegment[],
   nodeId: string,
   context: ExtractionContext,
@@ -601,6 +715,7 @@ function readRules(
   const addDynamicRule = (
     property: string,
     expression: unknown,
+    expressionSourcePath: readonly ModelPathSegment[],
   ): boolean => {
     const source = isFunction(expression)
       ? 'function'
@@ -611,10 +726,20 @@ function readRules(
       return false;
     }
 
-    const resolvedValue =
+    const projection =
       context.evidence === 'resolved'
-        ? toJsonValue(readPathValue(field, property))
-        : undefined;
+        ? projectResolvedRuleValue(field, property, options, context)
+        : { represented: true };
+    if (!projection.represented) {
+      addDiagnostic(
+        context,
+        'UNSUPPORTED_RULE',
+        `Resolved expression target ${property} is outside the adapter allowlist.`,
+        expressionSourcePath,
+        nodeId,
+      );
+    }
+    const resolvedValue = projection.resolvedValue;
     dynamicRules.push({
       property,
       source,
@@ -652,7 +777,13 @@ function readRules(
           expression: String(expression),
           evidence: 'declared',
         });
-      } else if (!addDynamicRule(property, expression)) {
+      } else if (
+        !addDynamicRule(
+          property,
+          expression,
+          [...sourcePath, propertyName, property],
+        )
+      ) {
         diagnoseOpaqueValue(
           expression,
           `Expression for ${property}`,
@@ -681,7 +812,11 @@ function readRules(
     });
   } else if (
     hideExpression !== undefined &&
-    !addDynamicRule('hide', hideExpression)
+    !addDynamicRule(
+      'hide',
+      hideExpression,
+      [...sourcePath, 'hideExpression'],
+    )
   ) {
     diagnoseOpaqueValue(
       hideExpression,
@@ -1204,7 +1339,8 @@ function extractNode(
   location: NodeLocation,
   context: ExtractionContext,
 ): ContractNode {
-  const keyPath = keyToPath(field.key);
+  const keyProjection = keyToPath(field.key);
+  const keyPath = keyProjection.path;
   const modelPath = [
     ...location.parentModelPath,
     ...keyPath,
@@ -1217,6 +1353,15 @@ function extractNode(
     location.position,
     location.sourcePath,
   );
+  if (keyProjection.hasUnsupportedNumericSegment) {
+    addDiagnostic(
+      context,
+      'UNKNOWN_FIELD_SHAPE',
+      'Field key contains a negative, fractional, or unsafe numeric segment and was represented structurally.',
+      [...location.sourcePath, 'key'],
+      id,
+    );
+  }
   const propsValue = field.props ?? field.templateOptions;
   const props = isRecord(propsValue) ? propsValue : {};
   const formlyType = typeof field.type === 'string' ? field.type : undefined;
@@ -1266,11 +1411,13 @@ function extractNode(
   }
 
   const constraints = [
-    ...readConstraints(props),
+    ...readConstraints(props, location.sourcePath, id, context),
     ...readNamedConstraints(field, location.sourcePath, id, context),
   ];
+  const options = readOptions(props, location.sourcePath, id, context);
   const { conditions, dynamicRules } = readRules(
     field,
+    options,
     location.sourcePath,
     id,
     context,
@@ -1281,7 +1428,6 @@ function extractNode(
     id,
     context,
   );
-  const options = readOptions(props, location.sourcePath, id, context);
   const optionSource = readOptionSource(
     field,
     props,
@@ -1385,6 +1531,18 @@ function cloneSyntheticModel(
   }
 }
 
+function cloneSyntheticFormState(
+  formState: Readonly<Record<string, unknown>> | undefined,
+): Record<string, unknown> {
+  try {
+    return structuredClone(formState ?? {});
+  } catch (error) {
+    throw new TypeError('Scenario form state must be structured-cloneable.', {
+      cause: error,
+    });
+  }
+}
+
 export function compileFormContractScenario(
   input: CompileFormContractScenarioInput,
 ): ExtractFormResult {
@@ -1393,7 +1551,7 @@ export function compileFormContractScenario(
     throw new TypeError('Scenario field factory must return an array.');
   }
 
-  const formState = { ...(input.formState ?? {}) };
+  const formState = cloneSyntheticFormState(input.formState);
   const root: FormlyFieldConfig = {
     model: cloneSyntheticModel(input.model),
     options: { formState },

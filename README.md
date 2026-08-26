@@ -165,7 +165,9 @@ const { contract } = compileFormContractScenario({
 
 This API runs Formly callbacks and therefore belongs only in a trusted build or
 CI process with synthetic inputs. MCP/query handlers read the resulting
-artifact and never invoke it.
+artifact and never invoke it. The model and form state must be
+structured-cloneable; both are deep-cloned before Formly runs so builder
+mutations cannot escape into caller-owned test data.
 
 Current limitations are intentional:
 
@@ -176,6 +178,11 @@ Current limitations are intentional:
   templates, and unsupported model rules remain stable diagnostics.
 - Async option sources are identified, but remote values and lifecycle-driven
   changes are not awaited by the initial scenario compiler.
+- Resolved expression values are retained only for contract-supported targets.
+  Options are projected to public label/value/disabled records; unsupported
+  targets stay declared and receive an `UNSUPPORTED_RULE` diagnostic.
+- Formly `RegExp` patterns are diagnosed rather than silently discarded; v0.3
+  represents string patterns only.
 - Custom widget semantics, rendered DOM evidence, Playwright actions, and MCP
   transport are not part of this MVP.
 - The compatibility claim is the exact pinned Angular 20.3.29 and Formly 6.1.8

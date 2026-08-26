@@ -23,6 +23,9 @@ The v0 adapter constructs cumulative model paths as follows:
 - bracketed word or numeric segments become path segments;
 - array-form keys preserve each segment literally;
 - numeric keys and numeric bracket segments become non-negative integers;
+- a negative, fractional, or unsafe numeric scalar or array-key segment is not
+  a valid model-path segment, so the node uses positional identity and emits an
+  `UNKNOWN_FIELD_SHAPE` diagnostic;
 - keyless groups inherit their parent model path for descendant model access;
   their own semantic identity remains structural; and
 - an array template adds the literal `*` segment before its template key.
@@ -47,6 +50,8 @@ silently merged.
 - Reordering a keyless structural group can change that group's structural ID;
   this limitation is explicit in v0.
 - Literal-dot array keys remain distinguishable from dotted string keys.
+- Unsupported numeric keys remain visible as diagnosed structural nodes rather
+  than crashing contract validation or being partially reinterpreted.
 
 ## Source
 

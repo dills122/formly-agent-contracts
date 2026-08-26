@@ -28,6 +28,12 @@ data, or opaque functions as unknown or diagnostic. Angular and application
 code run only in the controlled compiler process; the MCP query surface, if
 added, reads the emitted artifact.
 
+The caller's synthetic model and form state are structured-cloned before the
+builder runs. Resolved expression values are target-aware: options pass through
+the public option projector, state and presentation targets retain only their
+contract representation, and unsupported targets remain declared with a
+diagnostic. The resolved path never serializes arbitrary field properties.
+
 This is an executable compatibility claim for Angular 20.3.29 and Formly 6.1.8,
 not a general claim for other version combinations or custom workplace field
 types.
@@ -64,5 +70,7 @@ Sources:
 - Component instance defaults and view- or lifecycle-dependent behavior are not
   available from this harness and must not be presented as known facts.
 - Browser parity remains a later verification layer.
+- Scenario inputs must be structured-cloneable; this excludes services,
+  callbacks, and other live application objects from the trusted boundary.
 - A future Formly upgrade or additional supported version pair requires its own
   compatibility test before expanding the support claim.

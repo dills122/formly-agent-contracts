@@ -1,7 +1,10 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 import { describe, expect, it } from 'vitest';
 
-import { extractFormContract } from './extract-form.js';
+import {
+  compileFormContractScenario,
+  extractFormContract,
+} from './extract-form.js';
 
 function deepFreeze<T>(value: T): T {
   if (typeof value !== 'object' || value === null || Object.isFrozen(value)) {
@@ -313,6 +316,37 @@ describe('extractFormContract basic projection', () => {
     expect(second.contract.contentHash).toBe(first.contract.contentHash);
   });
 
+  it('diagnoses unsupported numeric keys and uses structural identity', () => {
+    const result = extractFormContract({
+      formId: 'edge.numeric-keys',
+      fields: [
+        { key: -1, type: 'input' },
+        { key: 1.5, type: 'input' },
+        { key: ['account', -2, 'name'], type: 'input' },
+        { key: ['account', 2.5, 'name'], type: 'input' },
+      ],
+    });
+
+    expect(result.contract.nodes.map(({ id, modelPath }) => ({
+      id,
+      modelPath,
+    }))).toEqual([
+      { id: 'edge.numeric-keys::position:0', modelPath: [] },
+      { id: 'edge.numeric-keys::position:1', modelPath: [] },
+      { id: 'edge.numeric-keys::position:2', modelPath: [] },
+      { id: 'edge.numeric-keys::position:3', modelPath: [] },
+    ]);
+    expect(result.diagnostics).toHaveLength(4);
+    for (const index of [0, 1, 2, 3]) {
+      expect(result.diagnostics).toContainEqual(
+        expect.objectContaining({
+          code: 'UNKNOWN_FIELD_SHAPE',
+          sourcePath: ['fields', index, 'key'],
+        }),
+      );
+    }
+  });
+
   it('uses structural identity for keyless layout groups under a keyed parent', () => {
     const result = extractFormContract({
       formId: 'layout.horizontal',
@@ -447,6 +481,144 @@ describe('extractFormContract arrays, conditions, and unknowns', () => {
       ),
     ).toBe(false);
     expect(callbackWasCalled).toBe(false);
+  });
+
+  it('allowlists resolved option values instead of copying raw objects', () => {
+    const result = compileFormContractScenario({
+      formId: 'resolved.option-allowlist',
+      builder: {
+        build: (root) => {
+          const field = root.fieldGroup?.[0];
+          if (field?.props !== undefined) {
+            field.props.options = [
+              {
+                label: 'Public choice',
+                value: 'public',
+                internalRecord: { secret: true },
+              },
+            ];
+          }
+        },
+      },
+      createFields: () => [
+        {
+          key: 'choice',
+          type: 'select',
+          props: { options: [] },
+          expressionProperties: {
+            'props.options': () => [],
+          },
+        },
+      ],
+    });
+
+    expect(result.contract.nodes[0]?.options).toEqual([
+      { label: 'Public choice', value: 'public' },
+    ]);
+    expect(result.contract.nodes[0]?.dynamicRules).toEqual([
+      {
+        property: 'props.options',
+        source: 'function',
+        evidence: 'resolved',
+        resolvedValue: [{ label: 'Public choice', value: 'public' }],
+      },
+    ]);
+  });
+
+  it('does not copy unsupported resolved expression targets', () => {
+    const result = compileFormContractScenario({
+      formId: 'resolved.unsupported-target',
+      builder: {
+        build: (root) => {
+          const field = root.fieldGroup?.[0];
+          if (field?.props !== undefined) {
+            (field.props as Record<string, unknown>).internalRecord = {
+              secret: true,
+            };
+          }
+        },
+      },
+      createFields: () => [
+        {
+          key: 'value',
+          type: 'input',
+          expressionProperties: {
+            'props.internalRecord': () => ({ secret: true }),
+          },
+        },
+      ],
+    });
+
+    expect(result.contract.nodes[0]?.dynamicRules).toEqual([
+      {
+        property: 'props.internalRecord',
+        source: 'function',
+        evidence: 'declared',
+      },
+    ]);
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'UNSUPPORTED_RULE',
+        sourcePath: [
+          'fields',
+          0,
+          'expressionProperties',
+          'props.internalRecord',
+        ],
+      }),
+    );
+  });
+
+  it('isolates nested scenario form state from builder mutation', () => {
+    const formState = { workflow: { attempts: 0 } };
+
+    compileFormContractScenario({
+      formId: 'resolved.form-state-isolation',
+      builder: {
+        build: (root) => {
+          const state = root.options?.formState as {
+            workflow: { attempts: number };
+          };
+          state.workflow.attempts += 1;
+        },
+      },
+      createFields: () => [],
+      formState,
+    });
+
+    expect(formState).toEqual({ workflow: { attempts: 0 } });
+  });
+
+  it('rejects scenario form state that cannot be structured-cloned', () => {
+    expect(() =>
+      compileFormContractScenario({
+        formId: 'resolved.form-state-clone-failure',
+        builder: { build: () => undefined },
+        createFields: () => [],
+        formState: { service: () => undefined },
+      }),
+    ).toThrow('Scenario form state must be structured-cloneable.');
+  });
+
+  it('diagnoses RegExp pattern constraints that v0.3 cannot represent', () => {
+    const result = extractFormContract({
+      formId: 'constraints.regexp',
+      fields: [
+        {
+          key: 'postalCode',
+          type: 'input',
+          props: { pattern: /^[A-Z]\d[A-Z] \d[A-Z]\d$/u },
+        },
+      ],
+    });
+
+    expect(result.contract.nodes[0]?.constraints).toEqual([]);
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'UNSUPPORTED_RULE',
+        sourcePath: ['fields', 0, 'props', 'pattern'],
+      }),
+    );
   });
 
   it('retains an unrealized array template with wildcard model paths', () => {
