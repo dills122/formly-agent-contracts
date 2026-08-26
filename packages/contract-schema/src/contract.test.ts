@@ -191,6 +191,22 @@ function contractWithInteractionProfile(
   });
 }
 
+function withoutNodeValueDomain(contract: FormContract): FormContract {
+  const nodeWithoutValueDomain = Object.fromEntries(
+    Object.entries(contract.nodes[0]!).filter(
+      ([property]) => property !== 'valueDomain',
+    ),
+  );
+  const draftWithoutHash = Object.fromEntries(
+    Object.entries(contract).filter(([property]) => property !== 'contentHash'),
+  );
+
+  return createFormContract({
+    ...draftWithoutHash,
+    nodes: [nodeWithoutValueDomain],
+  } as unknown as FormContractDraft);
+}
+
 const genericProfileFixtures = [
   genericInteractionProfile({
     semanticType: 'text',
@@ -563,6 +579,137 @@ describe('parseFormContract', () => {
       );
     },
   );
+
+  it.each([
+    ['choice', genericProfileFixtures[1]],
+    ['autocomplete', genericProfileFixtures[4]],
+    ['row-selection', genericProfileFixtures[5]],
+  ] as const)(
+    'rejects generic %s execution without a resolved value domain',
+    (_kind, profile) => {
+      const malformed = withoutNodeValueDomain(
+        contractWithInteractionProfile(profile),
+      );
+
+      expect(() => parseFormContract(malformed)).toThrow(
+        'valueDomain must be enumerated for generic',
+      );
+    },
+  );
+
+  it.each([
+    ['choice', genericProfileFixtures[1]],
+    ['autocomplete', genericProfileFixtures[4]],
+    ['row-selection', genericProfileFixtures[5]],
+  ] as const)(
+    'rejects generic %s execution with an unresolved dynamic value domain',
+    (_kind, profile) => {
+      const contract = contractWithInteractionProfile(profile);
+      const malformed = createFormContract({
+        ...contract,
+        nodes: [
+          {
+            ...contract.nodes[0]!,
+            valueDomain: {
+              kind: 'dynamic',
+              source: 'function',
+              evidence: 'declared',
+            },
+          },
+        ],
+      });
+
+      expect(() => parseFormContract(malformed)).toThrow(
+        'valueDomain must be enumerated for generic',
+      );
+    },
+  );
+
+  it('rejects a generic value-bearing driver whose domain value has no option label', () => {
+    const contract = contractWithInteractionProfile(genericProfileFixtures[1]);
+    const malformed = createFormContract({
+      ...contract,
+      nodes: [
+        {
+          ...contract.nodes[0]!,
+          valueDomain: {
+            kind: 'enumerated',
+            source: 'adapter',
+            completeness: 'complete',
+            evidence: 'declared',
+            values: [{ code: 'MISSING' }],
+          },
+        },
+      ],
+    });
+
+    expect(() => parseFormContract(malformed)).toThrow(
+      'options must contain exactly one label mapping for valueDomain.values[0]',
+    );
+  });
+
+  it('rejects an ambiguous generic label mapping for one model value', () => {
+    const contract = contractWithInteractionProfile(genericProfileFixtures[1]);
+    const malformed = createFormContract({
+      ...contract,
+      nodes: [
+        {
+          ...contract.nodes[0]!,
+          options: [
+            { label: 'First label', value: { code: 'EXAMPLE' } },
+            { label: 'Second label', value: { code: 'EXAMPLE' } },
+          ],
+        },
+      ],
+    });
+
+    expect(() => parseFormContract(malformed)).toThrow(
+      'options must contain exactly one label mapping for valueDomain.values[0]',
+    );
+  });
+
+  it.each([
+    ['fill', genericProfileFixtures[0]],
+    ['repeater', genericProfileFixtures[6]],
+  ] as const)(
+    'allows generic %s execution without an unrelated value domain',
+    (_kind, profile) => {
+      const contract = withoutNodeValueDomain(
+        contractWithInteractionProfile(profile),
+      );
+
+      expect(parseFormContract(contract)).toEqual(contract);
+    },
+  );
+
+  it('allows an application choice driver to own an unresolved value mapping', () => {
+    const profile = genericProfileFixtures[1];
+    const contract = contractWithInteractionProfile({
+      ...profile,
+      driver: {
+        kind: 'application',
+        id: 'test.dynamic-choice',
+        version: 1,
+        capabilities: ['check'],
+      },
+    });
+    const unresolved = createFormContract({
+      ...contract,
+      nodes: [
+        {
+          ...contract.nodes[0]!,
+          options: [],
+          valueDomain: {
+            kind: 'dynamic',
+            source: 'function',
+            evidence: 'declared',
+          },
+        },
+      ],
+    });
+
+    expect(parseFormContract(unresolved)).toEqual(unresolved);
+  });
 
   it('accepts every value-domain branch', () => {
     const domains = [

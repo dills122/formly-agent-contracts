@@ -14,11 +14,12 @@ import {
   type ContractOption,
   type ContractOptionSource,
   type ContractPresentation,
+  type ContractValueDomain,
   type FormContract,
   type JsonValue,
   type ModelPathSegment,
 } from './contract.js';
-import { verifyContentHash } from './canonical-json.js';
+import { canonicalStringify, verifyContentHash } from './canonical-json.js';
 import {
   FIELD_TYPE_PROFILE_SCHEMA_VERSION,
   parseContractValueDomain,
@@ -836,6 +837,42 @@ function nodeHasInteractionProfile(node: ContractNode): boolean {
   );
 }
 
+function assertGenericDriverValueMapping(
+  profile: ContractInteractionProfile,
+  valueDomain: ContractValueDomain | undefined,
+  options: readonly ContractOption[],
+  path: string,
+): void {
+  if (
+    profile.driver.kind !== 'generic' ||
+    (profile.interaction.kind !== 'choice' &&
+      profile.interaction.kind !== 'autocomplete' &&
+      profile.interaction.kind !== 'row-selection')
+  ) {
+    return;
+  }
+
+  if (valueDomain?.kind !== 'enumerated') {
+    throw new TypeError(
+      `${path}.valueDomain must be enumerated for generic ${profile.interaction.kind}`,
+    );
+  }
+
+  const optionCounts = new Map<string, number>();
+  for (const option of options) {
+    const key = canonicalStringify(option.value);
+    optionCounts.set(key, (optionCounts.get(key) ?? 0) + 1);
+  }
+
+  valueDomain.values.forEach((domainValue, index) => {
+    if (optionCounts.get(canonicalStringify(domainValue)) !== 1) {
+      throw new TypeError(
+        `${path}.options must contain exactly one label mapping for valueDomain.values[${index}]`,
+      );
+    }
+  });
+}
+
 function assertNode(
   value: unknown,
   path: string,
@@ -934,6 +971,12 @@ function assertNode(
         `${path}.semanticType must match interactionProfile.semanticType`,
       );
     }
+    assertGenericDriverValueMapping(
+      value.interactionProfile,
+      value.valueDomain as ContractValueDomain | undefined,
+      value.options as readonly ContractOption[],
+      path,
+    );
   }
   if (value.state !== undefined) {
     assertNodeState(value.state, `${path}.state`);
