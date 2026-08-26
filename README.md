@@ -41,6 +41,195 @@ The parser and contract are the current product. A production MCP server,
 automatic Playwright generation, browser observation, and application-source
 discovery are future layers and are not shipped by this MVP.
 
+## Use it in your own Angular/Formly codebase
+
+The package runs as build/test tooling beside your Angular application. It does
+not need to be added to the application's browser bundle. A typical adoption
+flow is:
+
+```text
+application-owned Formly factories
+              |
+     generation script or CI job
+              |
+       versioned contract JSON
+              |
+ Playwright / Cypress / agent tooling
+```
+
+### 1. Add the packages
+
+The packages are not published to npm yet. Until the first release, clone this
+repository next to the consuming application and build the two packages:
+
+```sh
+git clone https://github.com/dills122/formly-agent-contracts.git
+cd formly-agent-contracts
+pnpm install --frozen-lockfile
+pnpm --filter @formly-agent-contracts/contract-schema build
+pnpm --filter @formly-agent-contracts/formly-adapter build
+```
+
+Then link them from the consuming application's `package.json` (adjust the
+relative path for your checkout):
+
+```json
+{
+  "devDependencies": {
+    "@formly-agent-contracts/contract-schema": "link:../formly-agent-contracts/packages/contract-schema",
+    "@formly-agent-contracts/formly-adapter": "link:../formly-agent-contracts/packages/formly-adapter"
+  }
+}
+```
+
+Run `pnpm install` in the consuming application. The application must already
+provide compatible Angular and Formly peer dependencies; the currently tested
+combination is Angular `20.3.29` with Formly `6.1.8`. Once the packages are
+published, normal versioned `pnpm add --save-dev` dependencies will replace
+these local links.
+
+### 2. Select the forms to expose
+
+Application-source discovery is deliberately not automatic. Create a small,
+application-owned registry that imports only the form factories you want the
+contract generator to inspect:
+
+```ts
+// tools/contract-forms.ts
+import type { FormlyFieldConfig } from '@ngx-formly/core';
+import { createClaimFields } from '../src/app/claims/claim.fields';
+import { createCustomerFields } from '../src/app/customers/customer.fields';
+
+export interface ContractFormTarget {
+  id: string;
+  createFields: () => FormlyFieldConfig[];
+}
+
+export const contractForms: ContractFormTarget[] = [
+  { id: 'claims.create', createFields: () => createClaimFields() },
+  { id: 'customers.edit', createFields: () => createCustomerFields() },
+];
+```
+
+Each factory should return a fresh field tree. If a factory needs application
+inputs, wrap it in a closure with synthetic values that are safe to use in
+local development and CI.
+
+### 3. Generate contract artifacts
+
+Add a build-time script in the application repository:
+
+```ts
+// tools/generate-form-contracts.ts
+import { mkdir, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
+import { canonicalStringify } from '@formly-agent-contracts/contract-schema';
+import { extractFormContract } from '@formly-agent-contracts/formly-adapter';
+import { contractForms } from './contract-forms';
+
+const outputDirectory = resolve('artifacts/form-contracts');
+await mkdir(outputDirectory, { recursive: true });
+
+for (const target of contractForms) {
+  const { contract, diagnostics } = extractFormContract({
+    formId: target.id,
+    fields: target.createFields(),
+  });
+
+  await writeFile(
+    resolve(outputDirectory, `${target.id}.json`),
+    `${canonicalStringify(contract)}\n`,
+  );
+
+  console.log(
+    `${target.id}: ${contract.nodes.length} root nodes, ${diagnostics.length} diagnostics`,
+  );
+}
+```
+
+Run this file with the TypeScript runner already used by the consuming
+repository, or compile it as part of a Node-targeted tooling project. The
+resulting JSON can be committed for review, uploaded as a CI artifact, or read
+by downstream test-authoring tools. Because it is canonical and content-hashed,
+an unexpected form-contract change is visible in source control or CI.
+
+This declared path is the best starting point. It captures static structure and
+records expression callbacks as dynamic metadata without executing arbitrary
+application code.
+
+### 4. Use a contract in Playwright
+
+Validate stored JSON before trusting it, find the semantic node you need, and
+use one of its exact locator candidates. For a standard `data-testid` locator:
+
+```ts
+import { readFile } from 'node:fs/promises';
+import {
+  parseFormContract,
+  type ContractNode,
+  type ModelPathSegment,
+} from '@formly-agent-contracts/contract-schema';
+
+function findNodeByPath(
+  nodes: readonly ContractNode[],
+  modelPath: readonly ModelPathSegment[],
+): ContractNode | undefined {
+  for (const node of nodes) {
+    if (
+      node.modelPath.length === modelPath.length &&
+      node.modelPath.every((segment, index) => segment === modelPath[index])
+    ) {
+      return node;
+    }
+
+    const nested = findNodeByPath(
+      node.arrayTemplate
+        ? [...node.children, node.arrayTemplate]
+        : node.children,
+      modelPath,
+    );
+    if (nested) return nested;
+  }
+}
+
+const contract = parseFormContract(
+  JSON.parse(
+    await readFile('artifacts/form-contracts/claims.create.json', 'utf8'),
+  ),
+);
+
+const claimantName = findNodeByPath(contract.nodes, ['claimant', 'name']);
+
+const testId = claimantName?.locators.find(
+  (locator) =>
+    locator.strategy === 'testId' && locator.attribute === 'data-testid',
+);
+
+if (!claimantName || !testId) {
+  throw new Error('claimant.name has no exact data-testid locator');
+}
+
+await page.getByTestId(testId.value).fill('Ada Lovelace');
+```
+
+Real consumers will normally put recursive node lookup and locator selection in
+a shared Playwright or Cypress helper. Composite controls can expose several
+locator targets, so helpers should select by `target` rather than assuming one
+Formly node always maps to one DOM element. Empty locator arrays and diagnostics
+must be handled as missing evidence, not replaced with invented selectors.
+
+### 5. Resolve dynamic behavior when needed
+
+If expressions determine visibility, required/readonly state, or option lists,
+add synthetic scenarios and call `compileFormContractScenario`. Run that API in
+a trusted Angular test/build environment configured with the application's real
+Formly modules and custom types. Generate one artifact per meaningful scenario,
+using only synthetic model and form-state data.
+
+The [synthetic compatibility harness](fixtures/synthetic-form/src/compatibility.ts)
+shows the complete Angular `TestBed` setup for obtaining a
+`FormlyFormBuilder`. The detailed API example below shows the scenario call.
+
 ## Why this is useful
 
 Large Formly forms are often assembled from nested groups, shared fragments,
@@ -71,7 +260,7 @@ Consumers can inspect one contract to answer questions such as:
   available?
 - Which facts are exact, derived, resolved for one scenario, or still unknown?
 
-## Quick start
+## Try this repository
 
 Prerequisites:
 
