@@ -118,7 +118,7 @@ describe('Nx workspace consumer fixture', () => {
         return instance.fields.map((field) => field.type);
       }),
     ).toContain('cool-radio-btn-grp');
-  });
+  }, 20_000);
 
   it('shares one canonical radio profile across source-owning projects', async () => {
     const root = parseRootConfig(

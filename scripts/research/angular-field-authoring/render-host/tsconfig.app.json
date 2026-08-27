@@ -1,0 +1,17 @@
+{
+  "extends": "../../../../apps/formly-test-app/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../../../..",
+    "declaration": false,
+    "declarationMap": false,
+    "noEmit": false,
+    "paths": {
+      "@angular/*": ["apps/formly-test-app/node_modules/@angular/*"],
+      "@ngx-formly/core": ["apps/formly-test-app/node_modules/@ngx-formly/core"]
+    },
+    "types": []
+  },
+  "files": ["main.ts"],
+  "include": [],
+  "exclude": []
+}

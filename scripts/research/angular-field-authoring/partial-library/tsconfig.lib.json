@@ -1,0 +1,26 @@
+{
+  "extends": "../../../../tsconfig.base.json",
+  "compilerOptions": {
+    "baseUrl": "../../../..",
+    "declaration": true,
+    "declarationMap": false,
+    "lib": ["ES2022", "DOM"],
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "noEmit": false,
+    "outDir": "../.generated/partial-library",
+    "paths": {
+      "@angular/*": ["apps/formly-test-app/node_modules/@angular/*"],
+      "@ngx-formly/core": ["apps/formly-test-app/node_modules/@ngx-formly/core"]
+    },
+    "rootDir": "src",
+    "types": []
+  },
+  "angularCompilerOptions": {
+    "compilationMode": "partial",
+    "strictInjectionParameters": true,
+    "strictTemplates": true
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": ["src/negative/**/*.ts"]
+}

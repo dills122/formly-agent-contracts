@@ -1,4 +1,7 @@
-import { canonicalStringify } from '@formly-contract/schema';
+import {
+  canonicalStringify,
+  type RuntimeProvenance,
+} from '@formly-contract/schema';
 import {
   lstat,
   mkdir,
@@ -9,6 +12,7 @@ import {
   symlink,
   writeFile,
 } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -41,6 +45,11 @@ async function writeModule(
 async function seedRoot(workspaceRoot: string, extra = ''): Promise<void> {
   await writeModule(
     workspaceRoot,
+    'pnpm-lock.yaml',
+    "lockfileVersion: '9.0'\n",
+  );
+  await writeModule(
+    workspaceRoot,
     'formly-contracts.config.mjs',
     `export default {
       projectConfigs: ['projects/*.project.mjs']
@@ -54,6 +63,62 @@ function runnerOptions(workspaceRoot: string) {
     workspaceRoot,
     rootConfigPath: 'formly-contracts.config.mjs',
   } as const;
+}
+
+function runtimeProvenance(
+  overrides: {
+    readonly workerVersion?: string;
+    readonly lockHash?: string;
+  } = {},
+): RuntimeProvenance {
+  return {
+    schemaVersion: '1.0.0',
+    worker: {
+      id: '@formly-contract/workspace/in-process',
+      version: overrides.workerVersion ?? '0.1.0',
+      protocolVersion: '1',
+    },
+    adapter: {
+      id: '@formly-contract/compiler/declared',
+      version: '0.4.0',
+      mode: 'declared',
+    },
+    tools: [
+      { name: '@formly-contract/compiler', version: '0.4.0' },
+      { name: '@formly-contract/schema', version: '0.4.0' },
+      { name: '@formly-contract/workspace', version: '0.1.0' },
+    ],
+    loader: {
+      id: 'jiti',
+      version: '2.7.0',
+      options: {
+        fsCache: false,
+        interopDefault: false,
+        moduleCache: false,
+        tsconfigPaths: {
+          rootConfig: 'disabled',
+          projectConfigs: 'disabled',
+        },
+        nativeModules: [],
+      },
+    },
+    node: {
+      version: '22.22.1',
+      platform: 'linux',
+      architecture: 'x64',
+    },
+    executionProfile: {
+      id: 'trusted-local-v1',
+      version: '1',
+      network: 'not-enforced',
+    },
+    dependencySnapshot: {
+      kind: 'pnpm-lock',
+      workspaceRelativePath: 'pnpm-lock.yaml',
+      sha256: overrides.lockHash ?? `sha256:${'a'.repeat(64)}`,
+    },
+    runtimePackages: [],
+  };
 }
 
 async function pathExists(path: string): Promise<boolean> {
@@ -82,6 +147,151 @@ afterEach(async () => {
 });
 
 describe('runWorkspace', () => {
+  it('records the exact in-process toolchain, Node runtime, and selected root lockfile', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `export default { projectId: 'forms' };`,
+    );
+
+    const result = await runWorkspace(runnerOptions(workspaceRoot));
+    const lockBytes = "lockfileVersion: '9.0'\n";
+
+    expect(result.index.runtimeProvenance).toEqual({
+      schemaVersion: '1.0.0',
+      worker: {
+        id: '@formly-contract/workspace/in-process',
+        version: '0.1.0',
+        protocolVersion: '1',
+      },
+      adapter: {
+        id: '@formly-contract/compiler/declared',
+        version: '0.4.0',
+        mode: 'declared',
+      },
+      tools: [
+        { name: '@formly-contract/compiler', version: '0.4.0' },
+        { name: '@formly-contract/schema', version: '0.4.0' },
+        { name: '@formly-contract/workspace', version: '0.1.0' },
+      ],
+      loader: {
+        id: 'jiti',
+        version: '2.7.0',
+        options: {
+          fsCache: false,
+          interopDefault: false,
+          moduleCache: false,
+          tsconfigPaths: {
+            rootConfig: 'disabled',
+            projectConfigs: 'disabled',
+          },
+          nativeModules: [],
+        },
+      },
+      node: {
+        version: process.versions.node,
+        platform: process.platform,
+        architecture: process.arch,
+      },
+      executionProfile: {
+        id: 'trusted-local-v1',
+        version: '1',
+        network: 'not-enforced',
+      },
+      dependencySnapshot: {
+        kind: 'pnpm-lock',
+        workspaceRelativePath: 'pnpm-lock.yaml',
+        sha256: `sha256:${createHash('sha256')
+          .update(lockBytes)
+          .digest('hex')}`,
+      },
+      runtimePackages: [],
+    });
+    expect(result.index.projects[0]?.runtimeProvenance).toEqual(
+      result.index.runtimeProvenance,
+    );
+  });
+
+  it.each([
+    {
+      label: 'neither loader stage',
+      rootConfigured: false,
+      projectsConfigured: false,
+    },
+    {
+      label: 'only the root-config loader',
+      rootConfigured: true,
+      projectsConfigured: false,
+    },
+    {
+      label: 'only the project-config loaders',
+      rootConfigured: false,
+      projectsConfigured: true,
+    },
+    {
+      label: 'both loader stages',
+      rootConfigured: true,
+      projectsConfigured: true,
+    },
+  ])(
+    'records effective tsconfig-path use for $label',
+    async ({ rootConfigured, projectsConfigured }) => {
+      const workspaceRoot = await createTemporaryWorkspace();
+      await seedRoot(
+        workspaceRoot,
+        projectsConfigured ? `, tsconfigPath: 'project-tsconfig.json'` : '',
+      );
+      await writeModule(
+        workspaceRoot,
+        'projects/forms.project.mjs',
+        `export default { projectId: 'forms' };`,
+      );
+      await writeModule(workspaceRoot, 'root-tsconfig.json', `{}`);
+      await writeModule(workspaceRoot, 'project-tsconfig.json', `{}`);
+
+      const result = await runWorkspace({
+        ...runnerOptions(workspaceRoot),
+        ...(rootConfigured
+          ? {
+              rootLoaderOptions: {
+                tsconfigPath: join(workspaceRoot, 'root-tsconfig.json'),
+              },
+            }
+          : {}),
+      });
+
+      expect(result.index.runtimeProvenance.loader.options.tsconfigPaths).toEqual(
+        {
+          rootConfig: rootConfigured ? 'configured' : 'disabled',
+          projectConfigs: projectsConfigured ? 'configured' : 'disabled',
+        },
+      );
+    },
+  );
+
+  it('fails generation when the workspace-root dependency lock is unavailable', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.mjs',
+      `export default { projectConfigs: ['projects/*.project.mjs'] };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `export default { projectId: 'forms' };`,
+    );
+
+    await expect(runWorkspace(runnerOptions(workspaceRoot))).rejects.toEqual(
+      expect.objectContaining({
+        code: 'DEPENDENCY_SNAPSHOT_UNAVAILABLE',
+        phase: 'inventory',
+      }),
+    );
+  });
+
   it('deterministically inventories unordered bulk sources and emits byte-identical consecutive runs', async () => {
     const workspaceRoot = await createTemporaryWorkspace();
     await seedRoot(workspaceRoot);
@@ -173,6 +383,118 @@ describe('runWorkspace', () => {
     });
     expect(await readFile(indexPath, 'utf8')).toBe(indexBytes);
     expect(await readFile(artifactPath, 'utf8')).toBe(artifactBytes);
+  });
+
+  it('changes project/root configuration hashes for host or lock provenance without changing form artifacts', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `export default {
+        projectId: 'forms',
+        sources: [{ sourceId: 'forms', list: () => [{
+          id: 'claims.form',
+          create: () => ({ fields: [{ key: 'name', type: 'input' }] })
+        }] }]
+      };`,
+    );
+
+    const first = await runWorkspace({
+      ...runnerOptions(workspaceRoot),
+      runtimeProvenance: runtimeProvenance(),
+    });
+    const firstArtifactBytes = await readFile(
+      join(workspaceRoot, first.artifactPaths[0]!),
+      'utf8',
+    );
+    const lockChanged = await runWorkspace({
+      ...runnerOptions(workspaceRoot),
+      runtimeProvenance: runtimeProvenance({
+        lockHash: `sha256:${'b'.repeat(64)}`,
+      }),
+    });
+    const hostChanged = await runWorkspace({
+      ...runnerOptions(workspaceRoot),
+      runtimeProvenance: runtimeProvenance({ workerVersion: '0.1.1' }),
+    });
+
+    expect(lockChanged.index.projects[0]?.configurationHash).not.toBe(
+      first.index.projects[0]?.configurationHash,
+    );
+    expect(lockChanged.index.configurationHash).not.toBe(
+      first.index.configurationHash,
+    );
+    expect(hostChanged.index.projects[0]?.configurationHash).not.toBe(
+      first.index.projects[0]?.configurationHash,
+    );
+    expect(hostChanged.index.configurationHash).not.toBe(
+      first.index.configurationHash,
+    );
+    expect(lockChanged.artifactPaths).toEqual(first.artifactPaths);
+    expect(hostChanged.artifactPaths).toEqual(first.artifactPaths);
+    expect(
+      await readFile(join(workspaceRoot, hostChanged.artifactPaths[0]!), 'utf8'),
+    ).toBe(firstArtifactBytes);
+  });
+
+  it('normalizes set-like provenance before project and root configuration hashing', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `export default { projectId: 'forms' };`,
+    );
+    const provenance: RuntimeProvenance = {
+      ...runtimeProvenance(),
+      tools: [
+        { name: '@formly-contract/workspace', version: '0.1.0' },
+        { name: '@formly-contract/compiler', version: '0.4.0' },
+        { name: '@formly-contract/schema', version: '0.4.0' },
+      ],
+      loader: {
+        ...runtimeProvenance().loader,
+        options: {
+          ...runtimeProvenance().loader.options,
+          nativeModules: ['@angular/core', '@angular/compiler'],
+        },
+      },
+      runtimePackages: [
+        { name: '@ngx-formly/core', version: '6.1.8' },
+        { name: '@angular/core', version: '20.3.29' },
+      ],
+    };
+    const reordered: RuntimeProvenance = {
+      ...provenance,
+      tools: [...provenance.tools].reverse(),
+      loader: {
+        ...provenance.loader,
+        options: {
+          ...provenance.loader.options,
+          nativeModules: [...provenance.loader.options.nativeModules].reverse(),
+        },
+      },
+      runtimePackages: [...provenance.runtimePackages].reverse(),
+    };
+
+    const first = await runWorkspace({
+      ...runnerOptions(workspaceRoot),
+      runtimeProvenance: provenance,
+    });
+    const second = await runWorkspace({
+      ...runnerOptions(workspaceRoot),
+      runtimeProvenance: reordered,
+    });
+
+    expect(second.index.runtimeProvenance).toEqual(
+      first.index.runtimeProvenance,
+    );
+    expect(second.index.projects[0]?.configurationHash).toBe(
+      first.index.projects[0]?.configurationHash,
+    );
+    expect(second.index.configurationHash).toBe(first.index.configurationHash);
+    expect(second.index.contentHash).toBe(first.index.contentHash);
   });
 
   it('reports missing artifacts without creating output', async () => {

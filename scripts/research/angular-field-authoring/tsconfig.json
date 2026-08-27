@@ -1,0 +1,9 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "lib": ["ES2022", "DOM"],
+    "noEmit": true,
+    "types": ["node", "vitest/globals"]
+  },
+  "include": ["authoring-contract.experiment.ts", "authoring-contract.experiment.test.ts"]
+}

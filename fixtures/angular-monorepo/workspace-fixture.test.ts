@@ -16,11 +16,56 @@ import {
   type FieldTypeProfileExtractionRegistry,
 } from '@formly-contract/compiler';
 import { describe, expect, it } from 'vitest';
+import type { RuntimeProvenance } from '@formly-contract/schema';
 
 const fixtureRoot = fileURLToPath(new URL('./', import.meta.url));
 const fixtureTsconfig = resolve(fixtureRoot, 'tsconfig.json');
 const goldenRoot = resolve(fixtureRoot, 'goldens');
 const generatedOutputPrefix = 'dist/formly-contracts/';
+const goldenRuntimeProvenance: RuntimeProvenance = {
+  schemaVersion: '1.0.0',
+  worker: {
+    id: '@formly-contract/workspace/in-process',
+    version: '0.1.0',
+    protocolVersion: '1',
+  },
+  adapter: {
+    id: '@formly-contract/compiler/declared',
+    version: '0.4.0',
+    mode: 'declared',
+  },
+  tools: [
+    { name: '@formly-contract/compiler', version: '0.4.0' },
+    { name: '@formly-contract/schema', version: '0.4.0' },
+    { name: '@formly-contract/workspace', version: '0.1.0' },
+  ],
+  loader: {
+    id: 'jiti',
+    version: '2.7.0',
+    options: {
+      fsCache: false,
+      interopDefault: false,
+      moduleCache: false,
+      tsconfigPaths: {
+        rootConfig: 'disabled',
+        projectConfigs: 'configured',
+      },
+      nativeModules: [],
+    },
+  },
+  node: { version: '22.22.1', platform: 'linux', architecture: 'x64' },
+  executionProfile: {
+    id: 'trusted-local-v1',
+    version: '1',
+    network: 'not-enforced',
+  },
+  dependencySnapshot: {
+    kind: 'pnpm-lock',
+    workspaceRelativePath: 'pnpm-lock.yaml',
+    sha256: `sha256:${'a'.repeat(64)}`,
+  },
+  runtimePackages: [],
+};
 
 function goldenRelativePath(generatedPath: string): string {
   if (!generatedPath.startsWith(generatedOutputPrefix)) {
@@ -499,6 +544,7 @@ describe('Angular monorepo workspace fixture', () => {
         rootConfigPath: 'formly-contracts.config.ts',
         rootLoaderOptions: { tsconfigPath: fixtureTsconfig },
         cliOverrides: { outputDirectory },
+        runtimeProvenance: goldenRuntimeProvenance,
       } as const;
       const first = await runWorkspace(options);
       const firstIndexBytes = await readFile(
@@ -639,6 +685,7 @@ describe('Angular monorepo workspace fixture', () => {
         rootLoaderOptions: {
           tsconfigPath: resolve(temporaryWorkspace, 'tsconfig.json'),
         },
+        runtimeProvenance: goldenRuntimeProvenance,
       });
       const generatedPaths = [
         generated.indexPath,
