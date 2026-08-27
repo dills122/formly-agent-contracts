@@ -443,10 +443,23 @@ not add compilation, Angular execution, storage, or mutation to MCP requests.
 
 1. Validate the parser against a sanitized shape recreated from the target work
    application without copying its data or code.
-2. Add a host integration API for application-equivalent Formly providers.
+2. Add the controlled project-host prerequisite described in
+   [Angular JIT config loading in monorepos](research/angular-jit-config-loading.md):
+   publish the framework-neutral workspace host/protocol, version runtime
+   provenance, discover project descriptors without evaluating project configs,
+   run one inventory/compile worker per project, and add the Angular-owned JIT
+   wrapper with peer-correct-graph limits.
 3. Add runtime-builder parity for type defaults, wrappers, and initial
    expressions.
 4. Expand semantic rule representation and scenario resolution.
 5. Add custom type adapters and stable DOM identity.
 6. Add production MCP packaging only when its deployment boundary is known.
 7. Add Playwright intent and execution in a separate project milestone.
+
+The controlled-host increment is complete only when packed strict-pnpm
+consumers prove CLI and programmatic composition; project-specific runtime and
+tsconfig bases work; Angular aliases and version conflicts fail before import;
+no facade reaches the parent/Nx daemon; worker order/failure cannot change or
+partially publish a workspace index; portable provenance excludes machine
+paths; and isolated CI either proves network denial or fails closed. The generic
+in-process runner remains the Node-safe baseline until that gate is complete.

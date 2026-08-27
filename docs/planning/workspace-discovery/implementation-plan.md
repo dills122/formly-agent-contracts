@@ -1,17 +1,24 @@
 # Implementation Plan: Distributed Workspace Form Discovery
 
-Status: in progress; Tasks 1–6B and the machine-verifiable portion of
-Checkpoint A are implemented, including project-owned field-type profiles and
-cross-field effects, resolved effect projection, deterministic workspace
-artifacts/indexes, all three generic CLI commands, canonical Angular-fixture
-goldens, and linked/packed consumer smokes. The remaining Checkpoint A gate is
-maintainer review of the real config and artifact UX before Angular APIs begin.
+Status: in progress; Tasks 1–6B and Checkpoint A are complete. Task 7A.1 code
+and acceptance verification are complete after correcting the exact-loader and
+resolved-package findings from independent review instance 1 plus the
+order-insensitive configuration-hash finding from instance 2. Completed work
+includes
+project-owned field-type profiles and cross-field effects, resolved effect
+projection, deterministic workspace artifacts/indexes, all three generic CLI
+commands, canonical Angular-fixture goldens, linked/packed consumer smokes, and
+the schema-owned portable runtime/dependency provenance foundation. Task 7A.2
+begins only after the independent review loop returns a ready verdict.
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)
 
 Profile architecture research:
 [v0.4 Field-Type Adapter Research](../../research/v0.4-field-type-adapter.md)
+
+Controlled Angular loader research:
+[Angular JIT/config loading in pnpm and Nx monorepos](../../research/angular-jit-config-loading.md)
 
 Proposed decision:
 [ADR 0007](../../decisions/0007-distributed-workspace-discovery.md)
@@ -52,6 +59,10 @@ roots, serialize model values, or invent selectors.
   executable compatibility gate.
 - Keep Angular and Nx optional; neither enters `@formly-contract/schema` or the
   runtime dependency surface of `@formly-contract/compiler`.
+- Preserve one workspace-wide orchestrator and publication boundary. The first
+  Nx integration adds exactly one aggregate target to an explicitly selected
+  coordinator project; it does not run or publish one contract generation per
+  form-owning project.
 - Treat capture as incomplete migration evidence, never authoritative declared
   inventory.
 
@@ -69,11 +80,17 @@ Tasks 5A + 6A + 6B
        |
 Checkpoint A: generic pilot
        |
-Task 7A: Angular package scaffold
+Task 7A.1: portable provenance
        |
-Task 7B: Angular provider bridge
+Task 7A.2: workspace host protocol
+       |---------------------------|
+Task 7B.1 -> 7B.2        Task 7A.3: Angular package scaffold
+       |---------------------------|
+Task 7B.3                 Task 7D: Angular provider bridge
        |
-Task 8: trusted Angular scenario host
+Task 7C.1 -> 7C.2 -> 7C.3: guarded Angular JIT host
+       |---------------------------|
+Task 8: trusted Angular scenario compilation
        |
 Task 8B: Angular field-profile authoring
        |
@@ -83,17 +100,17 @@ Task 9: Nx version gate
        |
 Task 10A: Nx package scaffold
        |
-Task 10B: inferred Nx target
+Task 10B: one aggregate Nx target
        |
 Task 11A: Nx executor
-       |
-Task 11B: Nx generators
-       |
-Task 12A: Nx fixture shell
-       |
-Task 12B: Nx fixture projects
-       |
-Task 12C: cache/affected end-to-end proof
+       |-------------------------------|
+Task 11B: Nx generators     Task 11C: external isolated-CI provider
+       |                               |
+Task 12A: Nx fixture shell             |
+       |                               |
+Task 12B: Nx fixture projects          |
+       |-------------------------------|
+Task 12C: aggregate cache/affected + isolation proof
        |
 Checkpoint C: workplace-ready path
        |
@@ -563,40 +580,324 @@ fixture exports rather than duplicate files
       validated identity to form and workspace hashes.
 - [x] Linked and packed packages work from isolated temporary consumers.
 - [x] Full lint, tests, builds, demo, and documentation checks pass.
-- [ ] Maintainer reviews the actual config and artifact UX before Angular/Nx API
-      work begins.
+- [x] Maintainer reviewed the generic/workplace feedback and authorized the
+      accepted Angular host implementation plan on 2026-08-27. Additional
+      workplace UX feedback remains expected after the next pull-down test.
 
 ## Phase 2: Angular integration
 
-### Task 7A: Scaffold the Angular integration package
+### Task 7A: Publish the runtime-host contract and Angular package boundary
 
-**Description:** Add a publishable Angular integration package with peer
-dependencies, build configuration, and an empty public entry point. Do not add
-provider or compiler behavior yet.
+**Description:** Establish the versioned framework-neutral host contract first,
+then make the workspace and Angular packages consume it. This parent task is
+complete only after Tasks 7A.1–7A.3 pass; each child is a separate reviewable
+slice and must leave generic consumers working.
+
+#### Task 7A.1: Version portable runtime and dependency provenance
+
+**Description:** Add schema-owned, path-free DTOs for the worker protocol,
+runtime host, Jiti/Node toolchain, execution profile, and dependency snapshot.
+Version workspace index/configuration hashing deliberately rather than hiding
+the provenance migration inside worker changes.
 
 **Acceptance criteria:**
 
-- [ ] `@formly-contract/angular` builds as ESM with declarations.
-- [ ] Angular core/forms and Formly are peers, not workspace runtime dependencies.
-- [ ] Neither schema, compiler, nor workspace gains an Angular dependency.
+- [x] Runtime provenance records exact tool/worker/Jiti/Node/profile/adapter
+      identities plus platform/architecture and a relative selected-lockfile
+      path with SHA-256 digest.
+- [x] Portable DTOs reject absolute paths, module URLs, PIDs, timings, temporary
+      directories, environment values, and other machine-local observations.
+- [x] Project configuration hashes incorporate the runtime host and dependency
+      snapshot; the root index incorporates the resulting project hashes.
+- [x] The schema/version migration and compatibility behavior are explicit.
 
 **Verification:**
 
-- [ ] `pnpm --filter @formly-contract/angular build`
-- [ ] Dependency audit confirms the intended package direction.
+- [x] Runtime-schema, canonical-serialization, hash-causality, path-redaction,
+      and prior-version rejection/compatibility tests pass.
+- [x] Existing form-artifact goldens remain byte-identical; index/configuration
+      goldens migrate once and are deterministic across repeated runs.
 
-**Dependencies:** Checkpoint A
+**Dependencies:** Checkpoint A and the accepted
+`docs/research/angular-jit-config-loading.md` decision
+
+**Files likely touched:**
+
+- `packages/schema/src/runtime-provenance.ts`
+- `packages/schema/src/workspace-index.ts`
+- focused schema tests and public export
+
+**Estimated scope:** Medium
+
+#### Task 7A.2: Publish the workspace runtime-host protocol
+
+**Description:** Promote `@formly-contract/workspace` from the private prototype
+to the publishable framework-neutral execution host. Add strict IPC and
+parent-selected host-module descriptors plus public composition subpaths and a
+packed private worker entry. No Angular dependency enters this package.
+
+**Acceptance criteria:**
+
+- [ ] The package has complete publish metadata and public runtime-host/CLI
+      composition subpaths; its private worker entry is included in the tarball
+      but cannot be selected by project config.
+- [ ] Requests, inventory/approval/result messages, and host descriptors are
+      strict versioned DTOs. Only the trusted parent resolves the absolute
+      `file:` host URL used internally; it never enters portable output.
+- [ ] Protocol version, host ID/version, operation, and JSON-safety failures use
+      stable diagnostics before project code runs.
+- [ ] Generic CLI/programmatic consumers remain Angular-free.
+
+**Verification:**
+
+- [ ] Protocol round-trip/negative tests and package-export tests pass.
+- [ ] Linked and packed non-hoisted generic consumers load every public subpath
+      without repository aliases.
+- [ ] Dependency audit proves workspace depends only on framework-neutral
+      compiler/schema surfaces.
+
+**Dependencies:** Task 7A.1
+
+**Files likely touched:**
+
+- `packages/workspace/package.json`
+- `packages/workspace/src/runtime-host/`
+- `packages/workspace/src/index.ts`
+- packed consumer smoke fixture
+
+**Estimated scope:** Medium
+
+#### Task 7A.3: Scaffold the dependency-light Angular host package
+
+**Description:** Add the publishable Angular integration shell and its Node-safe
+`./jit` wrapper. Fix peer ownership with a strict pnpm install matrix before any
+runtime compatibility claim; the guarded compiler import itself belongs to Task
+7C.
+
+**Acceptance criteria:**
+
+- [ ] `@formly-contract/angular` has a mandatory compatible workspace peer and
+      no reverse dependency; Angular/Formly peer optionality is fixed by an
+      explicit supported/unsupported install matrix.
+- [ ] Importing `@formly-contract/angular/jit` performs no eager Angular import
+      and returns a host descriptor relative to the installed Angular package.
+- [ ] The unique future CLI/programmatic entry names are reserved without
+      advertising an unimplemented generation path.
+
+**Verification:**
+
+- [ ] Package builds and import-without-root-Angular smoke tests pass.
+- [ ] Linked, packed, hoist-disabled, missing-peer, incompatible-peer, and
+      project-only-peer install cases match the documented matrix.
+- [ ] Dependency audit proves `angular -> workspace -> compiler/schema`.
+
+**Dependencies:** Task 7A.2
 
 **Files likely touched:**
 
 - `packages/angular/package.json`
-- `packages/angular/tsconfig.json`
-- `packages/angular/tsconfig.build.json`
-- `packages/angular/src/index.ts`
+- `packages/angular/tsconfig*.json`
+- `packages/angular/src/jit.ts`
+- install-matrix fixture/test
 
 **Estimated scope:** Medium
 
-### Task 7B: Productize distributed Angular source providers
+### Task 7B: Defer every project config into a short-lived worker
+
+**Description:** Replace parent-process project evaluation in three ordered
+slices. The parent evaluates only the Node-safe root config; every project-owned
+config, registry, factory, and framework object stays inside one disposable
+child. Workers never publish final artifacts or the workspace index.
+
+#### Task 7B.1: Split discovery and inventory before project evaluation
+
+**Acceptance criteria:**
+
+- [ ] Stage-one discovery expands and validates project config paths without
+      importing them or claiming to know project/source IDs.
+- [ ] Each serialized request carries canonical config/project/runtime-base and
+      effective-tsconfig paths plus root policy and the parent-selected host.
+- [ ] Exact root overrides support centralized configs with precedence: exact
+      project override, root default, then absent.
+- [ ] A child loads its project once, returns inventory, and waits; the parent
+      rejects cross-project duplicate IDs before sending compile approval.
+
+**Verification:**
+
+- [ ] Import-spy, traversal/symlink, override-precedence, inventory-order, and
+      duplicate-before-factory tests pass.
+- [ ] `list` obtains inventory without invoking a form factory.
+
+**Dependencies:** Task 7A.2
+
+**Files likely touched:**
+
+- `packages/workspace/src/discover-projects.ts`
+- `packages/workspace/src/config.ts`
+- `packages/workspace/src/project-worker.ts`
+- focused discovery/protocol tests
+
+**Estimated scope:** Medium
+
+#### Task 7B.2: Enforce the trusted-local worker lifecycle
+
+**Acceptance criteria:**
+
+- [ ] Workers use direct `process.execPath` spawning with no shell, a scrubbed
+      allowlisted environment, validated IPC, explicit timeout/termination, and
+      no authority to write final outputs.
+- [ ] Inventory/approve/compile is one lifecycle; live configs and factories do
+      not cross IPC or reload between phases.
+- [ ] Malformed messages, early exit, late failure, timeout, or host mismatch
+      terminate the child and prevent publication.
+- [ ] `trusted-local-v1` provenance says network is not enforced; selecting
+      unavailable `isolated-ci-v1` fails closed.
+
+**Verification:**
+
+- [ ] Environment-secret, forbidden write/child/worker, malformed IPC, timeout,
+      crash, and cleanup tests pass without weakening the trusted-code caveat.
+- [ ] Reversed child completion produces identical validated result ordering.
+
+**Dependencies:** Task 7B.1
+
+**Files likely touched:**
+
+- `packages/workspace/src/project-worker.ts`
+- `packages/workspace/src/worker-supervisor.ts`
+- `packages/workspace/src/run-workspace.ts`
+- focused lifecycle fixtures/tests
+
+**Estimated scope:** Medium
+
+#### Task 7B.3: Make aggregation and publication failure-safe
+
+**Acceptance criteria:**
+
+- [ ] One generation lock spans discovery through publication; lock/package
+      metadata snapshots are rechecked before commit.
+- [ ] The parent validates/rehashes child results and sorts independently of
+      completion order.
+- [ ] Content-addressed artifacts publish before an atomic index-last replace;
+      worker failure cannot change the prior index.
+- [ ] Filesystem failure may leave only unreferenced artifacts. Prior index
+      authority, cleanup, and idempotent rerun behavior are documented/tested.
+
+**Verification:**
+
+- [ ] Concurrent generation, mid-run dependency mutation, artifact/index fault
+      injection, orphan cleanup, and rerun tests preserve the prior index.
+- [ ] Node-safe form-artifact bytes remain unchanged; provenance-versioned
+      index/configuration goldens migrate intentionally and remain canonical.
+
+**Dependencies:** Task 7B.2 and Task 7A.3
+
+**Files likely touched:**
+
+- `packages/workspace/src/run-workspace.ts`
+- `packages/workspace/src/publication.ts`
+- focused aggregation/publication tests
+- linked/packed consumer fixtures
+
+**Estimated scope:** Medium
+
+### Task 7C: Add the guarded Angular JIT runtime host
+
+**Description:** Implement the Angular-owned runtime for conventional
+peer-correct Angular graphs without claiming complete transitive singleton
+enforcement.
+
+#### Task 7C.1: Resolve and reserve the Angular runtime safely
+
+**Acceptance criteria:**
+
+- [ ] Core/compiler resolve without tsconfig aliases from the explicit project
+      runtime base; real package roots/metadata and exact versions agree before
+      compiler import.
+- [ ] Project-context and core-context compiler resolution identify the same
+      real package, and one pair is reserved atomically before global mutation.
+- [ ] Fully inherited exact, `@angular/*`, catch-all, and exported-subpath
+      tsconfig mappings are rejected for reserved runtime packages.
+- [ ] Missing, mismatch, conflict, alias, ambient-facade, and unsupported-graph
+      cases use stable pre-publication diagnostics.
+
+**Verification:**
+
+- [ ] Resolver/realpath/symlink/version/ambient/reservation tests pass against
+      strict non-hoisted and centralized-config fixtures.
+
+**Dependencies:** Tasks 7A.3 and 7B.3
+
+**Files likely touched:**
+
+- `packages/angular/src/runtime-resolution.ts`
+- `packages/angular/src/runtime-resolution.test.ts`
+- resolver fixtures
+
+**Estimated scope:** Medium
+
+#### Task 7C.2: Preload the compiler and load the project without fallback
+
+**Acceptance criteria:**
+
+- [ ] Core/compiler use Jiti's pinned native-module path; environment/Jiti
+      overrides cannot restore transformation fallback.
+- [ ] Compiler imports before the first partial declaration, and any failed or
+      partial import poisons/exits the worker without retry.
+- [ ] Non-Angular aliases still use the selected project tsconfig.
+- [ ] `formly-contracts-angular` and `runAngularWorkspace` compose the workspace
+      parent with the installed Angular host and never retain Angular state in
+      the caller/Nx daemon.
+
+**Verification:**
+
+- [ ] Retained tests pin Jiti tsconfig-before-alias and native-failure behavior.
+- [ ] Packed CLI/programmatic consumers succeed when compiler visibility exists
+      only from the selected project.
+
+**Dependencies:** Task 7C.1
+
+**Files likely touched:**
+
+- `packages/angular/src/project-host.ts`
+- `packages/angular/src/cli-main.ts`
+- `packages/angular/src/jit.ts`
+- focused host/CLI tests
+
+**Estimated scope:** Medium
+
+#### Task 7C.3: Prove the peer-correct compatibility boundary
+
+**Acceptance criteria:**
+
+- [ ] V1 requires Angular-consuming libraries to use peers and explicitly
+      excludes private/bundled copies, custom loaders, preserve-symlinks, and
+      alternate absolute runtime imports.
+- [ ] Different projects/Angular versions run in separate children; no compiler
+      facade or Angular cache enters the parent.
+- [ ] ESM/TS/CJS and supported Node/Angular/Formly/package-manager combinations
+      are recorded from maintained fixtures, not inferred broadly.
+
+**Verification:**
+
+- [ ] Root/project, project-only dependency, same-realpath symlink,
+      distinct-copy, mismatch, ambient-facade, and partial-evaluation fixtures
+      pass their documented outcomes.
+- [ ] A transitive private-copy fixture remains explicitly unsupported and
+      prevents a whole-graph singleton claim.
+- [ ] Full Angular install matrix, packed consumers, and `pnpm check` pass.
+
+**Dependencies:** Task 7C.2
+
+**Files likely touched:**
+
+- Angular runtime-host fixtures
+- packed consumer/integration tests
+- compatibility documentation
+
+**Estimated scope:** Medium
+
+### Task 7D: Productize distributed Angular source providers
 
 **Description:** Add the Angular integration package with a multi token,
 `provideFormContractSource`, and a deterministic catalog. Prove NgModule and
@@ -617,7 +918,7 @@ registrations.
       and duplicate cases.
 - [ ] Angular production compilation succeeds.
 
-**Dependencies:** Task 7A
+**Dependencies:** Task 7A.3
 
 **Files likely touched:**
 
@@ -651,7 +952,7 @@ adapter without retaining the injector or live field tree.
 - [ ] Declared and resolved artifacts remain separate and deterministic.
 - [ ] `pnpm check` passes at Checkpoint B.
 
-**Dependencies:** Task 7B
+**Dependencies:** Tasks 7C.3 and 7D
 
 **Files likely touched:**
 
@@ -701,6 +1002,16 @@ unknowns and never approve inferred interaction semantics.
 
 ## Checkpoint B: Angular consumer pilot
 
+- [ ] Root discovery imports no project configs; one fresh worker contains each
+      project's config, sources, factories, and Angular runtime state.
+- [ ] Packed, non-hoisted Angular CLI/programmatic consumers resolve the compiler
+      from the selected project rather than workspace/root hoisting.
+- [ ] The peer-correct graph limitation, reserved-alias failures, and unsupported
+      private-copy fixture are explicit and tested.
+- [ ] Trusted-local provenance says network is not enforced. Selecting
+      `isolated-ci-v1` before its external provider is installed fails closed
+      with `WORKER_ISOLATION_UNAVAILABLE`; network denial is a later Task 11C
+      gate rather than a Checkpoint B claim.
 - [ ] Multiple Angular feature sources compile through one project config.
 - [ ] Both NgModule and standalone contribution are documented.
 - [ ] Trusted scenario execution is isolated from CLI/MCP query handling.
@@ -771,24 +1082,38 @@ implementing inference.
 
 **Estimated scope:** Medium
 
-### Task 10B: Infer a contract target from each project marker
+### Task 10B: Infer one aggregate contract target on a coordinator project
 
 **Description:** Add the optional Nx plugin and use the supported CreateNodes API
-to detect project configs and infer a `form-contracts` target with explicit
-inputs and outputs.
+to recognize the root/project marker files as inert inputs, then attach exactly
+one `form-contracts` target to an explicitly configured existing Nx coordinator
+project. The plugin must not evaluate Formly Contract config in the Nx daemon.
+The target runs the workspace-wide parent once so inventory, cross-project
+duplicate validation, the generation lock, and index-last publication retain
+one owner. Fine-grained per-project contract caching is outside the first Nx
+contract.
 
 **Acceptance criteria:**
 
-- [ ] Only projects containing a matching project config receive the target.
-- [ ] Target inputs include the root config, project config, owned source files,
-      dependency production inputs, and relevant package versions.
-- [ ] Target outputs are isolated per Nx project and do not collide.
+- [ ] Plugin options select one existing coordinator project and reject missing,
+      ambiguous, or multiply configured coordinators.
+- [ ] Exactly that project receives the target; form-owning projects do not each
+      receive a publisher target.
+- [ ] Target inputs include the root config, every inert project marker/config,
+      declared owned sources, relevant dependency production inputs, lockfile,
+      and tool/runtime package versions.
+- [ ] Target outputs name the complete workspace artifact directory and index,
+      with no per-project publisher collision.
+- [ ] Inventory returned by the runner is checked against the project inputs the
+      plugin registered; drift fails with a stable diagnostic rather than
+      creating an under-keyed cache entry.
 
 **Verification:**
 
-- [ ] CreateNodes unit tests cover apps, libraries, packages, exclusions, and
-      duplicate target configuration.
-- [ ] `nx show project <fixture> --json` shows the inferred target and provenance.
+- [ ] CreateNodes unit tests cover apps, libraries, packages, exclusions,
+      missing/duplicate coordinators, and multiple form-owning projects.
+- [ ] `nx show project <coordinator> --json` shows one aggregate target, while
+      other fixture projects show none.
 
 **Dependencies:** Task 10A
 
@@ -804,12 +1129,17 @@ inputs and outputs.
 ### Task 11A: Execute workspace generation through Nx
 
 **Description:** Add an executor that delegates to the workspace runner without
-duplicating discovery, extraction, or artifact behavior.
+duplicating discovery, extraction, or artifact behavior. One executor invocation
+owns the complete workspace run; it does not fan out publication to Nx project
+tasks.
 
 **Acceptance criteria:**
 
 - [ ] The executor delegates compilation rather than duplicating workspace
       logic.
+- [ ] One invocation performs all project inventory, duplicate validation,
+      compilation, hashing, locking, and index-last publication through the
+      workspace runner.
 - [ ] Executor options expose only Nx-specific project/config/output selection;
       workspace policy remains in the typed config.
 
@@ -857,6 +1187,49 @@ local project marker without editing a central form list.
 
 **Estimated scope:** Medium
 
+### Task 11C: Add an external `isolated-ci-v1` execution provider
+
+**Description:** Define the workspace-owned, versioned external-sandbox provider
+contract and add one maintained CI realization that can enforce network denial.
+The trusted parent selects the provider; project configuration cannot supply an
+executable provider module or command. Node's Permission Model may add local
+guardrails but is never treated as the network boundary.
+
+**Acceptance criteria:**
+
+- [ ] Provider capability negotiation reports read/write/process/network
+      enforcement and fails closed with `WORKER_ISOLATION_UNAVAILABLE` when
+      `isolated-ci-v1` is requested without the required capabilities.
+- [ ] The maintained CI provider permits only declared fixture/package inputs,
+      an ephemeral output/staging area, validated IPC, and the selected runtime;
+      it receives no inherited credential environment.
+- [ ] Only `isolated-ci-v1` provenance may report enforced network denial;
+      `trusted-local-v1` continues to report `network: not-enforced`.
+- [ ] The provider returns the same versioned project inventory/result protocol
+      and never writes the final workspace index directly.
+
+**Verification:**
+
+- [ ] Unavailable, version-mismatch, malformed-capability, undeclared-read,
+      forbidden-write/process, credential-scrubbing, and denied-network probes
+      fail with stable diagnostics before publication.
+- [ ] The same fixture contract/index bytes result under trusted-local and
+      isolated-CI profiles apart from intentionally hashed execution provenance.
+- [ ] `pnpm check`, the maintained sandbox smoke, and packed-tarball consumer
+      tests pass at Checkpoint C.
+
+**Dependencies:** Checkpoint B and Task 11A; it can proceed in parallel with
+Task 11B and Tasks 12A–12B after the executor boundary is fixed
+
+**Files likely touched:**
+
+- `packages/workspace/src/isolation-provider.ts`
+- `packages/workspace/src/execution-profiles.ts`
+- `packages/workspace/src/isolation-provider.test.ts`
+- maintained CI sandbox fixture and workflow
+
+**Estimated scope:** Medium
+
 ### Task 12A: Scaffold the supported Nx fixture shell
 
 **Description:** Add the smallest real Nx workspace shell using the approved Nx
@@ -893,17 +1266,21 @@ capable. Plugin registration remains pending on Tasks 10–11.
 
 **Description:** Add three minimal projects: one form-owning application, one
 shared form library it depends on, and one intentionally unrelated library.
-Keep project configs and synthetic forms colocated in one small file per project.
+Keep project configs and synthetic forms colocated in one small file per project,
+and select the application as the sole aggregate-target coordinator.
 
 **Acceptance criteria:**
 
 - [ ] Two projects own forms and one project is intentionally unrelated.
-- [ ] The inferred target and dependency edge are visible through `nx show`.
-- [ ] A baseline run creates deterministic, project-isolated artifacts.
+- [ ] Exactly one aggregate target and the ordinary dependency edge are visible
+      through `nx show`; form-owning libraries receive no publisher target.
+- [ ] A baseline aggregate run creates deterministic workspace artifacts and a
+      globally validated index.
 
 **Verification:**
 
-- [ ] `nx run-many -t form-contracts` succeeds for the eligible projects.
+- [ ] `nx run <coordinator>:form-contracts` succeeds and invokes one workspace
+      generation.
 - [ ] Baseline artifact hashes are identical across two clean runs.
 
 **Dependencies:** Task 12A
@@ -919,11 +1296,11 @@ Keep project configs and synthetic forms colocated in one small file per project
 
 **Anchor status:** The workspace already contains application, feature,
 shared-form, and Formly-base projects with the expected static dependency chain
-and two representative source definitions. Inferred contract targets,
-project-isolated artifacts, and the intentionally unrelated invalidation case
-remain pending on the Nx package.
+and two representative source definitions. The aggregate contract target,
+workspace artifacts, and the intentionally unrelated invalidation case remain
+pending on the Nx package.
 
-### Task 12C: Prove caching and affected execution end to end
+### Task 12C: Prove aggregate caching and affected execution end to end
 
 **Description:** Build a minimal Nx fixture with three projects and verify cold,
 cached, changed-project, shared-dependency, and unaffected runs against real
@@ -931,19 +1308,22 @@ artifact outputs.
 
 **Acceptance criteria:**
 
-- [ ] A second unchanged run is restored from cache.
-- [ ] Changing one form-owning library reruns its contract target and dependent
-      aggregate target but not unrelated projects.
-- [ ] Changing the root locator policy invalidates every relevant contract
+- [ ] A second unchanged aggregate run is restored from cache.
+- [ ] Changing any declared form-owning project or shared dependency reruns the
+      one aggregate target.
+- [ ] Changing an unrelated project does not select or invalidate the aggregate
       target.
+- [ ] Changing root contract policy invalidates the aggregate target.
 
 **Verification:**
 
 - [ ] End-to-end commands and expected affected project sets are asserted in CI.
-- [ ] `nx affected -t form-contracts` succeeds in the fixture.
-- [ ] `pnpm check` and package tarball smoke tests pass at Checkpoint C.
+- [ ] `nx affected -t form-contracts` selects only the coordinator when a
+      relevant input changes and selects nothing for the unrelated fixture.
+- [ ] Tests state explicitly that v1 caches the workspace generation as one unit;
+      per-project contract shards are not claimed.
 
-**Dependencies:** Task 12B
+**Dependencies:** Task 12B and Task 11C
 
 **Files likely touched:**
 
@@ -953,7 +1333,7 @@ artifact outputs.
 **Estimated scope:** Medium
 
 **Anchor status:** The ordinary Angular production target is cacheable and a
-second identical run has been demonstrated as a local Nx cache hit. Affected
+second identical run has been demonstrated as a local Nx cache hit. Aggregate
 contract-target behavior remains pending until the inferred target/executor
 exists.
 
@@ -962,7 +1342,11 @@ exists.
 - [ ] A new form-owning Nx project needs only a local project config.
 - [ ] Existing registries and factory maps can be adapted in bulk.
 - [ ] Generic, Angular, and Nx package boundaries remain acyclic and optional.
-- [ ] Cached and affected execution is demonstrated, not inferred.
+- [ ] Exactly one coordinator-owned aggregate target preserves workspace-wide
+      duplicate validation/publication, and its cached/affected behavior is
+      demonstrated rather than inferred.
+- [ ] `isolated-ci-v1` proves external network denial and fails closed when its
+      provider is unavailable; trusted-local output never makes that claim.
 - [ ] Install, configuration, troubleshooting, and migration docs are complete.
 - [ ] A sanitized workplace pilot confirms integration effort before a broader
       rollout.
@@ -1067,8 +1451,8 @@ task is complete.
 ### Task 15B: Document Angular, Nx, and migration integrations
 
 **Description:** Finalize the Angular and Nx package READMEs plus focused
-consumer guides for provider composition, trusted scenarios, inferred targets,
-affected execution, and optional migration capture.
+consumer guides for provider composition, trusted scenarios, the one aggregate
+Nx target, affected execution, and optional migration capture.
 
 **Acceptance criteria:**
 
@@ -1161,7 +1545,7 @@ maintainer review, remediate validated findings, and record final evidence.
 | Bulk adapter executes real services/data | High | Fresh synthetic factories, no-network fixtures, structured-clone inputs, immediate allowlist projection |
 | Workspace index leaks model or environment information | High | Allowlisted index schema, privacy tests, no raw inputs or timestamps |
 | Package ecosystem fragments too early | Medium | Keep config/runner/CLI in `workspace`; add only Angular and Nx integration packages |
-| 100-form runs become slow | Medium | Per-project outputs, Nx cache/affected execution, later bounded concurrency after determinism proof |
+| 100-form runs become slow | Medium | Bounded project workers inside one deterministic generation, aggregate Nx caching for v1, and optional shard design only after global-validation semantics are preserved |
 | Project/form IDs collide across products | Medium | Global deterministic duplicate gate before artifact success |
 | Migration capture is mistaken for completeness | Medium | Explicit incomplete status and separate evidence/inventory reports |
 

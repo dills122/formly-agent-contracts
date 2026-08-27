@@ -95,4 +95,21 @@ export type {
   FieldTypeWrapperProfile,
   GenericFieldTypeDriverId,
 } from './field-type-profile.js';
+export {
+  RUNTIME_PROVENANCE_SCHEMA_VERSION,
+  canonicalizeRuntimeProvenance,
+  computeRuntimeProvenanceHash,
+  parseRuntimeProvenance,
+} from './runtime-provenance.js';
+export type {
+  RuntimeAdapterIdentity,
+  RuntimeDependencySnapshot,
+  RuntimeExecutionProfileProvenance,
+  RuntimeLoaderProvenance,
+  RuntimeNodeProvenance,
+  RuntimePackageIdentity,
+  RuntimeProvenance,
+  RuntimeToolIdentity,
+  RuntimeWorkerIdentity,
+} from './runtime-provenance.js';
 export { isModelPathSegment, parseFormContract } from './validation.js';
