@@ -306,6 +306,35 @@ describe('workspace CLI', () => {
     expect(captured.stderr.join('')).not.toContain('@company/forms');
   });
 
+  it('uses the same safe config-load guidance for list failures', async () => {
+    const captured = captureIo();
+    const privateConfigPath = '/private/workspace/apps/claims/project.ts';
+    const list = vi.fn().mockRejectedValue(
+      new WorkspaceConfigLoadError(
+        'CONFIG_LOAD_FAILED',
+        privateConfigPath,
+        `Unable to load workspace config: ${privateConfigPath}`,
+        new Error('Cannot import private Angular package @company/forms'),
+      ),
+    );
+
+    await expect(
+      runWorkspaceCli(['list'], {
+        ...captured.io,
+        cwd: () => '/workspace',
+        list,
+      }),
+    ).resolves.toBe(1);
+
+    expect(captured.stderr.join('')).toBe(
+      'List failed [WORKSPACE_DISCOVERY_FAILED]\n' +
+        'Workspace discovery failed.\n' +
+        'Hint: verify tsconfigPath and import a Node-safe contracts entry point; Angular browser barrels may require a dedicated contracts shim.\n',
+    );
+    expect(captured.stderr.join('')).not.toContain(privateConfigPath);
+    expect(captured.stderr.join('')).not.toContain('@company/forms');
+  });
+
   it('executes generate against a real temporary workspace', async () => {
     const workspaceRoot = await createTemporaryWorkspace();
     await writeModule(

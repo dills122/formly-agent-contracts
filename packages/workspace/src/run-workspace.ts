@@ -46,6 +46,9 @@ import {
   workspaceContractArtifactPath,
   type WorkspaceContractIndex,
   type WorkspaceContractIndexDraft,
+  type WorkspaceIndexCrossFieldEffectRegistryIdentity,
+  type WorkspaceIndexFieldTypeProfileRegistryIdentity,
+  type WorkspaceIndexProject,
   type WorkspaceIndexedDiagnostic,
 } from './workspace-index.js';
 
@@ -357,36 +360,30 @@ async function inventoryForms(
   return inventoried;
 }
 
-function findNodeFormlyType(
+function indexNodeFormlyTypes(
   nodes: readonly ContractNode[],
-  nodeId: string,
-): string | undefined {
+  destination: Map<string, string> = new Map<string, string>(),
+): ReadonlyMap<string, string> {
   for (const node of nodes) {
-    if (node.id === nodeId) {
-      return node.formlyType;
+    if (node.formlyType !== undefined) {
+      destination.set(node.id, node.formlyType);
     }
-    const child = findNodeFormlyType(node.children, nodeId);
-    if (child !== undefined) {
-      return child;
-    }
+    indexNodeFormlyTypes(node.children, destination);
     if (node.arrayTemplate !== undefined) {
-      const template = findNodeFormlyType([node.arrayTemplate], nodeId);
-      if (template !== undefined) {
-        return template;
-      }
+      indexNodeFormlyTypes([node.arrayTemplate], destination);
     }
   }
-  return undefined;
+  return destination;
 }
 
 function indexDiagnostic(
-  contract: FormContract,
   diagnostic: ContractDiagnostic,
+  formlyTypesByNodeId: ReadonlyMap<string, string>,
 ): WorkspaceIndexedDiagnostic {
   const formlyType =
     diagnostic.nodeId === undefined
       ? undefined
-      : findNodeFormlyType(contract.nodes, diagnostic.nodeId);
+      : formlyTypesByNodeId.get(diagnostic.nodeId);
   return {
     code: diagnostic.code,
     severity: diagnostic.severity,
@@ -408,6 +405,23 @@ function contractArtifactPath(
     formId: contract.formId,
     contentHash: contract.contentHash,
   });
+}
+
+function prepareProjectEffectRegistry(
+  project: ResolvedWorkspaceProjectConfig,
+  cache: WeakMap<object, CrossFieldEffectExtractionRegistry>,
+): CrossFieldEffectExtractionRegistry | undefined {
+  const configured = project.crossFieldEffects;
+  if (configured === undefined) {
+    return undefined;
+  }
+  const cached = cache.get(configured);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const prepared = prepareCrossFieldEffectExtractionRegistry(configured);
+  cache.set(configured, prepared);
+  return prepared;
 }
 
 function extractContracts(
@@ -456,6 +470,10 @@ function extractContracts(
 
     let contract: FormContract;
     try {
+      const crossFieldEffects = prepareProjectEffectRegistry(
+        form.project.resolved,
+        preparedEffectRegistries,
+      );
       contract = extractFormContract({
         formId: form.definition.id,
         fields: instance.fields,
@@ -469,22 +487,7 @@ function extractContracts(
         ...(form.project.resolved.fieldTypeProfiles === undefined
           ? {}
           : { fieldTypeProfiles: form.project.resolved.fieldTypeProfiles }),
-        ...(form.project.resolved.crossFieldEffects === undefined
-          ? {}
-          : {
-              crossFieldEffects: (() => {
-                const configured = form.project.resolved.crossFieldEffects;
-                const cached = preparedEffectRegistries.get(configured);
-                if (cached !== undefined) {
-                  return cached;
-                }
-                const prepared = prepareCrossFieldEffectExtractionRegistry(
-                  configured,
-                );
-                preparedEffectRegistries.set(configured, prepared);
-                return prepared;
-              })(),
-            }),
+        ...(crossFieldEffects === undefined ? {} : { crossFieldEffects }),
         effectCyclePolicy: form.project.resolved.effectCyclePolicy,
       }).contract;
     } catch (error) {
@@ -517,6 +520,7 @@ function extractContracts(
       relativePath,
       bytes: `${canonicalStringify(contract)}\n`,
     });
+    const formlyTypesByNodeId = indexNodeFormlyTypes(contract.nodes);
     indexedForms.push({
       ...provenance,
       evidence: 'declared',
@@ -524,7 +528,7 @@ function extractContracts(
       contractSchemaVersion: contract.schemaVersion,
       contentHash: contract.contentHash,
       diagnostics: contract.diagnostics.map((diagnostic) =>
-        indexDiagnostic(contract, diagnostic),
+        indexDiagnostic(diagnostic, formlyTypesByNodeId),
       ),
       ...(contract.crossFieldEffectRegistry === undefined
         ? {}
@@ -551,9 +555,39 @@ function extractContracts(
   return { artifacts: sortedArtifacts, forms: indexedForms };
 }
 
+function fieldTypeProfileRegistryIdentity(
+  project: ResolvedWorkspaceProjectConfig,
+): WorkspaceIndexFieldTypeProfileRegistryIdentity | undefined {
+  const registry = project.fieldTypeProfiles;
+  return registry === undefined
+    ? undefined
+    : {
+        schemaVersion: registry.schemaVersion,
+        id: registry.id,
+        version: registry.version,
+        contentHash: registry.contentHash,
+      };
+}
+
+function crossFieldEffectRegistryIdentity(
+  project: ResolvedWorkspaceProjectConfig,
+): WorkspaceIndexCrossFieldEffectRegistryIdentity | undefined {
+  const registry = project.crossFieldEffects;
+  return registry === undefined
+    ? undefined
+    : {
+        schemaVersion: registry.schemaVersion,
+        id: registry.id,
+        version: registry.version,
+        contentHash: registry.contentHash,
+      };
+}
+
 function projectConfigurationHash(
   project: ResolvedWorkspaceProjectConfig,
 ): string {
+  const fieldTypeProfileRegistry = fieldTypeProfileRegistryIdentity(project);
+  const crossFieldEffectRegistry = crossFieldEffectRegistryIdentity(project);
   return computeWorkspaceConfigurationHash({
     schemaVersion: project.schemaVersion,
     projectId: project.projectId,
@@ -569,28 +603,33 @@ function projectConfigurationHash(
       }),
     ),
     sourceIds: project.sourceIds,
-    ...(project.fieldTypeProfiles === undefined
+    ...(fieldTypeProfileRegistry === undefined
       ? {}
-      : {
-          fieldTypeProfileRegistry: {
-            schemaVersion: project.fieldTypeProfiles.schemaVersion,
-            id: project.fieldTypeProfiles.id,
-            version: project.fieldTypeProfiles.version,
-            contentHash: project.fieldTypeProfiles.contentHash,
-          },
-        }),
-    ...(project.crossFieldEffects === undefined
+      : { fieldTypeProfileRegistry }),
+    ...(crossFieldEffectRegistry === undefined
       ? {}
-      : {
-          crossFieldEffectRegistry: {
-            schemaVersion: project.crossFieldEffects.schemaVersion,
-            id: project.crossFieldEffects.id,
-            version: project.crossFieldEffects.version,
-            contentHash: project.crossFieldEffects.contentHash,
-          },
-        }),
+      : { crossFieldEffectRegistry }),
     effectCyclePolicy: project.effectCyclePolicy,
   });
+}
+
+function indexProject(project: ResolvedProject): WorkspaceIndexProject {
+  const { discovered, resolved } = project;
+  const fieldTypeProfileRegistry = fieldTypeProfileRegistryIdentity(resolved);
+  const crossFieldEffectRegistry = crossFieldEffectRegistryIdentity(resolved);
+  return {
+    configPath: discovered.configPath,
+    projectId: resolved.projectId,
+    sourceIds: resolved.sourceIds,
+    outputDirectory: normalizeRelativePath(resolved.outputDirectory),
+    configurationHash: projectConfigurationHash(resolved),
+    ...(fieldTypeProfileRegistry === undefined
+      ? {}
+      : { fieldTypeProfileRegistry }),
+    ...(crossFieldEffectRegistry === undefined
+      ? {}
+      : { crossFieldEffectRegistry }),
+  };
 }
 
 function buildIndex(
@@ -600,6 +639,7 @@ function buildIndex(
   aggregateOutputDirectory: string,
 ): WorkspaceContractIndex {
   const plugins = discovered.inventory.plugins.map((plugin) => ({ ...plugin }));
+  const indexedProjects = projects.map(indexProject);
   const configurationPlugins = [...(discovered.root.config.plugins ?? [])]
     .sort((left, right) => compareCodeUnits(left.id, right.id))
     .map(({ id, version, configSchemaVersion, options }) => ({
@@ -636,40 +676,14 @@ function buildIndex(
       effectCyclePolicy:
         discovered.root.config.effects?.cyclePolicy ?? 'error',
       plugins: configurationPlugins,
-      projects: projects.map(({ discovered: project, resolved }) => ({
+      projects: indexedProjects.map((project) => ({
         configPath: project.configPath,
-        projectId: resolved.projectId,
-        configurationHash: projectConfigurationHash(resolved),
+        projectId: project.projectId,
+        configurationHash: project.configurationHash,
       })),
     }),
     plugins,
-    projects: projects.map(({ discovered: project, resolved }) => ({
-      configPath: project.configPath,
-      projectId: resolved.projectId,
-      sourceIds: resolved.sourceIds,
-      outputDirectory: normalizeRelativePath(resolved.outputDirectory),
-      configurationHash: projectConfigurationHash(resolved),
-      ...(resolved.fieldTypeProfiles === undefined
-        ? {}
-        : {
-            fieldTypeProfileRegistry: {
-              schemaVersion: resolved.fieldTypeProfiles.schemaVersion,
-              id: resolved.fieldTypeProfiles.id,
-              version: resolved.fieldTypeProfiles.version,
-              contentHash: resolved.fieldTypeProfiles.contentHash,
-            },
-          }),
-      ...(resolved.crossFieldEffects === undefined
-        ? {}
-        : {
-            crossFieldEffectRegistry: {
-              schemaVersion: resolved.crossFieldEffects.schemaVersion,
-              id: resolved.crossFieldEffects.id,
-              version: resolved.crossFieldEffects.version,
-              contentHash: resolved.crossFieldEffects.contentHash,
-            },
-          }),
-    })),
+    projects: indexedProjects,
     forms,
   });
 }
