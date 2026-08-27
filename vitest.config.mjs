@@ -1,8 +1,11 @@
 import { fileURLToPath, URL } from 'node:url';
 
-import { defineConfig } from 'vitest/config';
+import { configDefaults, defineConfig } from 'vitest/config';
 
 export default defineConfig({
+  test: {
+    exclude: [...configDefaults.exclude, '**/.claude/worktrees/**'],
+  },
   // Test workspace consumers against package source without weakening the
   // published package's dist-only export boundary.
   // Source: https://vitest.dev/config/alias

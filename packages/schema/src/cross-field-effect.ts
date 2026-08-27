@@ -35,6 +35,17 @@ export type CrossFieldEffectTiming =
   | { readonly mode: 'async'; readonly readinessId: string }
   | { readonly mode: 'unknown' };
 
+export interface FieldTypeEffectReadinessCapability {
+  readonly id: string;
+  readonly targetProperty: CrossFieldEffectTargetProperty;
+  readonly evidence: 'declared';
+}
+
+export interface FieldTypeEffectCapabilities {
+  readonly targetProperties: readonly CrossFieldEffectTargetProperty[];
+  readonly readiness: readonly FieldTypeEffectReadinessCapability[];
+}
+
 export interface DeclaredCrossFieldEffect {
   readonly identity: CrossFieldEffectIdentity;
   readonly trigger: {
@@ -55,6 +66,7 @@ export interface DeclaredCrossFieldEffect {
 
 export interface FormCrossFieldEffects {
   readonly formId: string;
+  readonly coverage: 'complete' | 'partial';
   readonly effects: readonly DeclaredCrossFieldEffect[];
 }
 
@@ -66,7 +78,7 @@ export interface CrossFieldEffectRegistry {
 }
 
 const REGISTRY_KEYS = new Set(['schemaVersion', 'id', 'version', 'forms']);
-const FORM_KEYS = new Set(['formId', 'effects']);
+const FORM_KEYS = new Set(['formId', 'coverage', 'effects']);
 const EFFECT_KEYS = new Set([
   'identity',
   'trigger',
@@ -348,7 +360,7 @@ function validateEffect(
 
   validateTiming(effect.timing, `${path}.timing`);
   if (effect.conditionRuleId !== undefined) {
-    requireNamespacedId(
+    requireContractStableIdentifier(
       effect.conditionRuleId,
       `${path}.conditionRuleId`,
     );
@@ -381,6 +393,9 @@ function validateForm(value: unknown, path: string): FormCrossFieldEffects {
   const form = requireRecord(value, path);
   rejectUnknownKeys(form, FORM_KEYS, path);
   requireContractStableIdentifier(form.formId, `${path}.formId`);
+  if (form.coverage !== 'complete' && form.coverage !== 'partial') {
+    throw new TypeError(`${path}.coverage must be "complete" or "partial"`);
+  }
   const effects = requireArray(form.effects, `${path}.effects`);
   const effectIds = new Set<string>();
   effects.forEach((entry, index) => {

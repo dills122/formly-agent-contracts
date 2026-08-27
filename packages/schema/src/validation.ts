@@ -6,7 +6,9 @@ import {
   type ContractDiagnostic,
   type ContractDisplay,
   type ContractDynamicRule,
+  type ContractEffectAnalysis,
   type ContractFieldTypeProfileRegistryIdentity,
+  type ContractCrossFieldEffectRegistryIdentity,
   type ContractInteractionProfile,
   type ContractLocator,
   type ContractNode,
@@ -21,6 +23,18 @@ import {
 } from './contract.js';
 import { canonicalStringify, verifyContentHash } from './canonical-json.js';
 import {
+  collectContractConditionIds,
+  collectContractNodes,
+  contractEffectCycleComponents,
+  validateContractEffectReferences,
+} from './contract-effect-validation.js';
+import {
+  CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+  parseCrossFieldEffectRegistry,
+  type CrossFieldEffectTargetProperty,
+  type DeclaredCrossFieldEffect,
+} from './cross-field-effect.js';
+import {
   FIELD_TYPE_PROFILE_SCHEMA_VERSION,
   parseContractValueDomain,
   type FieldTypeProfileInteraction,
@@ -33,6 +47,13 @@ import {
 
 const IDENTIFIER_PUNCTUATION = '._:[]*-%';
 const CONTENT_HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
+const EFFECT_TARGET_PROPERTIES = [
+  'enabled',
+  'options',
+  'required',
+  'value',
+  'visibility',
+] as const satisfies readonly CrossFieldEffectTargetProperty[];
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -354,9 +375,10 @@ function assertDynamicRule(
   assertRecord(value, path);
   assertExactProperties(
     value,
-    new Set(['property', 'source', 'evidence', 'resolvedValue']),
+    new Set(['id', 'property', 'source', 'evidence', 'resolvedValue']),
     path,
   );
+  assertStableIdentifier(value.id, `${path}.id`);
   assertString(value.property, `${path}.property`);
   if (value.source !== 'function' && value.source !== 'async') {
     throw new TypeError(`${path}.source is unsupported`);
@@ -429,9 +451,10 @@ function assertCondition(
   assertRecord(value, path);
   assertExactProperties(
     value,
-    new Set(['property', 'expression', 'evidence']),
+    new Set(['id', 'property', 'expression', 'evidence']),
     path,
   );
+  assertStableIdentifier(value.id, `${path}.id`);
   assertString(value.property, `${path}.property`);
   assertString(value.expression, `${path}.expression`);
   assertEvidence(value.evidence, `${path}.evidence`);
@@ -669,6 +692,7 @@ function assertInteractionProfile(
       'parts',
       'interaction',
       'driver',
+      'effectCapabilities',
       'preconditions',
       'unknowns',
       'provenance',
@@ -729,6 +753,50 @@ function assertInteractionProfile(
       `${path}.driver.capabilities must include interaction operation "${value.interaction.operation}"`,
     );
   }
+  assertRecord(value.effectCapabilities, `${path}.effectCapabilities`);
+  assertExactProperties(
+    value.effectCapabilities,
+    new Set(['targetProperties', 'readiness']),
+    `${path}.effectCapabilities`,
+  );
+  if (!Array.isArray(value.effectCapabilities.targetProperties)) {
+    throw new TypeError(`${path}.effectCapabilities.targetProperties must be an array`);
+  }
+  const targetProperties = new Set<CrossFieldEffectTargetProperty>();
+  value.effectCapabilities.targetProperties.forEach((property, index) => {
+    const itemPath = `${path}.effectCapabilities.targetProperties[${index}]`;
+    if (!EFFECT_TARGET_PROPERTIES.includes(property as CrossFieldEffectTargetProperty)) {
+      throw new TypeError(`${itemPath} is unsupported`);
+    }
+    if (targetProperties.has(property as CrossFieldEffectTargetProperty)) {
+      throw new TypeError(`${itemPath} is duplicated`);
+    }
+    targetProperties.add(property as CrossFieldEffectTargetProperty);
+  });
+  if (!Array.isArray(value.effectCapabilities.readiness)) {
+    throw new TypeError(`${path}.effectCapabilities.readiness must be an array`);
+  }
+  const readinessIds = new Set<string>();
+  value.effectCapabilities.readiness.forEach((entry, index) => {
+    const itemPath = `${path}.effectCapabilities.readiness[${index}]`;
+    assertRecord(entry, itemPath);
+    assertExactProperties(
+      entry,
+      new Set(['id', 'targetProperty', 'evidence']),
+      itemPath,
+    );
+    assertNamespacedIdentifier(entry.id, `${itemPath}.id`);
+    if (readinessIds.has(entry.id as string)) {
+      throw new TypeError(`${itemPath}.id is duplicated`);
+    }
+    readinessIds.add(entry.id as string);
+    if (!targetProperties.has(entry.targetProperty as CrossFieldEffectTargetProperty)) {
+      throw new TypeError(`${itemPath}.targetProperty must be a declared target property`);
+    }
+    if (entry.evidence !== 'declared') {
+      throw new TypeError(`${itemPath}.evidence must be "declared"`);
+    }
+  });
   if (!Array.isArray(value.preconditions)) {
     throw new TypeError(`${path}.preconditions must be an array`);
   }
@@ -828,6 +896,88 @@ function assertFieldTypeProfileRegistryIdentity(
   }
 }
 
+function assertCrossFieldEffectRegistryIdentity(
+  value: unknown,
+  path: string,
+): asserts value is ContractCrossFieldEffectRegistryIdentity {
+  assertRecord(value, path);
+  assertExactProperties(
+    value,
+    new Set(['schemaVersion', 'id', 'version', 'contentHash']),
+    path,
+  );
+  if (value.schemaVersion !== CROSS_FIELD_EFFECT_SCHEMA_VERSION) {
+    throw new TypeError(`${path}.schemaVersion is unsupported`);
+  }
+  assertNamespacedIdentifier(value.id, `${path}.id`);
+  assertPositiveVersion(value.version, `${path}.version`);
+  if (
+    typeof value.contentHash !== 'string' ||
+    !CONTENT_HASH_PATTERN.test(value.contentHash)
+  ) {
+    throw new TypeError(`${path}.contentHash must be a sha256 digest`);
+  }
+}
+
+function assertDeclaredEffects(
+  value: unknown,
+  formId: string,
+  path: string,
+): asserts value is readonly DeclaredCrossFieldEffect[] {
+  if (!Array.isArray(value)) {
+    throw new TypeError(`${path} must be an array`);
+  }
+  try {
+    parseCrossFieldEffectRegistry({
+      schemaVersion: CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+      id: 'contract.validation',
+      version: 1,
+      forms: [{ formId, coverage: 'complete', effects: value }],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'is invalid';
+    throw new TypeError(`${path} ${message.replace(/^registry\.forms\[0\]\.effects/u, '')}`);
+  }
+}
+
+function assertEffectAnalysis(
+  value: unknown,
+  path: string,
+): asserts value is ContractEffectAnalysis {
+  assertRecord(value, path);
+  assertExactProperties(value, new Set(['completeness', 'reasons']), path);
+  if (value.completeness !== 'complete' && value.completeness !== 'incomplete') {
+    throw new TypeError(`${path}.completeness is unsupported`);
+  }
+  if (!Array.isArray(value.reasons)) {
+    throw new TypeError(`${path}.reasons must be an array`);
+  }
+  const allowed = new Set([
+    'declared-partial',
+    'effect-cycle',
+    'form-not-declared',
+    'invalid-declared-effect',
+    'opaque-dynamic-rule',
+    'opaque-diagnostic',
+  ]);
+  const seen = new Set<string>();
+  value.reasons.forEach((reason, index) => {
+    if (typeof reason !== 'string' || !allowed.has(reason)) {
+      throw new TypeError(`${path}.reasons[${index}] is unsupported`);
+    }
+    if (seen.has(reason)) {
+      throw new TypeError(`${path}.reasons[${index}] is duplicated`);
+    }
+    seen.add(reason);
+  });
+  if (value.completeness === 'complete' && value.reasons.length > 0) {
+    throw new TypeError(`${path}.reasons must be empty when analysis is complete`);
+  }
+  if (value.completeness === 'incomplete' && value.reasons.length === 0) {
+    throw new TypeError(`${path}.reasons must explain incomplete analysis`);
+  }
+}
+
 function nodeHasInteractionProfile(node: ContractNode): boolean {
   return (
     node.interactionProfile !== undefined ||
@@ -917,6 +1067,7 @@ function assertNode(
   value: unknown,
   path: string,
   nodeIds: Set<string>,
+  ruleIds: Set<string>,
 ): asserts value is ContractNode {
   assertRecord(value, path);
   assertExactProperties(
@@ -988,6 +1139,15 @@ function assertNode(
     items.forEach((item, index) =>
       assertion(item, `${path}.${property}[${index}]`),
     );
+    if (property === 'conditions' || property === 'dynamicRules') {
+      items.forEach((item, index) => {
+        const ruleId = (item as ContractCondition | ContractDynamicRule).id;
+        if (ruleIds.has(ruleId)) {
+          throw new TypeError(`${path}.${property}[${index}].id must be unique`);
+        }
+        ruleIds.add(ruleId);
+      });
+    }
   }
 
   if (value.optionSource !== undefined) {
@@ -1033,10 +1193,10 @@ function assertNode(
     throw new TypeError(`${path}.children must be an array`);
   }
   value.children.forEach((child, index) =>
-    assertNode(child, `${path}.children[${index}]`, nodeIds),
+    assertNode(child, `${path}.children[${index}]`, nodeIds, ruleIds),
   );
   if (value.arrayTemplate !== undefined) {
-    assertNode(value.arrayTemplate, `${path}.arrayTemplate`, nodeIds);
+    assertNode(value.arrayTemplate, `${path}.arrayTemplate`, nodeIds, ruleIds);
   }
 }
 
@@ -1067,7 +1227,11 @@ function assertDiagnostic(
   assertPath(value.sourcePath, `${path}.sourcePath`);
   if (value.nodeId !== undefined) {
     assertStableIdentifier(value.nodeId, `${path}.nodeId`);
-    if (!nodeIds.has(value.nodeId)) {
+    if (
+      !nodeIds.has(value.nodeId) &&
+      value.code !== 'UNKNOWN_EFFECT_SOURCE' &&
+      value.code !== 'UNKNOWN_EFFECT_TARGET'
+    ) {
       throw new TypeError(`${path}.nodeId must reference a contract node`);
     }
   }
@@ -1081,6 +1245,9 @@ export function parseFormContract(input: unknown): FormContract {
       'schemaVersion',
       'formId',
       'fieldTypeProfileRegistry',
+      'crossFieldEffectRegistry',
+      'declaredEffects',
+      'effectAnalysis',
       'contentHash',
       'nodes',
       'diagnostics',
@@ -1098,6 +1265,35 @@ export function parseFormContract(input: unknown): FormContract {
       'contract.fieldTypeProfileRegistry',
     );
   }
+  if (input.crossFieldEffectRegistry !== undefined) {
+    assertCrossFieldEffectRegistryIdentity(
+      input.crossFieldEffectRegistry,
+      'contract.crossFieldEffectRegistry',
+    );
+  }
+  if (input.declaredEffects !== undefined) {
+    assertDeclaredEffects(
+      input.declaredEffects,
+      input.formId,
+      'contract.declaredEffects',
+    );
+  }
+  if (input.effectAnalysis !== undefined) {
+    assertEffectAnalysis(input.effectAnalysis, 'contract.effectAnalysis');
+  }
+  const effectFields = [
+    input.crossFieldEffectRegistry,
+    input.declaredEffects,
+    input.effectAnalysis,
+  ];
+  if (
+    effectFields.some((value) => value !== undefined) &&
+    effectFields.some((value) => value === undefined)
+  ) {
+    throw new TypeError(
+      'contract cross-field effect registry, effects, and analysis must appear together',
+    );
+  }
   if (
     typeof input.contentHash !== 'string' ||
     !CONTENT_HASH_PATTERN.test(input.contentHash)
@@ -1109,9 +1305,37 @@ export function parseFormContract(input: unknown): FormContract {
   }
 
   const nodeIds = new Set<string>();
+  const ruleIds = new Set<string>();
   input.nodes.forEach((node, index) =>
-    assertNode(node, `nodes[${index}]`, nodeIds),
+    assertNode(node, `nodes[${index}]`, nodeIds, ruleIds),
   );
+  const contractNodes = collectContractNodes(input.nodes as readonly ContractNode[]);
+  const conditionIds = collectContractConditionIds(
+    input.nodes as readonly ContractNode[],
+  );
+  for (const [index, effect] of (
+    input.declaredEffects ?? []
+  ).entries()) {
+    const problems = validateContractEffectReferences(
+      effect,
+      contractNodes,
+      conditionIds,
+    );
+    if (problems.length > 0) {
+      throw new TypeError(
+        `contract.declaredEffects[${index}] has invalid contract references: ${problems.join(', ')}`,
+      );
+    }
+  }
+  if (
+    input.declaredEffects !== undefined &&
+    contractEffectCycleComponents(input.declaredEffects).length > 0 &&
+    !input.effectAnalysis?.reasons.includes('effect-cycle')
+  ) {
+    throw new TypeError(
+      'contract.effectAnalysis must report effect-cycle for cyclic declaredEffects',
+    );
+  }
 
   if (!Array.isArray(input.diagnostics)) {
     throw new TypeError('contract.diagnostics must be an array');

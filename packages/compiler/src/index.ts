@@ -31,6 +31,15 @@ export {
   prepareFieldTypeProfileRegistry,
   resolveFieldTypeProfile,
 } from './field-type-profiles.js';
+export {
+  prepareCrossFieldEffectExtractionRegistry,
+  resolveCrossFieldEffects,
+} from './resolve-effects.js';
+export type {
+  CrossFieldEffectExtractionRegistry,
+  CrossFieldEffectResolution,
+  ResolveCrossFieldEffectsInput,
+} from './resolve-effects.js';
 export type {
   FieldTypeProfileResolutionDiagnosticCode,
   FieldTypeProfileResolutionRequest,

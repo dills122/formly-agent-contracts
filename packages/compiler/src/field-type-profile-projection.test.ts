@@ -52,6 +52,7 @@ function createRegistry(): FieldTypeProfileRegistry {
           version: 1,
           capabilities: ['check'],
         },
+        effectCapabilities: { targetProperties: ['options'], readiness: [] },
         unknowns: [],
       },
       {
@@ -87,6 +88,7 @@ function createRegistry(): FieldTypeProfileRegistry {
           version: 2,
           capabilities: ['select-option'],
         },
+        effectCapabilities: { targetProperties: ['options'], readiness: [] },
         unknowns: [],
       },
     ],

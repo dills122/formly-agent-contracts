@@ -96,12 +96,14 @@ describe('Angular 20.3 and Formly 6.1 compatibility', () => {
       }),
     );
     expect(choice?.dynamicRules).toContainEqual({
+      id: 'scenario.dynamic-choice::path:s_choice::rule:expressionProperties:props.required',
       property: 'props.required',
       source: 'function',
       evidence: 'resolved',
       resolvedValue: true,
     });
     expect(choice?.dynamicRules).toContainEqual({
+      id: 'scenario.dynamic-choice::path:s_choice::rule:expressionProperties:props.options',
       property: 'props.options',
       source: 'function',
       evidence: 'resolved',

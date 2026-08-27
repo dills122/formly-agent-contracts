@@ -50,10 +50,12 @@ function createRegistry(reversed = false): CrossFieldEffectRegistry {
   const forms: CrossFieldEffectRegistry['forms'] = [
     {
       formId: 'claims.intake',
+      coverage: 'complete',
       effects: reversed ? [...effects].reverse() : effects,
     },
     {
       formId: 'claims.search',
+      coverage: 'partial',
       effects: [],
     },
   ];
@@ -253,7 +255,11 @@ describe('cross-field effect registry', () => {
       ...registry,
       forms: [
         registry.forms[0]!,
-        { formId: 'claims.search', effects: [secondFormEffect] },
+        {
+          formId: 'claims.search',
+          coverage: 'complete',
+          effects: [secondFormEffect],
+        },
       ],
     };
 
@@ -280,7 +286,7 @@ describe('cross-field effect registry', () => {
     const badCondition: unknown = structuredClone(createRegistry());
     firstEffect(badCondition).conditionRuleId = 'contains spaces';
     expect(() => parseCrossFieldEffectRegistry(badCondition)).toThrow(
-      'conditionRuleId must be a stable namespaced identifier',
+      'conditionRuleId must be a contract stable identifier',
     );
   });
 });

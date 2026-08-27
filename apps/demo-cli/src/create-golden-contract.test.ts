@@ -54,6 +54,7 @@ describe('createGoldenContract', () => {
         modelPath: ['profile', 'email'],
         conditions: [
           {
+            id: 'demo.golden-form::path:s_profile.s_email::rule:expressions:hide',
             property: 'hide',
             expression: "model.contactMethod !== 'email'",
             evidence: 'declared',
@@ -76,11 +77,13 @@ describe('createGoldenContract', () => {
     expect(eligibility?.dynamicRules).toEqual(
       expect.arrayContaining([
         {
+          id: 'demo.golden-form::path:s_eligibilityReview::rule:expressions:props.disabled',
           property: 'props.disabled',
           source: 'function',
           evidence: 'declared',
         },
         {
+          id: 'demo.golden-form::path:s_eligibilityReview::rule:expressionProperties:props.options',
           property: 'props.options',
           source: 'function',
           evidence: 'declared',

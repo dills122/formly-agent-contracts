@@ -530,6 +530,7 @@ function interactionProjection(
     parts: resolved.parts,
     interaction: resolved.profile.interaction,
     driver: resolved.profile.driver,
+    effectCapabilities: resolved.profile.effectCapabilities,
     preconditions: resolved.preconditions,
     unknowns: resolved.unknowns,
     provenance: resolved.provenance,

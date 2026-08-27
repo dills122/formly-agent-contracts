@@ -71,6 +71,7 @@ describe('Formly contract fixture integration', () => {
     }).contract;
 
     expect(communicationContract.nodes[1]?.conditions).toContainEqual({
+      id: 'applicant.communication::path:s_email::rule:expressions:hide',
       property: 'hide',
       expression: "model.channel !== 'email'",
       evidence: 'declared',

@@ -360,4 +360,67 @@ describe('workspace contract index', () => {
       }),
     ).toThrow(/formId.*stable contract identifier/u);
   });
+
+  it('does not retain nested effect aliases from parsed index input', () => {
+    const draft = createDraft();
+    const index = createWorkspaceContractIndex({
+      ...draft,
+      projects: draft.projects.map((project) =>
+        project.projectId === 'admin'
+          ? {
+              ...project,
+              crossFieldEffectRegistry: {
+                schemaVersion: '0.4.0',
+                id: 'fixture.effects',
+                version: 1,
+                contentHash: HASH_A,
+              },
+            }
+          : project,
+      ),
+      forms: draft.forms.map((form) =>
+        form.projectId === 'admin'
+          ? {
+              ...form,
+              declaredEffects: [
+                {
+                  identity: { id: 'fixture.a-to-b', version: 1 },
+                  trigger: {
+                    nodeId: 'a-form::a',
+                    event: 'valueChanged' as const,
+                  },
+                  target: {
+                    nodeId: 'a-form::b',
+                    property: 'visibility' as const,
+                  },
+                  kind: 'controls-state' as const,
+                  timing: { mode: 'sync' as const },
+                  ordering: 'source-before-target' as const,
+                  evidence: 'declared' as const,
+                  opacity: 'transparent' as const,
+                },
+              ],
+              effectAnalysis: { completeness: 'complete', reasons: [] },
+            }
+          : form,
+      ),
+    });
+    const input = structuredClone(index);
+    const parsed = parseWorkspaceContractIndex(input);
+    const mutableInput = input as unknown as {
+      forms: {
+        projectId: string;
+        declaredEffects?: { target: { property: string } }[];
+      }[];
+    };
+    mutableInput.forms.find(
+      ({ projectId }) => projectId === 'admin',
+    )!.declaredEffects![0]!.target.property = 'value';
+
+    expect(
+      parsed.forms.find(({ projectId }) => projectId === 'admin')
+        ?.declaredEffects?.[0]?.target.property,
+    ).toBe('visibility');
+    expect(computeWorkspaceIndexHash(parsed)).toBe(parsed.contentHash);
+  });
 });

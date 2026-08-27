@@ -72,6 +72,7 @@ export {
 } from './workspace-index.js';
 export type {
   WorkspaceContractIndex,
+  WorkspaceIndexCrossFieldEffectRegistryIdentity,
   WorkspaceIndexFieldTypeProfileRegistryIdentity,
   WorkspaceIndexForm,
   WorkspaceIndexedDiagnostic,

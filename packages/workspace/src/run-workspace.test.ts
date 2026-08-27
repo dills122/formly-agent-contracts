@@ -277,6 +277,7 @@ describe('runWorkspace', () => {
             interaction: { kind: 'fill', operation: 'fill', controlPart: 'control' },
             valueDomain: { kind: 'not-applicable', evidence: 'declared' },
             driver: { kind: 'generic', id: 'generic.fill', version: 1, capabilities: ['fill'] },
+            effectCapabilities: { targetProperties: [], readiness: [] },
             unknowns: []
           }],
           registrations: [{ formlyType: 'known-text', defaultProfile: { id: 'fixture.text', version: 1 }, variants: [] }],
@@ -328,6 +329,80 @@ describe('runWorkspace', () => {
     expect(serializedOutputs).not.toContain('forbiddenModelSecret');
     expect(serializedOutputs).not.toContain('forbiddenStateSecret');
     expect(serializedOutputs).not.toContain('forbiddenPluginSecret');
+  });
+
+  it('resolves configured effects into artifacts and indexes their full semantics', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/effects.project.mjs',
+      `export default {
+        projectId: 'claims',
+        crossFieldEffects: {
+          schemaVersion: '0.4.0', id: 'fixture.claim-effects', version: 1,
+          forms: [{
+            formId: 'claims.intake', coverage: 'complete', effects: [{
+              identity: { id: 'fixture.product-controls-details', version: 1 },
+              trigger: { nodeId: 'claims.intake::path:s_product', event: 'selectionChanged' },
+              target: { nodeId: 'claims.intake::path:s_details', property: 'visibility' },
+              kind: 'controls-state', timing: { mode: 'sync' },
+              ordering: 'source-before-target', evidence: 'declared', opacity: 'transparent'
+            }]
+          }]
+        },
+        sources: [{ sourceId: 'claims/forms', list: () => [{
+          id: 'claims.intake',
+          create: () => ({ fields: [
+            { key: 'product', type: 'select', props: { options: [{ label: 'Auto', value: 'auto' }] } },
+            { key: 'details', type: 'textarea' }
+          ] })
+        }] }]
+      };`,
+    );
+
+    const result = await runWorkspace(runnerOptions(workspaceRoot));
+    const artifact = JSON.parse(
+      await readFile(join(workspaceRoot, result.artifactPaths[0]!), 'utf8'),
+    ) as Record<string, unknown>;
+
+    expect(result.index.projects[0]?.crossFieldEffectRegistry).toMatchObject({
+      schemaVersion: '0.4.0',
+      id: 'fixture.claim-effects',
+      version: 1,
+    });
+    expect(result.index.forms[0]).toMatchObject({
+      declaredEffects: [
+        {
+          identity: { id: 'fixture.product-controls-details', version: 1 },
+          trigger: {
+            nodeId: 'claims.intake::path:s_product',
+            event: 'selectionChanged',
+          },
+          target: {
+            nodeId: 'claims.intake::path:s_details',
+            property: 'visibility',
+          },
+          kind: 'controls-state',
+          timing: { mode: 'sync' },
+          ordering: 'source-before-target',
+          evidence: 'declared',
+          opacity: 'transparent',
+        },
+      ],
+      effectAnalysis: { completeness: 'complete', reasons: [] },
+    });
+    expect(artifact).toMatchObject({
+      declaredEffects: [
+        {
+          identity: {
+            id: 'fixture.product-controls-details',
+            version: 1,
+          },
+        },
+      ],
+      effectAnalysis: { completeness: 'complete', reasons: [] },
+    });
   });
 
   it('honors CLI warning policy overrides', async () => {

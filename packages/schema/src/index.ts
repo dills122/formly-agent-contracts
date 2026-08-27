@@ -5,6 +5,16 @@ export {
   verifyContentHash,
 } from './canonical-json.js';
 export {
+  collectContractConditionIds,
+  collectContractNodes,
+  contractEffectCycleComponents,
+  contractNodeTargetCapabilities,
+  validateContractEffectReferences,
+} from './contract-effect-validation.js';
+export type {
+  ContractEffectReferenceProblem,
+} from './contract-effect-validation.js';
+export {
   CROSS_FIELD_EFFECT_SCHEMA_VERSION,
   canonicalizeCrossFieldEffectRegistry,
   computeCrossFieldEffectRegistryHash,
@@ -18,6 +28,8 @@ export type {
   CrossFieldEffectTiming,
   CrossFieldEffectTriggerEvent,
   DeclaredCrossFieldEffect,
+  FieldTypeEffectCapabilities,
+  FieldTypeEffectReadinessCapability,
   FormCrossFieldEffects,
 } from './cross-field-effect.js';
 export {
@@ -28,12 +40,15 @@ export {
 export type {
   ContractCondition,
   ContractConstraint,
+  ContractCrossFieldEffectRegistryIdentity,
   ContractDiagnostic,
   ContractDiagnosticCode,
   ContractDiagnosticSeverity,
   ContractDisplay,
   ContractDynamicRule,
   ContractDynamicRuleSource,
+  ContractEffectAnalysis,
+  ContractEffectAnalysisReason,
   ContractEvidence,
   ContractFieldTypeProfileRegistryIdentity,
   ContractInteractionProfile,

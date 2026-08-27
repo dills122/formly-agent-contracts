@@ -48,6 +48,7 @@ export const NX_FIELD_TYPE_PROFILES: NxFieldTypeProfiles = {
         version: 1,
         capabilities: ['check'],
       },
+      effectCapabilities: { targetProperties: ['options'], readiness: [] },
       unknowns: [],
     },
   ],

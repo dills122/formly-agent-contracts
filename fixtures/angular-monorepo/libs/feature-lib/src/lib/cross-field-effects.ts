@@ -10,6 +10,7 @@ export const CLAIMS_CROSS_FIELD_EFFECTS = {
   forms: [
     {
       formId: 'claims.intake',
+      coverage: 'complete',
       effects: [
         {
           identity: {

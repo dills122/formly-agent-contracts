@@ -7,6 +7,7 @@ import {
   type ContractConstraint,
   type ContractDiagnostic,
   type ContractDiagnosticCode,
+  type ContractDiagnosticSeverity,
   type ContractDisplay,
   type ContractDynamicRule,
   type ContractEvidence,
@@ -34,6 +35,10 @@ import {
   type FieldTypeProfileExtractionRegistry,
   type PreparedFieldTypeProfileExtractionRegistry,
 } from './field-type-profile-projection.js';
+import {
+  resolveCrossFieldEffects,
+  type CrossFieldEffectExtractionRegistry,
+} from './resolve-effects.js';
 
 export type FormContractFieldConfig = FormlyFieldConfig &
   ContractFormlyFieldConfig;
@@ -45,6 +50,8 @@ export interface ExtractFormInput {
   readonly formState?: Readonly<Record<string, unknown>>;
   readonly locatorOptions?: LocatorExtractionOptions;
   readonly fieldTypeProfiles?: FieldTypeProfileExtractionRegistry;
+  readonly crossFieldEffects?: CrossFieldEffectExtractionRegistry;
+  readonly effectCyclePolicy?: ContractDiagnosticSeverity;
 }
 
 export interface ExtractFormResult {
@@ -60,6 +67,8 @@ export interface CompileFormContractScenarioInput {
   readonly formState?: Readonly<Record<string, unknown>>;
   readonly locatorOptions?: LocatorExtractionOptions;
   readonly fieldTypeProfiles?: FieldTypeProfileExtractionRegistry;
+  readonly crossFieldEffects?: CrossFieldEffectExtractionRegistry;
+  readonly effectCyclePolicy?: ContractDiagnosticSeverity;
 }
 
 interface DerivedLocatorBase {
@@ -800,6 +809,28 @@ interface ResolvedRuleProjection {
   readonly resolvedValue?: JsonValue;
 }
 
+function encodeRuleIdSegment(value: string): string {
+  return [...value]
+    .map((character) =>
+      /^[A-Za-z0-9._:-]$/u.test(character)
+        ? character
+        : `%${character
+            .codePointAt(0)!
+            .toString(16)
+            .toUpperCase()
+            .padStart(6, '0')}`,
+    )
+    .join('');
+}
+
+function contractRuleId(
+  nodeId: string,
+  source: 'expressions' | 'expressionProperties' | 'hideExpression',
+  property: string,
+): string {
+  return `${nodeId}::rule:${source}:${encodeRuleIdSegment(property)}`;
+}
+
 const BOOLEAN_RULE_TARGETS = new Set([
   'hide',
   'props.required',
@@ -887,6 +918,7 @@ function readRules(
     property: string,
     expression: unknown,
     expressionSourcePath: readonly ModelPathSegment[],
+    ruleSource: 'expressions' | 'expressionProperties' | 'hideExpression',
   ): boolean => {
     const source = isFunction(expression)
       ? 'function'
@@ -912,6 +944,7 @@ function readRules(
     }
     const resolvedValue = projection.resolvedValue;
     dynamicRules.push({
+      id: contractRuleId(nodeId, ruleSource, property),
       property,
       source,
       evidence: resolvedValue === undefined ? 'declared' : 'resolved',
@@ -941,9 +974,15 @@ function readRules(
     for (const property of Object.keys(value).sort()) {
       const expression = value[property];
       if (typeof expression === 'string' && expression.length > 0) {
-        conditions.push({ property, expression, evidence: 'declared' });
+        conditions.push({
+          id: contractRuleId(nodeId, propertyName, property),
+          property,
+          expression,
+          evidence: 'declared',
+        });
       } else if (typeof expression === 'boolean') {
         conditions.push({
+          id: contractRuleId(nodeId, propertyName, property),
           property,
           expression: String(expression),
           evidence: 'declared',
@@ -953,6 +992,7 @@ function readRules(
           property,
           expression,
           [...sourcePath, propertyName, property],
+          propertyName,
         )
       ) {
         diagnoseOpaqueValue(
@@ -971,12 +1011,14 @@ function readRules(
   const hideExpression = field.hideExpression as unknown;
   if (typeof hideExpression === 'string' && hideExpression.length > 0) {
     conditions.push({
+      id: contractRuleId(nodeId, 'hideExpression', 'hide'),
       property: 'hide',
       expression: hideExpression,
       evidence: 'declared',
     });
   } else if (typeof hideExpression === 'boolean') {
     conditions.push({
+      id: contractRuleId(nodeId, 'hideExpression', 'hide'),
       property: 'hide',
       expression: String(hideExpression),
       evidence: 'declared',
@@ -987,6 +1029,7 @@ function readRules(
       'hide',
       hideExpression,
       [...sourcePath, 'hideExpression'],
+      'hideExpression',
     )
   ) {
     diagnoseOpaqueValue(
@@ -1755,6 +1798,15 @@ function projectFormContract(
       context,
     ),
   );
+  const effectResolution = resolveCrossFieldEffects({
+    formId: input.formId,
+    nodes,
+    diagnostics,
+    ...(input.crossFieldEffects === undefined
+      ? {}
+      : { registry: input.crossFieldEffects }),
+    cyclePolicy: input.effectCyclePolicy ?? 'error',
+  });
   const contract = parseFormContract(
     createFormContract({
       schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
@@ -1762,8 +1814,16 @@ function projectFormContract(
       ...(fieldTypeProfiles === undefined
         ? {}
         : { fieldTypeProfileRegistry: fieldTypeProfiles.identity }),
+      ...(effectResolution.crossFieldEffectRegistry === undefined
+        ? {}
+        : {
+            crossFieldEffectRegistry:
+              effectResolution.crossFieldEffectRegistry,
+            declaredEffects: effectResolution.declaredEffects!,
+            effectAnalysis: effectResolution.effectAnalysis!,
+          }),
       nodes,
-      diagnostics,
+      diagnostics: effectResolution.diagnostics,
     }),
   );
 
@@ -1829,6 +1889,12 @@ export function compileFormContractScenario(
       ...(input.fieldTypeProfiles === undefined
         ? {}
         : { fieldTypeProfiles: input.fieldTypeProfiles }),
+      ...(input.crossFieldEffects === undefined
+        ? {}
+        : { crossFieldEffects: input.crossFieldEffects }),
+      ...(input.effectCyclePolicy === undefined
+        ? {}
+        : { effectCyclePolicy: input.effectCyclePolicy }),
     },
     'resolved',
   );

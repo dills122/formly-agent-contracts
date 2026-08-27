@@ -458,18 +458,26 @@ describe('extractFormContract arrays, conditions, and unknowns', () => {
       evidence: 'declared',
     });
     expect(result.contract.nodes[1]?.dynamicRules).toEqual([
-      { property: 'hide', source: 'function', evidence: 'declared' },
       {
+        id: 'dynamic.choice::path:s_dependentChoice::rule:hideExpression:hide',
+        property: 'hide',
+        source: 'function',
+        evidence: 'declared',
+      },
+      {
+        id: 'dynamic.choice::path:s_dependentChoice::rule:expressionProperties:props.options',
         property: 'props.options',
         source: 'function',
         evidence: 'declared',
       },
       {
+        id: 'dynamic.choice::path:s_dependentChoice::rule:expressionProperties:props.readonly',
         property: 'props.readonly',
         source: 'function',
         evidence: 'declared',
       },
       {
+        id: 'dynamic.choice::path:s_dependentChoice::rule:expressionProperties:props.required',
         property: 'props.required',
         source: 'function',
         evidence: 'declared',
@@ -517,6 +525,7 @@ describe('extractFormContract arrays, conditions, and unknowns', () => {
     ]);
     expect(result.contract.nodes[0]?.dynamicRules).toEqual([
       {
+        id: 'resolved.option-allowlist::path:s_choice::rule:expressionProperties:props.options',
         property: 'props.options',
         source: 'function',
         evidence: 'resolved',
@@ -551,6 +560,7 @@ describe('extractFormContract arrays, conditions, and unknowns', () => {
 
     expect(result.contract.nodes[0]?.dynamicRules).toEqual([
       {
+        id: 'resolved.unsupported-target::path:s_value::rule:expressionProperties:props.internalRecord',
         property: 'props.internalRecord',
         source: 'function',
         evidence: 'declared',
@@ -801,11 +811,13 @@ describe('extractFormContract arrays, conditions, and unknowns', () => {
 
     expect(result.contract.nodes[0]?.conditions).toEqual([
       {
+        id: 'opaque.example::path:s_email::rule:expressions:hide',
         property: 'hide',
         expression: "model.channel !== 'email'",
         evidence: 'declared',
       },
       {
+        id: 'opaque.example::path:s_email::rule:expressions:props.required',
         property: 'props.required',
         expression: "model.channel === 'email'",
         evidence: 'declared',
@@ -817,11 +829,13 @@ describe('extractFormContract arrays, conditions, and unknowns', () => {
     });
     expect(result.contract.nodes[1]?.conditions).toEqual([
       {
+        id: 'opaque.example::path:s_legacyDetails::rule:hideExpression:hide',
         property: 'hide',
         expression: '!model.legacyName',
         evidence: 'declared',
       },
       {
+        id: 'opaque.example::path:s_legacyDetails::rule:expressionProperties:templateOptions.required',
         property: 'templateOptions.required',
         expression: '!!model.legacyName',
         evidence: 'declared',
@@ -842,11 +856,39 @@ describe('extractFormContract arrays, conditions, and unknowns', () => {
     expect(result.diagnostics).toContainEqual(
       expect.objectContaining({ code: 'OPAQUE_FUNCTION' }),
     );
-    expect(result.contract.nodes[2]?.dynamicRules).toContainEqual({
-      property: 'props.disabled',
-      source: 'function',
-      evidence: 'declared',
-    });
+    expect(result.contract.nodes[2]?.dynamicRules).toContainEqual(
+      expect.objectContaining({
+        property: 'props.disabled',
+        source: 'function',
+        evidence: 'declared',
+      }),
+    );
     expect(functionWasCalled).toBe(false);
+  });
+
+  it('uses collision-free fixed-width encoding for non-ASCII rule properties', () => {
+    const result = extractFormContract({
+      formId: 'rules.unicode',
+      fields: [
+        {
+          key: 'value',
+          type: 'input',
+          expressions: {
+            '\u123A': 'model.first',
+            '\u0123A': 'model.second',
+          },
+        },
+      ],
+    });
+
+    const ids = result.contract.nodes[0]!.conditions.map(({ id }) => id);
+    expect(ids).toHaveLength(2);
+    expect(new Set(ids)).toHaveLength(2);
+    expect(ids).toContain(
+      'rules.unicode::path:s_value::rule:expressions:%00123A',
+    );
+    expect(ids).toContain(
+      'rules.unicode::path:s_value::rule:expressions:%000123A',
+    );
   });
 });

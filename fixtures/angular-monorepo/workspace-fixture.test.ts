@@ -523,6 +523,57 @@ describe('Angular monorepo workspace fixture', () => {
           }),
         ]),
       );
+      const claimsProject = first.index.projects.find(
+        ({ projectId }) => projectId === 'fixture-feature-lib',
+      );
+      const claimsForm = first.index.forms.find(
+        ({ formId }) => formId === 'claims.intake',
+      );
+      const claimsArtifact = JSON.parse(
+        await readFile(resolve(fixtureRoot, claimsForm!.artifactPath), 'utf8'),
+      ) as {
+        readonly declaredEffects: readonly {
+          readonly identity: { readonly id: string };
+        }[];
+        readonly effectAnalysis: {
+          readonly completeness: string;
+          readonly reasons: readonly string[];
+        };
+      };
+      expect(claimsProject?.crossFieldEffectRegistry).toMatchObject({
+        id: 'fixture.angular-cross-field-effects',
+        version: 1,
+      });
+      expect(claimsForm).toMatchObject({
+        declaredEffects: [
+          {
+            identity: {
+              id: 'fixture.case-type-controls-other-details',
+              version: 1,
+            },
+          },
+          {
+            identity: {
+              id: 'fixture.product-filters-case-type',
+              version: 1,
+            },
+          },
+        ],
+        effectAnalysis: {
+          completeness: 'incomplete',
+          reasons: ['opaque-dynamic-rule'],
+        },
+      });
+      expect(
+        claimsArtifact.declaredEffects.map(({ identity }) => identity.id),
+      ).toEqual([
+        'fixture.case-type-controls-other-details',
+        'fixture.product-filters-case-type',
+      ]);
+      expect(claimsArtifact.effectAnalysis).toEqual({
+        completeness: 'incomplete',
+        reasons: ['opaque-dynamic-rule'],
+      });
       expect(first.index).toEqual(second.index);
       expect(first.indexPath).toBe(second.indexPath);
       expect(first.artifactPaths).toEqual(second.artifactPaths);
