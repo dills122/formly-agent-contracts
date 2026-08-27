@@ -10,6 +10,10 @@ loading, strict root/project descriptors, source catalogs, deterministic policy
 resolution, stable plugin identities, and serializable custom-field interaction
 profiles.
 
+For a copyable private-repository evaluation path, start with the
+[workplace pilot guide](workplace-pilot.md). This document is the detailed API
+and policy reference.
+
 Angular, Formly, Nx, Playwright, and application-specific packages should build
 convenience helpers and presets on these contracts. They must not create
 parallel configuration systems. A convenience helper may hide routine wiring,
@@ -61,17 +65,6 @@ export default defineConfig({
   output: { directory: 'dist/formly-contracts' },
   locators: { testIdAttributes: ['data-testid', 'data-cy'] },
   diagnostics: { failOn: ['error'] },
-  plugins: [
-    {
-      id: 'workspace/angular',
-      version: '1.0.0',
-      configSchemaVersion: '1',
-      options: {
-        bootstrap: 'claims-app',
-        includeLazyFeatures: false,
-      },
-    },
-  ],
 });
 ```
 
@@ -106,7 +99,7 @@ Each definition factory returns a fresh, framework-neutral declared instance:
 `formState` records. Application adapters normalize their registries or factory
 maps to that shape. Scalar field entries and arbitrary opaque instance return
 types are not part of the source contract; Formly-specific structural handling
-belongs to the adapter during artifact generation.
+belongs to the compiler during artifact generation.
 
 The root and project descriptors can be loaded as one deterministic inventory:
 
@@ -283,9 +276,9 @@ type/default or named variant and composes explicitly requested wrapper parts
 in request order. An unmapped custom type remains an explicit diagnostic, not
 an invitation to guess how its DOM works.
 
-The normal adapter extraction APIs accept the resolved registry bundle
-directly. This keeps `formly-adapter` independent of the workspace package
-while allowing the future runner to pass project configuration without
+The normal compiler extraction APIs accept the resolved registry bundle
+directly. This keeps `@formly-contract/compiler` independent of the workspace
+package while allowing the runner to pass project configuration without
 translating identity claims:
 
 ```ts
@@ -369,3 +362,7 @@ registries, and write the deterministic artifact set. Application driver
 identities remain data and do not execute code. Cross-field effects, the CLI
 `list`/`check` commands, Angular-assisted inventory, and observed runtime
 capture remain later increments on the same configuration bedrock.
+
+The [workplace pilot guide](workplace-pilot.md) turns this reference into a
+single operational checklist and includes the expected artifact layout,
+troubleshooting table, privacy boundary, and feedback template.

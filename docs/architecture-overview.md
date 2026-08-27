@@ -1,16 +1,24 @@
 # Architecture Overview
 
-## MVP boundary
+## Current implementation boundary
 
-The long-term architecture below remains the intended direction, but the first
-delivery is narrower: a versioned contract schema and parser for explicitly
-registered Formly configurations, demonstrated with synthetic data. A small MCP
-inspector may consume its output after the parser is working. Playwright,
-production MCP delivery, source indexing, runtime parity, and change analysis
-are post-MVP capabilities.
+The implemented generic pilot now includes schema v0.4, declared and trusted
+scenario compilation, project-owned custom-field profiles, repository-aware
+root/project/source configuration, deterministic multi-project discovery and
+artifact generation, a workspace index, and the pilot
+`formly-contracts generate` command.
 
-See [the MVP specification](mvp-spec.md) for the active scope and
-[the implementation plan](implementation-plan.md) for its shipping gate.
+The long-term architecture below remains the intended direction. Cross-field
+effects, the remaining `list`/`check` CLI commands, Angular-assisted profile
+inventory, optional Nx task integration, production MCP delivery, typed
+Playwright execution, browser observation, runtime parity, and change analysis
+remain later layers. They must consume or extend the same contracts rather than
+move trusted application execution into routine agent requests.
+
+See [the parser MVP specification](mvp-spec.md) for the original foundation,
+[the workspace implementation plan](planning/workspace-discovery/implementation-plan.md)
+for current sequencing, and the [workplace pilot guide](workplace-pilot.md) for
+the supported private-repository evaluation path.
 
 ## Context
 
