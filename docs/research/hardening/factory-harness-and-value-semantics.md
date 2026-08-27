@@ -1,14 +1,21 @@
 # RH-02: Factory Harness and Value Semantics
 
-**Scoped status:** Decision-ready research complete; bounded mechanics
-experiment passed; no production behavior implemented
+**Scoped status:** Decision-ready candidate after remediating all findings from
+three bounded independent-review instances, one adversarial doubt pass, one
+Claude Opus cross-model review, one original experiment, and four follow-up
+design spikes. The review-instance limit is exhausted, so the final corrections
+are self-verified rather than independently re-verdict-ed; no production
+behavior implemented
 
 **Decision owner:** Repository maintainer
 
-**Recommendation:** Conditional go for approved static inputs and named
-controlled factory-input scenarios in a conforming rootless OCI harness;
-no-go for publishing structure or values derived only from meaningless
-construction probes
+**Recommendation:** Go for contract/type and inert projector work; no-go for
+application factory execution until an inert registration sidecar and a
+runner-owned violation ledger pass the retained negative-control gate below.
+No-go for publishing controlled scenarios under v0.4; they remain internal
+until a versioned schema adds controlled node evidence.
+No-go for Angular/Formly-resolved evidence under RH-02; that remains a separate
+Task 8 evidence/security mode.
 
 ## Executive conclusion
 
@@ -18,25 +25,35 @@ Real synchronous form factories such as
 the form or mounting an application component. The safe boundary is narrower
 than "make a plausible options object," however.
 
-The recommended harness requires the application to classify every input
-binding and every semantic use. It publishes declared structure only from
-approved static/invariant inputs and publishes controlled structure only from
-named, safe factory-input scenarios. Tagged construction probes may establish
+The recommended harness requires the application to classify every supported
+top-level input binding and every semantic use. It publishes v0.4 structure
+only from approved static/invariant declared inputs. Named, safe controlled
+factory-input scenarios may produce internal compiler candidates and
+diagnostics, but v0.4 has no `controlled` node-evidence kind, so they cannot
+publish a `FormContract` until a versioned schema revision adds that evidence.
+Tagged construction probes may establish
 that a factory can be called and may diagnose data flow, but probe-only output
 is not publishable contract evidence. Inert capabilities may be captured but
-must fail on execution. A taint-aware allowlist projector remains useful as
+must record a violation before failing on execution. A taint-aware allowlist
+projector remains useful as
 defense in depth, not as a complete provenance engine. Structural booleans and
 enums are fixed invariants or values in named, business-valid variants. Model
 and Formly `formState` remain separate scenario inputs.
 
-Factory code is arbitrary trusted application code and can have import-time or
+Factory code is arbitrary, reviewed application code and can have import-time or
 construction-time side effects. Each form/variant must therefore load only
 inside a fresh child in the selected `oci-rootless-v1` profile with no
 credentials, no network, no host writes, bounded time/memory and output, a
 Node-safe staged entry point, and immediate allowlisted projection. A
 worker thread is useful for termination and resource limits but is not a
 sufficient isolation boundary because it shares the process and address space.
-Node's permission model is defense in depth, not the sole sandbox.
+Node's permission model is defense in depth, not the sole sandbox. Factory
+registrations therefore come from a code-free JSON sidecar; the TypeScript
+project config is not evaluated on the factory-execution path. A runner-owned
+preload records supported capability, scheduling, ambient-input, and Node API
+violations before throwing so application `try/catch` cannot erase them.
+OS containment still owns effect prevention; absence of a JavaScript-ledger
+entry is not proof that arbitrary hostile code attempted no syscall.
 
 The experiment established one risky data-flow seam. A representative
 factory filtered an input array, interpolated a tagged scalar into presentation
@@ -45,6 +62,20 @@ and class strings, created an RxJS `Subject`, and captured a callback in an
 probe options before declared extraction. Different probes produced the same
 contract hash; no probe reached JSON; and no callback, subscription,
 `TemplateRef` access, or lifecycle closure ran.
+
+Three follow-up spikes narrowed the remaining design gates. On the pinned
+Angular/Formly pair, importing one NgModule through another made a transitive
+environment initializer and provider factory executable. A separate
+module-free builder seam applied Formly type defaults while a rejecting
+injector exposed one explicit synthetic `useValue` token and rejected an
+application `providedIn: 'root'` service. A paired-selection projector then
+replaced the exact `options` and `value-domain` slots from one knowledge record;
+two different filtered scaffold arrays produced identical semantic output,
+the scaffold strings disappeared, and the captured lifecycle/callback counts
+remained zero. The provider spike also showed why RH-02 must not publish
+Angular/Formly-resolved evidence: Formly resolution can execute application
+expressions, validators, extensions, and captured closures even when DI itself
+is restricted. These are bounded observations, not production conformance.
 
 This is not a claim that automatic usage completeness or arbitrary primitive
 taint is solved. JavaScript array cardinality, booleans, and numbers can affect
@@ -60,7 +91,8 @@ probe mode; otherwise the harness fails closed.
 How may a trusted compiler invoke workplace Formly factories that require
 large live-looking options objects while ensuring that:
 
-- the real form factory remains the structural authority;
+- field/tree shape is factory-derived while semantic/value authority remains
+  explicit reviewed metadata;
 - application components and production services are not instantiated;
 - callbacks, Observables, and view objects do not execute;
 - construction scaffolds cannot become labels, option values, defaults,
@@ -88,7 +120,8 @@ In scope:
 - declared, factory-input, model/form-state, resolved, and observed evidence;
 - value-domain metadata and structural variants;
 - fail-closed diagnostics, isolation, cleanup, and determinism;
-- one bounded local experiment against the current extractor.
+- bounded local experiments against the current extractor and pinned
+  Angular/Formly provider/builder seams.
 
 Out of scope:
 
@@ -181,6 +214,19 @@ Detected versions:
    configured. Sources: <https://docs.docker.com/engine/network/drivers/none/>,
    <https://docs.docker.com/engine/containers/run/>, and
    <https://docs.docker.com/engine/security/rootless/>.
+8. Angular's public `importProvidersFrom` API collects providers from supplied
+   NgModules and standalone components, including transitively imported ones.
+   Angular's module injector is a flattened view of providers reachable through
+   recursive NgModule imports, and environment initializers execute when an
+   environment injector is constructed. A module/content hash is therefore not
+   a provider allowlist. Sources:
+   <https://angular.dev/api/core/importProvidersFrom>,
+   <https://angular.dev/guide/di/hierarchical-dependency-injection>, and
+   <https://angular.dev/api/core/provideEnvironmentInitializer>.
+9. Angular `InjectionToken` identity is object identity, not its description;
+   supplying an explicit value for the exact imported token can avoid its
+   default root factory, while an unrecognized token must not be delegated to a
+   root injector. Source: <https://angular.dev/api/core/InjectionToken>.
 
 ### Repository observations
 
@@ -207,6 +253,14 @@ Detected versions:
    controls for filesystem, child process, worker, addon, and WASI access but
    still no network-denial permission. This establishes command-surface
    feasibility only; no containment conformance run was performed.
+8. The current extractor computes `options` independently before deriving
+   `valueDomain`; a binding-aware override must therefore address both exact
+   slots or raw scaffold options remain projectable.
+9. ADR 0007's canonical package-import direction is `angular -> workspace`:
+   the optional Angular package consumes workspace-owned source contracts,
+   while workspace has no Angular dependency. Tasks 7B and 8 place provider
+   helpers and project-source scenario compilation in that Angular package. No
+   runtime plugin indirection is required for this direction.
 
 ### Prototype observations
 
@@ -229,6 +283,25 @@ Detected versions:
 6. Two different tag nonces and option payloads produced identical semantic
    `contentHash` values after redaction, and neither nonce appeared in the
    serialized contract.
+7. A follow-up Angular 20.3.29 spike imported `FeatureModule ->
+   ProductionModule` through `importProvidersFrom`. Injector construction ran
+   one transitive environment initializer; resolving the production token ran
+   one transitive provider factory.
+8. In that spike, a non-root environment injector did not auto-provide an
+   imported `providedIn: 'root'` application service. A rejecting `Injector`
+   facade returned one explicit synthetic value, rejected the root service
+   even when a fallback value was supplied, and was installed into a directly
+   constructed Formly 6.1.8 builder. The builder applied an `input` type
+   default and exposed only the rejecting facade through `field.options`.
+   The spike used the pinned Formly provider layout to initialize core config;
+   that is a version-specific feasibility seam, not an approved production API.
+9. A paired-selection spike exercised a factory that filtered an array,
+   interpolated filtered cardinality and a boolean, and captured a callback in
+   a lifecycle closure. The projector required coordinated exact `options` and
+   `value-domain` uses referencing one knowledge ID. Runs with two scaffold
+   nonces were equal, retained only the approved `Other` option/domain fact,
+   contained no scaffold/interpolated strings, and made zero lifecycle or
+   callback calls. Removing either exact use failed validation.
 
 ### Inferences
 
@@ -251,6 +324,15 @@ Detected versions:
    finite, closed synthetic provider protocol proves completion. Otherwise it
    is a partial scenario snapshot. A filtered dynamic domain cannot become
    complete merely because one scaffold row survived construction.
+7. An arbitrary Angular NgModule import is incompatible with the stronger
+   no-production-provider invariant: Angular intentionally flattens transitive
+   providers and may run initializers before any requested field is built.
+   The safe host must exclude application NgModules/providers rather than try
+   to denylist their tokens after registration.
+8. `options` and `valueDomain` remain separate public slots but can share one
+   reviewed knowledge authority. The runtime must validate and apply their two
+   exact projections as an indivisible pair; atomic metadata need not imply a
+   coarse multi-slot suppression operation.
 
 ### Unknowns
 
@@ -262,9 +344,11 @@ Detected versions:
    structure based on identity/method access; the latter must fail.
 4. Some factories may use numbers, dates, or booleans in both arithmetic and
    structure. No general lossless primitive taint is available in JavaScript.
-5. Angular custom extensions may subscribe, schedule tasks, or use component
-   context during the builder phase; only the pinned synthetic core setup has
-   been proven.
+5. Angular custom extensions may subscribe, schedule tasks, capture production
+   services, or use component context during the builder phase. The restricted
+   host deliberately excludes application NgModules, custom extensions,
+   validators, provider factories/classes, and component mounting; forms that
+   need them remain unsupported rather than weakening the provider guarantee.
 6. The selected rootless OCI containment profile has not been proven against a
    real workplace import graph or CI/desktop runtime. Its conformance probe
    remains a mandatory pre-execution gate.
@@ -284,7 +368,7 @@ type FactoryBindingKind =
   | 'known'
   | 'fixed'
   | 'structural'
-  | 'controlled-collection'
+  | 'selection-collection'
   | 'captured-callback'
   | 'construction-function'
   | 'inert-observable'
@@ -332,26 +416,39 @@ interface FactoryKnownOption extends ContractOption {
 
 declare const harnessValueBrand: unique symbol;
 declare const harnessAbsentBrand: unique symbol;
-interface HarnessValue<T> {
-  readonly [harnessValueBrand]: T;
+interface HarnessValue<T, TOptionKey extends string = string> {
+  readonly [harnessValueBrand]: {
+    readonly value: T;
+    readonly optionKey: TOptionKey;
+  };
 }
-interface HarnessAbsent {
-  readonly [harnessAbsentBrand]: true;
+interface HarnessAbsent<TOptionKey extends string = string> {
+  readonly [harnessAbsentBrand]: {
+    readonly optionKey: TOptionKey;
+  };
 }
 type StringKey<T> = Extract<keyof T, string>;
 type OptionalKey<T extends object> = {
   [Key in StringKey<T>]-?: {} extends Pick<T, Key> ? Key : never;
 }[StringKey<T>];
 type RequiredKey<T extends object> = Exclude<StringKey<T>, OptionalKey<T>>;
+type PresentUndefinedKey<T extends object> = {
+  [Key in StringKey<T>]-?: undefined extends Required<T>[Key] ? Key : never;
+}[StringKey<T>];
+type PresentOptionValue<
+  TOptions extends object,
+  TKey extends StringKey<TOptions>,
+> = Required<TOptions>[TKey];
 type BoundOptions<TOptions extends object> = {
   readonly [Key in StringKey<TOptions>]-?:
-    | HarnessValue<TOptions[Key]>
-    | (Key extends OptionalKey<TOptions> ? HarnessAbsent : never);
+    | HarnessValue<PresentOptionValue<TOptions, Key>, Key>
+    | (Key extends OptionalKey<TOptions> ? HarnessAbsent<Key> : never);
 };
 
 interface FactoryOptionShape<TOptions extends object> {
   readonly required: readonly RequiredKey<TOptions>[];
   readonly optional: readonly OptionalKey<TOptions>[];
+  readonly presentUndefined: readonly PresentUndefinedKey<TOptions>[];
 }
 
 interface ArtifactSafeValue<T extends JsonValue> {
@@ -364,33 +461,68 @@ interface ArtifactSafeValue<T extends JsonValue> {
   };
 }
 
+type NonCollectionSemanticFactoryTarget = Exclude<
+  SemanticFactoryTarget,
+  { readonly kind: 'options' } | { readonly kind: 'value-domain' }
+>;
+
+interface FactoryNodeTarget<TSlot extends SemanticFactoryTarget> {
+  readonly nodeId: string;
+  readonly expectedIdentity:
+    | { readonly kind: 'keyed'; readonly key: JsonValue }
+    | {
+        readonly kind: 'keyless';
+        readonly sourceOrdinalPath: readonly number[];
+      };
+  readonly expectedType?: string;
+  readonly slot: TSlot;
+}
+
 type FactoryInputUse =
   | { kind: 'construction-only' }
   | {
       kind: 'semantic';
-      target: { nodeId: string; slot: SemanticFactoryTarget };
+      target: FactoryNodeTarget<{ readonly kind: 'options' }>;
+      projection: {
+        kind: 'selection-options';
+        selectionKnowledgeId: string;
+      };
+    }
+  | {
+      kind: 'semantic';
+      target: FactoryNodeTarget<{ readonly kind: 'value-domain' }>;
       projection:
         | { kind: 'value-domain'; domainBindingId: string }
+        | {
+            kind: 'selection-value-domain';
+            selectionKnowledgeId: string;
+          }
         | {
             kind: 'suppress-as-unknown';
             reason: FactoryDomainUnknownReason;
           }
-        | { kind: 'allow-artifact-safe-scenario-value' }
+        | { kind: 'allow-artifact-safe-scenario-value' };
+    }
+  | {
+      kind: 'semantic';
+      target: FactoryNodeTarget<NonCollectionSemanticFactoryTarget>;
+      projection:
         | {
-            kind: 'finite-provider-domain';
-            protocolId: string;
-            projectorId: string;
-          };
+            kind: 'suppress-as-unknown';
+            reason: FactoryDomainUnknownReason;
+          }
+        | { kind: 'allow-artifact-safe-scenario-value' };
     }
   | {
       kind: 'captured-runtime';
-      target?: { nodeId: string; slot: SemanticFactoryTarget };
+      target?: FactoryNodeTarget<SemanticFactoryTarget>;
       reason: string;
     }
   | { kind: 'structural'; variantDimension: string };
 
-interface BindingDeclaration {
+interface BindingDeclaration<TOptionKey extends string = string> {
   readonly id: string;
+  readonly optionKey: TOptionKey;
   readonly uses: readonly FactoryInputUse[];
   readonly review: {
     readonly status: 'reviewed';
@@ -399,91 +531,145 @@ interface BindingDeclaration {
   };
 }
 
+type SelectionOptionsUse<TKnowledgeId extends string> = {
+  readonly kind: 'semantic';
+  readonly target: FactoryNodeTarget<{ readonly kind: 'options' }>;
+  readonly projection: {
+    readonly kind: 'selection-options';
+    readonly selectionKnowledgeId: TKnowledgeId;
+  };
+};
+
+type SelectionValueDomainUse<TKnowledgeId extends string> = {
+  readonly kind: 'semantic';
+  readonly target: FactoryNodeTarget<{
+    readonly kind: 'value-domain';
+  }>;
+  readonly projection: {
+    readonly kind: 'selection-value-domain';
+    readonly selectionKnowledgeId: TKnowledgeId;
+  };
+};
+
+interface SelectionBindingDeclaration<
+  TOptionKey extends string,
+  TKnowledgeId extends string,
+> extends Omit<BindingDeclaration<TOptionKey>, 'uses'> {
+  readonly uses: readonly [
+    SelectionOptionsUse<TKnowledgeId>,
+    SelectionValueDomainUse<TKnowledgeId>,
+  ];
+}
+
 type CapabilityIdentity =
   | { readonly kind: 'unique' }
   | { readonly kind: 'shared'; readonly groupId: string };
 
 interface CapabilityHarness {
-  capturedCallback<TArgs extends readonly unknown[], TResult = never>(
+  capturedCallback<
+    TOptionKey extends string,
+    TArgs extends readonly unknown[],
+    TResult = never,
+  >(
     options: {
-      declaration: BindingDeclaration;
+      declaration: BindingDeclaration<TOptionKey>;
       identity: CapabilityIdentity;
     },
-  ): HarnessValue<(...args: TArgs) => TResult>;
-  inertObservable<TObservable extends object>(
+  ): HarnessValue<(...args: TArgs) => TResult, TOptionKey>;
+  inertObservable<
+    TObservable extends object,
+    TOptionKey extends string,
+  >(
     options: {
-      declaration: BindingDeclaration;
+      declaration: BindingDeclaration<TOptionKey>;
       identity: CapabilityIdentity;
     },
-  ): HarnessValue<TObservable>;
-  unavailableTemplateRef<TTemplateRef extends object>(
+  ): HarnessValue<TObservable, TOptionKey>;
+  unavailableTemplateRef<
+    TTemplateRef extends object,
+    TOptionKey extends string,
+  >(
     options: {
-      declaration: BindingDeclaration;
+      declaration: BindingDeclaration<TOptionKey>;
       identity: CapabilityIdentity;
     },
-  ): HarnessValue<TTemplateRef>;
-  opaque<T extends object>(options: {
-    declaration: BindingDeclaration;
+  ): HarnessValue<TTemplateRef, TOptionKey>;
+  opaque<T extends object, TOptionKey extends string>(options: {
+    declaration: BindingDeclaration<TOptionKey>;
     identity: CapabilityIdentity;
-  }): HarnessValue<T>;
+  }): HarnessValue<T, TOptionKey>;
 }
 
 interface DeclaredFactoryHarness extends CapabilityHarness {
-  absent(declaration: BindingDeclaration): HarnessAbsent;
-  presentUndefined(
-    declaration: BindingDeclaration,
-  ): HarnessValue<undefined>;
-  known<T extends JsonValue>(
-    declaration: BindingDeclaration,
+  absent<TOptionKey extends string>(
+    declaration: BindingDeclaration<TOptionKey>,
+  ): HarnessAbsent<TOptionKey>;
+  presentUndefined<TOptionKey extends string>(
+    declaration: BindingDeclaration<TOptionKey>,
+  ): HarnessValue<undefined, TOptionKey>;
+  known<T extends JsonValue, TOptionKey extends string>(
+    declaration: BindingDeclaration<TOptionKey>,
     approved: ArtifactSafeValue<T>,
-  ): HarnessValue<T>;
-  fixed<T extends JsonValue>(options: {
-    declaration: BindingDeclaration;
+  ): HarnessValue<T, TOptionKey>;
+  fixed<T extends JsonValue, TOptionKey extends string>(options: {
+    declaration: BindingDeclaration<TOptionKey>;
     invariantKey: string;
     approved: ArtifactSafeValue<T>;
-  }): HarnessValue<T>;
-  structural<T extends string | number | boolean>(options: {
-    declaration: BindingDeclaration;
+  }): HarnessValue<T, TOptionKey>;
+  structural<
+    T extends string | number | boolean,
+    TOptionKey extends string,
+  >(options: {
+    declaration: BindingDeclaration<TOptionKey>;
     variantDimension: string;
     approved: ArtifactSafeValue<T>;
-  }): HarnessValue<T>;
+  }): HarnessValue<T, TOptionKey>;
+  declaredSelectionCollection<
+    const TOptionKey extends string,
+    const TKnowledgeId extends string,
+    T extends JsonValue,
+  >(options: {
+    declaration: SelectionBindingDeclaration<TOptionKey, TKnowledgeId>;
+    knowledge: FactorySelectionKnowledge<NoInfer<TKnowledgeId>>;
+    rows: ArtifactSafeValue<readonly T[]>;
+    mutability: 'frozen' | 'fresh-mutable-copy';
+  }): HarnessValue<T[], TOptionKey>;
 }
 
 interface ControlledFactoryHarness extends DeclaredFactoryHarness {
-  scenarioValue<T extends JsonValue>(
-    declaration: BindingDeclaration,
+  scenarioValue<T extends JsonValue, TOptionKey extends string>(
+    declaration: BindingDeclaration<TOptionKey>,
     approved: ArtifactSafeValue<T>,
-  ): HarnessValue<T>;
-  controlledCollection<T extends JsonValue>(options: {
-    declaration: BindingDeclaration;
-    knowledge: FactorySelectionKnowledge;
+  ): HarnessValue<T, TOptionKey>;
+  controlledCollection<
+    const TOptionKey extends string,
+    const TKnowledgeId extends string,
+    T extends JsonValue,
+  >(options: {
+    declaration: SelectionBindingDeclaration<TOptionKey, TKnowledgeId>;
+    knowledge: FactorySelectionKnowledge<NoInfer<TKnowledgeId>>;
     scenarioRows: ArtifactSafeValue<readonly T[]>;
     mutability: 'frozen' | 'fresh-mutable-copy';
-  }): HarnessValue<T[]>;
+  }): HarnessValue<T[], TOptionKey>;
   constantConstructionFunction<
+    TOptionKey extends string,
     TArgs extends readonly unknown[],
     TResult extends JsonValue,
   >(options: {
-    declaration: BindingDeclaration;
+    declaration: BindingDeclaration<TOptionKey>;
     maxCalls: number;
     result: ArtifactSafeValue<TResult>;
-  }): HarnessValue<(...args: TArgs) => TResult>;
-  finiteObservable<
-    TEmission extends JsonValue,
-    TObservable extends object,
-  >(options: {
-    declaration: BindingDeclaration;
-    protocol: FiniteProviderProtocol<TEmission>;
-    projectorId: string;
-  }): HarnessValue<TObservable>;
+  }): HarnessValue<(...args: TArgs) => TResult, TOptionKey>;
 }
 
 interface NonPublishingProbeHarness extends CapabilityHarness {
-  probeString(declaration: BindingDeclaration): HarnessValue<string>;
-  probeCollection<T>(options: {
-    declaration: BindingDeclaration;
+  probeString<TOptionKey extends string>(
+    declaration: BindingDeclaration<TOptionKey>,
+  ): HarnessValue<string, TOptionKey>;
+  probeCollection<T, TOptionKey extends string>(options: {
+    declaration: BindingDeclaration<TOptionKey>;
     constructionRows: readonly T[];
-  }): HarnessValue<T[]>;
+  }): HarnessValue<T[], TOptionKey>;
 }
 
 interface FactoryVariantDimension {
@@ -503,6 +689,7 @@ interface FactoryVariant {
 interface DeclaredFactoryInput<TOptions extends object> {
   readonly id: string;
   readonly variantId: string;
+  readonly outputPolicy: 'publish-declared-v0.4';
   readonly createOptions: (
     harness: DeclaredFactoryHarness,
   ) => BoundOptions<TOptions>;
@@ -511,6 +698,7 @@ interface DeclaredFactoryInput<TOptions extends object> {
 interface FactoryInputScenario<TOptions extends object> {
   readonly id: string;
   readonly variantId: string;
+  readonly outputPolicy: 'internal-candidate-only-v0.4';
   readonly createOptions: (
     harness: ControlledFactoryHarness,
   ) => BoundOptions<TOptions>;
@@ -519,6 +707,7 @@ interface FactoryInputScenario<TOptions extends object> {
 interface FactoryProbe<TOptions extends object> {
   readonly id: string;
   readonly variantId: string;
+  readonly outputPolicy: 'non-publishing';
   readonly createOptions: (
     harness: NonPublishingProbeHarness,
   ) => BoundOptions<TOptions>;
@@ -528,22 +717,6 @@ interface ModelFormStateScenario {
   readonly id: string;
   readonly model?: Readonly<Record<string, JsonValue>>;
   readonly formState?: Readonly<Record<string, JsonValue>>;
-}
-
-interface ResolvedScenarioComposition {
-  readonly id: string;
-  readonly factoryInput:
-    | { readonly kind: 'declared'; readonly id: string }
-    | { readonly kind: 'controlled'; readonly id: string };
-  readonly modelFormStateScenarioId: string;
-}
-
-interface FiniteProviderProtocol<T extends JsonValue> {
-  readonly id: string;
-  readonly emissions: ArtifactSafeValue<readonly T[]>;
-  readonly completion: 'synchronous-complete';
-  readonly maxEmissions: number;
-  readonly domainDerivation: 'project-all-emissions';
 }
 
 interface StagedModuleReference {
@@ -557,31 +730,20 @@ interface StagedModuleReference {
   }[];
 }
 
-type SyntheticProviderBinding =
-  | {
-      readonly token: StagedModuleReference;
-      readonly useValue: ArtifactSafeValue<JsonValue>;
-    }
-  | {
-      readonly token: StagedModuleReference;
-      readonly useProtocolId: string;
-    };
-
-interface AngularScenarioHost {
-  readonly identity: { readonly id: string; readonly version: number };
-  readonly imports: readonly StagedModuleReference[];
-  readonly syntheticProviders: readonly SyntheticProviderBinding[];
-  readonly forbiddenProviderTokenIds: readonly string[];
-  readonly settlingProtocolIds: readonly string[];
-  readonly teardown: {
-    readonly destroyTestBed: true;
-    readonly requireNoPendingTasks: true;
-  };
-}
-
 interface FormFactoryRegistration {
   readonly id: string;
+  readonly optionShape: {
+    readonly required: readonly string[];
+    readonly optional: readonly string[];
+    readonly presentUndefined: readonly string[];
+  };
   readonly executableContract: StagedModuleReference;
+}
+
+interface FormFactoryRegistrationSidecar {
+  readonly schemaVersion: 1;
+  readonly projectId: string;
+  readonly registrations: readonly FormFactoryRegistration[];
 }
 
 // Exported only from the staged, child-only secondary entry point.
@@ -593,22 +755,35 @@ interface ChildFormFactoryContract<TOptions extends object> {
   readonly declaredInputs?: readonly DeclaredFactoryInput<TOptions>[];
   readonly factoryInputScenarios?: readonly FactoryInputScenario<TOptions>[];
   readonly probes?: readonly FactoryProbe<TOptions>[];
-  readonly modelScenarios?: readonly ModelFormStateScenario[];
-  readonly resolvedScenarios?: readonly ResolvedScenarioComposition[];
-  readonly angularScenarioHost?: AngularScenarioHost;
 }
 
 declare function defineFormFactoryContract<TOptions extends object>(
   contract: ChildFormFactoryContract<TOptions>,
 ): ChildFormFactoryContract<TOptions>;
-declare function reviewedBinding(
+declare function reviewedBinding<const TOptionKey extends string>(
   options: {
     readonly id: string;
+    readonly optionKey: TOptionKey;
     readonly owner: string;
     readonly version: number;
     readonly uses: readonly FactoryInputUse[];
   },
-): BindingDeclaration;
+): BindingDeclaration<TOptionKey>;
+declare function reviewedSelectionBinding<
+  const TOptionKey extends string,
+  const TKnowledgeId extends string,
+>(
+  options: {
+    readonly id: string;
+    readonly optionKey: TOptionKey;
+    readonly owner: string;
+    readonly version: number;
+    readonly uses: readonly [
+      SelectionOptionsUse<TKnowledgeId>,
+      SelectionValueDomainUse<TKnowledgeId>,
+    ];
+  },
+): SelectionBindingDeclaration<TOptionKey, TKnowledgeId>;
 declare function artifactSafe<T extends JsonValue>(options: {
   readonly value: T;
   readonly owner: string;
@@ -617,13 +792,16 @@ declare function artifactSafe<T extends JsonValue>(options: {
 }): ArtifactSafeValue<T>;
 ```
 
-The two contract levels are intentional. The workspace-facing project config
-contains only validated `FormFactoryRegistration` records. It does not import
-the referenced module to inventory IDs, variants, or scenarios. The referenced
+The two contract levels are intentional. Factory-execution inventory comes
+only from an exact-schema `FormFactoryRegistrationSidecar` in JSON/JSONC at a
+fixed convention or explicit CLI path. The factory path does not evaluate the
+repository's TypeScript project config, a JavaScript config, package script,
+or generated module to discover registrations. The sidecar carries the erased
+runtime `optionShape`, so the parent can validate it before execution and the
+child can confirm the same canonical shape after import. The referenced
 secondary entry point exports the function-valued `ChildFormFactoryContract`
-and is loaded only from its staged path after containment is active. The child
-must confirm that its `id` matches the inert registration before any factory
-input is materialized.
+and is loaded only from its staged path after containment is active. ID or
+shape mismatch is fatal before any factory input is materialized.
 
 `StagedModuleReference` is not an arbitrary path. `packageName` and
 `exportSubpath` must resolve through an exact package `exports` entry;
@@ -635,21 +813,80 @@ bundler, TypeScript loader, Angular compiler, plugin, or package script, that
 producer runs under the same containment policy and its identity enters the
 manifest hash. A parent-side import is never a discovery fallback.
 
-The current TypeScript project-config loader remains a separate existing
-trusted configuration boundary. A project that imports application modules
-from that config is not eligible for this stronger factory-execution claim;
-factory registrations must be literal inert data or generated JSON-safe data
-consumed by the config.
+The existing TypeScript project-config loader remains a separate legacy trust
+boundary for the existing zero-argument source path. It is not used before or
+during RH-02 factory generation. Workspace integration may correlate the two
+sets of inert results only after both paths finish; it must not turn the TS
+config into a factory-registration fallback. Invalid JSON/JSONC, unknown keys,
+duplicate IDs, non-canonical option shapes, or a missing sidecar fail with
+`FACTORY_REGISTRATION_SIDECAR_INVALID`.
+
+RH-02 deliberately has no `AngularScenarioHost`. Even a module-free Formly
+builder runs core extensions that may evaluate application expressions,
+validators, hooks, async validators, or values captured by closures. A
+JSON-safe imitation of application type defaults would also be a second,
+drift-prone semantic authority. Consequently this contract stops at raw factory
+construction and immediate projection. Formly-resolved scenarios, finite
+Observable settling, type/default equivalence, and model/form-state composition
+belong to the separate application-equivalent Task 8 contract. That future
+contract must bind provider and settling protocols per named composition and
+must make its broader execution/evidence claim explicit; no RH-02 artifact is
+upgraded to resolved evidence.
 
 Representative controlled factory-input scenario:
 
 ```ts
-const binding = (id: string, uses: readonly FactoryInputUse[]) =>
+const binding = <const TOptionKey extends string>(
+  optionKey: TOptionKey,
+  uses: readonly FactoryInputUse[],
+) =>
   reviewedBinding({
-    id,
+    id: optionKey,
+    optionKey,
     owner: 'claims-forms',
     version: 1,
     uses,
+  });
+const selectionBinding = <
+  const TOptionKey extends string,
+  const TKnowledgeId extends string,
+>(
+  optionKey: TOptionKey,
+  nodeId: string,
+  expectedKey: string,
+  expectedType: string,
+  selectionKnowledgeId: TKnowledgeId,
+) =>
+  reviewedSelectionBinding({
+    id: optionKey,
+    optionKey,
+    owner: 'claims-forms',
+    version: 1,
+    uses: [
+      {
+        kind: 'semantic',
+        target: {
+          nodeId,
+          expectedIdentity: { kind: 'keyed', key: expectedKey },
+          expectedType,
+          slot: { kind: 'options' },
+        },
+        projection: { kind: 'selection-options', selectionKnowledgeId },
+      },
+      {
+        kind: 'semantic',
+        target: {
+          nodeId,
+          expectedIdentity: { kind: 'keyed', key: expectedKey },
+          expectedType,
+          slot: { kind: 'value-domain' },
+        },
+        projection: {
+          kind: 'selection-value-domain',
+          selectionKnowledgeId,
+        },
+      },
+    ],
   });
 const safe = <T extends JsonValue>(value: T, reason: string) =>
   artifactSafe({
@@ -670,6 +907,7 @@ export const nigoContract = defineFormFactoryContract<NigoOptions>({
       'compact',
     ],
     optional: [],
+    presentUndefined: [],
   },
   createFields: NigoAddFormConfig,
   variants: [
@@ -688,22 +926,18 @@ export const nigoContract = defineFormFactoryContract<NigoOptions>({
     {
       id: 'safe-active-reasons',
       variantId: 'standard',
+      outputPolicy: 'internal-candidate-only-v0.4',
       createOptions: (h) => ({
         customNigoReasons: h.controlledCollection({
-          declaration: binding('customNigoReasons', [
-            {
-              kind: 'semantic',
-              target: {
-                nodeId: 'claims.nigo-add::path:s_reason',
-                slot: { kind: 'value-domain' },
-              },
-              projection: {
-                kind: 'value-domain',
-                domainBindingId: 'customNigoReasons',
-              },
-            },
-          ]),
+          declaration: selectionBinding(
+            'customNigoReasons',
+            'claims.nigo-add::path:s_reason',
+            'reason',
+            'select',
+            'claims.nigo-reason-knowledge',
+          ),
           knowledge: {
+            id: 'claims.nigo-reason-knowledge',
             valueDomain: {
               kind: 'mixed',
               knownValues: ['Other'],
@@ -741,9 +975,12 @@ export const nigoContract = defineFormFactoryContract<NigoOptions>({
             identity: { kind: 'unique' },
           },
         ),
-        results$: h.inertObservable<NigoOptions['results$']>(
+        results$: h.inertObservable<
+          NigoOptions['results$'],
+          'results$'
+        >(
           {
-            declaration: binding('results', [
+            declaration: binding('results$', [
               {
                 kind: 'captured-runtime',
                 reason: 'Runtime query result.',
@@ -752,7 +989,10 @@ export const nigoContract = defineFormFactoryContract<NigoOptions>({
             identity: { kind: 'unique' },
           },
         ),
-        rowTemplate: h.unavailableTemplateRef<NigoOptions['rowTemplate']>(
+        rowTemplate: h.unavailableTemplateRef<
+          NigoOptions['rowTemplate'],
+          'rowTemplate'
+        >(
           {
             declaration: binding('rowTemplate', [
               {
@@ -783,6 +1023,34 @@ the eventual DTO. In v0.4 projection the extra role remains versioned
 generation metadata and is stripped from `ContractOption`; it requires an
 explicit future schema addition before becoming a public option property.
 
+A declared or controlled collection that can populate a choice field has one reviewed
+`FactorySelectionKnowledge.id` but exactly two coordinated semantic uses:
+
+1. `selection-options` addresses only the node's `options` slot; and
+2. `selection-value-domain` addresses only the node's `value-domain` slot.
+
+Both uses must be on the same binding declaration, resolve to the same node,
+reference the same knowledge ID passed to `declaredSelectionCollection` or
+`controlledCollection`, and appear
+exactly once. The pair is validated atomically before projection, then applied
+as two exact overrides. Missing/mismatched pairs fail with
+`FACTORY_SELECTION_PROJECTION_INCOMPLETE`; duplicate or competing authorities
+remain `FACTORY_BINDING_TARGET_CONFLICT`. The ordinary extractor never reads
+raw `props.options` for either controlled slot: it receives the approved
+`FactoryKnownOption[]` for `options` and the separately mapped
+`FactoryValueDomain` for `valueDomain`. Because v0.4 `ContractNode.options` is
+required, `FactorySelectionKnowledge.options` is required too; an
+intentionally empty approved array is explicit and never falls back to raw
+rows. Other exact presentation, state, locator, or default slots retain their
+normal extraction/override rules.
+
+This paired design preserves v0.4's two public fields without duplicating
+authority. The knowledge record is hashed once; each exact use hashes its slot
+plus the shared knowledge ID. A value-only control that genuinely has no
+options collection uses `scenarioValue` plus the ordinary one-slot
+`value-domain` projection; it does not use `controlledCollection` or
+`FactorySelectionKnowledge`.
+
 ### Binding classification
 
 | Binding | Materialization | May execute? | Semantic rule |
@@ -790,14 +1058,17 @@ explicit future schema addition before becoming a public option property.
 | Known JSON value | Exact value approved as safe/meaningful if copied anywhere in this scenario artifact | No | May enter scenario output; usage metadata still governs domain claims |
 | Probe string | Per-run nonce-tagged string in non-publishing mode | No | No contract artifact may be emitted from the run |
 | Structural scalar | Exact variant value | No | Affects only the named variant; never called a probe |
-| Controlled collection | Approved safe scenario rows; frozen or fresh mutable copy | Array operations only | Produces controlled scenario structure; raw rows never prove a global domain |
-| Captured callback/hook | Proxy function; calls and structural introspection traps throw | No | Truthiness/`typeof` reflect production presence; capture-only use is reviewed metadata |
+| Declared/controlled selection collection | Approved finite static rows or safe scenario rows; frozen or fresh mutable copy | Array operations only | Paired knowledge owns options/domain; raw rows never prove more than its declared evidence |
+| Captured callback/hook | Proxy function; calls and structural introspection traps record, then throw | No | Truthiness/`typeof` reflect production presence; capture-only use is reviewed metadata |
 | Construction function | Call-counted constant function returning one artifact-safe JSON result | Only explicitly allowed calls | Result is controlled scenario input, not global domain evidence |
-| Observable | Inert proxy; `subscribe`, `pipe`, symbol/prototype inspection, and other behavior throw | No | Dynamic/unknown until a finite controlled protocol materializes values |
-| `TemplateRef` | Capture-only proxy; any property/method access throws | No | View-dependent unknown |
-| `any`/service-shaped object | Opaque capture-only proxy; primitives forbidden | No | Cannot be structural or semantic evidence |
+| Observable | Inert proxy; `subscribe`, `pipe`, symbol/prototype inspection, and other behavior record, then throw | No | Dynamic/unknown in RH-02; finite settling belongs to Task 8 |
+| `TemplateRef` | Capture-only proxy; any property/method access records, then throws | No | View-dependent unknown |
+| `any`/service-shaped object | Opaque capture-only proxy; primitives forbidden; every trap records, then throws | No | Cannot be structural or semantic evidence |
 
-Binding declarations and immutable inputs are deeply frozen. A factory that
+Binding declarations and immutable inputs are deeply frozen and wrapped in
+runner-owned mutation guards. A `set`, `defineProperty`, `deleteProperty`, or
+mutating-array attempt records `FACTORY_INPUT_MUTATION_ATTEMPTED` before it
+throws, so sloppy-mode assignment cannot silently change behavior. A factory that
 uses in-place `sort`, `reverse`, `splice`, or row annotations may request one
 fresh mutable copy for a named controlled scenario; that mutation cannot alter
 caller data or upgrade evidence. Accessors, symbols, sparse arrays,
@@ -816,16 +1087,43 @@ output artifact. This avoids relying on primitive provenance for privacy or
 semantic relationships, and their completeness remains reviewed rather than
 inferred.
 
+The handle brand also carries the exact top-level `optionKey`, and each
+`BindingDeclaration` names that key explicitly. Materialization requires one
+unique declaration ID for one option key and rejects a handle whose branded
+key does not match the property receiving it. Reusing one declaration at a
+second key is invalid; v1 has no top-level binding-alias feature. Equivalent
+values at two keys use two declarations, preserving unambiguous variant,
+ledger, ownership, and semantic-use attribution. The canonical key-to-binding
+map is hashed before factory invocation.
+
+The first contract is deliberately top-level-only. A composite object or
+non-selection array may be passed as one `known` value only when the entire
+recursively plain JSON graph is artifact-safe and its binding is
+`construction-only`; no nested leaf may be structural, dynamic,
+capability-shaped, or independently semantic. Static/controlled choice arrays
+use the paired collection constructors instead. Nested booleans/enums that change structure,
+nested callbacks/providers, or nested collections consumed as option sources
+are unsupported and fail `FACTORY_NESTED_BINDING_UNSUPPORTED`; they must be
+flattened behind a reviewed factory adapter or wait for a future JSON-pointer
+binding grammar. This is narrower than the ideal workplace corpus but is
+enforceable and prevents a top-level approval from laundering unclassified
+nested behavior.
+
 Optional properties are also explicit. `OptionalKey<TOptions>` is derived from
 property optionality, not from whether the value type happens to include
 `undefined`. `h.absent(...)` is therefore assignable only to an optional key;
 a required `string | undefined` key must use a present handle, including
-`h.presentUndefined(...)` when appropriate. The child contract's explicit
+`h.presentUndefined(...)` when appropriate. Present handles use
+`Required<TOptions>[Key]`, so `optional?: string` cannot be present with
+`undefined`, while `optional?: string | undefined` may be. The child contract's explicit
 `optionShape` is the runtime authority after TypeScript erasure: it lists every
 supported string key, requires one bound handle per key, permits an absent
-handle only for a listed optional key, and rejects missing, extra, numeric, or
-symbol keys. Materialization omits an absent optional property and preserves an
-own property for present `undefined`.
+handle only for a listed optional key, permits present `undefined` only for a
+listed `presentUndefined` key, and rejects missing, extra, numeric, or symbol
+keys. The sidecar and child shapes must match canonically. Materialization
+omits an absent optional property and preserves an own property for approved
+present `undefined`. Type fixtures must cover both optional forms plus required
+`T | undefined`.
 
 Presence is a reviewed structural use. `fixed({ invariantKey, ... })` must
 resolve to the same canonical value in the selected variant's `invariants`.
@@ -835,8 +1133,21 @@ entry. This allows one `layout` dimension to require, for example,
 `compact=true`, `showDetails=false`, and `inlineActions=true` without pretending
 those booleans are independent dimensions.
 
+Field `key`, `type`, parent/child position, and sibling order are structural
+identity, not projectable semantic slots. A publishable controlled value may
+not determine them. Approved fixed or named structural bindings may do so only
+when the review declares that identity effect, and any configured-input delta
+must be represented by the selected variant. Before stable node IDs are
+computed, the runner addresses these properties by source ordinal path and
+compares declared/controlled runs plus mandatory two-nonce probe runs. A probe
+marker in `key` or `type`, an unexplained identity delta, or a controlled-only
+value in structural identity is fatal as `FACTORY_STRUCTURAL_IDENTITY_UNSAFE`.
+This check is not advertised as automatic proof for omitted primitive flow;
+the declaration remains a reviewed trust boundary.
+
 Capture-only capabilities are proxies. Application, construct, property,
-prototype, key-enumeration, and method traps fail. JavaScript truthiness,
+prototype, key-enumeration, and method traps first append a safe entry to the
+runner-owned violation ledger, then fail. JavaScript truthiness,
 strict comparison to `undefined`, and `typeof` cannot be trapped; publishing
 therefore requires the application review to state that capability presence
 and broad type are production-equivalent invariants. Factories that inspect
@@ -852,11 +1163,26 @@ value domains. A target names the node plus an exact contract slot, such as
 identity. `suppress-as-unknown` drops only that declared slot (for example an
 interpolated description or locator) and emits an unknown diagnostic;
 `allow-artifact-safe-scenario-value` retains scenario-specific content;
-`value-domain` and `finite-provider-domain` are reserved for option/value-domain
-targets. A target that does not resolve to exactly one projected slot is
+`value-domain` is reserved for option/value-domain targets. A target that does
+not resolve to exactly one projected slot is
 invalid; ambiguous or duplicate locator identities are rejected rather than
 broadly suppressing all locators. Contradictory projection kinds for one exact
-target are invalid.
+target are invalid. Each target also carries either a keyed expectation or a
+keyless `sourceOrdinalPath`, plus `expectedType` when stable. A node-ID match
+whose key presence/value, ordinal path, or type corroboration changed is
+`FACTORY_BINDING_TARGET_MISMATCH`, not authorization to retarget the override.
+This explicitly supports the current compiler's positional IDs for keyless
+nodes without inventing a key.
+
+Controlled runs never feed an unreserved raw `props.options` array or a domain
+derived from it to the ordinary extractor. Every option-bearing controlled
+node requires the exact paired selection declaration; otherwise the slot is
+unknown and the run fails publishing with
+`FACTORY_SELECTION_PROJECTION_INCOMPLETE`. This whole-tree default prevents
+one controlled collection reused at a second field—or mapped into fresh option
+objects—from becoming an accidental complete domain. Declared-mode literal
+options may use ordinary extraction only when no controlled/probe binding was
+materialized in that run and the entire option graph is approved static data.
 
 A locator `candidateId` is computed from its stable source slot/configuration
 before the potentially tainted locator value is read; it is not derived from
@@ -889,6 +1215,32 @@ A required scalar must be one of:
 3. an approved value in a named controlled factory-input scenario;
 4. a tagged string probe in a run that emits no artifact; or
 5. unsupported, producing `FACTORY_SCALAR_UNSAFE` and no artifact.
+
+### Runner-owned violation ledger
+
+Throwing is not evidence because ordinary application code can catch an error
+and continue with a fallback. Before the child imports any application byte, a
+tool-owned preload creates a module-private append-only ledger that the staged
+contract cannot reference or clear. Every harness capability and immutable
+input proxy closes over a recorder; each trap records a stable kind, phase,
+binding ID, and safe source identifier **before** throwing. The preload also
+guards the supported scheduling/ambient surface (`setTimeout`, `setInterval`,
+`setImmediate`, `queueMicrotask`, `process.nextTick`, `Promise.prototype.then`,
+`Date.now`, `new Date()` without an argument, `Math.random`, and
+`crypto.randomUUID`) and supported Node network/process/file entry points.
+After synchronous projection, the child can seal but not erase the ledger;
+the parent accepts a DTO only when the sealed summary is empty.
+
+This is a supported-surface contract, not a claim to instrument arbitrary
+syscalls or prove quiescence. OCI and Node permissions prevent external
+effects even when application code catches the resulting denial. The
+JavaScript ledger makes violations through the supported Node/harness APIs
+observable and refusal-safe; an attempted lower-level bypass is outside the
+trusted-code model and remains contained but may produce only a generic child
+failure. The conformance suite must show that each supported denial is recorded
+even when the factory catches every thrown error. The child is terminated
+unconditionally after its one synchronous result; pending Promise/RxJS work is
+never enumerated or called "settled."
 
 ### Selected containment backend and refusal behavior
 
@@ -931,10 +1283,12 @@ first backend.
 
 ## Compile flow
 
-1. **Inventory inert registrations.** Read only exact own-data
-   `FormFactoryRegistration` records from project config. Do not import the
-   `executableContract` module to list its ID, variants, or scenarios. Require a
-   precompiled Node-safe secondary entry point that does not import components.
+1. **Inventory a code-free sidecar.** Parse only the fixed-convention or
+   explicitly selected JSON/JSONC `FormFactoryRegistrationSidecar` with an
+   exact own-data schema. Do not evaluate the TypeScript project config,
+   package scripts, generated modules, or the `executableContract` to list IDs.
+   Require a precompiled Node-safe secondary entry point that does not import
+   components or production services.
 2. **Preflight `oci-rootless-v1`.** Capability-detect the runtime and execute
    the pinned conformance image under the exact policy. Refuse executable
    generation on an unavailable control, failed probe, or unapproved
@@ -953,14 +1307,15 @@ first backend.
    and inherited Node options; set an empty temporary working directory,
    `TZ=UTC`, explicit locale, fixed resource limits, structured IPC only, and
    ignored child stdout/stderr.
-5. **Apply layered containment.** Apply the conforming rootless OCI profile and use Node
+5. **Apply layered containment and instrumentation.** Apply the conforming rootless OCI profile and use Node
    permissions to deny writes, child processes, workers, addons, and WASI and
-   to allow reads only from the staged image. The pinned runtime has no Node
-   network permission flag, so do not claim one.
+   to allow reads only from the staged image. Install and self-test the
+   tool-owned violation-ledger preload before the first application import.
+   The pinned runtime has no Node network permission flag, so do not claim one.
 6. **Import the executable contract inside containment.** Resolve only the
    staged entry whose bytes and export name match the inert registration. The
-   exported child contract ID and runtime `optionShape` must match the
-   registration/validated schema. The metadata child projects a function-free
+   exported child contract ID and runtime `optionShape` must canonically match
+   the sidecar registration. The metadata child projects a function-free
    manifest of variant/scenario IDs and hashes, sends it over bounded IPC, and
    exits. The parent selects one manifest entry and starts a fresh execution
    child, which reimports the same content-hashed bytes before materialization.
@@ -972,48 +1327,67 @@ first backend.
    factory-input scenarios. Probe mode may use tags/scaffolds but cannot emit a
    contract artifact.
 8. **Materialize one named input.** Build the options object only through the
-   mode-specific harness and validate the resulting graph. Freeze immutable
-   inputs or create one disposable mutable scenario copy as declared.
+   mode-specific harness and validate the resulting graph. Require each
+   handle/declaration key to match its property, each declaration ID to map to
+   exactly one key, and present/absent values to satisfy `Required<T>[Key]` plus
+   the runtime `optionShape`. Freeze immutable
+   inputs behind mutation-recording proxies or create one disposable mutable
+   scenario copy as declared. Reject unsupported nested behavioral leaves.
 9. **Invoke and project in one synchronous turn.** The factory call, graph
    inspection, node-ID computation, allowlisted projection, deep freeze of the
    inert DTO, and initiation of structured IPC occur without `await` or a
    return to the event loop. Promise/Observable returns, re-entrancy,
-   capability execution, and out-of-budget work fail closed. Queued
-   microtasks/timers cannot mutate the already frozen projection; their mere
-   creation is still a side-effect diagnostic.
+   capability execution, and out-of-budget work fail closed. Supported
+   microtask/timer creation records a ledger violation before scheduling;
+   queued work cannot mutate the already frozen projection and is never
+   treated as settled. Seal the violation summary before IPC; any entry makes
+   the parent discard the DTO even if application code caught every throw.
+   The child is terminated after its single response.
 10. **Validate the returned field array inside containment.** Require a dense
    fresh array of expected field records. JavaScript cannot reliably prove an
    object is not a `Proxy`; reflection itself may invoke proxy traps. Treat all
    such inspection as continued trusted application execution under the same
    timeout. Capture safe intrinsic references before importing the factory and
    reject accessor descriptors when actually observed.
-11. **Build structure with correct evidence.** Compute stable node IDs, then
-    validate each reviewed usage target and reject conflicting projections.
+11. **Build structure with correct evidence.** Inspect structural identity by
+    source ordinal path before computing stable node IDs. Reject probe markers,
+    controlled-only identity, and unexplained key/type/order deltas. Then
+    compute stable node IDs, validate each reviewed usage target, and reject
+    conflicting projections.
     Declared inputs yield declared structure; factory-input scenarios yield
-    controlled scenario structure. Probe output stops here with diagnostics.
-12. **Project with binding overrides.** Suppress raw scenario values at
-    reviewed semantic targets and emit the binding's single domain/unknown
-    metadata authority. The standard extractor still reports unrelated opaque
-    hooks, parsers, validators, and functions.
-13. **Optionally compile controlled Formly resolutions.** In a separate
-    Angular-enabled child, create a new options object, model, formState,
-    fields, builder, and TestBed for each scenario. The runner constructs the
-    TestBed from the serializable `AngularScenarioHost` manifest; it does not
-    call an arbitrary exported host callback. Only content-hashed imports,
-    artifact-safe `useValue` providers, registered finite protocols, and
-    allowlisted provider tokens are allowed; forbidden tokens fail lookup.
-    A domain is scenario-complete only when a
-    finite closed provider protocol and settling condition succeed; otherwise
-    it is partial. Project immediately and destroy the process.
-14. **Check repeatability and declared determinism.** Re-run publishable inputs
-    in another fresh process and require equal canonical hashes. Record the
+    an internal controlled candidate only. Probe output stops here with
+    diagnostics.
+12. **Project with binding overrides.** Build an exact-slot projection plan
+    before reading contract-bearing values. For declared or controlled
+    harness-provided selections,
+    validate the complete two-slot pair and reserve `options` plus
+    `value-domain` for its one knowledge ID; do not call the ordinary raw-option
+    or derived-domain readers for those slots. Project the approved options and
+    mapped domain independently. In controlled mode, fail any unreserved
+    option/domain slot rather than calling raw-option extraction; other
+    unreserved non-selection slots use ordinary extraction. Suppress other
+    reviewed scenario values only at their exact targets. The standard
+    extractor still reports unrelated opaque hooks, parsers, validators, and
+    functions.
+13. **Stop before Angular/Formly resolution.** RH-02 does not call Formly's
+    builder, run expressions/validators/extensions, subscribe to providers,
+    settle async work, or combine model/formState. A future Task 8 source may
+    reference the factory-input and model/form-state scenario IDs, but it runs
+    under a separately approved application-equivalent threat model and emits
+    resolved evidence rather than mutating this raw-factory result.
+14. **Check repeatability and declared determinism.** Re-run declared
+    publishable inputs and internal controlled candidates in another fresh
+    process and require equal canonical hashes. Record the
     staged-image and environment-policy hashes. Forbid ambient clock, random,
     host identity, unordered filesystem, and undeclared environment inputs by
     source/policy review and guarded runtime APIs where feasible. Two equal
     runs are observed repeatability, not proof of determinism. Probe mode uses
     a different nonce only to test leak detection and still emits no artifact.
-15. **Publish only inert DTOs.** Keep declared variants and each controlled or resolved
-    scenario as distinct artifacts with input identities and evidence. The MCP
+15. **Publish only schema-compatible inert DTOs.** Under v0.4, only declared
+    variants may become `FormContract` artifacts. Controlled candidates remain
+    compiler-internal test/evaluation results and never enter storage or MCP.
+    Publishing them requires a future versioned `controlled` evidence kind,
+    provenance, validation, hashing, migration, and consumer behavior. The MCP
     path never imports the factory contract.
 
 ### Evidence separation
@@ -1021,14 +1395,15 @@ first backend.
 | View | Inputs | What it may claim | What it may not claim |
 | --- | --- | --- | --- |
 | Declared structure | Approved static/invariant factory input plus inert capture-only capabilities | Field/tree structure for that named variant; reviewed usage/domain declarations | Unknown provider-dependent structure, lifecycle outcome, browser parity |
-| Controlled factory result | Approved synthetic factory-input scenario | Factory output under the named input | Global domain completeness |
-| Formly resolved scenario | Fresh factory inputs plus model/formState and configured builder | Allowlisted post-build state for that exact scenario | Unvisited branches, mounted lifecycle, remote completion |
+| Controlled factory result (internal only under v0.4) | Approved synthetic factory-input scenario | Candidate factory output, projection feasibility, repeatability, and diagnostics under the named input | Any v0.4 `FormContract`, node evidence, storage/MCP publication, or global domain completeness |
+| Formly resolved scenario (future Task 8; not RH-02 output) | Fresh factory inputs plus model/formState and an application-equivalent configured builder | Allowlisted post-build state for that exact scenario | RH-02's no-production-service guarantee, unvisited branches, mounted lifecycle, remote completion |
 | Non-publishing probe | Meaningless tagged construction scaffolds | Feasibility and leak diagnostics only | Any semantic contract artifact |
 | Observed runtime | Browser visit and captured state | Rendered facts for visited state | Declared universe or unvisited branches |
 
 Factory-input scenarios and model/form-state scenarios have different IDs and
-hash inputs. They may be composed by a resolved scenario, but they must not be
-flattened into one untyped `options` bag in metadata.
+hash inputs. RH-02 owns only the former. A future Task 8 contract may compose
+their stable references, but they must not be flattened into one untyped
+`options` bag in metadata or executed by this harness.
 
 ## Value-domain design
 
@@ -1075,34 +1450,34 @@ type FactoryValueDomain =
     }
   | {
       kind: 'scenario';
-      scenarioEvidence:
-        | { kind: 'controlled'; factoryInputScenarioId: string }
-        | { kind: 'resolved'; resolvedScenarioId: string };
+      scenarioEvidence: {
+        kind: 'controlled';
+        factoryInputScenarioId: string;
+      };
       values: readonly JsonValue[];
       completeness: 'scenario-complete';
-      settling: { kind: 'finite-closed'; providerProtocolId: string };
+      basis: { kind: 'explicit-finite-construction-input' };
     }
   | {
       kind: 'scenario';
-      scenarioEvidence:
-        | { kind: 'controlled'; factoryInputScenarioId: string }
-        | { kind: 'resolved'; resolvedScenarioId: string };
+      scenarioEvidence: {
+        kind: 'controlled';
+        factoryInputScenarioId: string;
+      };
       values: readonly JsonValue[];
       completeness: 'partial';
-      settling: {
-        kind: 'snapshot';
-        reason: 'not-settled' | 'open-source';
-      };
+      reason: 'dynamic-remainder' | 'opaque-filter';
     }
   | {
       kind: 'unknown';
       reason: FactoryDomainUnknownReason;
-      evidence: 'declared' | 'resolved';
+      evidence: 'declared';
     };
 
-interface FactorySelectionKnowledge {
+interface FactorySelectionKnowledge<TKnowledgeId extends string = string> {
+  readonly id: TKnowledgeId;
   readonly valueDomain: FactoryValueDomain;
-  readonly options?: readonly FactoryKnownOption[];
+  readonly options: readonly FactoryKnownOption[];
 }
 ```
 
@@ -1117,30 +1492,43 @@ Rules:
 4. Filtered describes provenance. An opaque predicate over a dynamic source is
    unknown even if construction probes survive it. A declared filter over a
    complete static source may be complete after deterministic evaluation.
-5. Scenario values are scenario-complete only when a finite closed synthetic
-   provider protocol proves that all scenario emissions were consumed and a
-   bounded settling condition completed. A one-pass builder result, open
-   Observable, timeout, or immediate snapshot is partial.
-   Scenario/protocol IDs must resolve to the current contract's registered
-   scenario and the protocol actually materialized by its harness; unchecked
-   string references are invalid. For `finite-provider-domain`, output values
-   are computed through the registered allowlisted `projectorId` from the
-   protocol emissions actually consumed; the author cannot separately repeat
-   or override the scenario values.
+5. Controlled scenario values are scenario-complete only for the explicit
+   finite construction input supplied to that one scenario; this is not a
+   claim about a dynamic provider. A known local subset plus a dynamic
+   remainder is partial. Observable emissions, settling, and resolved evidence
+   are outside RH-02 and require a future Task 8 domain contract.
 6. Defaults, current model values, probe rows, table data, translated labels,
    and sentinel-like spelling never expand a domain automatically.
-7. Each option value must canonically match exactly one known domain value.
-   Duplicate canonical option values, option records for unknown values, and
-   two presentation records for one value are errors. A known value may omit
-   presentation when its label is not approved; that absence does not remove
-   the value from the domain.
-8. Projection to v0.4 is explicit: finite complete values map to
-   `enumerated/complete`, finite scenario values map to
-   `enumerated/scenario`, and unresolved dynamic knowledge maps to `dynamic` or
-   `unknown`. Mixed and filtered provenance is retained in versioned generation
-   metadata until a later schema version adds it; it must never be flattened
-   into a false complete v0.4 domain. `options` is projected independently and
-   remains the sole label/disabled authority.
+7. Inside `FactorySelectionKnowledge`, each option value must canonically match
+   exactly one value in `static.values`, `mixed.knownValues`, the filtered
+   knowledge subset, or the controlled scenario values. Duplicate canonical
+   option values, option records for an unknown remainder, and two presentation
+   records for one value are errors. A known value may omit presentation when
+   its label is not approved; that absence does not remove the value from the
+   internal domain.
+8. Every `FactorySelectionKnowledge` record carries `options` (an explicitly
+   approved empty array is permitted), and the declared or controlled binding
+   must declare the paired exact `selection-options` and
+   `selection-value-domain` uses described above.
+   The ordinary extractor's raw option and derived-domain paths are bypassed
+   only for those two slots. A partial pair, knowledge-ID mismatch, or another
+   authority for either slot is fatal before any declared node is published or
+   controlled candidate is accepted internally.
+9. Projection to v0.4 is explicit: globally finite declared values map to
+   `enumerated/complete`; RH-02 controlled-only values do **not** map to
+   `enumerated/scenario` because v0.4's scenario evidence is `resolved`.
+   A controlled run maps to no v0.4 node at all. For declared inputs,
+   unresolved dynamic knowledge maps to `dynamic` or `unknown`; mixed and
+   filtered provenance is retained in versioned generation metadata until a
+   later schema version adds it. None of these states may be flattened into a
+   false complete or resolved domain. Declared `options` is projected
+   independently and remains the sole label/disabled authority.
+   The current v0.4 validator additionally requires an enumerated domain for a
+   generic `choice`/`autocomplete`/`row-selection` interaction profile. A mixed
+   or partial node therefore cannot retain that executable generic profile:
+   keep the honest dynamic/unknown domain plus approved local options and omit
+   the generic profile with `FACTORY_V04_PARTIAL_CHOICE_UNEXECUTABLE`. Never
+   promote the known subset (for example `Other`) to a complete enumeration.
 
 The exact compatibility mapping is:
 
@@ -1148,16 +1536,17 @@ The exact compatibility mapping is:
 | --- | --- | --- | --- |
 | Static complete | `enumerated`, `static-options`, `complete`, declared; canonical values only | Matching approved presentations | Static binding/filter IDs in generation metadata |
 | Dynamic | `dynamic` with the declared `sourceKind` | Empty unless separately approved local presentations exist | Provider ID in generation metadata |
-| Mixed | `dynamic` with the dynamic remainder's `sourceKind`; do not enumerate the known subset as complete | Approved presentations for known local values only | `knownValues`, provider ID, and `partial` in generation metadata |
+| Mixed | `dynamic` with the dynamic remainder's `sourceKind`; do not enumerate the known subset as complete; omit incompatible generic choice execution profile | Approved presentations for known local values only | `knownValues`, provider ID, `partial`, and v0.4 execution limitation in generation metadata |
 | Filtered, declared, complete static input | `enumerated`, `static-options`, `complete`, declared | Matching approved presentations | Input binding and filter IDs |
-| Filtered partial/opaque | `dynamic` when the input source kind is known, otherwise `unknown` | Approved presentations for known survivors only | Filter/input IDs and partial/unknown reason |
-| Resolved finite-closed scenario | `enumerated`, `resolved-options`, `scenario`, resolved | Matching approved scenario presentations | Resolved scenario, protocol, projector, and settling IDs |
-| Controlled factory-input scenario without a Formly-resolved evidence kind | No v0.4 enumerated claim; retain `dynamic`/`unknown` declared output as applicable | Approved local presentations only | Full controlled scenario knowledge stays in versioned generation metadata until the public schema adds distinct controlled evidence |
-| Partial/open scenario | `dynamic` when source kind is known, otherwise `unknown` | Approved observed presentations only | Scenario ID and snapshot reason |
+| Filtered partial/opaque | `dynamic` when the input source kind is known, otherwise `unknown`; omit incompatible generic choice execution profile | Approved presentations for known survivors only | Filter/input IDs, partial/unknown reason, and v0.4 execution limitation |
+| Future Task 8 resolved finite-closed scenario (not emitted by RH-02) | `enumerated`, `resolved-options`, `scenario`, resolved | Matching approved scenario presentations | Resolved scenario, protocol, projector, and settling IDs |
+| Controlled factory-input scenario without a public controlled evidence kind | No v0.4 node or `valueDomain`; internal candidate only | No v0.4 options; internal candidate only | Scenario knowledge remains compiler-internal until a schema revision defines controlled evidence, validation, hashing, migration, and consumers |
+| Future Task 8 partial/open scenario (not emitted by RH-02) | `dynamic` when source kind is known, otherwise `unknown` | Approved observed presentations only | Scenario ID and snapshot reason |
 
-This mapping is intentionally lossy for mixed and controlled-only knowledge.
-Losing precision is preferable to reusing `resolved` evidence for a different
-stage or advertising a known subset as a complete finite domain. A future
+This mapping is intentionally lossy for declared mixed knowledge and refuses
+controlled publication entirely. Losing precision—or withholding an
+incompatible artifact—is preferable to reusing `resolved` evidence for a
+different stage or advertising a known subset as a complete finite domain. A future
 schema revision may add partial/controlled provenance additively; it must define
 migration, hashing, and consumer behavior before those facts enter the public
 contract.
@@ -1203,18 +1592,19 @@ states.
 
 | Threat | Required control | Failure result |
 | --- | --- | --- |
-| Import-time service/network activity | Node-safe entry point; empty credentials; OS network deny; staged dependency image | Abort variant; stable blocked-side-effect diagnostic |
+| Executable registration/config before containment | Code-free exact-schema JSON/JSONC sidecar; factory path never evaluates TS/JS config | Reject sidecar or refuse factory path |
+| Import-time service/network activity | Node-safe reviewed entry point; empty credentials; OS network deny; staged dependency image; preload ledger over supported Node APIs | External effect blocked; any ledger entry aborts; an uninstrumented caught OS denial may yield only generic child refusal and is not claimed attributable |
 | Files/customer data | Build and execute staged dependency-only image inside credential-free OS sandbox; no checkout/home/config/secrets mounts; no writes | Abort; discard child text output |
-| Callback called during construction | Throwing captured callback; separately declared bounded construction function | Abort with binding ID and call phase |
-| Observable subscription | `subscribe` throws; controlled scenario sources use approved synthetic data only | Abort; no retry or fallback to live source |
-| `TemplateRef`/Angular view access | Capture-only throwing proxy; no component/view creation | Abort and require browser/hosted variant |
-| DI/JIT imports | Separate Angular scenario host with explicit imports/providers | Declared extraction remains available; resolved scenario fails |
+| Callback called during construction | Ledger-recording captured callback; separately declared bounded construction function | Abort with binding ID and call phase even if the throw is caught |
+| Observable subscription | `subscribe` records then throws; RH-02 has no finite/active Observable protocol | Abort; no retry or fallback to live source |
+| `TemplateRef`/Angular view access | Capture-only proxy records then throws; no component/view creation | Abort and require browser/Task 8 evidence |
+| DI/JIT/Formly resolution | RH-02 does not create an Angular injector, import an NgModule, or call the Formly builder | `FACTORY_ANGULAR_HOST_UNSUPPORTED`; raw declared artifacts and internal controlled candidates only |
 | Timers/CPU/infinite loop | Child timeout plus OS CPU budget; hard kill fallback | No artifact for variant |
-| Microtask/timer mutates returned fields after factory return | Factory inspection/projection/freeze/IPC initiation stays in one synchronous turn; queued work never becomes evidence | Side-effect diagnostic; child discarded after frozen DTO send |
+| Microtask/timer mutates returned fields after factory return | Guard supported schedulers into the ledger; inspection/projection/freeze/IPC stays in one synchronous turn; unconditional child termination | Ledger violation when observed; queued work never becomes evidence; no quiescence claim |
 | Memory/output exhaustion | Process/V8 memory limit, bounded structured IPC, ignored child stdout/stderr | No artifact; stable resource diagnostic |
 | Spawn/worker/native escape | Node denies child, worker, addon, and WASI; rootless OCI isolates PID/user/mount/network namespaces, drops capabilities, applies no-new-privileges/seccomp, and bounds PIDs | Abort; a failed preflight forbids execution |
 | Global/module cache mutation | Fresh process per form/variant/scenario | Process discarded |
-| Subscription/Subject leak | Do not run lifecycle hooks; terminate child; explicit disposer only for harness-owned resources | Process discarded; leak diagnostic if it prevents quiescence |
+| Subscription/Subject leak | RH-02 never subscribes or runs lifecycle hooks; terminate the child unconditionally; dispose harness-owned resources | Process discarded; no claim that arbitrary pending tasks were enumerated |
 | Nondeterminism (`Date`, random, locale, env, host/filesystem) | Forbid ambient inputs by reviewed policy/guards; fixed declared context; record image/environment hashes; repeat fresh runs | Observed mismatch is fatal; equal runs do not prove determinism |
 | Sensitive exception/log content | Stable parent-generated codes; ignored child text streams; schema-limited IPC | No raw error/value in artifact |
 | Shared runner compromise | Never execute in MCP; child cannot write artifacts directly | Parent validates and writes inert result |
@@ -1240,35 +1630,52 @@ callback arguments, exception text, customer path, or environment value.
 | Code | Default severity | Meaning |
 | --- | --- | --- |
 | `FACTORY_DESCRIPTOR_INVALID` | error | Descriptor or options graph violates the exact schema |
+| `FACTORY_REGISTRATION_SIDECAR_INVALID` | error | Code-free registration sidecar is missing, non-canonical, duplicated, or violates its exact JSON/JSONC schema |
 | `FACTORY_CONTAINMENT_UNAVAILABLE` | error | The required rootless OCI runtime/control set is unavailable; no executable fallback is allowed |
 | `FACTORY_CONTAINMENT_NONCONFORMANT` | error | The pinned preflight failed or runtime/image/policy hashes are not approved |
 | `FACTORY_STAGE_INVALID` | error | Dependency-only execution image contains a prohibited or undeclared file |
 | `FACTORY_IMPORT_FAILED` | error | Node-safe descriptor could not be imported |
-| `FACTORY_SIDE_EFFECT_BLOCKED` | error | Network/file/process/worker/addon action was denied |
+| `FACTORY_SIDE_EFFECT_BLOCKED` | error | A supported network/file/process/worker/addon API attempt was recorded before denial; absence is not syscall-level proof |
+| `FACTORY_SCHEDULED_WORK_OBSERVED` | error | A guarded timer, microtask, next-tick, or Promise scheduling API was used |
+| `FACTORY_AMBIENT_INPUT_OBSERVED` | error | A guarded clock/random/host input was read |
 | `FACTORY_TIMEOUT` | error | Import, factory, or projection exceeded its budget |
 | `FACTORY_RESOURCE_LIMIT` | error | Memory, output, IPC, or handle budget was exceeded |
 | `FACTORY_RETURN_INVALID` | error | Factory did not synchronously return a fresh dense field array |
 | `FACTORY_CALLBACK_INVOKED` | error | Capture-only callback ran during import/construction/build |
 | `FACTORY_OBSERVABLE_SUBSCRIBED` | error | Inert Observable was subscribed |
 | `FACTORY_TEMPLATE_REF_DEREFERENCED` | error | Capture-only view token was read/called |
+| `FACTORY_INPUT_MUTATION_ATTEMPTED` | error | A supposedly immutable input was assigned, deleted, redefined, or mutated |
 | `FACTORY_OPTION_SHAPE_INVALID` | error | Bound option keys, required/optional classification, or absent/present materialization disagrees with `optionShape` |
+| `FACTORY_BINDING_KEY_MISMATCH` | error | Handle/declaration key does not match its option property, or one declaration ID was reused across keys |
+| `FACTORY_NESTED_BINDING_UNSUPPORTED` | error | A composite top-level input contains a nested structural, dynamic, capability, or independently semantic leaf |
 | `FACTORY_BINDING_UNCLASSIFIED` | error | Options contain a value not created/approved by the harness |
-| `FACTORY_USAGE_COVERAGE_UNREVIEWED` | error | A publishable binding lacks an owned/versioned usage review |
 | `FACTORY_BINDING_USAGE_UNDECLARED` | error | Taint/identity analysis actually detected flow to an undeclared semantic target; absence of this code is not coverage proof |
 | `FACTORY_BINDING_TARGET_MISSING` | error | Declared node/exact-slot target was absent or did not resolve uniquely in the variant |
+| `FACTORY_BINDING_TARGET_MISMATCH` | error | A target's computed node ID resolved but its keyed/keyless ordinal identity or expected type corroboration changed |
 | `FACTORY_BINDING_TARGET_CONFLICT` | error | Multiple declarations disagree about one target/domain authority |
+| `FACTORY_SELECTION_PROJECTION_INCOMPLETE` | error | A controlled selection lacks one exact options/domain use, targets different nodes, or references mismatched knowledge IDs |
 | `FACTORY_SCALAR_UNSAFE` | error | A required scalar cannot be safely known, varied, or tagged |
+| `FACTORY_STRUCTURAL_IDENTITY_UNSAFE` | error | Probe/controlled input reached field key/type/order/ancestry without a fixed or named structural declaration |
 | `FACTORY_PROBE_TAINT_OBSERVED` | info | Non-publishing probe reached a named structural or semantic path |
 | `FACTORY_TAINT_IN_PUBLISHABLE_OUTPUT` | error | Probe marker reached a run that was incorrectly marked publishable |
 | `FACTORY_VARIANT_REQUIRED` | error | An undeclared input changes contract-bearing structure |
 | `FACTORY_RUNTIME_BEHAVIOR_OPAQUE` | warning | Callback/hook/Observable/view/service is captured for later execution |
 | `FACTORY_SCENARIO_PARTIAL` | warning | Scenario materialization is not globally complete |
+| `FACTORY_V04_PARTIAL_CHOICE_UNEXECUTABLE` | warning | Honest mixed/partial knowledge cannot satisfy v0.4's enumerated-domain requirement for a generic choice-like interaction profile; profile omitted rather than fabricated |
+| `FACTORY_ANGULAR_HOST_UNSUPPORTED` | error | Angular DI/Formly builder, expression, validator, extension, component, or resolved evidence was requested from RH-02; use a separately approved Task 8 mode |
 | `FACTORY_NONDETERMINISTIC` | error | Repeated fresh-process canonical projections observably differ; absence is not proof |
-| `FACTORY_CLEANUP_FAILED` | error | Harness-owned cleanup or Angular host destruction failed |
+| `FACTORY_CLEANUP_FAILED` | error | Harness-owned cleanup or unconditional child termination failed; this is not pending-task enumeration |
 
 Any error produces no contract artifact for that variant/scenario. Policy may
 escalate warnings, but it must not downgrade errors that protect data origin,
 execution containment, identity, or determinism.
+
+These `FACTORY_*` identifiers are runner/generation diagnostics in this design,
+not additions silently serialized into v0.4's closed contract diagnostic-code
+union. Errors gate publication; warnings remain in the internal generation
+report/build log unless item 2 explicitly versions the public diagnostic DTO,
+validation, hashing, migration, and consumers. The same rule prevents a new
+factory diagnostic name from changing public contract bytes by accident.
 
 ## Alternatives and failure modes
 
@@ -1281,13 +1688,21 @@ execution containment, identity, or determinism.
 | Proxy or tag every value automatically | Reject as authority | Primitive provenance and closures are not reliably traceable; native behavior changes under proxies |
 | Static TypeScript analysis only | Retain as optional scaffold | Useful for symbol/source indexing, not authoritative execution or closure/DI semantics |
 | In-process or worker-only execution | Reject for production harness | Shared globals/module cache/process authority; weaker cleanup and containment |
-| Conforming rootless OCI run + fresh child + approved inputs/scenarios + reviewed usages + allowlisted projection | Recommend conditionally | Preserves real factory execution and honest evidence; preflight is mandatory, reviewed usage is a trust boundary, and probes cannot publish |
+| Content-hashed application NgModule imports plus provider denylist | Reject for the no-production-provider profile | Angular intentionally flattens transitive providers and runs environment initializers; hashes prove identity, not provider authorization |
+| Restricted pinned Formly core config plus exact synthetic value/protocol injector | Reject from RH-02; defer to Task 8 | DI restriction does not stop Formly core from running application expressions/validators/closures, and copied type defaults would drift |
+| Conforming rootless OCI run + fresh child + violation ledger + approved inputs/scenarios + reviewed usages + allowlisted projection | Recommend only after the negative-control gate | Preserves real factory execution and honest evidence if catch-resistant violations are proven; preflight is mandatory, reviewed usage is a trust boundary, and probes cannot publish |
 
 Important failure cases:
 
 - If a factory invokes a capture-only callback or subscribes during
   construction, do not return a neutral value. Fail and require a separately
-  reviewed bounded construction binding or refactor.
+  reviewed bounded construction binding or refactor. The ledger entry remains
+  fatal even if the factory catches the thrown trap and falls back.
+- If a controlled collection reaches two option-bearing nodes, both nodes need
+  their own paired selection authority; an unreserved second slot is unknown,
+  never an ordinary complete options/domain extraction.
+- If a scaffold or controlled-only value changes `key`, `type`, ancestry, or
+  order, reject the run. Structural identity is not a redactable semantic slot.
 - Any run containing a meaningless probe is non-publishing, whether or not a
   marker is observed in the result. Replace it with an approved named
   factory-input scenario or mark the form unsupported.
@@ -1431,16 +1846,168 @@ Does not prove:
 - compatibility with the workplace factories named in the request.
 - reproduction of the deleted temporary test from its hash/excerpt alone.
 
+## Follow-up design spikes after independent review 2
+
+These disposable spikes targeted only the two P1 findings. They ran from
+`scripts/research/factory-harness/` and are deleted after their hashes and
+results are retained here, preserving the one-artifact delivery boundary.
+
+### Environment and method
+
+```text
+Repository HEAD before the spikes:
+  1973bad9c8a92e01dd3fb5af7e9f47f29949af24
+
+Host:
+  Darwin 25.5.0 arm64 (RELEASE_ARM64_T6000)
+
+node --version
+  v22.22.1
+
+pnpm --version
+  10.23.0
+
+Pinned packages exercised:
+  @angular/core 20.3.29
+  @ngx-formly/core 6.1.8
+```
+
+`provider-boundary.mjs` created a JIT-decorated `ProductionModule`, imported it
+transitively through `FeatureModule`, and passed that graph to Angular's public
+`importProvidersFrom`/`createEnvironmentInjector` APIs. It then created a
+null-parent synthetic environment, a rejecting `Injector` facade, and a
+component-free Formly builder. The spike used Formly's pinned runtime provider
+layout only to establish feasibility. The final decision does not promote that
+seam into RH-02; all Formly-builder execution remains Task 8 work.
+
+`paired-selection-projection.mjs` invoked a realistic factory twice with
+different scaffold rows. The factory ran `filter`/`map`, interpolated the
+filtered count and a boolean, and captured a callback plus mutable lifecycle
+state in `onDestroy`. The miniature binding-aware projector reserved and
+replaced exact `options` and `value-domain` slots from one shared knowledge ID,
+suppressed the interpolated description, and left the lifecycle hook opaque.
+
+`typecheck-doc-api.mjs` combined the first three retained TypeScript fences
+with minimal external type declarations and semantically typechecked the full
+API plus representative contract as one unit under TypeScript 5.9.3 strict and
+exact-optional semantics. It typechecked the mechanics fence separately and
+used five `@ts-expect-error` cases to prove that an incomplete selection pair,
+a mismatched knowledge ID, missing explicit options, invalid optional-present
+`undefined`, and cross-key handle reuse remain rejected. A positive keyless
+target fixture also compiled.
+
+### Commands and exact results
+
+```text
+shasum -a 256 \
+  scripts/research/factory-harness/provider-boundary.mjs \
+  scripts/research/factory-harness/paired-selection-projection.mjs \
+  scripts/research/factory-harness/typecheck-doc-api.mjs
+  199a97f37ce00417285c8284d2822bc5f6fc21f514771fb19fa60e46dec5bf90  provider-boundary.mjs
+  f729dde6b244c86188431a7e0fdef1cb3527e48361fe885f9e312f8617e2de76  paired-selection-projection.mjs
+  566be136a11b41275717aeaa737c48488be7eb24230df471045876df1110957f  typecheck-doc-api.mjs
+
+node scripts/research/factory-harness/provider-boundary.mjs
+  {"angular":"20.3.29","formly":"6.1.8","transitiveInitializerCalls":1,
+   "transitiveProductionFactoryCalls":1,"explicitBuilderDefaultApplied":"text",
+   "unknownProviderRejected":true}
+
+node scripts/research/factory-harness/paired-selection-projection.mjs
+  {"equalAcrossScaffoldNonces":true,"retainedOptionValue":"Other",
+   "lifecycleCalls":0,"callbackCalls":0,"incompletePairRejected":true}
+
+node scripts/research/factory-harness/typecheck-doc-api.mjs
+  {"typescript":"5.9.3","fences":4,"semanticDiagnostics":0,
+   "expectedTypeErrors":5,"exactOptionalPropertyTypes":true,"strict":true}
+```
+
+Two failed intermediate attempts are also material evidence. A direct
+`BrowserTestingModule` TestBed run first failed `NG0908` without Zone.js; after
+Zone.js was added it failed because `document` was absent. This confirms that
+the established TestBed path carries browser-test-platform requirements even
+without mounting a component. The final provider spike deliberately avoided
+claiming that path as the restricted host implementation.
+
+### Spike conclusions and limits
+
+- **Observation:** arbitrary NgModule import cannot satisfy the stronger
+  provider invariant. One transitive initializer ran at injector creation and
+  one transitive production provider factory ran at lookup.
+- **Observation:** the pinned builder can apply core/type defaults while its
+  field-facing injector rejects every non-synthetic token, and a non-root
+  environment does not automatically materialize a `providedIn: 'root'`
+  application service.
+- **Observation:** two exact slot overrides can share one knowledge authority
+  without projecting raw filtered rows. Removing either slot was rejected.
+- **Observation:** the complete illustrative API/example now has zero semantic
+  diagnostics under strict TypeScript 5.9.3; incomplete-pair and mismatched-ID
+  `@ts-expect-error` cases are active. This is stronger than the earlier
+  syntax-only fence check but remains a disposable research fixture.
+- **Inference:** module-free and synthetic-value-only DI is necessary but not
+  sufficient. Formly core still resolves executable field surfaces, so RH-02
+  must stop before the builder rather than advertise a restricted host.
+- **Deferred:** supported Formly initialization, executable-field policy,
+  provider protocols, settling, and type-default equivalence belong to the
+  separate Task 8 design and compatibility fixtures.
+- **Unknown:** custom Formly extensions/providers and application-equivalent
+  DI cannot be admitted while retaining the no-production-provider invariant.
+- **Not proved:** OCI containment, malicious code resistance, complete
+  projection, semantic type safety, async settling, or workplace compatibility.
+
+## Adversarial negative-control spike after cross-model review
+
+The Claude review's decisive proof obligation was prototyped in a disposable
+Node script after the design was narrowed. The factory was intentionally
+ordinary rather than malicious: it caught every callback, Observable,
+TemplateRef, and fetch-facade error; filtered/mapped one array; interpolated a
+scaffold nonce into presentation and the field `key`; reused the resulting
+options at a second select; scheduled a closure that would mutate the returned
+field; and captured an uncalled lifecycle closure. A module-private miniature
+ledger recorded each trap before throwing. The scheduling facade recorded but
+did not enqueue its closure. The projector rejected structural-identity taint
+and the unreserved second options slot, then refused the artifact because the
+ledger was nonempty.
+
+Environment: Node `v22.22.1`, Darwin `25.5.0` arm64. Temporary file:
+`scripts/research/factory-harness/adversarial-negative-control.mjs`, SHA-256
+`2b74ee6cc5708718353edb9468cdf5657b2dc378a363301e3000e1294ec32aed`.
+It is deleted at final packaging to preserve the one-artifact delivery rule.
+
+```text
+node scripts/research/factory-harness/adversarial-negative-control.mjs
+  {"artifactPublished":false,
+   "caughtViolationsStillRecorded":["FACTORY_CALLBACK_INVOKED",
+   "FACTORY_OBSERVABLE_SUBSCRIBED","FACTORY_SIDE_EFFECT_BLOCKED",
+   "FACTORY_TEMPLATE_REF_DEREFERENCED"],"lifecycleCalls":0,
+   "scheduledMutationRan":false,"structuralIdentityRejected":true,
+   "unreservedOptionsRejected":true}
+
+shasum -a 256 \
+  scripts/research/factory-harness/adversarial-negative-control.mjs
+  2b74ee6cc5708718353edb9468cdf5657b2dc378a363301e3000e1294ec32aed
+```
+
+This proves only the record-before-throw and refusal algorithm in one process.
+It does not prove that a Node preload can comprehensively wrap ESM built-ins,
+that an OCI supervisor observes arbitrary syscalls, or that production target
+identity/whole-tree projection is correct. Those remain item 5 retained-test
+gates. It does show that caught exceptions need not erase supported harness
+violations and that the proposed negative-control assertion is executable.
+
 ## Decision and implementation consequences
 
 ### Go/no-go
 
-**Go** for a production design that publishes only approved static/invariant
-inputs or named safe factory-input scenarios and requires reviewed binding
-classification/usages, named structural variants, a staged dependency-only
-image, conforming `oci-rootless-v1` fresh child processes, immediate allowlisted projection,
-two-run repeatability plus a reviewed determinism policy, and fail-closed
-diagnostics.
+**Go** now for DTO/type specification and pure validation/projector work over
+inert synthetic fixtures.
+
+**No-go** for application factory execution until the code-free sidecar,
+catch-resistant violation ledger, structural-identity gate, whole-tree
+controlled-options refusal, and `oci-rootless-v1` conformance runner pass the
+retained adversarial negative control. After that gate, approve a pilot that
+publishes v0.4 contracts only from approved static/invariant declared inputs.
+Named safe factory-input scenarios remain internal repeatability/projection
+checks until a versioned schema adds controlled node evidence.
 
 **No-go** for a generic auto-filler that invents empty arrays, false booleans,
 no-op callbacks, fake templates, or plausible records and then treats factory
@@ -1450,114 +2017,174 @@ only for non-publishing feasibility/diagnostic runs.
 **No-go** for adding factory execution directly to the current workspace/MCP
 process or for running production providers/services to resolve inputs.
 
+**No-go** for Angular/Formly resolution under RH-02, including the earlier
+module-free restricted profile. DI restriction does not stop Formly from
+executing expressions, validators, extensions, or captured closures, and a
+copied JSON-safe type registry would drift from production. Application-
+equivalent Task 8 is a separate evidence/security mode, not an alias for this
+harness.
+
 ### Package ownership and dependency direction
 
 | Layer | Owns | Allowed dependencies | Must not own/import |
 | --- | --- | --- | --- |
 | `@formly-contract/schema` | Versioned inert output DTOs, canonical value-domain/option split, diagnostic/provenance DTOs, validators, hashing | JSON-safe schema utilities only | Formly, Angular, RxJS, Node process/container APIs, application modules |
 | `@formly-contract/compiler` | Child-only factory authoring types, binding/materialization validation, exact semantic-target grammar, binding-aware allowlisted projection | Schema; existing Formly peer boundary | Workspace config/discovery, OCI orchestration, Angular TestBed, production providers |
-| `@formly-contract/workspace` | Inert `FormFactoryRegistration` config, exact parent-side validation, dependency-manifest staging, `oci-rootless-v1` preflight/orchestration, parent-owned publication | Schema and compiler output APIs; Node/OCI adapter | Importing application factory contracts in the parent, Angular DI/TestBed, MCP-time execution |
-| planned `@formly-contract/angular` | Child-side resolution of `AngularScenarioHost`, fresh TestBed/Formly builder setup, finite settling, teardown | Schema and compiler; Angular/Formly/RxJS peers | Workspace discovery/publication, OCI policy, application component mounting by default |
-| application secondary entry point | `ChildFormFactoryContract<TOptions>`, the real factory reference, reviewed bindings/scenarios, literal host references | Compiler authoring API and application-owned Formly types | Production service resolution, customer data, component bootstrap, parent-side registration execution |
+| `@formly-contract/workspace` | Code-free `FormFactoryRegistrationSidecar` discovery, exact parent-side validation, dependency-manifest staging, `oci-rootless-v1` preflight/orchestration, parent-owned publication | Schema and compiler output APIs; Node/OCI adapter | Evaluating TS/JS config on the factory path, importing application factory contracts in the parent, Angular DI/TestBed, MCP-time execution |
+| planned `@formly-contract/angular` (Task 8, outside RH-02) | Application-equivalent Formly resolution, model/form-state composition, provider/settling protocols scoped to named scenarios, teardown, resolved evidence | Workspace source contracts, compiler and schema; Angular/Formly/RxJS peers | Claiming RH-02's no-production-service guarantee, weakening workspace containment, or rewriting raw factory evidence in place |
+| application secondary entry point | `ChildFormFactoryContract<TOptions>`, the real factory reference, reviewed bindings/scenarios | Compiler authoring API and application-owned Formly types | Production service resolution, customer data, component bootstrap, parent-side registration execution |
 
 The compiler API uses caller-supplied generic object types for Observable and
 TemplateRef-shaped capabilities; it does not import RxJS or Angular merely to
 create capture-only proxies. The planned Angular package may use those runtime
-peers only in the separate contained Angular child. Dependency direction is
-`schema <- compiler <- workspace` for generic generation and
-`schema <- compiler <- angular` for the optional Angular child adapter;
-`angular` must not depend on `workspace`, preventing a cycle. Workspace invokes
-the optional adapter through a validated tool-owned plugin entry, never an
-application export.
+peers only in its separate contained Task 8 child. Package-import direction is
+`angular -> workspace -> compiler -> schema`; neither workspace, compiler, nor
+schema imports Angular. This matches ADR 0007 and Tasks 7A–8: the Angular
+package consumes `FormContractSource`/future factory-source contracts and
+returns a generic source/registration that the unchanged workspace runner can
+validate and execute. This package direction does not authorize the RH-02
+factory path to evaluate an application project config; its sidecar remains a
+separate code-free input. Workspace never discovers or invokes Angular through
+a parallel plugin protocol. This graph is acyclic and keeps Angular optional.
+
+The factory contract still requires a child-only application secondary entry
+point. The sidecar visible to workspace contains only stable JSON data,
+including ID, option shape, and `StagedModuleReference`; the factory path does
+not import the project config. A future Angular helper may correlate inert IDs
+after RH-02 output exists, but executable factory/host symbols remain behind
+the staged reference and their respective containment gates.
 
 ### Ordered implementation breakdown
 
 1. **Approve concepts, exact boundaries, and schema mapping.** Decide that factory inputs, usage
-   bindings, structural variants, model/form-state scenarios, and observed
-   evidence are separate contracts; usage completeness is reviewed application
-   metadata; and probe runs cannot publish. Approve the ownership table, inert
-   registration/child-only executable split, exact target grammar, per-binding
-   variant assignments, optional-key/runtime option shape, v0.4
-   value-domain/options mapping, and stable diagnostic names.
+   bindings, structural variants, future model/form-state scenarios, and
+   observed evidence are separate contracts; usage completeness is reviewed
+   application metadata; and probe runs cannot publish. Approve the code-free
+   sidecar/child-only executable split, exact target plus key/type
+   or keyless-ordinal corroboration, structural-identity prohibition,
+   top-level-only v1 binding grammar, unique option-key/binding identity,
+   exact optional-present semantics, per-binding variant assignments, v0.4
+   paired-selection mapping, controlled-candidate non-publication,
+   explicit RH-02 stop before Angular/Formly resolution, canonical
+   `angular -> workspace` dependency direction, and stable diagnostics.
 2. **Specify and typecheck DTOs before runtime code.** Add versioned
-   internal/public types for inert registrations, binding declarations, exact
-   uses, variants, option shape, scenario identity, mixed/filtered provenance,
+   internal/public types for the exact JSON/JSONC sidecar, inert registrations,
+   keyed binding declarations, exact uses, keyed/keyless targets, variants,
+   option shape, scenario identity, mixed/filtered provenance,
    redaction evidence, and generation metadata. Preserve canonical
    `JsonValue[]` domains and separate option presentation. Add compile-time
-   authoring fixtures plus runtime exact-schema tests. Extend the
+   authoring fixtures that semantically typecheck the complete API/example as
+   one unit, including incomplete/mismatched selection-pair, stale key/type,
+   optional-options, `optional?: T` versus `optional?: T | undefined`,
+   declaration/key mismatch and reuse, keyless targets, and unsupported
+   nested-binding negative cases, plus
+   runtime exact-schema tests. Extend the
    architecture/spec/ADR only after maintainer approval.
-3. **Implement pure binding validation/materialization.** Exact own-data
-   schemas, freeze immutable data, create isolated mutable scenario copies,
-   call-counted/throwing capabilities,
-   target validation, and safe diagnostic formatting. Add negative tests for
+3. **Implement pure binding validation/materialization with synthetic fixtures
+   only.** Exact own-data
+   schemas, mutation-recording immutable proxies, isolated mutable scenario
+   copies, call-counted and record-before-throw capabilities, a module-private
+   ledger abstraction, target validation, and safe diagnostic formatting. Add negative tests for
    accessors, sparse arrays, exotic values, primitive misuse, and leaks.
-4. **Make projection binding-aware.** Apply semantic overrides at computed node
-   IDs, suppress controlled scenario values at reviewed targets, reject
-   conflicting authorities, block any publishable probe run, and ensure current
-   hook/async diagnostics remain. Never sanitize the live tree into a
-   misleading shape before identity computation.
-5. **Prove and build `oci-rootless-v1`, then the runner.** First implement the
-   fail-closed capability detector and pinned conformance image. Only after it
+   This item may not import an application factory module.
+4. **Make projection binding-aware with synthetic fixtures only.** Apply
+   structural-identity checks before node IDs; semantic overrides at computed node IDs; require one knowledge ID's exact
+   options/domain pair before bypassing raw option extraction; reject partial,
+   mismatched, duplicate, stale-target, and competing authorities; reject every
+   controlled unreserved option/domain slot; keep every controlled candidate
+   internal under v0.4; block any publishable probe run; and ensure current
+   hook/async diagnostics remain. Never sanitize
+   the live tree into a misleading shape before identity computation. This
+   item may use hand-built field trees but may not import application code.
+5. **Prove `oci-rootless-v1` plus the violation preload, then build the runner.** First implement the
+   fail-closed capability detector, pinned conformance image, and tool-owned
+   ledger preload. Retain a negative control whose factory catches every
+   callback/Observable/view/network denial, schedules a mutation, interpolates
+   a scaffold into `key`, and reuses a collection at an unreserved select; all
+   violations must remain visible and publication must fail. Only after it
    passes, produce and audit a dependency-only execution image; use shell-free
    spawn, ignored child text streams, sanitized env, schema-limited IPC,
    read-only mounts, no network/capabilities/privilege escalation, bounded
-   PID/time/memory, Node deny rules, parent-owned writes, hard-kill cleanup, and
-   two-fresh-process repeatability and ambient-input guards. Prove blocked
+   PID/time/memory, Node deny rules, parent-owned writes, unconditional
+   hard-kill cleanup, an empty sealed ledger requirement, and two-fresh-process
+   repeatability and ambient-input guards. Prove blocked
    network/file/spawn, import-time
    effects, infinite loop, OOM/output, and sensitive-error cases.
-6. **Integrate inert workspace registrations.** Add literal
-   `FormFactoryRegistration` data alongside, not in place of, the current
-   zero-argument executable definition. The parent must never import the
-   referenced application contract. Preserve existing source ordering, exact
-   validation, provenance, and failure semantics.
-7. **Add controlled Angular scenarios separately.** Explicit application
-   imports/providers, fresh TestBed and builder, approved synthetic provider
-   values, model/formState clones, finite-closed settling gates for
-   scenario-complete domains, destroy/exit, and no component mounting by
-   default.
-8. **Add realistic fixtures.** Cover a large nested options object; immediate
+6. **Integrate code-free workspace registration discovery.** Parse the
+   conventional/CLI-selected `FormFactoryRegistrationSidecar` on a factory-only
+   path that never evaluates TS/JS config. Keep the existing zero-argument
+   source behavior separate. The parent must never import the referenced
+   application contract. Preserve exact validation, provenance, and failure
+   semantics.
+7. **Design Angular/Formly resolution only as separate Task 8 work.** Do not
+   implement a restricted RH-02 host. A future proposal must cover executable
+   field surfaces, production type/default equivalence, scenario-scoped
+   provider/settling protocols, model/formState clones, cleanup, and its
+   application-equivalent evidence/security claim.
+8. **Add realistic fixtures.** Cover a large heterogeneous top-level options
+   object plus explicit nested-behavior rejection; immediate
    filter/sort/map; known `Other` plus dynamic remainder; called pure provider;
-   forbidden callback/subscription/view access; structural flags; hooks; mixed
-   and filtered domains; nondeterminism; and diagnostics without raw values.
+   caught forbidden callback/subscription/view/network access; scaffold-derived
+   field key; one collection reused at two selects; structural flags; hooks;
+   mixed and filtered domains; nondeterminism; and diagnostics without raw
+   values.
 9. **Gate workplace pilot.** Run in a credential-free checkout with an OS
-   network sandbox. Measure binding/variant authoring burden and unsupported
+   network sandbox. Publish only declared v0.4 artifacts; use controlled runs
+   as internal diagnostics unless a separately approved schema revision adds
+   controlled evidence. Measure binding/variant authoring burden and unsupported
    factory proportion before claiming scalability.
 10. **Defer browser conformance.** Only a later observed evidence layer may
     verify mounted lifecycle, templates, remote readiness, and rendered values.
 
 The next implementation gate is items 1–2: approve the corrected separation,
-ownership, and schema mapping, with typechecked fixtures. Executable work then
-starts with the containment preflight in item 5, not by extending the current
-`definition.create()` signature or importing a function-valued descriptor in
-the parent.
+ownership, sidecar, paired-slot mapping, controlled-evidence non-publication,
+exact optional/key identity, structural-identity rule, and explicit
+Angular/Formly no-go, with typechecked fixtures.
+Items 3–4 are pure library/test work over inert synthetic objects and may follow
+that approval. **No application contract import, application integration test,
+or factory-derived artifact is permitted until the containment preflight and
+runner in item 5 pass.** Application-executing work starts at item 5, not by
+extending the current `definition.create()` signature or importing a
+function-valued descriptor in the parent.
 
 ## Traceability
 
 | Acceptance | Decision/evidence | Verification | Status |
 | --- | --- | --- | --- |
 | RH02-A1: Concrete API/flow, alternatives, failures | Proposed generic API, compile flow, alternatives/failure modes | Static reconciliation against current source/compiler APIs | Met |
-| RH02-A2: Functions, filtered arrays, interpolated scalars, lifecycle closure; no scaffold output | Bounded experiment | Final two Vitest runs; two-nonce equal hash; zero execution counters | Met within bounded scope |
-| RH02-A3: Security/determinism rules and diagnostics | Threat model and diagnostic table | Source-backed design review; production containment not implemented | Design met; runtime proof deferred |
+| RH02-A2: Functions, filtered arrays, interpolated scalars, lifecycle closure; no scaffold output | Original bounded experiment, paired-selection spike, and adversarial negative control | Two-nonce semantic equality; zero lifecycle/callback counters; incomplete pair, scaffold key, caught violations, scheduled mutation, and second unreserved options slot rejected | Met within bounded scope |
+| RH02-A3: Security/determinism rules and diagnostics | Threat model, violation-ledger design, and diagnostic table | Source-backed design review and miniature catch-resistant ledger spike; production containment not implemented | Design met; production proof deferred |
 | RH02-A4: Recommendation, confidence, unknowns, ordered implementation | Go/no-go, unknowns, confidence, breakdown | Maintainer decision remains | Met |
 | RH02-NG1: No production/shared architecture/spec/plan changes | Only this research artifact retained | `git status`, `git diff --check`, explicit temporary-path check | Met |
+| RH02-DG1: Enforce the Angular/Formly execution boundary | RH-02 stops before the builder; all resolved evidence is separate Task 8 work | Tasks 1–2 and 7; provider spike plus source review of executable Formly surfaces | Explicit no-go selected |
+| RH02-DG2: Preserve exact `options` and `valueDomain` authority | One knowledge record, two mandatory exact uses, raw readers bypassed only for those slots | Tasks 1–4; paired-selection spike and future schema/projector negative tests | Design and miniature algorithm observed; production proof pending |
+| RH02-DG3: Match canonical package direction | `angular -> workspace -> compiler -> schema`, no reverse Angular import or parallel plugin protocol | Tasks 1, 6, and 7; ADR 0007/Tasks 7A–8 reconciliation plus dependency audit | Design reconciled; package not implemented |
+| RH02-DG4: Gate all application execution on containment | Code-free sidecar replaces TS config discovery; items 3–4 are inert-only; imports start only after item 5 passes | Tasks 1–6; sidecar/import-boundary tests and OCI preflight evidence | Order explicit; runtime gate pending |
+| RH02-DG5: Make caught violations fail closed | Module-private record-before-throw ledger; parent requires an empty sealed summary | Tasks 3, 5, and 8; adversarial negative-control spike and future retained child-runner test | Miniature mechanic observed; production proof pending |
+| RH02-DG6: Represent controlled evidence honestly | v0.4 publishes declared artifacts only; controlled runs remain internal until a versioned schema adds controlled evidence and consumer semantics | Tasks 1–4 and 9; schema/API negative tests before any controlled publication | Explicit non-publication gate selected |
 
 ## Confidence and limitations
 
 | Claim | Confidence | Reason |
 | --- | ---: | --- |
 | Real synchronous factories can be reused without components | 0.95 | Direct experiment and existing zero-argument factory corpus |
-| Approved inputs plus reviewed target overrides can prevent raw scenario values from becoming domains | 0.78 | Ownership is auditable; usage completeness and projector remain unproven |
+| Approved inputs plus paired exact target overrides can prevent raw scenario options/domains from entering an accepted internal candidate | 0.84 | Miniature two-nonce projector passed and incomplete pairs failed; production projector and usage completeness remain unproven; v0.4 publication is forbidden |
 | Tagged strings catch direct/interpolated leaks | 0.95 | Two-nonce experiment |
 | Automatic generic primitive taint would be safe | 0.15 | JavaScript primitive provenance is lost |
 | Staged `oci-rootless-v1` process-per-input is the correct first cleanup boundary | 0.82 | Required controls/refusal are concrete, but the conformance image and workplace import remain unproven |
-| Proposed domain union represents requested knowledge states without duplicating v0.4 option authority | 0.88 | Values and presentation are now separate with an explicit conservative mapping; schema review remains |
+| Proposed domain union represents requested knowledge states without duplicating v0.4 option authority | 0.92 | Values/presentation are separate and their coordinated exact projections now have one knowledge identity; schema review remains |
+| RH-02 must stop before Angular/Formly resolution | 0.93 | Provider spike and installed Formly source show DI restriction does not bound executable field expressions/validators/extensions |
+| A module-private record-before-throw ledger can survive ordinary `try/catch` | 0.90 | Adversarial miniature recorded callback/Observable/view/network/scheduling attempts and refused publication; production preload/OS integration remains unproven |
+| Canonical Angular/workspace package graph is acyclic | 0.95 | ADR 0007 and Tasks 7A–8 explicitly support Angular consuming workspace contracts with no reverse Angular dependency |
 | Node permission model alone is sufficient isolation | 0.20 | Official limitations and shared host risks require OS defense |
 | Workplace corpus is covered with acceptable authoring cost | 0.50 | No workplace factory was executed or measured |
 
-The largest remaining risks are import-time side effects, authoring burden for
-large option interfaces, structural variants hidden behind unclassified
-primitives, custom Angular extension behavior, and cleanup/settling of any
-future sanctioned async scenario.
+The largest remaining risks are import-time side effects outside the supported
+preload surface, production integration of the code-free sidecar and sealed
+ledger, authoring burden for large option interfaces, structural variants
+hidden behind unclassified primitives, and the intentionally unsupported
+nested-binding corpus. Angular/Formly initialization and async settling are
+separate Task 8 risks, not RH-02 implementation gates.
 
 Evidence that would change the recommendation:
 
@@ -1595,7 +2222,30 @@ after this revision with TypeScript 5.9.3 under `--strict` and
 cases confirmed that required keys (including `string | undefined`) cannot use
 the absent handle and cannot be listed as optional. The temporary typecheck
 file was deleted. This test did not typecheck the entire illustrative API or
-prove runtime validation/containment.
+prove runtime validation/containment at remediation commit `1973bad`. The
+follow-up `typecheck-doc-api.mjs` spike above supersedes the full-API typecheck
+gap for the current document, but remains non-retained test evidence and still
+does not prove runtime validation/containment.
+
+### Independent-review instance 2 remediation
+
+Independent-review instance 2 also returned `Not ready`. Its blind preliminary
+ledger was frozen before it received the author explanation. The explanation
+confirmed all four findings rather than contesting them. This revision treats
+the two P1 findings as immediate API-gate blockers and records the two P2
+corrections directly in ownership/order:
+
+| Review finding | Resolution in this revision | Remaining proof |
+| --- | --- | --- |
+| Angular host had a denylist but no enforceable positive provider boundary | Removed arbitrary host imports/providers; selected a module-free pinned core profile, exact synthetic value/protocol bindings, null-parent environment, rejecting injector, and explicit unsupported cases | Retained version-specific compatibility fixture; reject unknown/optional/root tokens and every unsupported provider/config form |
+| Selection knowledge mixed an exact `value-domain` target with separate `options` projection | One knowledge ID now requires two coordinated exact uses, one per public slot; raw option/domain readers are bypassed only after pair validation | Full API type fixture plus production projector conflict/missing/mismatch tests |
+| Angular/workspace dependency direction conflicted with ADR 0007 | Replaced the undefined plugin boundary with `angular -> workspace -> compiler -> schema`; workspace has no Angular import | Package manifests and import-boundary audit when the Angular package is implemented |
+| Items 3–4 appeared to execute before containment despite item 5 wording | Marked items 3–4 inert synthetic-only and stated the hard prohibition on application imports/integration before item 5 passes | CI/import-boundary test and OCI conformance evidence |
+
+The follow-up provider and paired-selection spikes above were added because the
+two P1 changes assert runtime mechanics that prose alone could not establish.
+They support the chosen direction but deliberately do not mark the production
+tasks complete.
 
 ## Doubt register and adversarial reconciliation
 
@@ -1605,9 +2255,12 @@ The non-trivial claim to challenge is:
 > projection are sufficient to invoke real factory structure without allowing
 > construction scaffolds or live behavior to become semantic evidence.
 
-One fresh-context adversarial review was run against only this artifact and the
-RH-02 contract. Cross-model review was skipped because this was a delegated,
-non-interactive research unit.
+The earlier revision received three bounded fresh-context adversarial passes.
+After independent-review instance 2, a new fresh-context remediation pass was
+run against only this artifact and the RH-02 contract, followed—with explicit
+user authorization—by a Claude Code 2.1.246 / Claude Opus cross-model review
+using `--safe-mode`, no tools, no session persistence, and only the artifact
+plus acceptance/review contract on stdin.
 
 | Finding | Classification | Reconciliation |
 | --- | --- | --- |
@@ -1653,18 +2306,57 @@ The third and final bounded cycle found eight remaining specification gaps.
 | Experiment did not exercise the throwing capability paths | Valid + actionable | Narrowed the observation to zero use in the example and explicitly lists throwing misuse behavior as unproven |
 | Retention/final verification was still pending | Valid + actionable | Closed only after the final commands/status recorded below |
 
+The later remediation pass and Claude review converged on two blocking defects
+and exposed additional boundary inconsistencies. Earlier Angular/finite-
+provider resolutions in the historical tables above are therefore superseded
+by the narrower final design.
+
+| Later finding | Source | Classification | Final reconciliation |
+| --- | --- | --- | --- |
+| Trap exceptions and OS denials can be caught, erasing diagnostics | Both | Valid + blocking | Added a module-private record-before-throw ledger, empty sealed-summary publication gate, explicit supported-surface limit, and adversarial negative-control spike |
+| TS project config executes application code before containment | Both | Valid + blocking | Replaced project-config inventory with an exact code-free JSON/JSONC sidecar; factory path never evaluates TS/JS config |
+| Restricted Formly builder still executes expressions/validators/extensions/closures | Remediation pass; reinforced by Claude type-registry drift finding | Valid + blocking | Removed `AngularScenarioHost`, finite Observable resolution, and resolved evidence from RH-02; deferred all builder work to Task 8 |
+| Selection pair allowed optional options/domain-only ambiguity | Remediation pass | Valid + actionable | `FactorySelectionKnowledge.options` is required; domain-only values use `scenarioValue`, not `controlledCollection` |
+| Provider/settling protocols were global and unscoped | Remediation pass | Valid + actionable | Removed them from RH-02; future Task 8 must scope protocols per named resolved composition |
+| Pending-task requirement was not implementable without a tracker | Remediation pass | Valid + actionable | Removed quiescence/pending-task claims; guarded scheduling records supported calls and the child is always terminated |
+| Structural key/type/order were neither projectable nor tested | Claude | Valid + blocking grammar defect | Made structural identity non-projectable, added pre-node-ID rejection and mandatory probe/delta checks, and exercised scaffold-derived `key` rejection |
+| Controlled rows could reach a second unreserved options slot | Claude | Valid + actionable | Controlled mode now refuses every unreserved options/domain slot across the whole tree; negative control reuses one collection at two selects |
+| Nested option leaves bypass top-level classification | Claude | Valid + actionable support limit | Selected an explicit top-level-only v1; nested behavioral/structural leaves fail closed instead of receiving whole-object approval |
+| Deep freeze can silently fail in sloppy code | Claude | Valid + actionable | Immutable inputs use mutation-recording proxies before throwing; fresh mutable copies remain explicit controlled inputs |
+| Hand-authored node IDs can retarget after drift | Claude | Valid + actionable | Exact targets now require expected key/type corroboration and mismatch diagnostics |
+| Registration type lacked the option shape checked in compile flow | Claude | Valid + actionable | Added JSON-safe sidecar `optionShape` and canonical parent/child equality |
+
+Final independent-review instance 3 of 3 then returned `Not ready`. Its blind
+ledger was frozen before the author explanation and it verified the exact
+worktree/canonical sources. The four remaining findings were accepted:
+
+| Independent-review instance 3 finding | Classification | Final resolution |
+| --- | --- | --- |
+| v0.4 has no honest node evidence for controlled factory artifacts | Valid + blocking | Controlled scenarios are now compiler-internal candidates only; v0.4 publishes declared inputs. Public controlled publication requires a versioned evidence/provenance/validation/hash/migration/consumer change first |
+| `BoundOptions` allowed present `undefined` for `optional?: T` under exact optional semantics | Valid + actionable | Present handles use `Required<TOptions>[Key]`; five-case typecheck distinguishes absence, `optional?: T`, `optional?: T | undefined`, and required `T | undefined` |
+| A binding declaration was not uniquely tied to one option key | Valid + actionable | Handle/declaration brands carry the literal option key; materialization requires a unique canonical key-to-binding map and rejects cross-key reuse; the map is hashed |
+| Mandatory `expectedKey` excluded positional keyless Formly nodes | Valid + actionable | Target identity is a discriminated keyed value or keyless source ordinal path, with optional type corroboration |
+
+This exhausted the configured three-instance independent-review bound. The
+accepted corrections receive focused self-verification below, but no fourth
+independent readiness verdict is claimed.
+
 The reconciled claim is deliberately smaller:
 
-> A staged, isolated harness can publish exact artifact-safe declared inputs
-> and named artifact-safe controlled scenarios while keeping reviewed
-> capture-only behavior inert.
+> After its retained negative-control gate passes, a staged, isolated harness
+> can publish exact artifact-safe declared inputs
+> while evaluating named artifact-safe controlled scenarios internally and
+> keeping reviewed capture-only behavior inert.
 > Meaningless construction probes establish feasibility only and produce no
 > semantic artifact. Reviewed usage/variant metadata remains application-owned
 > authority whose completeness is not automatically proven.
 
-The doubt stop condition was the three-cycle bound. All substantive findings
-from each cycle were classified as actionable or explicit trust-boundary
-trade-offs and reconciled above. No fourth cycle was run.
+The final doubt stop condition was convergence: the local remediation pass and
+Claude agreed on both blockers, every substantive finding was classified, and
+the highest-risk catch/identity/reuse mechanic received a bounded negative
+control. Independent review subsequently found and closed the controlled-
+evidence/API identity gaps above; the next uncertainty is the retained
+production preload/OCI experiment in implementation item 5.
 
 ## Original verification record
 
@@ -1740,6 +2432,62 @@ or runtime runner has been implemented or proven.
 The modified status above was captured immediately before packaging this
 remediation; the post-commit worktree was clean.
 
+## Final hardening verification record
+
+The last design revision, cross-model reconciliation, and independent-review
+instance 3 remediation ran from branch
+`codex/rh-02-factory-harness-research` at pre-packaging HEAD
+`1973bad9c8a92e01dd3fb5af7e9f47f29949af24`.
+
+```text
+node scripts/research/factory-harness/provider-boundary.mjs
+  {"angular":"20.3.29","formly":"6.1.8",
+   "transitiveInitializerCalls":1,"transitiveProductionFactoryCalls":1,
+   "explicitBuilderDefaultApplied":"text","unknownProviderRejected":true}
+
+node scripts/research/factory-harness/paired-selection-projection.mjs
+  {"equalAcrossScaffoldNonces":true,"retainedOptionValue":"Other",
+   "lifecycleCalls":0,"callbackCalls":0,"incompletePairRejected":true}
+
+node scripts/research/factory-harness/typecheck-doc-api.mjs
+  {"typescript":"5.9.3","fences":4,"semanticDiagnostics":0,
+   "expectedTypeErrors":5,"exactOptionalPropertyTypes":true,"strict":true}
+
+node scripts/research/factory-harness/adversarial-negative-control.mjs
+  {"artifactPublished":false,
+   "caughtViolationsStillRecorded":["FACTORY_CALLBACK_INVOKED",
+   "FACTORY_OBSERVABLE_SUBSCRIBED","FACTORY_SIDE_EFFECT_BLOCKED",
+   "FACTORY_TEMPLATE_REF_DEREFERENCED"],"lifecycleCalls":0,
+   "scheduledMutationRan":false,"structuralIdentityRejected":true,
+   "unreservedOptionsRejected":true}
+
+pnpm exec vitest run packages/schema/src/contract.test.ts
+  Test Files  1 passed (1)
+  Tests       79 passed (79)
+
+pnpm check:docs
+  Documentation checks passed for 57 files.
+
+git diff --check
+  exit 0; no output
+
+test ! -e scripts/research/factory-harness/provider-boundary.mjs
+test ! -e scripts/research/factory-harness/paired-selection-projection.mjs
+test ! -e scripts/research/factory-harness/typecheck-doc-api.mjs
+test ! -e scripts/research/factory-harness/adversarial-negative-control.mjs
+  all exit 0
+
+git status --short --branch
+  ## codex/rh-02-factory-harness-research
+   M docs/research/hardening/factory-harness-and-value-semantics.md
+
+```
+
+The four scripts were deliberately disposable and were deleted only after the
+recorded hashes and final results above. The sole retained change remains this
+research artifact. Adding this verification record changed only documentation;
+`pnpm check:docs` and `git diff --check` are rerun once more before commit.
+
 ## Source index
 
 Repository sources:
@@ -1761,6 +2509,10 @@ Repository sources:
 - `packages/workspace/src/run-workspace.ts`
 - `packages/compiler/src/extract-form.ts`
 - `packages/compiler/src/extract-form.test.ts`
+- pinned installed Angular 20.3.29 injector implementation under
+  `node_modules/.pnpm/@angular+core@20.3.29*/node_modules/@angular/core/fesm2022/`
+- pinned installed Formly 6.1.8 core implementation and declarations under
+  `packages/compiler/node_modules/@ngx-formly/core/`
 - `fixtures/synthetic-form/src/compatibility.ts`
 - `fixtures/synthetic-form/src/compatibility.test.ts`
 - `apps/formly-test-app/src/app/forms/operations/operations-forms.ts`
@@ -1778,6 +2530,14 @@ Official sources:
   <https://angular.dev/tools/libraries/creating-libraries#consuming-partial-ivy-code-outside-the-angular-cli>
 - Angular TestBed services:
   <https://angular.dev/guide/testing/services#testing-services-with-the-testbed>
+- Angular transitive provider collection:
+  <https://angular.dev/api/core/importProvidersFrom>
+- Angular injector hierarchy/provider flattening:
+  <https://angular.dev/guide/di/hierarchical-dependency-injection>
+- Angular environment initializers:
+  <https://angular.dev/api/core/provideEnvironmentInitializer>
+- Angular `InjectionToken` identity/default factories:
+  <https://angular.dev/api/core/InjectionToken>
 - RxJS Observable: <https://rxjs.dev/api/index/class/Observable>
 - RxJS Subject: <https://rxjs.dev/api/index/class/Subject>
 - Node 22 permissions:
