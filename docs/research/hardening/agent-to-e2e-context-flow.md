@@ -1,0 +1,1162 @@
+# RH-05: Agent-to-Contract-to-Playwright Context Flow
+
+**Status:** Research complete; conditional implementation recommendation
+
+**Research date:** 2026-08-27
+
+**Repository commit inspected:** `d4ffdb517d0d506ed7cd55074c4eac720a145f8b`
+
+**Environment:** Node.js `22.22.1`, pnpm `10.23.0`, Angular `20.3.29`,
+Formly `6.1.8`; Playwright is not a production dependency in this repository.
+
+**Decision owner:** Project maintainer
+
+## Executive decision
+
+**Inference — recommendation:** Proceed with a narrow agent-context layer, but
+do not begin with Playwright code generation. The smallest reliable product is
+a read-only, hash-pinned discovery/query surface plus a strict test-intent
+validator that can refuse execution. Add deterministic driver execution only
+after a fixture can pass the validator without selector, value, scenario,
+navigation, validation, or readiness guesses.
+
+**Repository observation — current feasibility:** The v0.4 form artifacts and
+workspace index already carry much of the middle of the journey: stable form
+and node IDs, content hashes, model paths, labels, constraints, value domains,
+interaction-profile identities, wrapper preconditions, explicit cross-field
+effects, analysis completeness, locators, and diagnostics. They do not yet
+carry the two ends of the journey: (1) a stable join from repository/page/route
+or step evidence to a form usage, or (2) a typed test-intent and driver boundary
+that can prove a browser action and assertion are supported.
+
+**Repository observation — blocking gaps:** The current workspace source type
+accepts named scenarios, but `runWorkspace` only calls the base form factory
+and declared extractor; it neither invokes scenario factories nor emits a
+scenario index/resolved artifact. The `claims.intake` golden therefore retains
+`claimDetails.caseType` as a dynamic value domain with no executable
+interaction profile. Its wrapper-aware custom radio profile also names
+`wrapper-expand`, `group`, and `option` parts while the node exposes only a
+`target: "control"` DOM-ID locator. A strict compiler cannot infer the missing
+part scopes.
+
+**Inference — value proposition:** The full flow is worthwhile for a
+repository with many repeated Formly patterns, custom widgets, and recurring
+agent-authored tests. It is not yet better than source reading plus ordinary
+Playwright inspection for a one-off simple native form. Its distinctive value
+is early, explainable refusal: a model can discover the right form, but cannot
+silently invent a selector, option value, branch transition, validation
+trigger, or readiness wait.
+
+**Confidence:** `0.88` that the proposed contracts are sufficient for the two
+paper journeys; `0.72` that they will provide net value in a real repository
+before one representative usage, scenario compiler, and driver are measured.
+The largest unknown is the cost of authoring usage/action/validation metadata
+and exact custom-part locators in the workplace corpus.
+
+## Evidence vocabulary and method
+
+Every material conclusion in this report is tagged as one of:
+
+- **Documented fact:** supported by a current repository contract/specification
+  or an official external source.
+- **Repository observation:** read or executed against the commit and
+  environment above.
+- **Inference:** a design conclusion derived from documented facts and
+  repository observations.
+- **Unknown:** not established by the present repository, fixture, or primary
+  sources.
+
+**Repository observation — method:** The research read [AGENTS.md](../../../AGENTS.md),
+the [architecture overview](../../architecture-overview.md), the
+[implementation plan](../../implementation-plan.md), the
+[v0.3 locator specification](../../v0.3-test-locators-spec.md), the
+[v0.4 E2E metadata specification](../../v0.4-e2e-authoring-metadata-spec.md),
+the [workspace configuration contract](../../workspace-configuration.md), the
+current schema/compiler/workspace implementation, the Angular monorepo fixture
+sources and goldens, and the prior
+[form discovery](../form-discovery-dx.md),
+[field-profile](../v0.4-field-type-adapter.md), and
+[cross-field effect](../v0.4-cross-field-effects.md) research.
+
+**Documented fact — external source policy:** Playwright's locator,
+actionability, and assertion claims below use only official Playwright
+documentation. Accessibility claims use W3C WAI sources.
+
+**Repository observation — retained output:** No research prototype was
+retained. The paper walkthrough uses existing committed fixture sources and
+goldens. This document is the only changed research artifact.
+
+## Decision question and success bar
+
+**Documented fact:** The target request is representative of an agent starting
+with imprecise repository language, for example: “A bug was reported on order
+entry step one; add positive and negative tests.” The agent must get from that
+language to the correct form usage and scenario, then produce tests without
+inventing selectors or application semantics.
+
+**Inference — success bar:** A reliable journey must meet all of these gates:
+
+1. Discovery returns explicit candidate usages with match evidence and does
+   not silently pick between ambiguous forms/usages.
+2. Every selected usage, form, and scenario is pinned to compatible immutable
+   artifact hashes with an honest freshness state.
+3. The agent initially receives a compact summary, then asks for focused nodes,
+   prerequisites, effects, values, and blockers.
+4. Test intent names semantic IDs and typed values/policies only. It has no CSS,
+   XPath, Playwright locator, callback source, or driver package name supplied
+   by the agent.
+5. Validation proves the node, value, operation, ordering, readiness,
+   wrapper/repeater access, validation surface, and usage action are supported.
+6. Compilation resolves only pre-registered driver IDs/versions and locator
+   targets. A missing fact is a diagnostic, never a fallback guess.
+7. Runtime execution uses Playwright actionability and web-first assertions and
+   reports parity/staleness failures against the pinned context.
+
+## Current repository evidence
+
+### What is already sufficient
+
+| Current artifact fact | Evidence class | Why it helps the flow |
+| --- | --- | --- |
+| Workspace forms have `projectId`, `sourceId`, `formId`, `artifactPath`, schema version, content hash, diagnostics, effects, and effect-analysis state. | Repository observation | A query service can enumerate immutable declared artifacts without importing Angular. |
+| Contract nodes have stable IDs, ordered trees, typed model paths, form/semantic types, labels, constraints, options/domains, state, locators, children, and array templates. | Repository observation | Node lookup and focused context slices can use stable identities rather than source-derived selectors. |
+| Value domains distinguish enumerated, dynamic, and unknown values, including evidence and complete versus scenario completeness. | Documented fact | A validator can reject unsupported concrete values instead of treating a label, default, or model sample as a domain. |
+| Custom profiles describe semantic parts, operations, value shape, driver identity/version, wrapper preconditions, readiness capabilities, and unknowns. | Repository observation | A driver can be allowlisted and widget-specific sequencing can be kept out of the agent prompt. |
+| Explicit effects connect trigger and target node IDs with property, kind, ordering, timing/readiness, and analysis completeness. | Repository observation | The validator can require source-before-target ordering and avoid fixed sleeps. |
+| Artifact diagnostics omit raw option/model/callback/error data. | Documented fact | The existing privacy boundary is compatible with model-facing queries. |
+
+The current interfaces are defined in
+[`packages/schema/src/contract.ts`](../../../packages/schema/src/contract.ts),
+[`packages/schema/src/field-type-interaction.ts`](../../../packages/schema/src/field-type-interaction.ts),
+[`packages/schema/src/cross-field-effect.ts`](../../../packages/schema/src/cross-field-effect.ts),
+and
+[`packages/workspace/src/workspace-index.ts`](../../../packages/workspace/src/workspace-index.ts).
+
+### What is genuinely missing
+
+| Missing input | Evidence class | Consequence if omitted | Minimum repair |
+| --- | --- | --- | --- |
+| Form **usage** index: repository-relative source location, symbol, consuming page/component, form ID, and usage ID. | Repository observation | Bug text or an open source file cannot be joined to the workspace form. | Add a stable, versioned usage record joined to the existing form entry. |
+| Route/step membership and entry/navigation action. | Repository observation | “Step one” cannot be distinguished from another use of the same form, and the browser cannot reach it without an invented route/click. | Usage-owned entry driver and ordered step records with node/action membership. |
+| Generated scenario inventory and resolved artifact references. | Repository observation | Dynamic options and conditional state remain declared/unknown even though scenario definitions exist in source. | Emit scenario IDs, safe input provenance, basis hash, resolved artifact hash, and diagnostics during trusted generation. |
+| Versioned native-field and application-driver bindings. | Repository observation | Many current native nodes have no `interactionProfile`; a strict compiler cannot decide whether to fill, check, or select. | Resolve built-in profiles into artifacts or a hash-pinned driver capability registry. |
+| Locator scope/target coverage for every profile part and wrapper precondition. | Repository observation | `wrapper-expand` or overlay option parts cannot be located from `target: control`. | Validate that each required part has an exact node-local locator or an explicitly defined driver-owned scoped-role recipe. |
+| Validation activation and assertion surface. | Repository observation | “Required” says what is invalid, but not whether validation appears on blur, submit/next, or change, nor how to assert the correct message. | Usage/node metadata must name the trigger, constraint/rule ID, and observable error target/state. |
+| Freshness envelope tying source inputs, usage index, scenarios, contract, and driver registry together. | Repository observation | Matching hashes can still describe an older checkout, and independently generated indexes can be mixed. | Add build ID, repository revision, input digest, registry hashes, and current/stale/unknown comparison. |
+| Journey action/outcome metadata where a test must advance or submit. | Documented fact | A field contract alone cannot prove the action or expected application outcome. | Keep actions/outcomes in the usage journey contract, not in field nodes. |
+
+**Inference:** These are minimum execution inputs, not an argument to place all
+of them in the core `FormContract`. Usage/navigation/step/action data belongs
+in a usage/journey index; scenario identity belongs in an artifact envelope;
+field interaction and validation surfaces belong with nodes/profiles; driver
+implementations remain in the trusted Playwright package.
+
+## Smallest reliable journey
+
+**Inference — proposed sequence:**
+
+```text
+bug text / open file / route / component
+                 |
+         search_form_usages
+                 |
+   explicit candidate usage + match reasons
+                 |
+   get_form_context(summary, pinned hashes)
+                 |
+ find_form_nodes / get_e2e_slice(focus nodes)
+                 |
+          typed test intent
+                 |
+  validate_test_intent (refuse or plan)
+                 |
+  compile_test_intent (trusted driver calls)
+                 |
+ Playwright actionability + web-first assertions
+                 |
+ parity/freshness diagnostics against pinned context
+```
+
+**Inference — key boundary:** Discovery may use fuzzy text ranking to present
+candidates, but the intent must contain an exact `usageId`, `formId`, contract
+hash, and scenario artifact hash. Ranking evidence never becomes execution
+authority.
+
+### Context identity
+
+**Inference — minimum reference carried through every query and intent:**
+
+```ts
+interface ContractContextRef {
+  readonly workspaceIndexHash: `sha256:${string}`;
+  readonly buildId: string;
+  readonly usage: { readonly id: string; readonly version: number };
+  readonly form: {
+    readonly id: string;
+    readonly contractHash: `sha256:${string}`;
+  };
+  readonly scenario?: {
+    readonly id: string;
+    readonly artifactHash: `sha256:${string}`;
+    readonly basisContractHash: `sha256:${string}`;
+  };
+  readonly driverRegistryHash: `sha256:${string}`;
+}
+```
+
+**Inference:** The server must reject a context whose usage, form, scenario,
+and driver registry were not generated under the same build envelope. A
+scenario's `basisContractHash` prevents a resolved artifact from being applied
+to a newer declared form with coincidentally stable node IDs.
+
+## Minimal query/API contract
+
+The shapes below are proposals for strict read-only MCP tools. They are not a
+production schema change.
+
+### 1. `search_form_usages`
+
+**Inference — purpose:** Map repository or bug evidence to candidate form
+usages without returning whole contracts.
+
+```ts
+interface SearchFormUsagesInput {
+  readonly query?: string; // untrusted search text, never instructions
+  readonly sourceLocation?: {
+    readonly path: string; // workspace-relative only
+    readonly line?: number;
+    readonly column?: number;
+  };
+  readonly symbol?: {
+    readonly projectId?: string;
+    readonly qualifiedName: string;
+  };
+  readonly route?: { readonly routeId?: string; readonly path?: string };
+  readonly step?: {
+    readonly usageId?: string;
+    readonly id?: string;
+    readonly ordinal?: number;
+    readonly label?: string;
+  };
+  readonly formId?: string;
+  readonly modelPath?: readonly (string | number | '*')[];
+  readonly label?: string;
+  readonly scenarioId?: string;
+  readonly capabilities?: readonly (
+    | 'fill'
+    | 'check'
+    | 'select-option'
+    | 'select-from-overlay'
+    | 'type-and-pick'
+    | 'select-row'
+    | 'add-item'
+    | 'expand-item'
+  )[];
+  readonly limit?: number; // server-capped
+  readonly cursor?: string;
+}
+
+interface FormUsageCandidate {
+  readonly usage: { readonly id: string; readonly version: number };
+  readonly formId: string;
+  readonly projectId: string;
+  readonly sourceId: string;
+  readonly component?: { readonly symbol: string; readonly path: string };
+  readonly route?: { readonly id: string; readonly pathTemplate?: string };
+  readonly step?: { readonly id: string; readonly ordinal: number };
+  readonly scenarioIds: readonly string[];
+  readonly match: readonly {
+    readonly kind:
+      | 'exact-source'
+      | 'symbol'
+      | 'route'
+      | 'step'
+      | 'form-id'
+      | 'model-path'
+      | 'label'
+      | 'capability'
+      | 'text';
+    readonly evidenceRef: string;
+  }[];
+  readonly blockers: readonly DiagnosticSummary[];
+  readonly contextRef: ContractContextRef;
+}
+```
+
+**Inference — ambiguity policy:** A unique exact structured match may be
+selected automatically. More than one viable usage, or text-only ranking
+without a configured confidence gate, returns `AMBIGUOUS_FORM_USAGE` and
+candidate references. The API never resolves ambiguity with array order.
+
+### 2. `get_form_context`
+
+**Inference — purpose:** Return a compact form/usage/step summary after a
+candidate is selected.
+
+```ts
+interface GetFormContextInput {
+  readonly contextRef: ContractContextRef;
+  readonly view: 'summary' | 'diagnostics' | 'journey';
+}
+
+interface FormContextSummary {
+  readonly contextRef: ContractContextRef;
+  readonly freshness: 'current' | 'stale' | 'unknown';
+  readonly usage: {
+    readonly entryCapability: string;
+    readonly steps: readonly {
+      readonly id: string;
+      readonly ordinal: number;
+      readonly nodeCount: number;
+      readonly actionIds: readonly string[];
+    }[];
+  };
+  readonly form: {
+    readonly nodeCount: number;
+    readonly diagnosticCounts: Readonly<Record<string, number>>;
+    readonly executableCapabilities: readonly string[];
+    readonly scenarioIds: readonly string[];
+    readonly effectAnalysis: 'complete' | 'incomplete' | 'absent';
+  };
+  readonly blockers: readonly DiagnosticSummary[];
+}
+```
+
+### 3. `find_form_nodes`
+
+**Inference — purpose:** Resolve a node by form ID, model path, label,
+scenario, or capability while keeping ambiguity explicit.
+
+```ts
+interface FindFormNodesInput {
+  readonly contextRef: ContractContextRef;
+  readonly withinStepId?: string;
+  readonly nodeId?: string;
+  readonly modelPath?: readonly (string | number | '*')[];
+  readonly label?: string;
+  readonly semanticType?: string;
+  readonly capability?: string;
+  readonly scenarioId?: string;
+  readonly include?: readonly (
+    | 'constraints'
+    | 'domain'
+    | 'interaction'
+    | 'locators'
+    | 'effects'
+    | 'unknowns'
+  )[];
+  readonly limit?: number;
+  readonly cursor?: string;
+}
+```
+
+**Inference:** Exact `nodeId` and typed `modelPath` matches outrank labels.
+Labels are useful discovery text, not identity. Duplicate labels return
+`AMBIGUOUS_NODE` with stable IDs and model paths.
+
+### 4. `get_e2e_slice`
+
+**Inference — purpose:** Return only the closure needed to author one test
+case: focused nodes, their step/usage entry, incoming ordering/effect edges,
+wrapper/repeater preconditions, values, validation surface, readiness, and
+blocking unknowns.
+
+```ts
+interface GetE2eSliceInput {
+  readonly contextRef: ContractContextRef;
+  readonly nodeIds: readonly string[];
+  readonly goal: 'positive' | 'negative' | 'boundary';
+  readonly includeOutgoingEffects?: boolean;
+}
+
+interface E2eSlice {
+  readonly contextRef: ContractContextRef;
+  readonly entry: UsageEntryProjection;
+  readonly step: UsageStepProjection;
+  readonly nodes: readonly E2eNodeProjection[];
+  readonly prerequisites: readonly E2ePrerequisite[];
+  readonly effects: readonly DeclaredEffectProjection[];
+  readonly blockers: readonly DiagnosticSummary[];
+}
+```
+
+### 5. `validate_test_intent` and `compile_test_intent`
+
+**Inference — purpose:** Validation is pure/read-only and returns either a
+fully resolved execution plan or structured blockers. Compilation accepts only
+the validated plan plus the exact same context reference. It never accepts raw
+selectors, arbitrary driver imports, or expressions.
+
+```ts
+interface ValidateTestIntentInput {
+  readonly intent: TestIntent;
+}
+
+type ValidateTestIntentResult =
+  | {
+      readonly status: 'valid';
+      readonly planHash: `sha256:${string}`;
+      readonly plan: ValidatedExecutionPlan;
+      readonly warnings: readonly IntentDiagnostic[];
+    }
+  | {
+      readonly status: 'invalid';
+      readonly diagnostics: readonly IntentDiagnostic[];
+    };
+
+interface CompileTestIntentInput {
+  readonly contextRef: ContractContextRef;
+  readonly planHash: `sha256:${string}`;
+  readonly output: 'driver-calls' | 'playwright-test';
+}
+```
+
+**Inference:** `compile_test_intent` should be idempotent for the same plan hash
+and tool version. In the first slice it should return driver calls for review,
+not write files.
+
+## Progressive disclosure
+
+| Level | Agent receives | Default exclusions | Promotion trigger | Evidence class |
+| --- | --- | --- | --- | --- |
+| 0 — candidates | Usage/form IDs, source/component/route/step summaries, match reasons, hashes, blocker counts | Node trees, values, labels beyond matched snippets | Agent selects a candidate or asks the user to disambiguate | Inference |
+| 1 — summary | Selected usage journey outline, step node counts, capabilities, scenario list, diagnostics/effect status | Full nodes and option values | Agent names goal and target field(s) | Inference |
+| 2 — E2E slice | Focus nodes plus one-hop prerequisites/effects, value/constraint/interaction/validation data, blockers | Unrelated sections, full registries, raw source | Agent drafts typed intent | Inference |
+| 3 — explanation | One node/effect/diagnostic with provenance and safe source references | Callback source, model values, secrets, arbitrary DOM | Validator failure or explicit explanation request | Inference |
+| 4 — full artifact | Immutable contract resource | Nothing except prohibited sensitive/executable material | Explicit expert/debug request with size pagination | Documented fact from the architecture's large-form boundary |
+
+**Inference:** Every response needs bounded arrays, deterministic ordering,
+continuation cursors, and the same `contextRef`. A model should not need the
+whole contract to add a two-field regression test.
+
+## Minimal typed test intent
+
+```ts
+interface TestIntent {
+  readonly schemaVersion: '0.1.0';
+  readonly contextRef: ContractContextRef;
+  readonly case: {
+    readonly id: string;
+    readonly title: string;
+    readonly polarity: 'positive' | 'negative';
+  };
+  readonly steps: readonly TestIntentStep[];
+}
+
+type IntentValue =
+  | { readonly kind: 'domain-value'; readonly value: JsonValue }
+  | { readonly kind: 'candidate'; readonly id: string }
+  | {
+      readonly kind: 'runtime-policy';
+      readonly policy: 'first-enabled';
+    }
+  | {
+      readonly kind: 'constraint-violation';
+      readonly constraint: 'required' | 'min' | 'max' | 'pattern' | string;
+    }
+  | {
+      readonly kind: 'literal';
+      readonly value: JsonValue;
+      readonly expectedClassification: 'valid' | 'invalid';
+    };
+
+type TestIntentStep =
+  | { readonly op: 'openUsage' }
+  | { readonly op: 'set'; readonly nodeId: string; readonly value: IntentValue }
+  | {
+      readonly op: 'addItem' | 'expandItem';
+      readonly nodeId: string;
+      readonly item?: { readonly index: number };
+    }
+  | {
+      readonly op: 'expectState';
+      readonly nodeId: string;
+      readonly state:
+        | 'visible'
+        | 'hidden'
+        | 'enabled'
+        | 'disabled'
+        | 'valid'
+        | 'invalid';
+    }
+  | {
+      readonly op: 'expectValue';
+      readonly nodeId: string;
+      readonly value: IntentValue;
+    }
+  | {
+      readonly op: 'invokeUsageAction';
+      readonly actionId: string;
+    }
+  | {
+      readonly op: 'expectValidation';
+      readonly nodeId: string;
+      readonly constraint: string;
+      readonly state: 'present' | 'absent';
+    }
+  | {
+      readonly op: 'expectOutcome';
+      readonly outcomeId: string;
+    };
+```
+
+### Value authority
+
+**Inference:** `domain-value` is executable only when the canonical JSON value
+is present in the selected complete or scenario domain. `candidate` resolves
+to an application-declared synthetic value. `runtime-policy` is allowed only
+when the profile/driver declares runtime enumeration, readiness, stable order,
+and a value codec; it is unsuitable when the assertion depends on a particular
+business value. `constraint-violation` delegates negative-value construction
+to a reviewed validator/driver capability.
+
+**Inference:** A `literal` is a proposal, not authority. Validation may approve
+it only when all relevant constraints can decisively classify it and no opaque
+validator/parser/codec could change that classification. Otherwise it returns
+`VALUE_CLASSIFICATION_UNKNOWN`. Defaults and current model samples never
+authorize a value domain.
+
+### Ordering, readiness, wrappers, hidden fields, and repeaters
+
+**Inference:** Cross-field ordering is not silently repaired. If an effect says
+source-before-target and intent sets the target first, validation returns
+`ORDERING_PRECONDITION_MISSING` with a machine-readable required source node.
+After the source step, the compiler may insert only the declared readiness
+capability; it may not add a fixed sleep.
+
+**Inference:** Wrapper activation preconditions are mechanical and may be
+expanded by compilation after locator-target validation. Hidden fields require
+an explicit reachable trigger path and an `expectState` before interaction.
+Repeater descendants require an item context plus explicit `addItem` or
+`expandItem` when the profile says activation is needed. An array wildcard is
+never converted to row zero by convention.
+
+## Diagnostic model and failure UX
+
+```ts
+interface IntentDiagnostic {
+  readonly code: string;
+  readonly severity: 'warning' | 'error';
+  readonly phase: 'discovery' | 'context' | 'validation' | 'compile' | 'runtime';
+  readonly message: string; // stable template; untrusted text kept separate
+  readonly at?: {
+    readonly stepIndex?: number;
+    readonly usageId?: string;
+    readonly nodeId?: string;
+    readonly actionId?: string;
+  };
+  readonly evidenceRefs: readonly string[];
+  readonly remediation: readonly (
+    | { readonly kind: 'choose-candidate'; readonly usageIds: readonly string[] }
+    | { readonly kind: 'regenerate-artifacts' }
+    | { readonly kind: 'choose-scenario'; readonly scenarioIds: readonly string[] }
+    | { readonly kind: 'set-before'; readonly nodeId: string }
+    | { readonly kind: 'wait-for'; readonly readinessId: string }
+    | { readonly kind: 'declare-profile'; readonly formlyType: string }
+    | { readonly kind: 'declare-locator-target'; readonly target: string }
+    | { readonly kind: 'inspect-source'; readonly sourceRefs: readonly string[] }
+  )[];
+}
+```
+
+| Failure | Required diagnostic behavior | Example stable message | Evidence class |
+| --- | --- | --- | --- |
+| Multiple usage matches | Block and return match reasons, not a winner. | `AMBIGUOUS_FORM_USAGE: 2 usages match; choose an exact usageId.` | Inference |
+| Source/artifact drift | Block compile; search may still return stale candidates. | `STALE_CONTEXT: form contract was generated from a different input digest.` | Inference |
+| Scenario absent for a dynamic node | Block concrete set. | `SCENARIO_REQUIRED: node ... has a dynamic domain and no resolved scenario artifact.` | Repository observation + inference |
+| Value outside selected domain | Block before browser execution. | `VALUE_OUT_OF_DOMAIN: canonical value is absent from scenario ...` | Inference |
+| Literal cannot be classified | Block; do not downgrade to warning. | `VALUE_CLASSIFICATION_UNKNOWN: opaque validator or codec prevents classification.` | Inference |
+| Missing profile/driver | Block only the affected operation. | `UNSUPPORTED_INTERACTION: node ... has no executable interaction profile.` | Repository observation + inference |
+| Missing custom part locator | Block compilation. | `MISSING_LOCATOR_TARGET: profile requires wrapper-expand but no scoped locator recipe exists.` | Repository observation + inference |
+| Locator resolves zero/many at runtime | Fail with parity evidence; never use `.first()`/`.nth()` fallback. | `LOCATOR_PARITY_MISMATCH: expected exactly 1 target; observed 2.` | Documented fact + inference |
+| Target used before source | Block and return the source node/effect. | `ORDERING_PRECONDITION_MISSING: set ...product before ...caseType.` | Repository observation + inference |
+| Async target lacks readiness | Block; no sleep suggestion. | `READINESS_UNAVAILABLE: effect requires an undeclared or unsupported readiness capability.` | Inference |
+| Hidden branch lacks witness | Block interaction, allow explicit source inspection. | `HIDDEN_NODE_UNREACHABLE: selected context does not prove a visible path.` | Inference |
+| Repeater wildcard lacks row context | Block. | `REPEATER_CONTEXT_REQUIRED: choose/add an item before addressing wildcard descendant.` | Inference |
+| Validation trigger/surface absent | Block negative assertion. | `VALIDATION_ASSERTION_UNSUPPORTED: required is known but its activation/assertion surface is not.` | Repository observation + inference |
+| Effect analysis incomplete | Permit explicitly declared path; warn against claims based on absent edges. | `EFFECT_COVERAGE_INCOMPLETE: do not infer independence or unreachability from missing effects.` | Documented fact |
+| Browser differs from contract | Fail with redacted observed facts. | `RUNTIME_PARITY_MISMATCH: declared role/target/state did not match the visited page.` | Inference |
+
+**Documented fact:** Playwright locators are strict for operations on one DOM
+target; a multi-match throws, and Playwright advises a uniquely identifying
+locator rather than `.first()`, `.last()`, or `.nth()` fallbacks. Playwright
+also auto-waits for actionability such as uniqueness, visibility, stability,
+event reception, enabled state, and editability, depending on the action.
+Therefore runtime diagnostics should preserve strictness rather than defeat it.
+
+## Walkthrough 1 — positive order-entry step-one test
+
+### User request and current evidence
+
+> A bug was reported on order entry step one; add a positive test.
+
+**Repository observation:** The closest current fixture is
+`operations.purchase-order` in
+[`apps/formly-test-app/src/app/forms/operations/operations-forms.ts`](../../../apps/formly-test-app/src/app/forms/operations/operations-forms.ts).
+It has an async/Observable supplier select, a static currency select, and a
+custom currency-like total field with `min: 0`. The fixture application reaches
+forms through a catalog in
+[`apps/formly-test-app/src/app/app.component.ts`](../../../apps/formly-test-app/src/app/app.component.ts),
+not a route/step journey contract.
+
+**Repository observation — current stop:** This form is not in the committed
+workspace golden index, no current usage metadata connects “order entry step
+one” to its symbol or catalog entry, the supplier value source is async, and
+the custom `currency` type has no production interaction profile in the
+workspace artifact set. Current artifacts cannot compile this test reliably.
+
+### Minimum paper supplement
+
+**Inference:** A successful proposed flow needs only these additions for this
+case:
+
+- usage `test-app.catalog/operations.purchase-order@1`, joined to the source
+  symbol and form ID;
+- step `details@1` with member nodes `supplier`, `currency`, and `total`;
+- an allowlisted catalog-entry driver keyed by the exact form ID;
+- a safe synthetic scenario with a driver capability for “supplier options
+  ready” and stable runtime enumeration; and
+- a reviewed `currency` profile with a scalar decimal codec and `fill`
+  operation.
+
+**Inference:** The supplier can use `first-enabled` because the positive test
+does not assert supplier-specific business behavior. The total cannot use an
+unclassified generated number if an opaque parser/validator exists; in this
+fixture the known `min: 0` and reviewed decimal codec can classify `125` as
+valid.
+
+### Query storyboard
+
+```json
+{"query":"order entry step one","step":{"ordinal":1},"capabilities":["fill"]}
+```
+
+**Inference — expected candidate:** `search_form_usages` returns the one usage
+with match evidence such as source symbol/title/step metadata, not its full
+contract. The agent pins the returned context, requests the three nodes, then
+asks for an E2E slice with goal `positive`.
+
+### Typed intent
+
+```json
+{
+  "schemaVersion": "0.1.0",
+  "contextRef": {
+    "workspaceIndexHash": "sha256:<index>",
+    "buildId": "fixture-build-1",
+    "usage": {"id": "test-app.catalog/operations.purchase-order", "version": 1},
+    "form": {"id": "operations.purchase-order", "contractHash": "sha256:<declared>"},
+    "scenario": {
+      "id": "synthetic-suppliers-ready",
+      "artifactHash": "sha256:<resolved>",
+      "basisContractHash": "sha256:<declared>"
+    },
+    "driverRegistryHash": "sha256:<drivers>"
+  },
+  "case": {
+    "id": "purchase-order-step-one-positive",
+    "title": "accepts a valid order total",
+    "polarity": "positive"
+  },
+  "steps": [
+    {"op": "openUsage"},
+    {
+      "op": "set",
+      "nodeId": "operations.purchase-order::path:s_supplier",
+      "value": {"kind": "runtime-policy", "policy": "first-enabled"}
+    },
+    {
+      "op": "set",
+      "nodeId": "operations.purchase-order::path:s_currency",
+      "value": {"kind": "domain-value", "value": "CAD"}
+    },
+    {
+      "op": "set",
+      "nodeId": "operations.purchase-order::path:s_total",
+      "value": {"kind": "literal", "value": 125, "expectedClassification": "valid"}
+    },
+    {
+      "op": "expectValue",
+      "nodeId": "operations.purchase-order::path:s_total",
+      "value": {"kind": "literal", "value": 125, "expectedClassification": "valid"}
+    },
+    {
+      "op": "expectValidation",
+      "nodeId": "operations.purchase-order::path:s_total",
+      "constraint": "min",
+      "state": "absent"
+    }
+  ]
+}
+```
+
+### Validation and compilation result
+
+**Inference — valid only if all minimum inputs exist:** The validator confirms
+the exact usage and scenario hashes, waits through the declared supplier
+readiness capability, lets the driver select the first enabled runtime option,
+validates `CAD` against its enumerated domain, classifies `125` through the
+reviewed decimal codec plus `min: 0`, and verifies the validation assertion
+surface. Compilation emits trusted calls conceptually equivalent to:
+
+```ts
+await formDriver.openUsage(contextRef);
+await formDriver.setRuntimeChoice(supplierNode, 'first-enabled');
+await formDriver.set(currencyNode, 'CAD');
+await formDriver.set(totalNode, 125);
+await formDriver.expectValue(totalNode, 125);
+await formDriver.expectValidation(totalNode, 'min', 'absent');
+```
+
+**Inference:** No selector, option label, widget event sequence, or sleep comes
+from the agent. If runtime option order is not declared stable, validation must
+reject `first-enabled` and require a resolved exact domain value instead.
+
+## Walkthrough 2 — negative conditional/custom-field test
+
+### User request and current evidence
+
+> On claim intake step one, selecting “Other” must reveal details; add a
+> negative test for leaving those details empty.
+
+**Repository observation:** The committed `claims.intake` artifact is
+`sha256:690ac3bdc549efefb1c2cfbb1e72d7624fbce1d288ca0e158fd8d21dbd2e7d07`.
+Its declared effects require product before case type and case type before the
+visibility of other details. The source in
+[`claim-details.fragment.ts`](../../../fixtures/angular-monorepo/libs/forms-kit/src/lib/fragments/claim-details.fragment.ts)
+shows scenario-dependent case-type options and a function-driven conditional
+field. The declared artifact honestly keeps both callbacks opaque.
+
+**Repository observation:** `caseType` is the custom `dependent-select` type.
+Although the project registry declares its trigger/listbox/option parts and a
+readiness capability in
+[`field-type-profiles.ts`](../../../fixtures/angular-monorepo/libs/forms-kit/src/lib/field-type-profiles.ts),
+the declared golden has a dynamic function domain and no interaction profile.
+The base source definition declares `new-claim`, but the workspace runner does
+not generate a resolved scenario artifact.
+
+**Repository observation:** The other-details node has a required constraint,
+but no validation trigger or assertion target. The current artifact can explain
+why this is a candidate regression test; it cannot execute it.
+
+### Minimum paper supplement
+
+**Inference:** The negative flow needs:
+
+- usage/component/step metadata for the claim-intake page;
+- a trusted resolved scenario `auto-other` whose basis is the declared hash and
+  whose `caseType` domain contains canonical value `"other"`;
+- the resolved `dependent-select` interaction profile with complete part scope
+  and a supported driver;
+- the two already declared sync ordering/effect edges;
+- an explicit visibility outcome for the scenario/effect; and
+- a validation surface for the other-details `required` rule, including the
+  trigger (`blur`, `next`, or submit) and observable target/state.
+
+### Query storyboard
+
+```json
+{
+  "formId": "claims.intake",
+  "step": {"ordinal": 1},
+  "scenarioId": "auto-other",
+  "capabilities": ["select-from-overlay", "fill"]
+}
+```
+
+**Inference:** `get_e2e_slice` for `caseType` and `otherDetails` must include
+the incoming product-to-options effect even if the agent did not name product.
+It also returns `effectAnalysis: incomplete` because of opaque rules. That
+warning does not invalidate this explicitly declared path, but it forbids a
+claim that no other effect can interfere.
+
+### Typed intent
+
+```json
+{
+  "schemaVersion": "0.1.0",
+  "contextRef": {
+    "workspaceIndexHash": "sha256:<index>",
+    "buildId": "fixture-build-1",
+    "usage": {"id": "test-app.page/claims.intake/step-one", "version": 1},
+    "form": {
+      "id": "claims.intake",
+      "contractHash": "sha256:690ac3bdc549efefb1c2cfbb1e72d7624fbce1d288ca0e158fd8d21dbd2e7d07"
+    },
+    "scenario": {
+      "id": "auto-other",
+      "artifactHash": "sha256:<resolved-auto-other>",
+      "basisContractHash": "sha256:690ac3bdc549efefb1c2cfbb1e72d7624fbce1d288ca0e158fd8d21dbd2e7d07"
+    },
+    "driverRegistryHash": "sha256:<drivers>"
+  },
+  "case": {
+    "id": "claim-other-details-required",
+    "title": "requires details when case type is Other",
+    "polarity": "negative"
+  },
+  "steps": [
+    {"op": "openUsage"},
+    {
+      "op": "set",
+      "nodeId": "claims.intake::path:s_claimDetails.s_product",
+      "value": {"kind": "domain-value", "value": "auto"}
+    },
+    {
+      "op": "set",
+      "nodeId": "claims.intake::path:s_claimDetails.s_caseType",
+      "value": {"kind": "domain-value", "value": "other"}
+    },
+    {
+      "op": "expectState",
+      "nodeId": "claims.intake::path:s_claimDetails.s_otherDetails",
+      "state": "visible"
+    },
+    {
+      "op": "set",
+      "nodeId": "claims.intake::path:s_claimDetails.s_otherDetails",
+      "value": {"kind": "constraint-violation", "constraint": "required"}
+    },
+    {
+      "op": "expectValidation",
+      "nodeId": "claims.intake::path:s_claimDetails.s_otherDetails",
+      "constraint": "required",
+      "state": "present"
+    }
+  ]
+}
+```
+
+### Validation and compilation result
+
+**Inference:** Validation proves product precedes case type, inserts no sleep
+for the declared sync effect, checks `"other"` against the selected resolved
+scenario domain, compiles the custom overlay operation through the pinned
+profile/driver, waits for visible other-details through a web-first assertion,
+clears/omits its value through the required-violation capability, invokes the
+declared validation trigger, and asserts the declared error surface.
+
+**Inference — important refusal:** If the agent reverses product and case type,
+validation returns `ORDERING_PRECONDITION_MISSING`. If it uses the current
+declared artifact, validation returns `SCENARIO_REQUIRED` and
+`UNSUPPORTED_INTERACTION`. If the validation surface is absent, it returns
+`VALIDATION_ASSERTION_UNSUPPORTED`. None is recoverable by reading the dynamic
+function body, selecting by visible text, or writing a CSS locator.
+
+## RH-01–RH-04 metadata dependency audit
+
+The work item describes capabilities other lanes may provide but does not
+guarantee their success. This table states what this flow actually consumes.
+
+| Proposed lane metadata | Required for this flow | Optional / useful later | Not useful as execution authority | Evidence class |
+| --- | --- | --- | --- | --- |
+| Stable form/source-lineage index | **Required:** form ID; project/source ID; form definition symbol/path/span; consuming page/component usage; stable usage ID; route/entry when present; ordered step ID/membership; source-input digest. | Owners, tags, full import graph, blame/history, human descriptions. | Raw AST dumps, arbitrary source snippets in every response, heuristic “looks like a form root” findings without registration authority. | Inference based on current missing join |
+| Declared/resolved scenario artifacts | **Required for dynamic/conditional tests:** scenario ID/version; safe synthetic-input provenance; declared basis hash; resolved artifact hash; scenario diagnostics; resolved node state/domain/profile; effect/readiness outcome. | Automatically generated witnesses, large scenario matrices, human scenario prose. | Executable scenario callbacks in MCP, customer-derived inputs, a model sample treated as a domain, one scenario claimed globally complete. | Documented fact + repository observation |
+| Custom field interaction profiles | **Required for every non-native/custom operation:** semantic/value shape; operation; named parts/cardinality/roles; codec/value projection; driver ID/version; wrapper preconditions; locator scope/targets; readiness; blocking unknowns. | Angular component symbol/template evidence, authoring scaffolds, component-harness references, observed conformance history. | Inferring behavior from a Formly type name, serializing Angular component classes, agent-selected driver packages. | Documented fact |
+| Static/dynamic/mixed values | **Required:** domain kind, canonical values when known, label mapping for choice drivers, evidence, completeness, disabled state, runtime-enumeration capability, privacy classification. | Boundary-value candidates, locale-specific display samples, generator explanations. | Defaults/current model as domain, raw remote option payloads, labels alone as model values. | Documented fact |
+| Explicit/derived effects | **Required for dependent paths:** validated declared ordering, timing/readiness, endpoints/properties, condition reference, coverage completeness, unknowns. Derived/observed evidence may corroborate but not authorize. | Witness generation, change-impact graph, observed parity history. | Operational verbs inferred from callbacks, handler names, source proximity, one scenario delta, or missing edges under incomplete analysis. | Documented fact |
+| Explicit unknowns | **Required:** machine-readable blocker scope and aspect on nodes, scenarios, effects, profiles, usage, validation, and freshness. | Aggregate coverage dashboards and ownership routing. | Free-form warnings with no stable code/evidence/remediation. | Inference |
+
+**Inference — minimum versus nice-to-have:** Full source dependency graphs,
+whole-contract dumps, automatic boundary generation, exhaustive scenario
+witnesses, and browser observation history improve authoring and maintenance,
+but neither walkthrough needs them. Both do need the small usage join,
+hash-compatible resolved scenarios, executable field profiles, values/effects,
+and validation/entry surfaces.
+
+## Freshness, ambiguity, and runtime boundaries
+
+### Freshness and staleness
+
+**Repository observation:** Current contracts and the workspace index are
+content-addressed, and `formly-contracts check` can compare expected artifacts
+with generated output. The current index does not record a repository revision,
+scenario artifact, usage lineage/input digest, or driver-registry identity.
+
+**Inference — policy:** Queries may read stale artifacts but must label them.
+Intent validation should fail closed unless freshness is `current`, or the
+caller explicitly uses a review-only mode that cannot compile. For a dirty
+working tree, a commit SHA alone is insufficient; generation must record a
+canonical input digest covering the form definition, relevant fragments,
+usage metadata, scenario definition, profile/effect registries, compiler, and
+driver registry. If the MCP deployment cannot inspect the current checkout,
+freshness is `unknown`, not `current`.
+
+### Multiple forms/usages
+
+**Inference:** One form may have multiple page usages, steps, roles, tenants, or
+navigation paths. A route may contain multiple forms. Search therefore returns
+usage candidates, not only form IDs. An exact form ID still requires a usage
+for browser entry unless the caller requests contract-only analysis.
+
+### Dynamic runtime values
+
+**Inference:** Three distinct policies are needed:
+
+1. Exact scenario value: deterministic and preferred when the behavior depends
+   on the chosen value.
+2. Runtime `first-enabled`: allowed only for irrelevant setup fields with a
+   declared stable enumeration/readiness/codec capability.
+3. Unknown dynamic value: blocks execution and directs the author to add a safe
+   scenario/provider or application driver.
+
+**Unknown:** The workplace proportion of dynamic fields that can safely expose
+stable runtime enumeration without leaking sensitive option data is not
+measured.
+
+### Browser parity
+
+**Documented fact:** Playwright's role locators follow ARIA role, attribute,
+and accessible-name semantics. W3C WAI explains that interactive elements need
+accessible names and that browsers compute names through defined precedence.
+This makes roles/names valuable observed evidence, but not proof that a
+declared custom profile still matches the rendered component.
+
+**Inference:** Before each operation, the driver should resolve its declared
+node-local target strictly and report zero/many matches as parity failures. It
+may use Playwright actionability and web-first assertions for waiting, but those
+features do not invent cross-field readiness or prove a hidden branch is
+reachable.
+
+## Security and privacy constraints
+
+| Constraint | Required behavior | Evidence class |
+| --- | --- | --- |
+| No trusted-code execution in queries | MCP reads validated immutable artifacts; it never loads config, Angular, form factories, scenario callbacks, expressions, or driver modules from request data. | Documented fact |
+| No agent selectors | Intent schemas contain semantic node/action IDs only. Locator strategies and driver bindings come from trusted, hash-pinned artifacts/registries. Reject unknown properties. | Inference |
+| No agent package execution | Application drivers are installed and allowlisted by ID/version/hash at deployment. The agent cannot name a module path or package. | Inference |
+| Treat presentation as untrusted data | Labels, help text, option labels, route titles, and source snippets are data fields with length/control-character limits; never interpolate them into tool instructions or diagnostic templates. | Documented fact + inference |
+| Workspace path confinement | Normalize source paths; reject absolute paths, traversal, symlink escapes, unsupported URI schemes, and source locations outside the configured workspace. | Repository observation + inference |
+| Synthetic values only | Do not emit customer values, secrets, credentials, unrestricted option payloads, callback source, or service errors. Values need provenance and sensitivity classification. | Documented fact |
+| Runtime selection privacy | A runtime policy returns only success/selected candidate ID when permitted; logs and model context do not receive the full option collection by default. | Inference |
+| Test artifact privacy | Screenshots, video, and traces can capture rendered values and network activity; retention/redaction must be configured per project, with failure artifacts treated as sensitive. | Documented fact + inference |
+| Bounded read surface | Cap result size, node/value counts, recursive depth, and query complexity; paginate deterministically. | Inference |
+| Hash and schema pinning | Validate schema versions and all referenced hashes before intent validation and again before compilation/runtime. | Inference |
+
+**Documented fact:** Playwright documents traces, screenshots, and video as
+test artifacts and notes that tracing can include browser operations and
+network activity. This supports treating failure artifacts as potentially
+sensitive rather than enabling them indiscriminately.
+
+**Documented fact:** W3C WCAG guidance requires automatically detected input
+errors to identify the item and describe the error in text, and distinguishes
+status messages for success, waiting, progress, and errors. A negative-test
+contract should therefore prefer a programmatically associated error
+role/name/description target over brittle visual text adjacency; it must still
+verify the product's actual accessible error behavior rather than manufacture
+one.
+
+## Alternatives compared consistently
+
+| Option | Constraints satisfied | Main failure modes | Complexity/reversibility | Confidence | Evidence that would change the decision |
+| --- | --- | --- | --- | ---: | --- |
+| A. Source reading + ordinary Playwright inspection | Can solve one form with a live app; no new metadata system. | Agent chooses wrong usage, misses hidden branches, invents selectors/values/waits, depends on auth/data, repeats work, leaks runtime data. | Lowest initial cost; fully reversible. | 0.95 that it remains best for one-off simple forms. | Repeated first-run success across representative custom/dynamic forms with low review cost would weaken the case for contracts. |
+| B. Contract query, then agent writes raw Playwright | Improves form/node/value discovery. | Still invents widget selectors, wrapper/overlay sequence, readiness, validation trigger, and page navigation. | Medium; easy to stop before public driver API. | 0.90 that it is insufficient for the stated reliability goal. | Evidence that existing app-owned page objects already provide complete semantic drivers could make this enough. |
+| C. Live Playwright/ARIA inspection first | Uses current rendered truth and Playwright strictness/actionability. | Sees only visited state, may require real data/auth, cannot prove unvisited branches or model codecs, and may collect sensitive traces. | Medium operational cost; little artifact investment. | 0.82 that it is valuable as parity/audit, not authority. | A safe synthetic environment with exhaustive scenario navigation and stable app-owned page objects could raise it to primary. |
+| D. Full proposed usage → query → typed intent → driver flow | Meets no-selector/no-guess goal, supports early diagnostics, reuse, freshness, and progressive context. | Metadata/driver authoring cost, drift, false sense of completeness, complex diagnostics, scenario explosion. | Highest cost, but reversible if delivered as slices with validator first. | 0.88 for technical feasibility; 0.72 for near-term net value. | A representative pilot showing low coverage, excessive manual usage metadata, or driver maintenance above ordinary tests should stop expansion. |
+| E. Generate selectors/values from source or DOM heuristics | Appears automatic. | Confuses configuration/DOM with semantics, breaks on overlays/wrappers/repeaters/codecs, hides uncertainty. | Medium build cost; costly to unwind after generated tests spread. | 0.95 confidence in rejection. | Only a tightly bounded native-control subset with measured uniqueness/parity could be admitted as an explicit profile, not a general heuristic. |
+
+**Inference — decision:** Choose D incrementally, keep A as the explicit
+fallback for blocked/rare cases, and use C only as observed parity evidence.
+Do not ship B as “safe agent generation,” because it preserves the most
+failure-prone last mile.
+
+## UX failure modes
+
+| User-visible problem | Likely cause | Good agent response | Bad fallback to prohibit | Evidence class |
+| --- | --- | --- | --- | --- |
+| “No form found” for a source file | Missing usage/source lineage | Show searched keys and nearby source/config references; suggest registration. | Scan arbitrary exports and pick one. | Inference |
+| Several forms match “order entry” | Shared fragments, aliases, multiple steps/usages | Show concise candidates with route/component/step/match reasons; ask only if evidence cannot disambiguate. | Choose first result. | Inference |
+| Contract exists but compile says stale | Checkout changed since generation | Offer exact regeneration/check command and preserve the drafted intent. | Compile against stale selectors. | Inference |
+| Dynamic field has no value | Scenario not generated or runtime provider unsafe | Explain required scenario/provider/readiness capability. | Use first visible text or model default. | Repository observation + inference |
+| Custom widget is structurally known but not operable | Missing/blocked profile, driver, codec, or part locator | Name the exact missing aspect and source owner. | Use type-name or DOM heuristics. | Documented fact |
+| Conditional target remains hidden | Wrong scenario, missing trigger, or opaque behavior | Return prerequisite edge/witness when declared; otherwise mark unreachable unknown. | Force click/fill hidden control. | Inference |
+| Test times out after source change | Locator/role/readiness parity drift | Report expected target and redacted observed count/state; point to source/profile. | Increase timeout or force action. | Documented fact + inference |
+| Negative test cannot assert error | Constraint known but activation/surface missing | Offer source inspection and metadata addition; do not generate partial assertion. | Assert any nearby text or CSS class. | Repository observation + inference |
+| Repeater child resolves ambiguously | Missing item identity/index/activation | Require explicit item context and add/expand step. | Assume row zero or call `.nth(0)`. | Inference |
+| Large form overwhelms context | Whole artifact returned eagerly | Fall back to summary and one-hop E2E slices with cursors. | Truncate without saying what was omitted. | Inference |
+
+## Ordered implementation slices and stop/go gates
+
+### Slice 0 — Artifact envelope and usage join
+
+**Inference:** Add versioned usage records, route/component/source/step joins,
+journey entry/action IDs, build/repository/input digests, scenario references,
+and driver-registry identity to an index extension. Do not change the core node
+schema unless a node-owned fact is required.
+
+**Gate:** From a source path, component symbol, form ID, catalog/route, and step
+query, a fixture returns the correct usage or an explicit ambiguity diagnostic.
+If representative workplace forms cannot be joined without per-field manual
+metadata, revisit the source-lineage design before proceeding.
+
+### Slice 1 — Read-only progressive query surface
+
+**Inference:** Implement `search_form_usages`, `get_form_context`,
+`find_form_nodes`, and `get_e2e_slice` over immutable validated artifacts.
+Enforce strict schemas, bounded/paginated results, path confinement, untrusted
+presentation data, and no trusted-code loading.
+
+**Gate:** The two paper journeys can obtain all relevant nodes/prerequisites
+without reading a full contract. Measure result size and ambiguity on at least
+one large form.
+
+### Slice 2 — Pure typed-intent schema and validator
+
+**Inference:** Add intent DTO/runtime validation, value classification,
+ordering/reachability checks, profile/driver/locator coverage, validation
+surface checks, structured diagnostics, and a canonical plan hash. Return no
+Playwright code.
+
+**Gate:** Valid fixture intents pass; reversed ordering, stale hashes, missing
+scenarios, unknown values, missing part locators, hidden/repeater ambiguity, and
+unsupported validation fail with stable diagnostics. This slice alone tests the
+central value proposition.
+
+### Slice 3 — One native positive/negative driver vertical
+
+**Inference:** Add one usage-entry driver and built-in fill/select/check
+profiles plus validation surfaces for native controls. Compile only validated
+plans to stable driver calls, then Playwright tests. Retain strict uniqueness,
+actionability, and web-first assertions.
+
+**Gate:** One positive and one negative native fixture test pass repeatedly
+without raw selectors in intent or generated source. Compare author/review time
+and first-run rate against an ordinary hand-written Playwright test.
+
+### Slice 4 — Resolved scenario and custom/dynamic vertical
+
+**Inference:** Generate/index trusted resolved scenarios, part-scoped locators,
+runtime value/readiness capabilities, custom profile drivers, wrapper
+preconditions, and the claims conditional path.
+
+**Gate:** Walkthrough 2 passes and each deliberately removed metadata item
+causes the expected blocker. If safe scenario materialization cannot settle the
+dynamic field, use an application driver or keep the flow blocked; do not move
+execution into MCP.
+
+### Slice 5 — Repeaters, browser parity, and change analysis
+
+**Inference:** Add explicit repeated-item context, add/expand capabilities,
+observed locator/role/state parity, source-to-contract change impact, and
+redacted trace policy only after the simpler path is stable.
+
+**Gate:** Representative repeater and overlay cases remain deterministic under
+row count and DOM changes; parity failures identify the contract/profile owner
+without exposing sensitive values.
+
+## Feasibility and value recommendation
+
+**Inference — feasibility:** Technically feasible. The current schema already
+models most field-level planning facts and deliberately separates data from
+trusted execution. A small query/validator layer can reuse those boundaries.
+The missing metadata is identifiable and versionable; no arbitrary source or
+browser inference is necessary.
+
+**Inference — value:** Conditional go. Build Slices 0–2 and measure them before
+committing to a broad Playwright driver package. A validator that catches stale,
+ambiguous, dynamic, hidden, ordering, readiness, wrapper/repeater, and
+validation-surface gaps provides value even if compilation remains limited.
+
+**Inference — stop conditions:** Stop or narrow the project if a representative
+pilot shows any of:
+
+- usage/step metadata requires duplicating application routing/form structure
+  manually with high drift;
+- fewer than roughly 70% of targeted nodes can pass intent validation without
+  application-specific drivers;
+- scenario generation needs production data/network access or cannot remain
+  synthetic and deterministic;
+- first-run success and review effort do not materially improve over source
+  reading plus ordinary Playwright; or
+- teams bypass diagnostics with raw-selector escape hatches.
+
+**Unknown:** The 70% figure is a proposed pilot gate, not a measured threshold.
+The maintainer should replace it with an observed cost/coverage target after
+the first workplace sample.
+
+## Acceptance traceability
+
+| Acceptance criterion | Evidence in this artifact | Result |
+| --- | --- | --- |
+| 1. Two end-to-end walkthroughs cover positive and negative tests, including a custom/dynamic field and conditional branch. | “Walkthrough 1” covers a positive order-entry flow with async runtime choice and custom currency control; “Walkthrough 2” covers a negative custom dependent-select and conditional required field. Both include query, intent, validation, and conceptual driver calls/refusals. | Met as paper walkthrough; current artifacts are explicitly shown insufficient. |
+| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Query/API, progressive disclosure, typed intent, diagnostic/failure UX, security/privacy, and alternatives sections. | Met. |
+| 3. Explicit required/optional/not-useful RH-01–RH-04 metadata list. | “RH-01–RH-04 metadata dependency audit.” | Met without assuming lane success. |
+| 4. Feasibility/value recommendation, confidence, UX failure modes, ordered implementation slices. | Executive decision, alternatives, UX table, slices/stop gates, and feasibility/value section. | Met. |
+
+## Verification record
+
+**Repository observation:** The following commands were run from the repository
+root on the commit/environment stated at the top. Exact final results are
+recorded here after the artifact was written.
+
+```text
+$ pnpm install --frozen-lockfile --offline
+Scope: all 10 workspace projects
+Lockfile is up to date; 1029 packages reused from the local store; exit 0.
+Warnings: fixture CLI bins were unavailable before workspace build outputs,
+and pnpm reported ignored dependency build scripts. No tracked file changed.
+
+$ pnpm exec vitest run fixtures/angular-monorepo/workspace-fixture.test.ts
+Test Files  1 passed (1)
+Tests       7 passed (7)
+Duration    15.76s
+Exit        0
+
+$ pnpm check:docs
+Documentation checks passed for 57 files.
+Exit 0.
+
+$ git diff --check
+No output; exit 0.
+```
+
+## Primary sources
+
+### Repository sources
+
+- [Architecture overview](../../architecture-overview.md)
+- [Implementation plan](../../implementation-plan.md)
+- [v0.3 test locator specification](../../v0.3-test-locators-spec.md)
+- [v0.4 E2E authoring metadata specification](../../v0.4-e2e-authoring-metadata-spec.md)
+- [Workspace configuration](../../workspace-configuration.md)
+- [Schema contract](../../../packages/schema/src/contract.ts)
+- [Field interaction DTOs](../../../packages/schema/src/field-type-interaction.ts)
+- [Cross-field effect DTOs](../../../packages/schema/src/cross-field-effect.ts)
+- [Workspace source/scenario definitions](../../../packages/workspace/src/source.ts)
+- [Workspace runner](../../../packages/workspace/src/run-workspace.ts)
+- [Workspace index](../../../packages/workspace/src/workspace-index.ts)
+- [Angular monorepo workspace golden](../../../fixtures/angular-monorepo/goldens/workspace-index.golden.json)
+- [Claims intake contract golden](../../../fixtures/angular-monorepo/goldens/projects/id_Zml4dHVyZS1mZWF0dXJlLWxpYg/forms/id_Y2xhaW1zLmludGFrZQ/sha256-690ac3bdc549efefb1c2cfbb1e72d7624fbce1d288ca0e158fd8d21dbd2e7d07.contract.golden.json)
+
+### Official external sources
+
+- Playwright, [Locators](https://playwright.dev/docs/locators)
+- Playwright, [Auto-waiting and actionability](https://playwright.dev/docs/actionability)
+- Playwright, [Assertions](https://playwright.dev/docs/test-assertions)
+- Playwright, [Test configuration and artifacts](https://playwright.dev/docs/test-configuration)
+- W3C WAI, [Providing Accessible Names and Descriptions](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/)
+- W3C WAI, [Understanding SC 3.3.1: Error Identification](https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html)
+- W3C WAI, [Understanding SC 4.1.3: Status Messages](https://www.w3.org/WAI/WCAG22/Understanding/status-messages)
+
+## Limitations and next evidence
+
+**Unknown:** No production MCP server, intent validator, driver registry,
+Playwright dependency, or usage/scenario artifact schema exists to execute the
+proposed shapes. The walkthrough is deliberately a paper validation over
+existing synthetic fixtures, not a claim that generated tests currently pass.
+
+**Unknown:** The current Angular monorepo fixture has page/component usages but
+no route/step-one or submit/next action. The proposed usage/step metadata is a
+minimal paper supplement, not observed repository output.
+
+**Unknown:** Async option settlement, cancellation, empty/error states, stable
+runtime order, localization, and customer-data redaction require a real
+application pilot. Playwright actionability does not answer those application
+questions.
+
+**Inference — recommended next action:** Implement Slice 0 as an isolated
+versioned research/experimental usage-and-artifact envelope, then implement the
+pure Slice 2 validator against fixture JSON before adding MCP transport or
+Playwright execution. The first gate should reproduce every valid/refusal
+result in the two walkthroughs.
