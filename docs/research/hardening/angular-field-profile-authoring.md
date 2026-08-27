@@ -495,7 +495,10 @@ export default defineAngularFieldAuthoring({
       id: 'claims-intake-lazy',
       load: async () => {
         const feature = await import('./src/app/claims/claims.routes');
-        return { imports: [feature.ClaimsIntakeAuthoringModule] };
+        return {
+          imports: [feature.ClaimsIntakeAuthoringModule],
+          providers: [provideClaimsIntakeAuthoringData()],
+        };
       },
     }),
   ],
@@ -510,7 +513,9 @@ export default defineAngularFieldAuthoring({
 
 The entry accepts:
 
-- `imports`: NgModules and standalone declarables accepted by TestBed;
+- `imports`: public Angular `ImportProvidersSource` values—NgModules,
+  `ModuleWithProviders`, or standalone components—accepted by
+  `importProvidersFrom`;
 - `providers`: ordinary or environment providers needed to reproduce the
   controlled application configuration;
 - explicit feature-scope loaders corresponding to real lazy ownership
@@ -571,7 +576,53 @@ request root and feature-scope inventory. The retained assertions must prove:
 4. root and feature registries are observed in fresh browser contexts without
    cross-scope contamination;
 5. opaque and missing-resource cases produce stable refusal diagnostics; and
-6. the emitted result passes the strict report schema and canonical round trip.
+6. the emitted result passes the minimal compatibility-result schema and
+   canonical round trip.
+
+The minimal gate schema is implemented before the gate fixture and is not the
+full authoring report:
+
+```ts
+type AngularHostCompatibilityCaseId =
+  | 'entry-and-tsconfig'
+  | 'partial-library-and-external-resource'
+  | 'ngmodule-composition'
+  | 'standalone-composition'
+  | 'root-scope'
+  | 'feature-scope-isolation'
+  | 'opaque-child-refusal'
+  | 'missing-resource-refusal'
+  | 'network-denial';
+
+type AngularHostCompatibilityCase =
+  | { readonly id: AngularHostCompatibilityCaseId; readonly status: 'pass' }
+  | {
+      readonly id: AngularHostCompatibilityCaseId;
+      readonly status: 'fail';
+      readonly diagnosticCode: string;
+    };
+
+interface AngularHostCompatibilityResult {
+  readonly schemaVersion: '0.1.0';
+  readonly environment: {
+    readonly builder: '@angular/build:application' | '@nx/angular:application';
+    readonly buildTarget: string;
+    readonly angularVersion: string;
+    readonly formlyVersion: string;
+    readonly typescriptVersion: string;
+    readonly playwrightVersion: string;
+    readonly targetConfigurationHash: string;
+    readonly partialFixturePackageHash: string;
+  };
+  readonly cases: readonly AngularHostCompatibilityCase[];
+}
+```
+
+Its runtime schema rejects unknown keys, requires every case exactly once in
+the declared order, requires a diagnostic for failure and none for pass, and
+requires all cases to pass before the tuple is supported. It exists solely to
+prove the host substrate; full coverage/scaffold schemas follow only after this
+gate succeeds.
 
 The gate records the effective builder/executor, Angular/Formly/TypeScript
 versions, target configuration hash, and fixture-library package hash. Failure
@@ -584,6 +635,73 @@ Angular platform and injector. The Node parent serves only the confined build
 output, selects a configured scope ID, reads one strict JSON result, then closes
 the context. It does not evaluate application source or parse console logs as
 the report protocol.
+
+### Exact browser-host lifecycle and network boundary
+
+**Documented fact:** `bootstrapApplication` bootstraps a standalone root
+component and returns an `ApplicationRef`. `importProvidersFrom` collects
+providers from NgModules, `ModuleWithProviders`, and standalone components for
+an application/environment injector. `ApplicationRef.whenStable()` and
+`destroy()` are public lifecycle APIs. Sources:
+[bootstrapApplication](https://angular.dev/api/platform-browser/bootstrapApplication),
+[importProvidersFrom](https://angular.dev/api/core/importProvidersFrom), and
+[ApplicationRef](https://angular.dev/api/core/ApplicationRef).
+
+**Inference — decision:** The pinned host uses exactly this public lifecycle:
+
+1. Before navigation, the Node orchestrator creates a new Playwright browser
+   context with service workers blocked, installs the deny-by-default request
+   route, and registers a one-shot `page.exposeBinding` result bridge.
+2. It navigates to the confined authoring origin with one validated configured
+   `scopeId`. The compiled authoring main statically imports the trusted
+   definition and rejects an unknown/duplicate scope before Angular bootstrap.
+3. It awaits the selected feature loader, if any, and constructs one provider
+   list: `importProvidersFrom(...root.imports, ...feature.imports)`, followed by
+   the reviewed root and feature providers in declared order.
+4. It calls `bootstrapApplication(AuthoringShellComponent, { providers })`.
+   `AuthoringShellComponent` is a package-owned standalone component with no
+   router, network service, template outlet, or application bootstrap side
+   effect. Bootstrap/provider/initializer failure becomes
+   `ANGULAR_HOST_BOOTSTRAP_FAILED`.
+5. After bootstrap resolves, it awaits `appRef.whenStable()` with the scope
+   timeout, then reads `FormlyConfig` from `appRef.injector`, inventories the
+   configured scope, and submits exactly one discriminated success/failure
+   envelope through the exposed binding. Node schema-validates the value; no
+   console or DOM text is parsed as protocol.
+6. In `finally`, the shell calls `appRef.destroy()` when created. The
+   orchestrator closes the page and context and treats a second result, late
+   callback, pending navigation, or teardown error as a stable gate failure.
+
+This lifecycle composes the root plus one feature into a fresh application
+environment injector; it does not claim to recreate the production router's
+lazy child injector. Scope ownership is established by separate root-only and
+root-plus-feature runs and their explicit scope IDs. If that representation
+does not reproduce the registered Formly surface in the retained gate, the host
+design fails rather than silently claiming lazy parity.
+
+**Documented fact:** Playwright browser contexts can route requests and abort
+them, route WebSockets separately, block service workers so they do not bypass
+routing, and expose an explicit host binding to browser code. Sources:
+[Playwright network](https://playwright.dev/docs/network) and
+[BrowserContext.routeWebSocket](https://playwright.dev/docs/api/class-browsercontext#browser-context-route-web-socket),
+and [page.exposeBinding](https://playwright.dev/docs/api/class-page#page-expose-binding).
+
+**Inference — decision:** Network denial is installed before `page.goto`:
+
+- allow only `GET`/`HEAD` requests to the exact random loopback authoring origin
+  and confined build-output path prefix;
+- create the context without storage state, HTTP credentials, client
+  certificates, or an upstream proxy;
+- abort every unmatched HTTP(S), beacon, EventSource, and other routed request;
+  install `routeWebSocket` before page creation and immediately close every
+  unmocked WebSocket; record `OUTBOUND_NETWORK_BLOCKED` and fail the scope even
+  when the application catches the browser error; and
+- permit reviewed mocks only as exact method + URL bindings that fulfill a
+  local static/JSON response. Mocks never pass through, contain no credentials,
+  have stable IDs/hashes, and are reported as configuration evidence.
+
+The Task 2 fixture includes an initializer that attempts an external request
+and must produce the stable denial case without reaching the test server.
 
 ## Process boundaries
 
@@ -636,7 +754,7 @@ type JsonPrimitive = null | boolean | number | string;
 type JsonValue = JsonPrimitive | JsonObject | readonly JsonValue[];
 interface JsonObject { readonly [key: string]: JsonValue }
 
-interface AuthoringEvidence<T extends JsonValue = JsonValue> {
+type AuthoringEvidence<T extends JsonValue = JsonValue> = {
   readonly id: string;
   readonly source:
     | 'formly-registry'
@@ -649,10 +767,11 @@ interface AuthoringEvidence<T extends JsonValue = JsonValue> {
   readonly evidence: 'declared' | 'derived' | 'observed';
   readonly scopeId: string;
   readonly scenarioId?: string;
-  readonly value?: T;
-  readonly status: 'known' | 'unknown' | 'error';
-  readonly reason?: string;
-}
+} & (
+  | { readonly status: 'known'; readonly value: T }
+  | { readonly status: 'unknown'; readonly reason: string }
+  | { readonly status: 'error'; readonly reason: string }
+);
 ```
 
 Rules:
@@ -684,6 +803,11 @@ For every alias in every configured scope, report:
 - child selectors and whether their sources are in-program or opaque;
 - scaffold disposition and explicit unknowns; and
 - conformance status if a scenario exists.
+
+All-alias inventory includes the schema-owned built-in allowlist. Custom-profile
+coverage is the subset whose exact alias is not built-in-exempt. The compiler
+and authoring validators consume the same versioned allowlist contract so a
+standard alias cannot drift into `missingProfile` or scaffold output.
 
 ### Component/source joins
 
@@ -763,7 +887,6 @@ type ScopeLoadStatus =
   | 'bootstrap-failed'
   | 'timed-out'
   | 'invalid-output';
-type JoinStatus = 'joined' | 'ambiguous' | 'outside-roots' | 'declaration-only' | 'missing';
 type ConformanceStatus = 'pass' | 'fail' | 'inconclusive' | 'not-configured';
 
 interface ConfiguredScopeCoverage {
@@ -783,18 +906,41 @@ interface ScopeCoverage {
   readonly diagnosticIds: readonly string[];
 }
 
-interface ComponentIdentity {
-  readonly status: 'known' | 'missing' | 'ambiguous';
-  readonly selector?: string;
-  readonly sourceId?: string;
-  readonly exportName?: string;
-}
+type ComponentIdentity =
+  | {
+      readonly status: 'known';
+      readonly selector: string;
+      readonly sourceRecordId: string;
+      readonly exportName: string;
+    }
+  | { readonly status: 'runtime-opaque'; readonly selector?: string }
+  | { readonly status: 'missing' }
+  | { readonly status: 'ambiguous'; readonly candidateSourceRecordIds: readonly string[] };
 
-interface RawRegistrationCoverage {
+type JsonDefaultOptionsProjection =
+  | { readonly status: 'json'; readonly value: JsonObject }
+  | {
+      readonly status: 'partially-omitted';
+      readonly jsonValue: JsonObject;
+      readonly omittedKeyPaths: readonly string[];
+      readonly unknownId: string;
+    }
+  | {
+      readonly status: 'non-json';
+      readonly omittedKeyPaths: readonly string[];
+      readonly unknownId: string;
+    };
+
+interface RawRegistrationProjection {
+  readonly formlyType: string;
   readonly extends?: string;
   readonly component: ComponentIdentity;
   readonly wrappers: readonly string[];
-  readonly jsonSafeDefaultOptions?: JsonObject;
+  readonly defaultOptions: JsonDefaultOptionsProjection;
+}
+
+interface RawRegistrationCoverage {
+  readonly projection: RawRegistrationProjection;
   readonly fingerprint: string;
 }
 
@@ -806,22 +952,52 @@ interface EffectiveRegistrationCoverage {
   readonly jsonSafeDefaultOptions?: JsonObject;
 }
 
-interface ReviewedProfileCoverage {
-  readonly status: 'reviewed' | 'missing' | 'intentionally-non-interactive';
-  readonly registrationId?: string;
-  readonly profileId?: string;
-  readonly profileVersion?: number;
-  readonly disposition?: {
-    readonly source: 'project-angular-authoring-config';
-    readonly classification: 'display-only' | 'assertion-only';
-    readonly reason: string;
-    readonly configurationHash: string;
-  };
-}
+type ReviewedProfileCoverage =
+  | {
+      readonly status: 'reviewed';
+      readonly registryReference: {
+        readonly formlyType: string;
+        readonly variant?: string;
+        readonly profileId: string;
+        readonly profileVersion: number;
+      };
+    }
+  | { readonly status: 'missing' }
+  | {
+      readonly status: 'intentionally-non-interactive';
+      readonly disposition: {
+        readonly source: 'project-angular-authoring-config';
+        readonly classification: 'display-only' | 'assertion-only';
+        readonly reason: string;
+        readonly configurationHash: string;
+      };
+    }
+  | {
+      readonly status: 'built-in-exempt';
+      readonly policyReference: {
+        readonly policyVersion: 'formly-built-ins-v1';
+        readonly formlyType: BuiltInFormlyType;
+        readonly policyHash: string;
+      };
+    };
+
+type BuiltInFormlyType =
+  | 'checkbox'
+  | 'formly-template'
+  | 'input'
+  | 'radio'
+  | 'select'
+  | 'textarea';
+
+type SourceJoinResult =
+  | { readonly status: 'joined'; readonly sourceRecordId: string }
+  | { readonly status: 'ambiguous'; readonly candidateSourceRecordIds: readonly string[] }
+  | { readonly status: 'outside-roots'; readonly sourceRecordId: string }
+  | { readonly status: 'declaration-only'; readonly sourceRecordId: string }
+  | { readonly status: 'missing' };
 
 interface SourceJoinCoverage {
-  readonly status: JoinStatus;
-  readonly sourceId?: string;
+  readonly join: SourceJoinResult;
   readonly template: 'inline' | 'external' | 'dynamic' | 'unavailable' | 'parse-error';
   readonly childSelectors: readonly string[];
   readonly opaqueChildSelectors: readonly string[];
@@ -829,7 +1005,7 @@ interface SourceJoinCoverage {
 }
 
 interface TypeConformanceCoverage {
-  readonly scenarioIds: readonly string[];
+  readonly scenarioReferenceIds: readonly string[];
   readonly status: ConformanceStatus;
   readonly diagnosticIds: readonly string[];
 }
@@ -845,7 +1021,7 @@ interface TypeCoverage {
   readonly source: SourceJoinCoverage;
   readonly evidenceIds: readonly string[];
   readonly unknownIds: readonly string[];
-  readonly scaffoldId?: string;
+  readonly scaffoldArtifactId?: string;
   readonly conformance: TypeConformanceCoverage;
 }
 
@@ -854,7 +1030,10 @@ interface WrapperCoverage {
   readonly wrapperName: string;
   readonly scopeIds: readonly string[];
   readonly source: SourceJoinCoverage;
-  readonly reviewedProfileId?: string;
+  readonly reviewedProfile?: {
+    readonly profileId: string;
+    readonly profileVersion: number;
+  };
   readonly evidenceIds: readonly string[];
   readonly unknownIds: readonly string[];
 }
@@ -865,9 +1044,45 @@ interface AuthoringDiagnostic {
   readonly severity: 'error' | 'warning' | 'information';
   readonly scopeId?: string;
   readonly typeCoverageId?: string;
-  readonly scenarioId?: string;
+  readonly scenarioReferenceId?: string;
   readonly message: string;
   readonly evidenceIds: readonly string[];
+}
+
+type SourceRecord =
+  | {
+      readonly id: string;
+      readonly kind: 'workspace-source' | 'workspace-template';
+      readonly workspaceRelativePath: string;
+      readonly contentHash: string;
+      readonly exportName?: string;
+    }
+  | {
+      readonly id: string;
+      readonly kind: 'package-declaration';
+      readonly packageName: string;
+      readonly exportName: string;
+      readonly declarationHash: string;
+    };
+
+interface ScaffoldArtifactReference {
+  readonly id: string;
+  readonly formlyType: string;
+  readonly workspaceRelativePath: string;
+  readonly contentHash: string;
+}
+
+interface BuiltInTypePolicy {
+  readonly version: 'formly-built-ins-v1';
+  readonly formlyTypes: readonly BuiltInFormlyType[];
+  readonly policyHash: string;
+}
+
+interface ScenarioReference {
+  readonly id: string;
+  readonly scopeId: string;
+  readonly formlyType: string;
+  readonly expectationHash: string;
 }
 
 interface AngularFieldAuthoringReport {
@@ -878,14 +1093,20 @@ interface AngularFieldAuthoringReport {
     readonly angularVersion: string;
     readonly formlyVersion: string;
     readonly typescriptVersion: string;
+    readonly playwrightVersion: string;
     readonly builder: '@angular/build:application' | '@nx/angular:application';
     readonly buildTarget: string;
     readonly targetConfigurationHash: string;
+    readonly profileRegistryHash: string;
+    readonly builtInTypePolicy: BuiltInTypePolicy;
   };
   readonly configuredScopeCoverage: ConfiguredScopeCoverage;
   readonly scopes: readonly ScopeCoverage[];
   readonly types: readonly TypeCoverage[];
   readonly wrappers: readonly WrapperCoverage[];
+  readonly sources: readonly SourceRecord[];
+  readonly scaffoldArtifacts: readonly ScaffoldArtifactReference[];
+  readonly scenarios: readonly ScenarioReference[];
   readonly evidence: readonly AuthoringEvidence[];
   readonly unknowns: readonly ReviewUnknown[];
   readonly diagnostics: readonly AuthoringDiagnostic[];
@@ -912,10 +1133,35 @@ interface AngularFieldAuthoringReport {
 
 It never means workspace completeness. The configured/loaded/failed arrays are
 sorted unique sets; their union and intersection invariants are runtime-schema
-refinements. Every referenced ID must resolve exactly once. Summary counts are
-derived from the `types` and `conformance` records, never supplied by a worker.
+refinements. Every scope, type, evidence, unknown, diagnostic, source,
+scaffold-artifact, and scenario ID must resolve exactly once in its
+report-owned collection. Wrapper scope IDs and every nested reference obey the
+same rule. Summary counts are derived from the `types` and `conformance`
+records, never supplied by a worker.
 `intentionallyNonInteractive` counts only exact aliases with a valid persisted
 project-config disposition and never counts an inferred display candidate.
+
+The built-in policy is a schema-owned, versioned allowlist aligned with the
+compiler's built-in Formly exemption. Its six values are `checkbox`,
+`formly-template`, `input`, `radio`, `select`, and `textarea`. A type record
+whose exact alias is in that allowlist has `built-in-exempt` coverage. Built-ins
+remain visible in all-alias inventory but are excluded from `missingProfile`
+and `scaffolded`; only non-built-in aliases participate in custom-profile
+coverage. The policy array is sorted, its hash is verified, and a retained
+invariant test must exercise every built-in plus one missing custom alias.
+Implementation moves the existing exact list into one schema-owned exported
+contract consumed by both compiler and authoring code; it must not create a
+second independently maintained built-in list.
+
+`RawRegistrationCoverage.fingerprint` hashes only the canonical
+`RawRegistrationProjection`. Component constructors/functions never enter the
+projection. A uniquely joined component uses stable source-record/export
+identity; an unjoined runtime component uses only the `runtime-opaque` status
+and allowlisted stable reflection selector when present. Default options are
+recursively projected to canonical JSON. Function, symbol, class-instance,
+accessor, cyclic, and otherwise non-JSON values are omitted, their sorted key
+paths are recorded, and one blocking unknown explains the omission. The hash
+therefore attests the explicit projection, not the original live object.
 
 The report is canonical JSON. Arrays with set semantics sort by stable
 scope/type/profile/evidence IDs; declaration-order arrays such as wrappers and
@@ -924,6 +1170,18 @@ normalized to workspace-relative paths. The report contains no source text,
 template text, model values, functions, Angular types, injectors, secrets, or
 timestamps. Configuration, target, and registration fingerprints use the
 repository's canonical hash conventions.
+
+`ScaffoldArtifactReference` is a cross-artifact contract, not a dangling ID.
+The report owns the reference, workspace-relative path, and canonical content
+hash; `TypeCoverage.scaffoldArtifactId` resolves into that collection. The
+scaffold's own `id`, project ID, and Formly alias must match the reference and
+type record when read. Reviewed registry references use the repository's real
+identity: exact `formlyType` plus optional declared variant and resolved profile
+ID/version. They resolve against the reviewed registry snapshot identified by
+`profileRegistryHash`; wrapper profile references use the same external
+snapshot. No synthetic registration ID is introduced. Scenario references are
+report-owned and attest the canonical reviewed expectation hash without
+embedding executable factories.
 
 ### Review scaffold
 
@@ -1118,11 +1376,13 @@ interface PartExpectation {
 
 type PopupAssociation =
   | {
+      readonly id: string;
       readonly kind: 'aria-controls' | 'aria-owns';
       readonly triggerPartId: string;
       readonly popupPartId: string;
     }
   | {
+      readonly id: string;
       readonly kind: 'scenario-contract-id';
       readonly triggerPartId: string;
       readonly popupPartId: string;
@@ -1130,17 +1390,50 @@ type PopupAssociation =
       readonly value: string;
     }
   | {
+      readonly id: string;
       readonly kind: 'harness-binding';
       readonly triggerPartId: string;
       readonly popupPartId: string;
       readonly bindingId: string;
     };
 
-interface ReviewedActionVector {
+interface OpenPopupStep {
   readonly id: string;
+  readonly kind: 'open-popup';
+  readonly triggerPartId: string;
+  readonly associationId: string;
   readonly driverBindingId: string;
+  readonly operation: 'open';
+  readonly intent: JsonObject;
+  readonly postOpen: {
+    readonly popupPartId: string;
+    readonly readiness: 'attached' | 'visible' | 'enabled';
+  };
+}
+
+interface InteractionStep {
+  readonly id: string;
+  readonly kind: 'interaction';
+  readonly partId: string;
+  readonly driverBindingId: string;
+  readonly operation: string;
   readonly intent: JsonObject;
   readonly expectedModelValue: JsonValue;
+}
+
+type ReviewedScenarioStep = OpenPopupStep | InteractionStep;
+
+interface ReviewedNetworkMock {
+  readonly id: string;
+  readonly method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
+  readonly url: string;
+  readonly status: number;
+  readonly jsonBody?: JsonValue;
+}
+
+interface ScenarioNetworkPolicy {
+  readonly mode: 'deny-external';
+  readonly mocks: readonly ReviewedNetworkMock[];
 }
 
 interface BrowserScenarioExpectation {
@@ -1152,7 +1445,8 @@ interface BrowserScenarioExpectation {
   readonly scenarioRootTestId: string;
   readonly parts: readonly PartExpectation[];
   readonly popupAssociations: readonly PopupAssociation[];
-  readonly actionVectors: readonly ReviewedActionVector[];
+  readonly steps: readonly ReviewedScenarioStep[];
+  readonly networkPolicy: ScenarioNetworkPolicy;
 }
 
 defineAngularFieldScenario({
@@ -1161,15 +1455,26 @@ defineAngularFieldScenario({
 });
 ```
 
-The expectation validator requires unique part/action IDs, exactly one
-scenario root anchor, every popup-root reference and association to resolve,
-and every `document-root` popup to have exactly one reviewed association.
+The expectation validator requires unique part/association/step/mock IDs,
+exactly one scenario root anchor, every popup-root reference and association to
+resolve, and every `document-root` popup to have exactly one reviewed
+association.
 Non-popup parts may not declare `document-root`. `aria-controls`/`aria-owns`
-must resolve the trigger's attribute to the observed popup element after the
-reviewed open action. `scenario-contract-id` requires the trigger and popup to
-share the exact committed value; the runner never invents it. A harness binding
-must be registered under the exact ID and profile version. Test IDs are allowed
-only when supplied by the application in this reviewed contract.
+must resolve the trigger's attribute to the observed popup element immediately
+after the associated `open-popup` step. `scenario-contract-id` requires the
+trigger and popup to share the exact committed value; the runner never invents
+it. A harness binding must be registered under the exact ID and profile
+version. Test IDs are allowed only when supplied by the application in this
+reviewed contract.
+
+`steps` is a declaration-order sequence. Every `PopupAssociation` is referenced
+by exactly one earlier-or-current `OpenPopupStep`; the step's trigger and
+`postOpen.popupPartId` must equal the association's trigger and popup. The
+runner executes that binding/operation, waits for the declared post-open state,
+resolves the association, and only then advances. An interaction whose part is
+inside a popup is invalid unless its popup's open step precedes it. Multiple
+overlays require distinct association/open-step pairs. The runner neither
+reorders steps nor guesses that an arbitrary activation opened a popup.
 
 Part names are mandatory and exact/pattern expectations are validated before
 the browser runs. Option parts must use `{ popupPartId }`, never
@@ -1178,7 +1483,9 @@ the browser runs. Option parts must use `{ popupPartId }`, never
 
 The executable factory, providers, model sink, and harness callbacks are
 trusted build inputs but are never serialized. Reports contain the expectation
-ID, binding IDs, allowlisted observations, and diagnostics only.
+ID, binding IDs, step IDs, network-mock IDs, allowlisted observations, and
+diagnostics only. Network mocks are exact reviewed inputs; unmatched requests
+remain denied.
 
 ### TestBed lane
 
@@ -1208,11 +1515,12 @@ declared part it records:
 - allowlisted visible option labels; and
 - an explicitly approved JSON-safe model sink for codec vectors.
 
-Overlay checks first execute the reviewed open vector against the declared
-trigger, then resolve and validate the configured `PopupAssociation`. A portal
-may live outside the scenario root, but its popup and option parts are scoped
-through the associated popup part. Global option enumeration and unassociated
-document-root popup queries are forbidden.
+Overlay checks execute the ordered `open-popup` step against the declared
+trigger, wait for its post-open state, then resolve and validate that step's
+configured `PopupAssociation`. A portal may live outside the scenario root,
+but its popup and option parts are scoped through the associated popup part.
+Global option enumeration and unassociated document-root popup queries are
+forbidden.
 
 ### Names, codecs, and actions
 
@@ -1226,7 +1534,10 @@ Codec checks use reviewed vectors:
 ```ts
 {
   id: 'choose-amber',
+  kind: 'interaction',
+  partId: 'option',
   driverBindingId: 'claims-autocomplete-driver-v1',
+  operation: 'choose',
   intent: { optionLabel: 'Amber record' },
   expectedModelValue: { id: 'amber' },
 }
@@ -1256,6 +1567,8 @@ The first slice does not attempt to run CDK harnesses through Playwright.
 Conformance outcomes are `pass`, `fail`, or `inconclusive` per scenario/fact.
 Stable diagnostics include:
 
+- `ANGULAR_HOST_BOOTSTRAP_FAILED`;
+- `OUTBOUND_NETWORK_BLOCKED`;
 - `DECLARED_PART_NOT_OBSERVED`;
 - `DECLARED_ROLE_MISMATCH`;
 - `DECLARED_NAME_MISMATCH`;
@@ -1313,8 +1626,8 @@ later pair—CI must retain and prove:
    fresh browser contexts;
 6. inline/external template source analysis and opaque/missing-resource refusal
    produce schema-valid deterministic output;
-7. the strict report passes canonical serialization and rejects malformed or
-   cross-scope output;
+7. the minimal compatibility result passes canonical serialization and rejects
+   missing, duplicate, malformed, or contradictory cases;
 8. the optional TestBed target and AOT browser scenario render when those lanes
    are enabled; and
 9. no private-Ivy imports/property reads occur in the package or fixture gate.
@@ -1335,9 +1648,11 @@ when no exact adapter exists. Runtime inventory and manual review remain usable.
 | AOT application gallery + Playwright, optional TestBed/CDK | Real build/browser behavior and computed accessibility | High assurance | Heavier setup; scenario-specific; gallery drift | Medium-high; optional target | Medium | Retained gallery checks fail to associate overlays or isolate providers/data, or provide little additional signal |
 | Private Ivy metadata mining | Could expose compiled template internals | Superficially high | Patch breakage, unsupported API, still no semantic truth | Low | High reject | No evidence should reverse this under current constraints |
 
-**Inference — recommendation:** Fresh-scope Formly inventory plus optional version-gated
-source scaffolds is the first production slice. Add TestBed/CDK conformance
-next, then an opt-in AOT browser gallery for profiles that justify the cost.
+**Inference — recommendation:** First retain the minimal schema and application-
+target compatibility gate. If it passes, fresh-scope Formly inventory is the
+first production slice; optional version-gated source scaffolds follow only
+after the inventory/value gate. Add TestBed/CDK and browser conformance later
+for profiles that justify the cost.
 
 ## Feasibility, value, and confidence
 
@@ -1368,90 +1683,101 @@ Stop or narrow productionization when any gate fails:
    providers cannot replace, do not run automated inventory/conformance for
    that scope; use a side-effect-free application-owned gallery or manual
    declaration.
-5. **Lazy honesty gate:** if configured scopes cannot be distinguished, report
+5. **Network-boundary gate:** if deny-by-default routing and service-worker
+   blocking cannot be installed before navigation, or an unmatched outbound
+   request is not observable as a stable failure, do not execute trusted
+   application providers in the worker.
+6. **Lazy honesty gate:** if configured scopes cannot be distinguished, report
    incomplete coverage and do not publish a union as complete.
-6. **Report-contract gate:** if worker output cannot pass strict schemas,
+7. **Report-contract gate:** if worker output cannot pass strict schemas,
    reference invariants, derived-count checks, and canonical round trips, retain
    a scope failure rather than emitting a partial report.
-7. **Disposition-authority gate:** if a display/assertion-only alias lacks an
+8. **Disposition-authority gate:** if a display/assertion-only alias lacks an
    exact reviewed config disposition or future no-interaction profile, count it
    as missing rather than non-interactive.
-8. **Compiler maintenance gate:** if an Angular minor breaks the source adapter
+9. **Compiler maintenance gate:** if an Angular minor breaks the source adapter
    without a small localized fix and focused tests, disable template analysis
    for that version rather than couple to Ivy.
-9. **Partial-build gate:** if a library can be loaded only as unlinked partial
+10. **Partial-build gate:** if a library can be loaded only as unlinked partial
    output in bare Node, move the observation into the consuming Angular build.
-10. **Overlay-association gate:** if a reviewed popup association is missing,
+11. **Overlay-association gate:** if a reviewed popup association is missing,
     invalid, or non-unique, emit `OVERLAY_SCOPE_AMBIGUOUS`; do not search the
     document globally or select the first match.
-11. **Conformance safety gate:** if verifying a codec requires indiscriminate
+12. **Conformance safety gate:** if verifying a codec requires indiscriminate
    clicking or real business effects, require reviewed synthetic vectors or
    leave it unverified.
-12. **False-confidence gate:** if an unknown is required to authorize a generic
+13. **False-confidence gate:** if an unknown is required to authorize a generic
    driver, the scaffold remains non-actionable.
-13. **Value gate:** run a workplace pilot. Continue source scaffolding only if it
+14. **Value gate:** run a workplace pilot. Continue source scaffolding only if it
    produces useful non-semantic evidence for a substantial share of custom
    types and saves more review time than the host/scenario upkeep costs. Record
    elapsed setup/review time rather than claiming a percentage in advance.
-14. **Drift-noise gate:** if browser scenarios fail frequently for unrelated
+15. **Drift-noise gate:** if browser scenarios fail frequently for unrelated
     layout/content changes, narrow expectations to contract-relevant
     role/name/part/codec facts instead of weakening mismatch policy.
 
 ## Ordered implementation tasks
 
-1. **Retain the application-target compatibility gate.** Before a package shell
+1. **Implement the minimal compatibility-result contract.** Add the strict
+   `AngularHostCompatibilityResult` validator, canonical serializer, exact-case
+   refinement, environment identity/hash checks, and pass/fail diagnostic
+   union. This schema has no dependency on the future full authoring report.
+2. **Retain the application-target compatibility gate.** Before a package shell
    or host API, add the consuming application fixture, partial-compiled fixture
    library, authoring browser entry, external resource, NgModule/standalone
-   cases, isolated root/lazy scopes, opaque/missing-resource refusals, strict
-   output validation, and exact Angular CLI/Nx build commands described above.
-   Stop if normal application linking/resource resolution cannot support them
-   without private Ivy.
-2. **Approve complete authoring contracts.** Move the closed report/scaffold,
+   cases, exact public host lifecycle, denied-network case, isolated root/lazy
+   scopes, opaque/missing-resource refusals, minimal result validation, and
+   exact Angular CLI/Nx build commands described above. Stop if normal
+   application linking/resource resolution cannot support them without private
+   Ivy or the public lifecycle/network boundary fails.
+3. **Approve complete authoring contracts.** Move the closed report/scaffold,
    evidence, unknown, diagnostic, configured-scope, disposition, and scenario
    expectation shapes into schema-owned strict validators. Add canonical
    round-trip, unknown-key rejection, ID-reference, set-ordering, count, and
-   configured-scope refinement tests.
-3. **Resolve schema gaps.** Decide whether v0.4.x adds explicit
+   configured-scope refinement tests, including built-in exemption and raw
+   projection/fingerprint fixtures.
+4. **Resolve schema gaps.** Decide whether v0.4.x adds explicit
    display/assertion-only profiles, compound fill/date range, and multi-select
    semantics. Until approved, keep those non-generic. Implement and validate
    the exact-type authoring disposition as the temporary coverage authority.
-4. **Add the optional Angular package shell.** Pin the first
+5. **Add the optional Angular package shell.** Pin the first
    Angular/Formly/TypeScript and builder/executor tuple, schedule only the proven
    application target, and add a private-Ivy import/property lint gate.
-5. **Add Node-safe workspace pointers.** Validate build/serve target,
+6. **Add Node-safe workspace pointers.** Validate build/serve target,
    entry/tsconfig/source-root paths, and exact-type dispositions without
    importing Angular during generic discovery.
-6. **Implement isolated browser workers.** Serve the confined AOT authoring
-   output, support NgModule/standalone composition, enforce time/output limits,
-   validate the explicit browser bridge, and create fresh root/feature scope
-   contexts.
-7. **Implement Formly inventory.** Preserve raw/effective registration,
+7. **Implement isolated browser workers.** Serve the confined AOT authoring
+   output, use the proven `bootstrapApplication`/`importProvidersFrom`
+   lifecycle, enforce deny-by-default routing plus time/output limits, validate
+   the one-shot browser bridge, and create fresh root/feature scope contexts.
+8. **Implement Formly inventory.** Preserve raw/effective registration,
    inheritance, defaults, wrappers, scope provenance, alias conflicts, and
    profile coverage.
-8. **Implement the TypeScript source index.** Join registrations/components,
+9. **Implement the TypeScript source index.** Join registrations/components,
    collect props candidates, and handle inline/external templates through an
    exact Angular adapter with refusal tests.
-9. **Implement canonical coverage/scaffold output.** No registry writes; add
+10. **Implement canonical coverage/scaffold output.** No registry writes; add
    stable diffs and explicit unknowns.
-10. **Run the workplace value pilot.** Measure configuration effort, custom-type
+11. **Run the workplace value pilot.** Measure configuration effort, custom-type
    coverage, review time, ambiguous joins, and saved mechanical work without
    retaining workplace source.
-11. **Add TestBed conformance.** Through the exact-version application-backed
-    unit-test target, verify parts, wrapper gates, reviewed action vectors,
+12. **Add TestBed conformance.** Through the exact-version application-backed
+    unit-test target, verify parts, wrapper gates, reviewed scenario steps,
     model sinks, and explicit CDK harness bindings.
-12. **Add the reviewed browser-conformance contract.** Implement strict
-    scenario expectation and popup-association validation, then use the proven
-    AOT authoring target to verify computed roles/names, overlay association,
-    popup-local options, and reviewed codecs with normal Playwright locators.
-13. **Expand the retained synthetic acceptance matrix.** The gate in Task 1
+13. **Add the reviewed browser-conformance contract.** Implement strict
+    scenario expectation, ordered open-step/popup-association, and reviewed
+    network-mock validation, then use the proven AOT authoring target to verify
+    computed roles/names, overlay association, popup-local options, and reviewed
+    codecs with normal Playwright locators.
+14. **Expand the retained synthetic acceptance matrix.** The gate in Task 2
     already owns external-template, partial-library, standalone/NgModule,
     opaque/refusal, and lazy-scope cases. Add native and Material-
     like button toggles, autocomplete, text editor, display-only info panel,
     overlay single/multi-select, table selection, date range, expandable
     repeater, wrapper, inheritance, dynamic-name, and ambiguous-overlay cases.
-14. **Document review and CI workflows.** Explain authority, version increments,
+15. **Document review and CI workflows.** Explain authority, version increments,
     optional conformance, failure policy, and unsupported-version behavior.
-15. **Require independent review before Checkpoint B.** Review security/trusted
+16. **Require independent review before Checkpoint B.** Review security/trusted
     execution, determinism, public API use, schema fit, and workplace value
     evidence.
 
@@ -1461,7 +1787,7 @@ Stop or narrow productionization when any gate fails:
 | --- | --- | --- |
 | 1. Distinguish spike proof from unproven work | “What the retained spike proves—and does not prove”; focused packet | Satisfied |
 | 2. Workspace/Angular API, process boundaries, evidence model, report/scaffold, conformance | Proposed API; process diagram; evidence/report/scaffold; conformance sections | Satisfied as a candidate production design; runtime validators remain implementation work |
-| 3. Lazy, external template, opaque child, overlay, display-only, partial/JIT risks | Author testimony identifies risks; selected application target; retained gate; strict disposition and popup contracts; template/opaque rules; partial/JIT policy | Satisfied as a bounded design with explicit unknowns; production feasibility remains blocked until retained Task 1 checks pass |
+| 3. Lazy, external template, opaque child, overlay, display-only, partial/JIT risks | Author testimony identifies risks; selected application target/lifecycle; retained gate; strict disposition, ordered popup, and network contracts; template/opaque rules; partial/JIT policy | Satisfied as a bounded design with explicit unknowns; production feasibility remains blocked until retained Task 2 checks pass |
 | 4. Options, feasibility/value, confidence, stop gates, ordered tasks | Final four decision sections | Satisfied |
 
 ## Residual unknowns
@@ -1484,15 +1810,17 @@ Stop or narrow productionization when any gate fails:
   cost.
 
 The substrate unknown blocks the package shell and inventory/scaffold slice
-until Task 1 passes. The remaining unknowns block broad value claims,
+until Task 2 passes. The remaining unknowns block broad value claims,
 generic-driver approval for the affected families, and any claim of
 workspace-complete conformance.
 
 ## Recommended next action
 
-Authorize Task 1 only: retain the application-owned authoring entry,
-partial-compiled fixture library, external resource, root/lazy isolation, and
-strict-output compatibility gate under the selected Angular CLI/Nx application
-target. If it passes, approve Tasks 2–7 as the first inventory slice. Do not
-implement source heuristics, TestBed/CDK, or browser conformance until the
-substrate and report contracts are retained and independently reviewable.
+Authorize Tasks 1–2 only: first implement the minimal compatibility-result
+schema, then retain the application-owned authoring entry, public browser-host
+lifecycle, network-denial case, partial-compiled fixture library, external
+resource, root/lazy isolation, and strict compatibility gate under the selected
+Angular CLI/Nx application target. If it passes, approve Tasks 3–8 as the first
+inventory slice. Do not implement source heuristics, TestBed/CDK, or browser
+conformance until the substrate and full report contracts are retained and
+independently reviewable.
