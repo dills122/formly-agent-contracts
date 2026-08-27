@@ -248,14 +248,30 @@ type E2eCapability =
   | 'invoke-usage-action'
   | 'assert-outcome';
 
-interface PageRequestProjection {
+interface PageRequestProjection<Collection extends string> {
+  readonly collection: Collection;
   readonly limit?: number; // server-capped
   readonly cursor?: string; // opaque and bound to the exact context/query
 }
 
-type PageProjection =
-  | { readonly truncated: false; readonly nextCursor?: never }
-  | { readonly truncated: true; readonly nextCursor: string };
+type PageProjection<Collection extends string> =
+  | {
+      readonly collection: Collection;
+      readonly truncated: false;
+      readonly nextCursor?: never;
+    }
+  | {
+      readonly collection: Collection;
+      readonly truncated: true;
+      readonly nextCursor: string;
+    };
+
+interface AtomicCollectionProjection<Collection extends string, Item> {
+  readonly collection: Collection;
+  readonly complete: true;
+  readonly maximumItems: number;
+  readonly items: readonly Item[];
+}
 
 type ContractDiagnosticCodeProjection =
   | 'OPAQUE_FUNCTION'
@@ -279,58 +295,31 @@ type ContractDiagnosticCodeProjection =
   | 'UNKNOWN_EFFECT_CONDITION'
   | 'EFFECT_CYCLE';
 
-type DiagnosticIdentityProjection =
-  | {
-      readonly source: 'form-contract';
-      readonly schemaVersion: '0.4.0';
-      readonly code: ContractDiagnosticCodeProjection;
-    }
-  | {
-      readonly source: 'agent-context';
-      readonly schemaVersion: '0.1.0';
-      readonly code: IntentDiagnosticCode;
-    };
+interface ContractDiagnosticIdentityProjection {
+  readonly source: 'form-contract';
+  readonly schemaVersion: '0.4.0';
+  readonly code: ContractDiagnosticCodeProjection;
+}
 
-type DiagnosticSummary =
-  | {
-      readonly source: 'form-contract';
-      readonly identity: Extract<
-        DiagnosticIdentityProjection,
-        { readonly source: 'form-contract' }
-      >;
-      readonly severity: 'warning' | 'error';
-      readonly count: number;
-      readonly blocking: boolean;
-      readonly evidenceRefs: readonly string[];
-    }
-  | {
-      readonly source: 'agent-context';
-      readonly diagnostic: IntentDiagnostic;
-      readonly count: number;
-    };
+interface ContractDiagnosticEvidenceProjection {
+  readonly identity: ContractDiagnosticIdentityProjection;
+  readonly sourceSeverity: 'warning' | 'error';
+  readonly sourcePath: readonly (string | number)[];
+  readonly evidenceRefs: readonly string[];
+}
+
+interface DiagnosticSummary {
+  readonly source: 'agent-context';
+  readonly diagnostic: IntentDiagnostic;
+  readonly count: number;
+}
 
 type AgentContextQueryDiagnostic = Extract<
   IntentDiagnostic,
   { readonly phase: 'discovery' | 'context' }
 >;
 
-type QueryDiagnosticProjection =
-  | {
-      readonly source: 'form-contract';
-      readonly identity: Extract<
-        DiagnosticIdentityProjection,
-        { readonly source: 'form-contract' }
-      >;
-      readonly severity: 'warning' | 'error';
-      readonly phase: 'discovery' | 'context';
-      readonly message: string;
-      readonly blocking: boolean;
-      readonly evidenceRefs: readonly string[];
-    }
-  | {
-      readonly source: 'agent-context';
-      readonly diagnostic: AgentContextQueryDiagnostic;
-    };
+type QueryDiagnosticProjection = AgentContextQueryDiagnostic;
 
 interface UsageDriverProjection {
   readonly kind: 'application';
@@ -492,7 +481,7 @@ type E2ePrerequisite =
   | {
       readonly kind: 'item-context';
       readonly nodeId: string;
-      readonly itemMode: 'index';
+      readonly itemModes: readonly ['existing-index', 'created-item'];
     };
 
 interface DeclaredEffectProjection {
@@ -545,8 +534,7 @@ interface SearchFormUsagesInput {
   readonly label?: string;
   readonly scenarioId?: string;
   readonly capabilities?: readonly E2eCapability[];
-  readonly limit?: number; // server-capped
-  readonly cursor?: string;
+  readonly candidatePage?: PageRequestProjection<'candidates'>;
 }
 
 interface FormUsageCandidate {
@@ -557,30 +545,48 @@ interface FormUsageCandidate {
   readonly component?: { readonly symbol: string; readonly path: string };
   readonly route?: { readonly id: string; readonly pathTemplate?: string };
   readonly step?: { readonly id: string; readonly ordinal: number };
-  readonly scenarioIds: readonly string[];
-  readonly match: readonly {
-    readonly kind:
-      | 'exact-source'
-      | 'symbol'
-      | 'route'
-      | 'step'
-      | 'form-id'
-      | 'model-path'
-      | 'label'
-      | 'capability'
-      | 'text';
-    readonly evidenceRef: string;
-  }[];
-  readonly blockers: readonly DiagnosticSummary[];
+  readonly scenarioIds: AtomicCollectionProjection<'scenario-ids', string>;
+  readonly match: AtomicCollectionProjection<
+    'match-evidence',
+    {
+      readonly kind:
+        | 'exact-source'
+        | 'symbol'
+        | 'route'
+        | 'step'
+        | 'form-id'
+        | 'model-path'
+        | 'label'
+        | 'capability'
+        | 'text';
+      readonly evidenceRef: string;
+    }
+  >;
+  readonly blockers: AtomicCollectionProjection<'blockers', DiagnosticSummary>;
   readonly contextRef: ContractContextRef;
 }
 
-interface SearchFormUsagesResult {
-  readonly schemaVersion: '0.1.0';
-  readonly candidates: readonly FormUsageCandidate[];
-  readonly page: PageProjection;
-  readonly diagnostics: readonly QueryDiagnosticProjection[];
-}
+type SearchFormUsagesResult =
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly status: 'complete';
+      readonly candidates: readonly FormUsageCandidate[];
+      readonly page: PageProjection<'candidates'>;
+      readonly diagnostics: AtomicCollectionProjection<
+        'diagnostics',
+        QueryDiagnosticProjection
+      >;
+    }
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly status: 'refused';
+      readonly diagnostics: readonly [
+        Extract<
+          AgentContextQueryDiagnostic,
+          { readonly code: 'ATOMIC_RECORD_TOO_LARGE' }
+        >,
+      ];
+    };
 ```
 
 **Inference — ambiguity policy:** A unique exact structured match may be
@@ -597,8 +603,13 @@ candidate is selected.
 type GetFormContextInput =
   | {
       readonly contextRef: ContractContextRef;
-      readonly view: 'summary' | 'diagnostics';
-      readonly page?: PageRequestProjection;
+      readonly view: 'summary';
+      readonly stepPage?: PageRequestProjection<'steps'>;
+    }
+  | {
+      readonly contextRef: ContractContextRef;
+      readonly view: 'diagnostics';
+      readonly diagnosticPage?: PageRequestProjection<'diagnostics'>;
     }
   | {
       readonly contextRef: ContractContextRef;
@@ -619,30 +630,39 @@ interface FormContextSummary {
   };
   readonly form: {
     readonly nodeCount: number;
-    readonly diagnosticCounts: readonly {
-      readonly identity: DiagnosticIdentityProjection;
-      readonly count: number;
-    }[];
-    readonly executableCapabilities: readonly E2eCapability[];
-    readonly scenarioIds: readonly string[];
+    readonly contractDiagnosticEvidenceCounts: AtomicCollectionProjection<
+      'contract-diagnostic-evidence-counts',
+      {
+        readonly identity: ContractDiagnosticIdentityProjection;
+        readonly sourceSeverity: 'warning' | 'error';
+        readonly count: number;
+      }
+    >;
+    readonly executableCapabilities: AtomicCollectionProjection<
+      'executable-capabilities',
+      E2eCapability
+    >;
+    readonly scenarioIds: AtomicCollectionProjection<'scenario-ids', string>;
     readonly effectAnalysis: 'complete' | 'incomplete' | 'absent';
   };
-  readonly blockers: readonly DiagnosticSummary[];
+  readonly blockers: AtomicCollectionProjection<'blockers', DiagnosticSummary>;
 }
 
 type GetFormContextResult =
   | {
       readonly schemaVersion: '0.1.0';
       readonly view: 'summary';
+      readonly status: 'complete';
       readonly summary: FormContextSummary;
-      readonly page: PageProjection; // pages summary.usage.steps
+      readonly page: PageProjection<'steps'>;
     }
   | {
       readonly schemaVersion: '0.1.0';
       readonly view: 'diagnostics';
+      readonly status: 'complete';
       readonly contextRef: ContractContextRef;
       readonly diagnostics: readonly QueryDiagnosticProjection[];
-      readonly page: PageProjection;
+      readonly page: PageProjection<'diagnostics'>;
     }
   | {
       readonly schemaVersion: '0.1.0';
@@ -650,7 +670,10 @@ type GetFormContextResult =
       readonly status: 'complete';
       readonly contextRef: ContractContextRef;
       readonly journey: UsageJourneyProjection;
-      readonly diagnostics: readonly QueryDiagnosticProjection[];
+      readonly diagnostics: AtomicCollectionProjection<
+        'diagnostics',
+        QueryDiagnosticProjection
+      >;
     }
   | {
       readonly schemaVersion: '0.1.0';
@@ -660,22 +683,46 @@ type GetFormContextResult =
       readonly diagnostics: readonly [
         Extract<
           AgentContextQueryDiagnostic,
-          { readonly code: 'ATOMIC_VIEW_TOO_LARGE' }
+          {
+            readonly code:
+              | 'ATOMIC_VIEW_TOO_LARGE'
+              | 'ATOMIC_RECORD_TOO_LARGE';
+          }
         >,
         ...Extract<
           AgentContextQueryDiagnostic,
-          { readonly code: 'ATOMIC_VIEW_TOO_LARGE' }
+          {
+            readonly code:
+              | 'ATOMIC_VIEW_TOO_LARGE'
+              | 'ATOMIC_RECORD_TOO_LARGE';
+          }
         >[],
+      ];
+    }
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly view: 'summary' | 'diagnostics';
+      readonly status: 'refused';
+      readonly contextRef: ContractContextRef;
+      readonly diagnostics: readonly [
+        Extract<
+          AgentContextQueryDiagnostic,
+          { readonly code: 'ATOMIC_RECORD_TOO_LARGE' }
+        >,
       ];
     };
 ```
 
 **Inference — bounded-result rule:** `summary` pages only the ordered step
-summaries and `diagnostics` pages only diagnostics; both accept and return the
-same opaque cursor protocol. A journey is a referentially complete atomic view:
+summaries through `stepPage`/`collection: 'steps'`, while `diagnostics` pages
+only agent-context diagnostics through
+`diagnosticPage`/`collection: 'diagnostics'`. A journey is a referentially
+complete atomic view:
 the server either returns its entry, steps, actions, and outcomes together or
 returns `ATOMIC_VIEW_TOO_LARGE` with no partial journey. This avoids a cursor
-that strands an action away from its step or outcome.
+that strands an action away from its step or outcome. Any oversized atomic
+summary/diagnostic record returns `ATOMIC_RECORD_TOO_LARGE` with no partial
+record.
 
 ### 3. `find_form_nodes`
 
@@ -700,17 +747,32 @@ interface FindFormNodesInput {
     | 'effects'
     | 'unknowns'
   )[];
-  readonly limit?: number;
-  readonly cursor?: string;
+  readonly nodePage?: PageRequestProjection<'nodes'>;
 }
 
-interface FindFormNodesResult {
-  readonly schemaVersion: '0.1.0';
-  readonly contextRef: ContractContextRef;
-  readonly nodes: readonly E2eNodeProjection[];
-  readonly page: PageProjection;
-  readonly diagnostics: readonly QueryDiagnosticProjection[];
-}
+type FindFormNodesResult =
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly status: 'complete';
+      readonly contextRef: ContractContextRef;
+      readonly nodes: readonly E2eNodeProjection[];
+      readonly page: PageProjection<'nodes'>;
+      readonly diagnostics: AtomicCollectionProjection<
+        'diagnostics',
+        QueryDiagnosticProjection
+      >;
+    }
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly status: 'refused';
+      readonly contextRef: ContractContextRef;
+      readonly diagnostics: readonly [
+        Extract<
+          AgentContextQueryDiagnostic,
+          { readonly code: 'ATOMIC_RECORD_TOO_LARGE' }
+        >,
+      ];
+    };
 ```
 
 **Inference:** Exact `nodeId` and typed `modelPath` matches outrank labels.
@@ -744,7 +806,10 @@ type GetE2eSliceResult =
       readonly prerequisites: readonly E2ePrerequisite[];
       readonly effects: readonly DeclaredEffectProjection[];
       readonly effectAnalysis: 'complete' | 'incomplete' | 'absent';
-      readonly blockers: readonly DiagnosticSummary[];
+      readonly blockers: AtomicCollectionProjection<
+        'blockers',
+        DiagnosticSummary
+      >;
     }
   | {
       readonly schemaVersion: '0.1.0';
@@ -756,7 +821,8 @@ type GetE2eSliceResult =
           {
             readonly code:
               | 'STEP_SCOPE_MISMATCH'
-              | 'ATOMIC_VIEW_TOO_LARGE';
+              | 'ATOMIC_VIEW_TOO_LARGE'
+              | 'ATOMIC_RECORD_TOO_LARGE';
           }
         >,
         ...Extract<
@@ -764,7 +830,8 @@ type GetE2eSliceResult =
           {
             readonly code:
               | 'STEP_SCOPE_MISMATCH'
-              | 'ATOMIC_VIEW_TOO_LARGE';
+              | 'ATOMIC_VIEW_TOO_LARGE'
+              | 'ATOMIC_RECORD_TOO_LARGE';
           }
         >[],
       ];
@@ -776,7 +843,9 @@ every focused `nodeId` must belong to that exact step. A cross-step request
 returns `STEP_SCOPE_MISMATCH`; the server never chooses a step from array order.
 The prerequisite/effect closure is atomic because truncating it could omit an
 execution-safety edge. A server cap therefore returns `ATOMIC_VIEW_TOO_LARGE`
-with no partial slice. A later multi-step tool would need an ordered `steps`
+with no partial slice; an individually oversized node/prerequisite/effect
+record instead returns `ATOMIC_RECORD_TOO_LARGE`. A later multi-step tool would
+need an ordered `steps`
 array and explicit node membership; it is not part of the minimum journey.
 
 ### 5. `validate_test_intent` and `compile_test_intent`
@@ -792,6 +861,19 @@ never accepts raw selectors, arbitrary driver imports, or expressions.
 interface ValidateTestIntentInput {
   readonly intent: TestIntent;
 }
+
+type ApprovedItemContext =
+  | {
+      readonly kind: 'existing-index';
+      readonly repeaterNodeId: string;
+      readonly index: number;
+    }
+  | {
+      readonly kind: 'created-item';
+      readonly repeaterNodeId: string;
+      readonly itemContextId: string;
+      readonly establishedByPlanStepId: string;
+    };
 
 interface ApprovedNodeBinding {
   readonly nodeId: string;
@@ -834,12 +916,7 @@ interface ApprovedNodeBinding {
       readonly locatorTargetRef: string;
     }[],
   ];
-  readonly itemContext?: {
-    readonly kind: 'index';
-    readonly repeaterNodeId: string;
-    readonly index: number;
-    readonly establishedByPlanStepId: string;
-  };
+  readonly itemContext?: ApprovedItemContext;
 }
 
 type ResolvedPlanValue =
@@ -948,14 +1025,39 @@ type ValidatedExecutionStep = ValidatedPlanStepBase &
         ];
       }
     | {
-        readonly op: 'add-item' | 'expand-item';
-        readonly binding: ApprovedNodeBinding;
+        readonly op: 'add-item';
+        readonly binding: Omit<ApprovedNodeBinding, 'itemContext'> & {
+          readonly itemContext?: never;
+        };
         readonly physicalOperationId: string;
-        readonly item?: { readonly index: number };
-        readonly establishesItemContext?: {
-          readonly kind: 'index';
+        readonly addTarget: {
+          readonly partRef: string;
+          readonly locatorTargetRef: string;
+        };
+        readonly establishesItemContext: {
+          readonly kind: 'created-item';
+          readonly itemContextId: string;
           readonly repeaterNodeId: string;
-          readonly index: number;
+          readonly establishedByPlanStepId: string;
+          readonly itemTarget: {
+            readonly partRef: string;
+            readonly locatorTargetRef: string;
+          };
+        };
+      }
+    | {
+        readonly op: 'expand-item';
+        readonly binding: ApprovedNodeBinding & {
+          readonly itemContext: ApprovedItemContext;
+        };
+        readonly physicalOperationId: string;
+        readonly itemTarget: {
+          readonly partRef: string;
+          readonly locatorTargetRef: string;
+        };
+        readonly expandTarget: {
+          readonly partRef: string;
+          readonly locatorTargetRef: string;
         };
       }
     | {
@@ -1115,6 +1217,13 @@ must additionally prove all of the following before returning `status: valid`:
 - every binding for a wildcard descendant carries an exact `itemContext` whose
   establishing plan step precedes the descendant operation. No descendant
   driver may receive a default index; and
+- `add-item` has no input item context, serializes its exact add-control target,
+  and establishes one plan-local `created-item` context through a driver
+  capability that proves exactly one new item and returns its separately
+  serialized scoped item target. `expand-item` is a separate variant and
+  always carries an `existing-index` or `created-item` context plus exact
+  item/expand targets; a many-cardinality expand part is never passed to the
+  compiler unscoped; and
 - every usage-action commit is bidirectionally linked: the set points to the
   action plan step and that action's `commitIds` contains the selected commit.
 - every validation activation is assigned to exactly one serialized physical
@@ -1149,6 +1258,18 @@ expire within a bounded interval, and bind the context hash, normalized query,
 sort order, and privacy scope so they cannot continue a different request. A
 model should not need the whole contract to add a two-field regression test.
 
+**Inference — cursor ownership:** Every page serializes exactly one collection
+name: `candidates`, `steps`, `diagnostics`, or `nodes`. Its matching request
+property and `PageRequestProjection` repeat that same literal collection name.
+All top-level secondary arrays in that result are
+`AtomicCollectionProjection`s repeated completely on every page. Nested arrays
+inside one primary record are part of that atomic record. Strict output schemas
+cap every nested string/array and each primary record; if one candidate, node,
+summary, diagnostic, or secondary atomic collection cannot fit, the tool
+returns `ATOMIC_RECORD_TOO_LARGE` and no partial primary record. Cursor tests
+must concatenate only the named collection, verify stable repeated atomic
+metadata, and reject a cursor under a different collection/query/context.
+
 ## Minimal typed test intent
 
 ```ts
@@ -1180,13 +1301,21 @@ type IntentValue =
       readonly expectedClassification: 'valid' | 'invalid';
     };
 
+type IntentItemContext =
+  | {
+      readonly kind: 'index';
+      readonly repeaterNodeId: string;
+      readonly index: number;
+    }
+  | {
+      readonly kind: 'created-item';
+      readonly repeaterNodeId: string;
+      readonly capture: string;
+    };
+
 interface TestIntentNodeTarget {
   readonly nodeId: string;
-  readonly itemContext?: {
-    readonly kind: 'index';
-    readonly repeaterNodeId: string;
-    readonly index: number;
-  };
+  readonly itemContext?: IntentItemContext;
 }
 
 type TestIntentStep =
@@ -1196,9 +1325,14 @@ type TestIntentStep =
       readonly value: IntentValue;
     })
   | {
-      readonly op: 'addItem' | 'expandItem';
+      readonly op: 'addItem';
       readonly nodeId: string;
-      readonly item?: { readonly index: number };
+      readonly captureAs: string;
+    }
+  | {
+      readonly op: 'expandItem';
+      readonly nodeId: string;
+      readonly itemContext: IntentItemContext;
     }
   | (TestIntentNodeTarget & {
       readonly op: 'expectState';
@@ -1272,6 +1406,16 @@ descendants require a serialized item context plus explicit `addItem` or
 `expandItem` when the profile says activation is needed. An array wildcard is
 never converted to row zero by convention.
 
+**Inference:** `addItem.captureAs` is a plan-local alias, not a DOM locator. The
+validator resolves it to an `itemContextId`; the approved add driver must prove
+that the operation creates exactly one item and return that item under the
+exact serialized item target, separately from the add-control target. Capture
+aliases are unique within a case and a created-item reference must point to an
+earlier add step. If the driver cannot establish exactly one item, validation returns
+`REPEATER_ITEM_CAPTURE_UNSUPPORTED`. `expandItem` always names either an exact
+existing index or a prior capture, and validation serializes item-scoped item
+and expand targets. Missing context is rejected before plan creation.
+
 **Inference:** Validation assertions do not authorize activation. A declared,
 node-local activation such as blur requires an explicit `activateValidation`
 step and may not navigate, submit, persist data, or invoke a usage action.
@@ -1302,6 +1446,7 @@ interface IntentDiagnosticBase {
   readonly schemaVersion: '0.1.0';
   readonly message: string; // rendered from the code-owned stable template
   readonly evidenceRefs: readonly string[];
+  readonly sourceDiagnostics: readonly ContractDiagnosticEvidenceProjection[];
 }
 
 interface SearchDiagnosticLocation {
@@ -1483,6 +1628,11 @@ interface IntentDiagnosticPolicyByCode {
     readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
     readonly remediation: readonly [{ readonly kind: 'choose-item-context'; readonly repeaterNodeId: string }];
   };
+  readonly REPEATER_ITEM_CAPTURE_UNSUPPORTED: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-repeater-capture'; readonly repeaterNodeId: string }];
+  };
   readonly EFFECT_COVERAGE_INCOMPLETE: {
     readonly phase: 'validation'; readonly severity: 'warning'; readonly blocking: false;
     readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
@@ -1497,6 +1647,16 @@ interface IntentDiagnosticPolicyByCode {
     readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
     readonly at: ContextDiagnosticLocation;
     readonly remediation: readonly [{ readonly kind: 'narrow-slice'; readonly maximumItems: number }];
+  };
+  readonly ATOMIC_RECORD_TOO_LARGE: {
+    readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: ContextDiagnosticLocation & { readonly recordKind: string; readonly recordId: string };
+    readonly remediation: readonly [{ readonly kind: 'narrow-projection'; readonly maximumBytes: number }];
+  };
+  readonly CONTRACT_CONTEXT_INVALID: {
+    readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: ContextDiagnosticLocation & { readonly aspect: string };
+    readonly remediation: readonly [{ readonly kind: 'regenerate-artifacts' }];
   };
   readonly RUNTIME_PARITY_MISMATCH: {
     readonly phase: 'runtime'; readonly severity: 'error'; readonly blocking: true;
@@ -1543,6 +1703,28 @@ existing records whose trusted drivers are absent; missing, unsupported, and
 ambiguous commit/value-assertion cases have distinct codes rather than one
 catch-all refusal.
 
+**Inference — form-contract diagnostic boundary:** Raw
+`ContractDiagnosticCodeProjection` values are not executable diagnostics in
+MCP results. They appear only as source evidence counts or inside
+`IntentDiagnosticBase.sourceDiagnostics`, where `sourceSeverity` preserves the
+artifact's observed/configured severity without granting agent-facing phase,
+blocking, or remediation semantics. Query `diagnostics` and every `blockers`
+collection contain only `IntentDiagnostic` variants.
+
+A schema-owned projection first classifies the affected agent operation/aspect,
+then emits the corresponding fixed `IntentDiagnosticPolicyByCode` variant—for
+example, an opaque value classifier becomes `VALUE_CLASSIFICATION_UNKNOWN`, an
+incomplete effect becomes `EFFECT_COVERAGE_INCOMPLETE`, and an unmapped
+interaction becomes `UNSUPPORTED_INTERACTION`—while attaching the raw contract
+record as causal evidence. Raw identity or severity alone never selects that
+variant. If a contract problem lacks the structured node/effect/usage unknown
+needed for one of those operation-specific projections, the context is invalid
+for agent execution and returns fixed `CONTRACT_CONTEXT_INVALID`; it never
+forwards a generic form-contract severity/phase/blocking tuple. Runtime tests
+must enumerate every `ContractDiagnosticCodeProjection`, prove it is
+evidence-only, exercise every allowed structured operation/aspect-to-agent-code
+mapping in both directions, and fail closed on a missing structured projection.
+
 | Failure | Required diagnostic behavior | Example stable message | Evidence class |
 | --- | --- | --- | --- |
 | Multiple usage matches | Block and return match reasons, not a winner. | `AMBIGUOUS_FORM_USAGE: 2 usages match; choose an exact usageId.` | Inference |
@@ -1551,6 +1733,8 @@ catch-all refusal.
 | Outcome exists but cannot be asserted | Block the outcome assertion. | `OUTCOME_ASSERTION_UNSUPPORTED: outcome ... has no trusted assertion driver.` | Inference |
 | Focus nodes cross the requested step | Refuse the whole slice; return exact step candidates. | `STEP_SCOPE_MISMATCH: all focus nodes must belong to step ...` | Inference |
 | Atomic journey/slice exceeds its safe cap | Refuse without partial data and suggest a narrower focus. | `ATOMIC_VIEW_TOO_LARGE: requested closure exceeds ... items.` | Inference |
+| One primary or secondary atomic record exceeds its cap | Refuse without partial data. | `ATOMIC_RECORD_TOO_LARGE: node ... exceeds the safe projection cap.` | Inference |
+| Contract evidence has no structured agent-context projection | Refuse executable context and regenerate/fix the artifact projection. | `CONTRACT_CONTEXT_INVALID: aspect ... cannot be represented safely.` | Inference |
 | Source/artifact drift | Block compile; search may still return stale candidates. | `STALE_CONTEXT: form contract was generated from a different input digest.` | Inference |
 | Submitted context differs from validated plan | Block before driver resolution. | `CONTEXT_MISMATCH: compile context does not equal the plan's pinned context.` | Inference |
 | Submitted plan does not reproduce its hash | Block before driver resolution. | `PLAN_HASH_MISMATCH: canonical submitted plan does not match planHash.` | Inference |
@@ -1564,6 +1748,7 @@ catch-all refusal.
 | Async target lacks readiness | Block; no sleep suggestion. | `READINESS_UNAVAILABLE: effect requires an undeclared or unsupported readiness capability.` | Inference |
 | Hidden branch lacks witness | Block interaction, allow explicit source inspection. | `HIDDEN_NODE_UNREACHABLE: selected context does not prove a visible path.` | Inference |
 | Repeater wildcard lacks row context | Block. | `REPEATER_CONTEXT_REQUIRED: choose/add an item before addressing wildcard descendant.` | Inference |
+| Add driver cannot identify exactly one created item | Block capture and every dependent descendant/expand step. | `REPEATER_ITEM_CAPTURE_UNSUPPORTED: add-item cannot establish a deterministic item context.` | Inference |
 | Value commit ID absent, driver unsupported, or authority ambiguous | Block post-set execution with the distinct fixed policy. | `COMMIT_NOT_FOUND`, `COMMIT_UNSUPPORTED`, or `COMMIT_AUTHORITY_AMBIGUOUS`. | Repository observation + inference |
 | Committed-value assertion ID absent or driver unsupported | Block the assertion with the distinct fixed policy. | `VALUE_ASSERTION_NOT_FOUND` or `VALUE_ASSERTION_UNSUPPORTED`. | Inference |
 | Validation record absent | Block activation/assertion. | `VALIDATION_NOT_FOUND: validation ID ... is absent from the pinned context.` | Repository observation + inference |
@@ -2159,13 +2344,13 @@ fallback for blocked/rare cases, and use C only as observed parity evidence.
 Do not ship B as “safe agent generation,” because it preserves the most
 failure-prone last mile.
 
-### Review-instance-3 remediation decisions
+### Contract-closure remediation decisions
 
 | Finding | Credible options considered | Selected correction and constraint fit | Failure modes / reversibility | Confidence and evidence that would change it |
 | --- | --- | --- | --- | --- |
-| Lossy validated plan | Re-derive from pinned metadata; duplicate every record; serialize stable selections and rehydrate exact IDs. | Serialize commit linkage, physical-operation authority, wrapper mechanic, and item context; allow lookup only by selected immutable ID. Preserves stateless compilation without copying locator recipes. | More plan bytes and referential-integrity checks; fully versionable and reversible before production schemas exist. | 0.94. A proof that every omitted choice is globally unique and immutable across registry versions could justify less serialization. |
-| Non-exhaustive diagnostics | Generic envelope plus prose table; hand-written discriminated union; schema-owned policy map generating type/runtime variants. | Use the exhaustive policy map as the normative source for code, phase, severity, blocking, location, and remediation. It is compact enough to test bidirectionally. | Policy changes become versioned contract changes; code generation adds modest tooling. Reversible by versioning, not silent mutation. | 0.93. If the runtime-schema library cannot preserve exact mapped variants, generate an explicit union from the same data and snapshot it. |
-| Incomplete pagination | Page every nested array; silently cap; page safe lists and atomically refuse integrity-sensitive closures. | Cursor-page independent lists; return journey/slice closures complete or refuse. Matches progressive disclosure without severing prerequisites from nodes. | Atomic refusal can block unusually large steps; the user must narrow focus. Reversible through a future separate multi-step/chunked closure protocol. | 0.90. Measured workplace closures regularly exceeding the cap would justify a graph-continuation design with dependency proofs. |
+| Lossy validated plan | Re-derive from pinned metadata; duplicate every record; serialize stable selections and rehydrate exact IDs. | Serialize commit linkage, physical-operation authority, wrapper mechanic, and item context; split add/capture from exact-item expand; allow lookup only by selected immutable ID. Preserves stateless compilation without copying locator recipes. | More plan bytes and referential-integrity checks; fully versionable and reversible before production schemas exist. | 0.94. A proof that every omitted choice is globally unique and immutable across registry versions could justify less serialization. |
+| Non-exhaustive diagnostics | Generic envelope plus prose table; forward raw form diagnostics; schema-owned agent policy with raw diagnostics retained only as evidence. | Use the exhaustive agent policy map as the normative source for code, phase, severity, blocking, location, and remediation; raw contract codes never enter executable diagnostic collections. | Policy changes become versioned contract changes; aspect projection adds modest tooling. Reversible by versioning, not silent mutation. | 0.93. If structured node/effect unknowns cannot conservatively project a raw contract issue, keep the operation blocked rather than restoring a generic tuple. |
+| Incomplete pagination | Page every nested array; silently cap; page one named safe list and atomically repeat/refuse all secondary data. | Each cursor names exactly one primary collection; journey/slice closures and secondary collections are complete, while an oversized record refuses. | Atomic refusal can block unusually large records/steps; the user must narrow focus. Reversible through a future separate multi-step/chunked closure protocol. | 0.90. Measured workplace records/closures regularly exceeding caps would justify a graph-continuation design with dependency proofs. |
 | Ambiguous slice step | Infer from first node; return multiple steps; require exact step. | Require `withinStepId` and reject cross-step focus. It is the smallest truthful shape for the stated step-one request. | Cross-step tests need multiple slices or a later tool; no silent membership loss. Additive future extension is straightforward. | 0.96. Representative tests that inherently assert across several steps would justify an ordered multi-step result sooner. |
 
 ## UX failure modes
@@ -2214,6 +2399,11 @@ Property-test the `PageProjection` union so `truncated: true` always has a
 cursor and `false` never does; replay every cursor only with its pinned query
 and context. Verify complete continuation for each pageable view. For atomic
 journey/slice views, exceed the cap and assert refusal with no partial payload.
+For every pageable result, assert that request, page, and continuation name the
+same single collection; concatenate only that collection and prove all
+secondary `AtomicCollectionProjection`s repeat completely and identically.
+Exceed each candidate/node/summary/diagnostic record cap and assert
+`ATOMIC_RECORD_TOO_LARGE` with no partial record.
 Request nodes from two steps and assert `STEP_SCOPE_MISMATCH`; a same-step
 request must return the exact requested `withinStepId`.
 
@@ -2235,6 +2425,12 @@ ambiguous commit authority, and unsupported validation activation/assertion
 produce no plan and fail with their exact discriminated policies. Assert that
 the runtime diagnostic policy and schema have identical exhaustive code sets
 and reject every wrong code/phase/severity/blocking/location/remediation pair.
+Enumerate every form-contract code and prove it can appear only as source
+evidence; cover every allowed operation/aspect translation to a fixed
+agent-context diagnostic and reject generic raw projections. Split `addItem`
+from `expandItem`: reject expand without exact item context and exact scoped
+targets, round-trip both an existing-index expand and add-created capture, and
+reject add when the driver cannot prove/capture exactly one created item.
 Assert that every valid plan step is one member of the closed discriminated
 union and contains all approved binding, target, value, commit, wrapper
 mechanic, item context, precondition, readiness, activation, action, and
@@ -2257,8 +2453,9 @@ commit authority; and prove post-commit rather than DOM-only value state.
 Round-trip representative plans through canonical JSON, then compile them with
 a registry API instrumented to fail if it performs selection instead of exact
 ID lookup. Prove wrapper click/check preservation, repeater descendant item
-binding, bidirectional usage-action commit linkage, and that a shared
-blur-commit/validation activation emits exactly one browser event.
+binding at schema/compile-call level, bidirectional usage-action commit linkage,
+and that a shared blur-commit/validation activation emits exactly one browser
+event. Browser-level add/capture/expand proof remains in Slice 5.
 Compare author/review time and first-run rate against an ordinary hand-written
 Playwright test.
 
@@ -2280,8 +2477,10 @@ observed locator/role/state parity, source-to-contract change impact, and
 redacted trace policy only after the simpler path is stable.
 
 **Gate:** Representative repeater and overlay cases remain deterministic under
-row count and DOM changes; parity failures identify the contract/profile owner
-without exposing sensitive values.
+row count and DOM changes. Prove add establishes exactly one created-item
+context, expand requires and stays scoped to an exact existing/created item,
+and a many-cardinality expand part never reaches the driver unscoped. Parity
+failures identify the contract/profile owner without exposing sensitive values.
 
 ## Feasibility and value recommendation
 
@@ -2318,7 +2517,7 @@ the first workplace sample.
 | Acceptance criterion | Evidence in this artifact | Result |
 | --- | --- | --- |
 | 1. Two end-to-end walkthroughs cover positive and negative tests, including a custom/dynamic field and conditional branch. | “Walkthrough 1” covers a positive order-entry flow with async runtime choice, custom currency control, explicit blur commit, a separately approved validation activation coalesced into one serialized physical event, and post-commit assertions; “Walkthrough 2” covers a negative custom dependent-select and conditional required field. Both enumerate complete execution prerequisites and include query, intent, validation, and conceptual driver calls/refusals. | Met as paper walkthrough; current artifacts are explicitly shown insufficient. |
-| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Closed query results; cursor-safe independent lists and complete-or-refuse atomic closures; exact single-step slice scope; progressive disclosure; typed intent with distinct commit/validation/action authority; a lossless discriminated stateless plan/compile handoff; an exhaustive code-policy mapping; security/privacy; and alternatives/remediation-decision sections. | Met as a proposed contract, pending production-schema tests in Slice 2. |
+| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Closed query results; collection-named request/response cursors with atomic secondary metadata and oversized-record refusal; complete-or-refuse atomic closures; exact single-step slice scope; progressive disclosure; typed intent with exact add/capture/expand authority and distinct commit/validation/action authority; a lossless discriminated stateless plan/compile handoff; raw form diagnostics retained only as evidence behind an exhaustive fixed agent policy; security/privacy; and alternatives/remediation-decision sections. | Met as a proposed contract, pending production-schema tests in Slices 1–2. |
 | 3. Explicit required/optional/not-useful RH-01–RH-04 metadata list. | “RH-01–RH-04 metadata dependency audit.” | Met without assuming lane success. |
 | 4. Feasibility/value recommendation, confidence, UX failure modes, ordered implementation slices. | Executive decision, alternatives, UX table, slices/stop gates, and feasibility/value section. | Met. |
 
@@ -2484,6 +2683,63 @@ checked for opaque cursor request/continuation semantics, and the tools page was
 checked for output-schema conformance requirements. Current official Angular
 and Playwright sources were rechecked for `updateOn`, `fill`, `blur`, strict
 locator, and actionability behavior.
+
+### New-cycle review-instance-1 correction and final self-review
+
+**Repository observation:** On 2026-08-27, the three findings from independent
+review instance 1 of 3 in the newly authorized cycle were accepted and
+addressed in this artifact only. The correction worktree started from commit
+`8f69d33de2591c6739efad79cd45ba9a22bd7393` on branch
+`codex/rh-05-agent-e2e-context-flow`.
+
+| Accepted finding | Retained correction | Adversarial self-check |
+| --- | --- | --- |
+| Repeater add/expand authority still permits an unscoped row | Split intent and plan add/expand variants. Add has no input item context, names the exact add target, and establishes a unique created-item capture with a separate exact item target. Expand requires an exact existing-index or earlier created-item context plus exact item/expand targets. | Strict negative types reject expand without context, add with an input context, add without its target, and incomplete created-item authority. Slice 2 owns schema/round-trip proof; Slice 5 owns browser proof that a many-cardinality expand never reaches a driver unscoped. |
+| Raw form-contract diagnostics bypass the fixed agent policy | Removed raw form-contract branches from executable query diagnostics and blockers. Raw identity/severity remain evidence only; structured artifact aspects select one of the fixed agent variants, while an absent safe projection returns fixed `CONTRACT_CONTEXT_INVALID`. | AST audit found 37 structurally complete policy entries. A negative type rejects raw form diagnostics as `QueryDiagnosticProjection`; Slice 2 enumerates source codes, mappings, missing-projection refusal, and wrong policy tuples. |
+| A cursor does not identify which collection it continues or how other records remain complete | Both request and response page types carry the same literal collection identity. Each result pages one primary list; top-level secondary lists are atomic and repeat completely. Nested arrays are part of capped atomic records, and an oversized primary/secondary record refuses with `ATOMIC_RECORD_TOO_LARGE`. | Type negatives reject both illegal truncation states and request/response collection mismatch. The Slice 1 gate requires per-collection continuation, stable repeated atomic metadata, cursor binding, and oversized-record refusal without partial data. |
+
+The final self-review also separated existing-index authority from plan-created
+item authority, required distinct add-control and created-item targets, and
+added the fail-closed contract-context diagnostic. These are bounded contract
+clarifications, not production implementation or an architecture change.
+
+```text
+$ pnpm check:docs
+Documentation checks passed for 57 files.
+Exit 0.
+
+$ pnpm exec vitest run fixtures/angular-monorepo/workspace-fixture.test.ts
+Test Files  1 passed (1)
+Tests       7 passed (7)
+Duration    14.80s
+Exit        0.
+
+$ pnpm check
+First sandboxed run: lint, 34 test files / 450 tests, and all builds passed;
+the workspace-consumer check then failed because pnpm could not write its
+external store (`ERR_PNPM_EPERM`). This was an environment limitation, not a
+test failure.
+Approved rerun: lint passed; 34 test files / 450 tests passed; all demo/app/
+fixture builds passed; workspace consumers, release manifest, package checks,
+demo smoke, and 57-file documentation checks passed. Exit 0.
+
+$ node /private/tmp/rh05-type-audit.cjs
+Total TypeScript fences       11
+Contract fences                9
+Contract TypeScript lines   1234
+Unexpected diagnostics         0
+Negative type assertions      14
+Unexpected diagnostics         0
+Policy codes                   37
+Incomplete policy entries      0
+Required correction codes    all present
+Executable raw contract diagnostics excluded
+Request/response page collections owned: candidates, diagnostics, nodes, steps
+Repeater add/expand split and exact expand binding confirmed
+Exit 0.
+The temporary audit file was outside the repository and removed after use so
+the named research artifact remains the only retained path.
+```
 
 ## Primary sources
 
