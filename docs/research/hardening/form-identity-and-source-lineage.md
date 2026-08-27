@@ -121,10 +121,11 @@ The authority chain used for this packet is:
   output. This is why cross-program declaration-to-source joining remains a
   feasibility gate rather than a proven result here.
 - Angular's [route-definition guide](https://angular.dev/guide/routing/define-routes)
-  documents literal `component`, `loadComponent`, and `loadChildren` route
-  forms and notes that loader functions can be arbitrary. Static route analysis
-  must therefore recognize a bounded grammar and preserve dynamic cases as
-  unknown.
+  documents the general route grammar and literal `component` form. Its
+  [route-loading strategies guide](https://angular.dev/guide/routing/loading-strategies)
+  documents `loadComponent`/`loadChildren` and that they may use arbitrary async
+  loader functions. Static route analysis must therefore recognize a bounded
+  grammar and preserve dynamic cases as unknown.
 - Angular's [AOT compiler guide](https://angular.dev/tools/cli/aot-compiler#how-aot-works)
   describes Angular metadata as instructions for constructing and interacting
   with Angular-managed classes. It does not define application Formly root
@@ -237,10 +238,10 @@ candidates. Wrapper calls, conditional aliases, and a higher-order parameter
 did not falsely resolve as direct usages. Route objects were considered only
 under a recognized `provideRouter` entry point: repeated and nested literal
 component routes were retained, an unrelated `{path, component}` object and a
-redirect were ignored, and lazy/dynamic cases remained unknown. Four invocations
+redirect were ignored, and lazy/dynamic cases remained unknown. Five invocations
 inside descriptor creation expressions/adapters were separately classified as
-definition-creation provenance, and report sorting uses code-unit rather than
-locale-sensitive ordering.
+definition-creation provenance after the callable-`const` fixture was added,
+and report sorting uses code-unit rather than locale-sensitive ordering.
 
 ### Inferences
 
@@ -281,12 +282,13 @@ tsconfigs, project references, declaration maps, generated files, path aliases,
 and build-tool overlays were not available. Cross-program source/declaration
 joining is unproven against the real topology.
 
-**`UNK-02` — Target factory conventions.** Named exported functions, classes,
-and callable `const` variables with direct arrow/function initializers are in
-the proposed first slice. It is not known how often the target names instead
-use object methods, bound functions, dependency-injected services, wrapper
-factories, inherited static methods, reassigned variables, or generated
-registries.
+**`UNK-02` — Target factory conventions.** Named directly exported functions,
+classes, and callable `const` variables with direct arrow/function initializers
+are in the proposed first slice. Export-list-only declarations are deliberately
+excluded from the first slice and must be inventoried by the workplace gate. It
+is not known how often target names instead use that export form, object methods,
+bound functions, dependency-injected services, wrapper factories, inherited
+static methods, reassigned variables, or generated registries.
 
 **`UNK-03` — Route composition conventions.** The frequency of literal route
 arrays, custom route builders, lazy route indirection, module federation, and
@@ -470,14 +472,19 @@ Rules:
   type-check the zero-argument `create`; an unconstrained identity helper is not
   sufficient.
 - The allowed `rootSymbol` syntax is exactly an identifier or property access
-  that the checker resolves to one of these named exported declarations: a
-  function, a class, or a `const` variable whose initializer is directly an
-  arrow function or function expression. This admits the common stable
-  `export const createForm = (...) => ...` convention without general value-flow
-  analysis. `let`/`var`, destructuring, indirect variable initializers, inline
-  expressions, local/unexported declarations, `.bind`, `.call`, `.apply`,
-  computed access, and conditional expressions fail with
-  `UNSTABLE_SOURCE_SYMBOL` or `UNEXPORTED_SOURCE_SYMBOL`.
+  that the checker resolves to one of these named **directly exported**
+  declarations: a function or class with a declaration-level `export` modifier,
+  or a `const` variable in an `export const` statement whose initializer is
+  directly an arrow function or function expression. This admits the common
+  stable `export const createForm = (...) => ...` convention without general
+  value-flow or module-export reachability analysis. A declaration exported
+  only later through `export { createForm }` is intentionally unsupported in
+  the first slice and fails with `UNEXPORTED_SOURCE_SYMBOL`; the workplace gate
+  measures its prevalence before contract approval. `let`/`var`, destructuring,
+  indirect variable initializers, inline expressions, local/unexported
+  declarations, `.bind`, `.call`, `.apply`, computed access, and conditional
+  expressions fail with `UNSTABLE_SOURCE_SYMBOL` or
+  `UNEXPORTED_SOURCE_SYMBOL`.
 - The checker must find a call or construct signature whose result is assignable
   to the approved form-root product. A stable but unrelated function/class fails
   `INCOMPATIBLE_SOURCE_SYMBOL`. This type check prevents obvious false anchors;
@@ -921,7 +928,7 @@ rebuilds, but the artifact hashes remain the correctness mechanism.
 | Resolution input changes outside retained sources | Old alias/declaration relation appears current | Hash the instrumented semantic resolution closure or fail the program closed as incomplete |
 | Compiler API changes | Index behavior drifts across TypeScript versions | Pin supported versions, record version, run compatibility fixtures |
 | Programmatic descriptor hides literal form ID/root | Cannot establish exact anchor | Require explicit typed definition/lineage sidecar; emit `UNANCHORED_FORM_DEFINITION` |
-| `rootSymbol` is inline, local, bound, unexported, reassigned, or an indirect variable value | Portable identity is false | Accept only exported functions/classes and direct callable `const` initializers; keep contract source Node-only and bundle-isolated |
+| `rootSymbol` is inline, local, bound, unexported, export-list-only, reassigned, or an indirect variable value | Portable first-slice identity is unsupported | Accept only declaration-level exported functions/classes and direct `export const` callable initializers; inventory export-list-only prevalence; keep contract source Node-only and bundle-isolated |
 | `rootSymbol` has no compatible call/construct result | Unrelated stable symbol becomes form authority | Reject with `INCOMPATIBLE_SOURCE_SYMBOL`; type compatibility is necessary but descriptor declaration remains authoritative |
 | Descriptor adapter invokes its root | Synthetic creation appears as a page usage | Retain `definition-creation` provenance on the anchor and exclude it from ordinary usage queries |
 | Wrapper body grows dynamic | Previously derived edge becomes unsafe | Version bounded grammar, downgrade to unknown, require annotation |
@@ -944,7 +951,7 @@ the following gates pass on a sanitized representative workplace slice:
 
 | Gate | Pass condition | Stop condition |
 | --- | --- | --- |
-| `GATE-SYM-01` Direct identity | 100% of enumerated direct calls/constructors for the target function, class, and exported callable-`const` conventions resolve to the expected compatible anchored symbol across local, path-alias, barrel, and namespace imports; same-named helpers/lookalikes are ignored and descriptor adapter calls are creation provenance | Any wrong unique match, incompatible root accepted, helper matched by name/path text rather than canonical identity, or creation call reported as application usage |
+| `GATE-SYM-01` Direct identity | 100% of enumerated direct calls/constructors for declaration-level exported function, class, and direct `export const` conventions resolve to the expected compatible anchored symbol across local, path-alias, barrel, and namespace imports; export-list-only declarations return the documented unsupported diagnostic; same-named helpers/lookalikes are ignored and descriptor adapter calls are creation provenance | Any wrong unique match, export-list-only declaration silently accepted or misdiagnosed, incompatible root accepted, helper matched by name/path text rather than canonical identity, or creation call reported as application usage |
 | `GATE-PROG-01` Distributed programs | At least three leaf projects, one project reference, one declaration-output consumer, and one cross-project alias join to one portable anchor identity | Join depends on symbol spelling, absolute host path, or comparing `ts.Symbol` objects across programs |
 | `GATE-COVERAGE-01` Relevance and overlap | Multiple configs/options/hosts in one project, overlapping app/test roots, scope exclusions, an incomplete dependency graph, and conflicting resolution prove unique program IDs, conservative relevance, deduplication, retained contributor IDs, and incomplete-query behavior | Missing or unproven-excluded program produces an unscoped empty result, or overlap becomes false ambiguity/duplicate usage |
 | `GATE-AMB-01` Ambiguity | Multiple form IDs, multiple routes, and conditional wrappers always return sorted ambiguity/unknown and never a guessed exact result | Any input-order-dependent or first-match selection |
@@ -968,18 +975,21 @@ These are proposed follow-up units, not changes authorized by RH-01:
 
 1. **`RH01-T1` — Approve source-lineage contract.** Decide artifact ownership,
    evidence vocabulary, portable anchor identity, path modes, strict usage
-   marker attachment nodes, exported callable-`const` support, and
-   contract-source bundle isolation. Output: approved spec/ADR update.
+   marker attachment nodes, the declaration-level export requirement and
+   export-list-only exclusion for callable `const` symbols, and contract-source
+   bundle isolation. Output: approved spec/ADR update.
 2. **`RH01-T2` — Run workplace topology gate.** Add sanitized fixtures for leaf
    tsconfigs, project references, declaration maps, path aliases, barrels, and
    lazy features, and inventory function/class/callable-`const` factory
-   conventions. Measure cold/incremental resource use. Output: retained gate
-   evidence; no public API yet.
+   conventions including declaration-level versus export-list-only forms.
+   Measure cold/incremental resource use. Output: retained gate evidence; no
+   public API yet.
 3. **`RH01-T3` — Add typed definition anchors.** Add
    `defineFormContractDefinition` and optional `lineage.rootSymbol` in the
    workspace authoring boundary with explicit precedence, exported
-   call/construct compatibility, creation-provenance classification, bundle
-   isolation, and no artifact function serialization. Output: anchored
+   call/construct compatibility, declaration-level export enforcement and an
+   export-list-only negative fixture, creation-provenance classification,
+   bundle isolation, and no artifact function serialization. Output: anchored
    definition tests.
 4. **`RH01-T4` — Build direct source index.** Create per-leaf TypeScript programs,
    canonicalize alias chains, index direct calls/constructors, preserve

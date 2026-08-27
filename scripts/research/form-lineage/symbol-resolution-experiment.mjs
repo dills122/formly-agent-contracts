@@ -18,6 +18,8 @@ const sources = new Map(
         return { fields: [input] };
       }
       export const ArrowFormConfig = (input: object): FormInstance => ({ fields: [input] });
+      const ExportListOnlyFormConfig = (input: object): FormInstance => ({ fields: [input] });
+      export { ExportListOnlyFormConfig };
       export class OrderEntryStepperForm implements FormInstance {
         readonly fields: readonly object[];
         constructor(readonly input: object) { this.fields = [input]; }
@@ -466,6 +468,16 @@ assert.equal(
   false,
   'explicit rootSymbol must override a direct create adapter',
 );
+const exportListOnlySymbol = declaredSymbol(
+  `${virtualRoot}/forms.ts`,
+  'ExportListOnlyFormConfig',
+);
+assert.equal(
+  exportListOnlySymbol.valueDeclaration !== undefined &&
+    isSupportedExportedRootDeclaration(exportListOnlySymbol.valueDeclaration),
+  false,
+  'the first slice intentionally requires a declaration-level export modifier',
+);
 
 function nodeKey(node) {
   return `${node.getSourceFile().fileName}:${node.pos}:${node.end}`;
@@ -788,6 +800,7 @@ const virtualReport = {
     namespaceImportCanonicalized: true,
     constructorAliasCanonicalized: true,
     exportedCallableVariableCanonicalized: true,
+    exportListOnlyCallableVariableRejected: true,
     oneSymbolToManyFormIdsIsAmbiguous: true,
     fragmentRoleDoesNotBecomeFormRoot: true,
     usageMarkerAttachmentContainersAreExplicit: true,
