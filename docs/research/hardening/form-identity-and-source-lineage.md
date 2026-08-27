@@ -7,8 +7,10 @@
 - **Research baseline commit:** `d4ffdb517d0d506ed7cd55074c4eac720a145f8b`
 - **Initial retained research revision:**
   `d1f14d7e2fb542927af9226699383f1a99691fb4`
-- **Review-correction experiment revision:**
+- **Instance-1 remediation experiment revision:**
   `6cbab4d5bf59793168468c47e7fa8590ae20eb6d`
+- **Final experiment revision:**
+  `d6da48c4714ca1b2f15355f03a418bbd8fa752a6`
 - **Branch:** `codex/rh-01-form-lineage-research`
 - **Authorized output:** This research artifact and the isolated experiment at
   [`scripts/research/form-lineage/symbol-resolution-experiment.mjs`](../../../scripts/research/form-lineage/symbol-resolution-experiment.mjs)
@@ -381,6 +383,30 @@ one orphan marker. The repository Angular fixture result remained 46 roots,
 zero diagnostics, four exact direct usages, two recognized sources, and two
 inline definitions without explicit root anchors. Documentation checks passed
 for 57 files, ESLint passed, and the correction diff had no whitespace errors.
+
+### Final review-correction rerun
+
+Review instance 2 found an ambiguity between the documented word “exported” and
+the experiment's declaration-level `export` check, plus one stale evidence count
+and one stale Angular citation. The boundary was made explicit, the count and
+citation were corrected, and an export-list-only negative fixture was added at
+this exact revision:
+
+```text
+commit:     d6da48c4714ca1b2f15355f03a418bbd8fa752a6
+Node.js:    v22.22.1
+TypeScript: 5.9.3
+date:       2026-08-27
+```
+
+The same experiment, ESLint, documentation, and `git diff --check HEAD^ HEAD`
+commands all exited 0 from that clean revision. The virtual program reported 19
+true Boolean assertions, including the new explicit rejection of a callable
+`const` exported only through a later export list. Definition-creation and
+non-creation form-root counts remained five and 16 respectively; all eight
+marker attachment/failure fixtures retained their expected outcomes. The
+repository fixture remained at 46 roots, zero diagnostics, and four exact direct
+usages. Documentation checks passed for 57 files.
 
 ### Experiment interpretation
 
