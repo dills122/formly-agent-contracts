@@ -1,12 +1,20 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  createConsumerInstallArguments,
   createPackedConsumerManifest,
   verifyPackedWorkspaceManifest,
 } from './check-workspace-consumers.mjs';
 
 describe('workspace consumer smoke helpers', () => {
-  it('creates an offline consumer manifest with local package overrides', () => {
+  it('allows missing registry metadata while preferring cached consumer packages', () => {
+    const arguments_ = createConsumerInstallArguments('/tmp/consumer');
+
+    expect(arguments_).toContain('--prefer-offline');
+    expect(arguments_).not.toContain('--offline');
+  });
+
+  it('creates a consumer manifest with local package overrides', () => {
     expect(
       createPackedConsumerManifest([
         {

@@ -115,18 +115,21 @@ async function runPnpm(arguments_, options = {}) {
   });
 }
 
+export function createConsumerInstallArguments(consumerRoot) {
+  return [
+    '--dir',
+    consumerRoot,
+    'install',
+    '--prefer-offline',
+    '--ignore-scripts',
+    '--no-frozen-lockfile',
+  ];
+}
+
 async function installConsumer(consumerRoot) {
-  await runPnpm(
-    [
-      '--dir',
-      consumerRoot,
-      'install',
-      '--offline',
-      '--ignore-scripts',
-      '--no-frozen-lockfile',
-    ],
-    { cwd: consumerRoot },
-  );
+  await runPnpm(createConsumerInstallArguments(consumerRoot), {
+    cwd: consumerRoot,
+  });
 }
 
 async function runConsumerCli(consumerRoot, arguments_, environment = {}) {
