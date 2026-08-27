@@ -20,6 +20,10 @@ const temporaryDirectories: string[] = [];
 async function createTemporaryWorkspace(): Promise<string> {
   const directory = await mkdtemp(join(tmpdir(), 'formly workspace cli '));
   temporaryDirectories.push(directory);
+  await writeFile(
+    join(directory, 'pnpm-lock.yaml'),
+    "lockfileVersion: '9.0'\n",
+  );
   return directory;
 }
 
@@ -101,7 +105,7 @@ describe('workspace CLI', () => {
     const captured = captureIo();
     const list = vi.fn().mockResolvedValue({
       inventory: {
-        schemaVersion: '0.1.0',
+        schemaVersion: '0.2.0',
         rootConfigPath: 'config/formly.ts',
         plugins: [],
         projects: [
