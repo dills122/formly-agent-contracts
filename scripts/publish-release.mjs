@@ -84,43 +84,28 @@ async function publish({ npmTag, tarballPath }) {
   }
 }
 
+// Packages version independently now, so there is no single release-wide
+// npm dist-tag to pass in. Each tarball's own version decides its dist-tag
+// (`latest` for a stable version, `next` for a prerelease).
 function parseArguments(arguments_) {
-  let npmTag;
   const tarballPaths = [];
-  for (let index = 0; index < arguments_.length; index += 1) {
-    const argument = arguments_[index];
-    if (argument === '--tag') {
-      npmTag = arguments_[index + 1];
-      if (npmTag === undefined) {
-        throw new Error('--tag requires a value');
-      }
-      index += 1;
-      continue;
-    }
+  for (const argument of arguments_) {
     if (argument.startsWith('-')) {
       throw new Error(`Unknown argument: ${argument}`);
     }
     tarballPaths.push(resolve(argument));
   }
-  if (npmTag === undefined) {
-    throw new Error('--tag is required');
-  }
   if (tarballPaths.length === 0) {
     throw new Error('At least one release tarball is required');
   }
-  return { npmTag, tarballPaths: tarballPaths.sort() };
+  return { tarballPaths: tarballPaths.sort() };
 }
 
 async function main() {
-  const { npmTag, tarballPaths } = parseArguments(process.argv.slice(2));
+  const { tarballPaths } = parseArguments(process.argv.slice(2));
   for (const tarballPath of tarballPaths) {
     const manifest = await readPackedManifest(tarballPath);
-    const expectedTag = npmTagForVersion(manifest.version);
-    if (npmTag !== expectedTag) {
-      throw new Error(
-        `${manifest.name}@${manifest.version} must use npm tag ${expectedTag}`,
-      );
-    }
+    const npmTag = npmTagForVersion(manifest.version);
 
     const status = await publishReleaseTarball({
       getRegistryIntegrity,

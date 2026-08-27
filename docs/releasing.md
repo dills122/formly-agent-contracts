@@ -1,29 +1,73 @@
 # Releasing
 
-This repository releases two public npm packages from one synchronized version
-and Git tag:
+This repository releases every non-private package directly under `packages/`.
+Today that is:
 
-- `packages/contract-schema`
-- `packages/formly-adapter`
+- `packages/schema` (`@formly-contract/schema`)
+- `packages/compiler` (`@formly-contract/compiler`)
 
-The root, applications, demo, and fixtures remain private. Package names may
-change before the first release, but the directory-based release boundary stays
-the same.
+`packages/workspace` (`@formly-contract/workspace`) exists but stays
+`private: true` — it is experimental and not yet part of a release. Adding a
+new `@formly-contract/*` package to the release needs no script or workflow
+edit: clear its `private: true` and satisfy the metadata checks in
+[scripts/release-manifest.mjs](../scripts/release-manifest.mjs) (name,
+description, semantic version, `files: ["dist"]`, public `publishConfig`, and
+a `repository.directory` matching its real path). See
+[ADR 0008](decisions/0008-package-rename.md) for how the current package
+names and scope were chosen, and [ADR 0009](decisions/0009-changesets-independent-versioning.md)
+for how versioning and releases work.
 
-## Release contract
+The root, applications, demo, and fixtures remain private and are never
+eligible for release regardless of their `private` flag — only directories
+directly under `packages/` can join it.
 
-A pushed `vX.Y.Z` tag starts `.github/workflows/release.yml`. The workflow:
+Every published package versions **independently**. There is no repo-wide
+"the release version" — [Changesets](https://github.com/changesets/changesets)
+tracks per-package version bumps and changelogs, and a release tag is a
+trigger, not a version.
 
-1. verifies that the tag points at the current `main` commit;
-2. verifies both public packages have version `X.Y.Z` and complete npm metadata;
-3. runs the full `pnpm check` quality gate;
-4. builds pnpm tarballs and checks their contents, rewritten dependencies, and
-   installed imports;
-5. publishes the exact checked tarballs to npm with trusted publishing; and
-6. creates a GitHub release with generated notes and both tarballs attached.
+## Authoring a change
 
-Stable versions use the npm `latest` tag. SemVer prereleases such as
-`0.4.0-rc.1` use `next` and become GitHub prereleases.
+Any PR that changes a released package's behavior needs a changeset:
+
+```sh
+pnpm changeset
+```
+
+Pick the affected package(s), a bump type, and write the changelog entry.
+Commit the generated `.changeset/*.md` file with the rest of the PR. See
+[.changeset/README.md](../.changeset/README.md).
+
+## From merged changesets to a release
+
+1. Merging a PR with one or more `.changeset/*.md` files to `main` runs
+   [.github/workflows/changesets.yml](../.github/workflows/changesets.yml),
+   which opens or updates a bot-authored "Version Packages" pull request. That
+   PR bumps every affected package's `package.json` and writes its
+   `CHANGELOG.md` entries. The bot never publishes anything.
+2. A maintainer reviews and merges the Version Packages PR like any other
+   change (full `pnpm check` gate applies).
+3. A maintainer pushes a release tag to trigger
+   [.github/workflows/release.yml](../.github/workflows/release.yml):
+
+   ```sh
+   git switch main
+   git pull --ff-only
+   git tag -a v1 -m "Release"
+   git push origin v1
+   ```
+
+   The tag only needs to match the protected `v*` pattern — it does not need
+   to equal any package's version, and its content is otherwise ignored. Any
+   value that satisfies the pattern works; incrementing counters
+   (`v1`, `v2`, ...) or a date-stamped tag are both fine.
+4. The release workflow builds every `packages/*` package, packs and verifies
+   the ones eligible to publish, and publishes each one **that isn't already
+   on npm** with matching integrity — packages with no pending version bump
+   are silently skipped, not re-published. Each package's own version decides
+   its npm dist-tag (`latest` for a stable version, `next` for a prerelease).
+5. A single GitHub release is created for that tag, generated notes attached,
+   bundling whatever tarballs were built (published or already-current).
 
 Release jobs build and test with the repository's pinned Node `22.22.1`
 baseline. Immediately before publication, the workflow installs exact npm
@@ -32,98 +76,75 @@ minimums without violating the workspace's engine-strict Node range.
 
 ## Before the first release
 
-The current package scope is not final. Before publishing anything:
-
-1. choose the final public package names;
-2. confirm the npm account or organization owns the selected scope and that
-   both names are available;
-3. update package manifests, imports, workspace aliases, tests, and docs in one
-   reviewed rename change; and
-4. merge the release workflow to `main` before creating a release tag; and
-5. protect the `v*` tag pattern with a GitHub ruleset so only release
-   maintainers can create or update release tags.
-
 npm only allows trusted publishing to be configured for an existing package.
 The first release therefore needs this one-time bootstrap:
 
-1. Set the synchronized package version and merge the release change to `main`.
-2. Run `pnpm check` locally, then run `pnpm release:pack` and inspect the two
+1. Confirm the npm account or organization owns the `@formly-contract` scope
+   and that every to-be-released package name is available.
+2. Merge the release and Changesets workflows to `main` and protect the `v*`
+   tag pattern with a GitHub ruleset so only release maintainers can create or
+   update release tags. In repository settings under Actions > General,
+   enable "Allow GitHub Actions to create and approve pull requests" so the
+   Changesets workflow can open its Version Packages PR.
+3. Merge at least one already-versioned package to `main` (or merge a
+   generated Version Packages PR) so every to-be-released package has its
+   intended first version.
+4. Run `pnpm check` locally, then run `pnpm release:pack` and inspect the
    tarballs under `artifacts/releases/`.
-3. Tag the current `main` commit and push the tag. The workflow will verify the
-   release and preserve an `npm-release-X.Y.Z` artifact, then npm publication
-   will stop because trust is not configured yet.
-4. Download that exact workflow artifact. Interactively publish the schema
-   tarball first and the adapter tarball second with `npm publish --access
-   public`. Add `--tag next` when bootstrapping a prerelease.
-5. In each package's npm settings, configure a GitHub Actions trusted publisher
-   for organization/user `dills122`, repository `formly-contract`,
+5. Tag the current `main` commit and push the tag. The workflow will verify
+   the release and preserve an `npm-release-<tag>` artifact, then npm
+   publication will stop because trust is not configured yet.
+6. Download that exact workflow artifact. Interactively publish each tarball
+   with `npm publish --access public`, in the order printed by
+   `pnpm release:check`. Add `--tag next` when bootstrapping a prerelease.
+7. In each package's npm settings, configure a GitHub Actions trusted
+   publisher for organization/user `dills122`, repository `formly-contract`,
    workflow file `release.yml`, and permission `npm publish`.
-6. Rerun the failed workflow jobs. The publisher compares each existing npm
-   version's SHA-512 integrity with the checked tarball, safely skips the exact
-   bootstrap uploads, and completes the GitHub release.
-7. After the OIDC release succeeds, require 2FA and disallow token publishing
+8. Rerun the failed workflow jobs. The publisher compares each existing npm
+   version's SHA-512 integrity with the checked tarball, safely skips the
+   exact bootstrap uploads, and completes the GitHub release.
+9. After the OIDC release succeeds, require 2FA and disallow token publishing
    in each npm package's settings. Revoke any temporary bootstrap token.
 
 Do not bootstrap with locally rebuilt tarballs after the tagged workflow has
 run. Use the preserved workflow artifact so the integrity check can prove that
 the npm and GitHub release assets are identical.
 
-## Normal release procedure
-
-1. Update both public `package.json` versions to the same SemVer value. Update
-   contracts and documentation in the same change when behavior changed.
-2. Run:
-
-   ```sh
-   pnpm install --frozen-lockfile
-   pnpm check
-   pnpm release:pack
-   ```
-
-3. Inspect the two tarballs under `artifacts/releases/`. `pnpm check` already
-   verifies the same package boundary without retaining temporary tarballs.
-4. Merge the reviewed release change to `main` and confirm required CI passes.
-5. Tag the current remote `main` commit and push only that tag:
-
-   ```sh
-   git switch main
-   git pull --ff-only
-   git tag -a v0.4.0 -m "Release v0.4.0"
-   git push origin v0.4.0
-   ```
-
-6. Watch the Release workflow. Confirm both npm package pages show the expected
-   version and provenance, then confirm the GitHub release contains both
-   tarballs.
-
 Never move or reuse a published version tag. npm package name/version pairs are
 immutable even when unpublished.
 
 ## Local release checks
 
-- `pnpm release:check` validates public/private package boundaries, metadata,
-  synchronized versions, and an optional workflow tag.
-- `pnpm pack:check` expects built `dist` directories, packs both libraries in a
-  temporary directory, checks the allowlisted files and dependency rewrite,
-  imports the installed tarballs, and removes its temporary files.
-- `pnpm release:pack` builds the library slice and retains verified tarballs in
-  the ignored `artifacts/releases/` directory for manual inspection.
+- `pnpm changeset status` shows pending changesets and the version bumps they
+  imply, without writing anything.
+- `pnpm release:check` validates public/private package boundaries and
+  metadata for every publishable package.
+- `pnpm pack:check` expects built `dist` directories, packs every published
+  package in a temporary directory, checks the allowlisted files and
+  dependency rewrite, imports the installed tarballs, and removes its
+  temporary files.
+- `pnpm release:pack` builds the workspace packages and retains verified
+  tarballs in the ignored `artifacts/releases/` directory for manual
+  inspection.
 
 ## Failure and retry behavior
 
 - A tag not pointing at the current `main` commit fails before publication.
-- A tag/version mismatch or unsynchronized package versions fails before
+- Incomplete or invalid npm metadata on any publishable package fails before
   publication.
 - Existing npm versions are skipped only when registry integrity exactly
   matches the checked tarball. A mismatch is a hard failure and must be
   investigated; never force or overwrite it.
-- The two npm packages publish sequentially. If the second publish fails, rerun
-  the job after correcting the external issue; the first package's matching
-  integrity makes the retry safe.
-- GitHub release creation runs only after both npm packages are present.
+- Published packages publish sequentially. If a later publish fails, rerun the
+  job after correcting the external issue; every already-matching package's
+  integrity check makes the retry safe.
+- GitHub release creation runs only after every npm package publish attempt
+  completes.
 
 ## Source references
 
+- [Changesets documentation](https://github.com/changesets/changesets)
+- [changesets/action](https://github.com/changesets/action)
 - [npm trusted publishing](https://docs.npmjs.com/trusted-publishers/)
 - [npm trusted-publisher management](https://docs.npmjs.com/cli/v11/commands/npm-trust/)
 - [pnpm 10 workspace publishing](https://pnpm.io/10.x/workspaces#publishing-workspace-packages)

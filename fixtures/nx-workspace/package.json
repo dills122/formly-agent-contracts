@@ -1,5 +1,5 @@
 {
-  "name": "@formly-agent-contracts/nx-workspace-fixture",
+  "name": "@formly-contract/nx-workspace-fixture",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -23,7 +23,7 @@
     "@angular/build": "20.3.29",
     "@angular/cli": "20.3.29",
     "@angular/compiler-cli": "20.3.29",
-    "@formly-agent-contracts/workspace": "workspace:*",
+    "@formly-contract/workspace": "workspace:*",
     "@nx/angular": "23.1.1",
     "@nx/workspace": "23.1.1",
     "nx": "23.1.1",

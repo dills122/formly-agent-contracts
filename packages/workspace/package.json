@@ -1,5 +1,5 @@
 {
-  "name": "@formly-agent-contracts/workspace",
+  "name": "@formly-contract/workspace",
   "version": "0.1.0",
   "private": true,
   "description": "Configuration bedrock for deterministic Formly Contract discovery.",
@@ -22,8 +22,8 @@
     "node": ">=22.13.0 <23"
   },
   "dependencies": {
-    "@formly-contract/contract-schema": "workspace:*",
-    "@formly-contract/formly-adapter": "workspace:*",
+    "@formly-contract/schema": "workspace:*",
+    "@formly-contract/compiler": "workspace:*",
     "jiti": "2.7.0",
     "picomatch": "4.0.7",
     "tinyglobby": "0.2.17"

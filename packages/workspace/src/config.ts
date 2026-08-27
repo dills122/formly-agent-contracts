@@ -6,7 +6,7 @@ import {
   type ContractDiagnosticSeverity,
   type FieldTypeProfileRegistry,
   type JsonValue,
-} from '@formly-contract/contract-schema';
+} from '@formly-contract/schema';
 
 import { parseFormContractSource, type FormContractSource } from './source.js';
 import {

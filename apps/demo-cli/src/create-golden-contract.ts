@@ -1,5 +1,5 @@
-import type { FormContract } from '@formly-contract/contract-schema';
-import { extractFormContract } from '@formly-contract/formly-adapter';
+import type { FormContract } from '@formly-contract/schema';
+import { extractFormContract } from '@formly-contract/compiler';
 import { createGoldenFormFields } from '@formly-contract/synthetic-form';
 
 export function createGoldenContract(): FormContract {

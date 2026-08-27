@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { canonicalStringify } from '@formly-contract/contract-schema';
+import { canonicalStringify } from '@formly-contract/schema';
 
 export interface ProfilePart {
   name: string;

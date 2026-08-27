@@ -1,11 +1,7 @@
-import { appendFile, readFile, readdir } from 'node:fs/promises';
+import { readFile, readdir } from 'node:fs/promises';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const PUBLISHED_PACKAGE_DIRECTORIES = [
-  'packages/contract-schema',
-  'packages/formly-adapter',
-];
 const WORKSPACE_DIRECTORIES = ['apps', 'fixtures', 'packages'];
 export const RELEASE_REPOSITORY_URL =
   'git+https://github.com/dills122/formly-contract.git';
@@ -31,6 +27,32 @@ async function findWorkspacePackageDirectories(rootDirectory) {
       if (entry.isDirectory()) {
         directories.push(`${workspaceDirectory}/${entry.name}`);
       }
+    }
+  }
+
+  return directories.sort();
+}
+
+// Any package directly under packages/ that is not explicitly private is
+// treated as part of the published family. This is the one place a new
+// @formly-contract/* package needs to touch to start releasing: clear
+// `private: true` and satisfy assertReleasePackageMetadata. apps/* and
+// fixtures/* never auto-publish regardless of their private flag; they must
+// always be private, checked below.
+async function findPublishablePackageDirectories(rootDirectory) {
+  const entries = await readdir(join(rootDirectory, 'packages'), {
+    withFileTypes: true,
+  });
+  const directories = [];
+
+  for (const entry of entries) {
+    if (!entry.isDirectory()) {
+      continue;
+    }
+    const directory = `packages/${entry.name}`;
+    const manifest = await readPackageManifest(rootDirectory, directory);
+    if (manifest.private !== true) {
+      directories.push(directory);
     }
   }
 
@@ -72,7 +94,7 @@ function assertReleasePackageMetadata(directory, manifest) {
     throw new Error(`${directory} must identify its monorepo source directory`);
   }
   if (
-    directory === 'packages/formly-adapter' &&
+    directory === 'packages/compiler' &&
     manifest.peerDependencies?.['@ngx-formly/core'] !== FORMLY_6_PEER_RANGE
   ) {
     throw new Error(
@@ -88,7 +110,12 @@ export function npmTagForVersion(version) {
   return version.includes('-') ? 'next' : 'latest';
 }
 
-export async function loadReleaseManifest({ rootDirectory, tag } = {}) {
+// Packages version independently (Changesets owns version selection; see
+// .changeset/). There is deliberately no repo-wide "the release version" or
+// "the release tag" here anymore: a release run publishes whichever
+// packages/* have a version not already on npm and skips the rest. See
+// docs/releasing.md and ADR 0009 for the full flow.
+export async function loadReleaseManifest({ rootDirectory } = {}) {
   const resolvedRoot = resolve(
     rootDirectory ?? dirname(dirname(fileURLToPath(import.meta.url))),
   );
@@ -100,8 +127,11 @@ export async function loadReleaseManifest({ rootDirectory, tag } = {}) {
   const workspaceDirectories = await findWorkspacePackageDirectories(
     resolvedRoot,
   );
+  const publishedPackageDirectories = await findPublishablePackageDirectories(
+    resolvedRoot,
+  );
   for (const directory of workspaceDirectories) {
-    if (!PUBLISHED_PACKAGE_DIRECTORIES.includes(directory)) {
+    if (!publishedPackageDirectories.includes(directory)) {
       const manifest = await readPackageManifest(resolvedRoot, directory);
       if (manifest.private !== true) {
         throw new Error(`${directory} must remain private`);
@@ -109,8 +139,12 @@ export async function loadReleaseManifest({ rootDirectory, tag } = {}) {
     }
   }
 
+  if (publishedPackageDirectories.length === 0) {
+    throw new Error('No publishable packages found under packages/');
+  }
+
   const packages = [];
-  for (const directory of PUBLISHED_PACKAGE_DIRECTORIES) {
+  for (const directory of publishedPackageDirectories) {
     const manifest = await readPackageManifest(resolvedRoot, directory);
     assertReleasePackageMetadata(directory, manifest);
     packages.push({
@@ -120,53 +154,14 @@ export async function loadReleaseManifest({ rootDirectory, tag } = {}) {
     });
   }
 
-  const versions = new Set(packages.map((manifest) => manifest.version));
-  if (versions.size !== 1) {
-    throw new Error('Published package versions must match');
-  }
-
-  const version = packages[0]?.version;
-  if (version === undefined) {
-    throw new Error('No published packages are configured');
-  }
-  if (tag !== undefined && tag !== `v${version}`) {
-    throw new Error(`Release tag ${tag} must equal v${version}`);
-  }
-
-  return {
-    version,
-    npmTag: npmTagForVersion(version),
-    packages,
-  };
-}
-
-function parseArguments(arguments_) {
-  const options = {};
-  for (let index = 0; index < arguments_.length; index += 1) {
-    const argument = arguments_[index];
-    if (argument === '--tag' || argument === '--github-output') {
-      const value = arguments_[index + 1];
-      if (value === undefined) {
-        throw new Error(`${argument} requires a value`);
-      }
-      options[argument.slice(2)] = value;
-      index += 1;
-      continue;
-    }
-    throw new Error(`Unknown argument: ${argument}`);
-  }
-  return options;
+  return { packages };
 }
 
 async function main() {
-  const options = parseArguments(process.argv.slice(2));
-  const release = await loadReleaseManifest({ tag: options.tag });
-  if (options['github-output'] !== undefined) {
-    await appendFile(
-      options['github-output'],
-      `version=${release.version}\nnpm_tag=${release.npmTag}\n`,
-    );
+  if (process.argv.length > 2) {
+    throw new Error(`Unknown argument: ${process.argv[2]}`);
   }
+  const release = await loadReleaseManifest();
   console.log(JSON.stringify(release, null, 2));
 }
 

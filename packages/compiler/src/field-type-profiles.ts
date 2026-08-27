@@ -8,7 +8,7 @@ import {
   type FieldTypeProfileRegistry,
   type FieldTypeProfileUnknown,
   type FieldTypeWrapperPrecondition,
-} from '@formly-contract/contract-schema';
+} from '@formly-contract/schema';
 
 export const FIELD_TYPE_PROFILE_RESOLUTION_DIAGNOSTIC_CODES = [
   'UNMAPPED_FIELD_TYPE',

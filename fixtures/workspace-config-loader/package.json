@@ -1,5 +1,5 @@
 {
-  "name": "@formly-agent-contracts/workspace-config-loader-fixture",
+  "name": "@formly-contract/workspace-config-loader-fixture",
   "version": "0.0.0",
   "private": true,
   "type": "module"

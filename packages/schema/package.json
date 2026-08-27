@@ -1,5 +1,5 @@
 {
-  "name": "@formly-contract/contract-schema",
+  "name": "@formly-contract/schema",
   "version": "0.4.0",
   "description": "Versioned Formly Contract types, validation, canonical JSON, and hashing.",
   "author": "Dylan Steele <dylansteele57@gmail.com>",
@@ -20,7 +20,7 @@
   "repository": {
     "type": "git",
     "url": "git+https://github.com/dills122/formly-contract.git",
-    "directory": "packages/contract-schema"
+    "directory": "packages/schema"
   },
   "publishConfig": {
     "access": "public",

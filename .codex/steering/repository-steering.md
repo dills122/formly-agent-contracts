@@ -17,8 +17,8 @@ Core priorities:
 
 ## Active Boundaries
 
-- The contract-schema package owns public DTOs, diagnostics, versioning, serialization, and compatibility.
-- The Formly adapter owns all Angular/Formly execution and must emit inert allowlisted artifacts.
+- The schema package owns public DTOs, diagnostics, versioning, serialization, and compatibility.
+- The compiler package owns all Angular/Formly execution and must emit inert allowlisted artifacts.
 - The MCP and Playwright layers consume contracts and must not bootstrap arbitrary application code.
 
 ## Safe Refactor Boundaries

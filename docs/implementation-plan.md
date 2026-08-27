@@ -153,10 +153,10 @@ ordered form tree, model paths, constraints, options, evidence, and unknowns.
 
 **Files likely touched:**
 
-- `packages/contract-schema/package.json`
-- `packages/contract-schema/src/contract.ts`
-- `packages/contract-schema/src/validation.ts`
-- `packages/contract-schema/src/contract.test.ts`
+- `packages/schema/package.json`
+- `packages/schema/src/contract.ts`
+- `packages/schema/src/validation.ts`
+- `packages/schema/src/contract.test.ts`
 
 **Estimated scope:** Medium
 
@@ -179,10 +179,10 @@ on object insertion order or environment-specific values.
 
 **Files likely touched:**
 
-- `packages/contract-schema/src/canonical-json.ts`
-- `packages/contract-schema/src/content-hash.ts`
-- `packages/contract-schema/src/canonical-json.test.ts`
-- `packages/contract-schema/src/index.ts`
+- `packages/schema/src/canonical-json.ts`
+- `packages/schema/src/content-hash.ts`
+- `packages/schema/src/canonical-json.test.ts`
+- `packages/schema/src/index.ts`
 
 **Estimated scope:** Small
 
@@ -216,10 +216,10 @@ allowlist into contract nodes.
 
 **Files likely touched:**
 
-- `packages/formly-adapter/package.json`
-- `packages/formly-adapter/src/extract-form.ts`
-- `packages/formly-adapter/src/extract-form.test.ts`
-- `packages/formly-adapter/src/index.ts`
+- `packages/compiler/package.json`
+- `packages/compiler/src/extract-form.ts`
+- `packages/compiler/src/extract-form.test.ts`
+- `packages/compiler/src/index.ts`
 
 **Estimated scope:** Medium
 
@@ -284,10 +284,10 @@ conditional behavior while producing diagnostics for unsafe values.
 
 **Files likely touched:**
 
-- `packages/formly-adapter/src/extract-form.ts`
-- `packages/formly-adapter/src/extract-form.test.ts`
-- `packages/contract-schema/src/contract.ts`
-- `packages/contract-schema/src/contract.test.ts`
+- `packages/compiler/src/extract-form.ts`
+- `packages/compiler/src/extract-form.test.ts`
+- `packages/schema/src/contract.ts`
+- `packages/schema/src/contract.test.ts`
 
 **Estimated scope:** Medium
 

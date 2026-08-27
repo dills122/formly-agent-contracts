@@ -1,5 +1,5 @@
 {
-  "name": "@formly-agent-contracts/angular-monorepo-fixture",
+  "name": "@formly-contract/angular-monorepo-fixture",
   "version": "0.0.0",
   "private": true,
   "scripts": {
@@ -21,7 +21,7 @@
     "@angular/build": "20.3.29",
     "@angular/cli": "20.3.29",
     "@angular/compiler-cli": "20.3.29",
-    "@formly-agent-contracts/workspace": "workspace:*",
+    "@formly-contract/workspace": "workspace:*",
     "typescript": "5.9.3"
   }
 }

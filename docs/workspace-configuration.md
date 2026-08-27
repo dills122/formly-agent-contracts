@@ -4,7 +4,7 @@ Status: experimental configuration bedrock; deterministic project discovery and
 project-owned field-type profile registries are implemented, while artifact
 generation remains planned
 
-`@formly-agent-contracts/workspace` is the framework-neutral configuration
+`@formly-contract/workspace` is the framework-neutral configuration
 layer for repository-aware Formly Contract tooling. It provides trusted config
 loading, strict root/project descriptors, source catalogs, deterministic policy
 resolution, stable plugin identities, and serializable custom-field interaction
@@ -49,7 +49,7 @@ contain project-owned source; exclude them explicitly when appropriate.
 The root config owns repository-wide discovery and policy:
 
 ```ts
-import { defineConfig } from '@formly-agent-contracts/workspace';
+import { defineConfig } from '@formly-contract/workspace';
 
 export default defineConfig({
   projectConfigs: [
@@ -82,7 +82,7 @@ generation policy:
 import {
   defineFormContractProject,
   defineFormContractSource,
-} from '@formly-agent-contracts/workspace';
+} from '@formly-contract/workspace';
 
 const claimsSource = defineFormContractSource({
   sourceId: 'claims/forms',
@@ -111,7 +111,7 @@ belongs to the adapter during artifact generation.
 The root and project descriptors can be loaded as one deterministic inventory:
 
 ```ts
-import { discoverWorkspaceProjects } from '@formly-agent-contracts/workspace';
+import { discoverWorkspaceProjects } from '@formly-contract/workspace';
 
 const discovered = await discoverWorkspaceProjects({
   workspaceRoot: process.cwd(),
@@ -152,8 +152,8 @@ there is no fuzzy matching or silent last-write-wins behavior.
 import {
   FIELD_TYPE_PROFILE_SCHEMA_VERSION,
   type FieldTypeProfileRegistry,
-} from '@formly-contract/contract-schema';
-import { defineFormContractProject } from '@formly-agent-contracts/workspace';
+} from '@formly-contract/schema';
+import { defineFormContractProject } from '@formly-contract/workspace';
 
 const fieldTypeProfiles: FieldTypeProfileRegistry = {
   schemaVersion: FIELD_TYPE_PROFILE_SCHEMA_VERSION,
@@ -218,7 +218,7 @@ registry input does not change that identity; changing semantic content or a
 profile version does. Registry data cannot contain Angular components,
 callbacks, Playwright locators, or executable drivers.
 
-`resolveFieldTypeProfile` in `@formly-contract/formly-adapter` resolves an exact
+`resolveFieldTypeProfile` in `@formly-contract/compiler` resolves an exact
 type/default or named variant and composes explicitly requested wrapper parts
 in request order. An unmapped custom type remains an explicit diagnostic, not
 an invitation to guess how its DOM works.

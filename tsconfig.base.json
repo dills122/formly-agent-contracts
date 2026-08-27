@@ -13,13 +13,13 @@
     "noEmitOnError": true,
     "noUncheckedIndexedAccess": true,
     "paths": {
-      "@formly-contract/contract-schema": [
-        "./packages/contract-schema/src/index.ts"
+      "@formly-contract/schema": [
+        "./packages/schema/src/index.ts"
       ],
-      "@formly-contract/formly-adapter": [
-        "./packages/formly-adapter/src/index.ts"
+      "@formly-contract/compiler": [
+        "./packages/compiler/src/index.ts"
       ],
-      "@formly-agent-contracts/workspace": [
+      "@formly-contract/workspace": [
         "./packages/workspace/src/index.ts"
       ],
       "@formly-contract/synthetic-form": [

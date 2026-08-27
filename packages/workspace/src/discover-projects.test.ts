@@ -1,4 +1,4 @@
-import { canonicalStringify } from '@formly-contract/contract-schema';
+import { canonicalStringify } from '@formly-contract/schema';
 import {
   chmod,
   mkdir,

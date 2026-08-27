@@ -5,8 +5,8 @@
     "noEmit": false,
     "outDir": "dist",
     "paths": {
-      "@formly-contract/contract-schema": [
-        "../contract-schema/dist/index.d.ts"
+      "@formly-contract/schema": [
+        "../schema/dist/index.d.ts"
       ]
     },
     "rootDir": "src",

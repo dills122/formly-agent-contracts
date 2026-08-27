@@ -17,8 +17,8 @@ Optimize for:
 
 Primary areas:
 
-- `packages/contract-schema/`: versioned DTOs, runtime schemas, diagnostics, canonical serialization, and hashing
-- `packages/formly-adapter/`: form registry, controlled Angular/Formly compilation, and allowlisted projection
+- `packages/schema/`: versioned DTOs, runtime schemas, diagnostics, canonical serialization, and hashing
+- `packages/compiler/`: form registry, controlled Angular/Formly compilation, and allowlisted projection
 - `apps/mcp-server/`, `packages/test-intent/`, and `packages/playwright-driver/`: read-only discovery, intent validation, and deterministic browser execution
 
 When a change spans areas, preserve ownership boundaries and update shared contracts first.
@@ -29,7 +29,7 @@ Treat these as interface contracts before implementation details:
 
 - `docs/architecture-overview.md`
 - `docs/implementation-plan.md`
-- the future versioned schemas under `packages/contract-schema/`
+- the future versioned schemas under `packages/schema/`
 
 If behavior changes, update the relevant contract and docs in the same change.
 

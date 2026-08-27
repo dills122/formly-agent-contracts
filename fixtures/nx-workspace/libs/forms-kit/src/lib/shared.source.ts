@@ -1,4 +1,4 @@
-import { defineFormContractSource } from '@formly-agent-contracts/workspace';
+import { defineFormContractSource } from '@formly-contract/workspace';
 
 import type { NxFixtureFormInstance } from './form-instance.js';
 import { createNxContactFragment } from './contact.fragment.js';

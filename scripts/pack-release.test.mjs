@@ -3,8 +3,8 @@ import { describe, expect, it } from 'vitest';
 import { verifyPackedPackage } from './pack-release.mjs';
 
 const releasePackage = {
-  directory: 'packages/formly-adapter',
-  name: '@formly-contract/formly-adapter',
+  directory: 'packages/compiler',
+  name: '@formly-contract/compiler',
   version: '0.4.0',
 };
 
@@ -23,7 +23,7 @@ function createPackedManifest(overrides = {}) {
     },
     files: ['dist'],
     dependencies: {
-      '@formly-contract/contract-schema': '0.4.0',
+      '@formly-contract/schema': '0.4.0',
     },
     peerDependencies: {
       '@ngx-formly/core': '>=6.0.0 <7.0.0',
@@ -65,7 +65,7 @@ describe('verifyPackedPackage', () => {
   it('rejects a workspace protocol left in the packed manifest', () => {
     const packedManifest = createPackedManifest({
       dependencies: {
-        '@formly-contract/contract-schema': 'workspace:*',
+        '@formly-contract/schema': 'workspace:*',
       },
     });
 
@@ -119,7 +119,7 @@ describe('verifyPackedPackage', () => {
         packedManifest: createPackedManifest({ version: '0.4.1' }),
         releasePackage,
       }),
-    ).toThrow('must be @formly-contract/formly-adapter@0.4.0');
+    ).toThrow('must be @formly-contract/compiler@0.4.0');
   });
 
   it('rejects packed metadata that cannot establish npm provenance', () => {

@@ -1,17 +1,17 @@
-# `@formly-contract/contract-schema`
+# `@formly-contract/schema`
 
 Versioned Form Contract types, strict runtime validation, canonical JSON, and
 content hashing for agent-readable Angular Formly contracts.
 
 ```sh
-pnpm add --save-dev @formly-contract/contract-schema
+pnpm add --save-dev @formly-contract/schema
 ```
 
 ```ts
 import {
   canonicalStringify,
   parseFormContract,
-} from '@formly-contract/contract-schema';
+} from '@formly-contract/schema';
 
 const contract = parseFormContract(JSON.parse(serializedContract));
 const canonicalJson = canonicalStringify(contract);

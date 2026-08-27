@@ -190,9 +190,9 @@ illustrative and must be specified before it becomes public:
 
 ```ts
 // formly-contracts.config.ts
-import { defineConfig } from '@formly-agent-contracts/config';
-import angular from '@formly-agent-contracts/angular';
-import nx from '@formly-agent-contracts/nx';
+import { defineConfig } from '@formly-contract/config';
+import angular from '@formly-contract/angular';
+import nx from '@formly-contract/nx';
 
 export default defineConfig({
   projectConfigs: [
@@ -270,7 +270,7 @@ to expose compiled or directly loadable modules.
 
 #### Config-loader gate result
 
-The retained `@formly-agent-contracts/workspace` loader uses Jiti `2.7.0` with
+The retained `@formly-contract/workspace` loader uses Jiti `2.7.0` with
 filesystem and module caches disabled for the compatibility fixture and
 `tsconfigPaths` disabled unless an explicit path is supplied. The fixture
 covers ESM JavaScript, CommonJS, TypeScript, one TypeScript path alias, a
@@ -280,7 +280,7 @@ Verification:
 
 ```sh
 pnpm vitest run packages/workspace/src/config-loader.test.ts
-pnpm --filter @formly-agent-contracts/workspace build
+pnpm --filter @formly-contract/workspace build
 ```
 
 Result on Node `22.22.1`: eight loader tests passed and the ESM package emitted
@@ -330,7 +330,7 @@ feature. It does not by itself load every lazy feature.
 
 ### 4. Nx project discovery
 
-An optional `@formly-agent-contracts/nx` plugin should detect a conventional
+An optional `@formly-contract/nx` plugin should detect a conventional
 project marker such as:
 
 ```text
@@ -400,7 +400,7 @@ adds one project marker that can expose many forms:
 
 ```ts
 // libs/claims/forms/formly-contracts.project.ts
-import { defineFormContractProject } from '@formly-agent-contracts/config';
+import { defineFormContractProject } from '@formly-contract/config';
 
 export default defineFormContractProject({
   projectId: 'claims-forms',
@@ -446,18 +446,18 @@ Keep the initial ecosystem to five public packages, including the two that
 already exist:
 
 ```text
-@formly-agent-contracts/contract-schema
+@formly-contract/schema
                     |
-@formly-agent-contracts/formly-adapter
+@formly-contract/compiler
                     |
-@formly-agent-contracts/workspace   (typed config, discovery, runner, CLI)
+@formly-contract/workspace   (typed config, discovery, runner, CLI)
                  /       \
-@formly-agent-contracts/angular   @formly-agent-contracts/nx
+@formly-contract/angular   @formly-contract/nx
 ```
 
-- `contract-schema` remains framework-independent contract data, validation,
+- `schema` remains framework-independent contract data, validation,
   canonical serialization, and hashing.
-- `formly-adapter` remains the Formly projection and controlled scenario API.
+- `compiler` remains the Formly projection and controlled scenario API.
 - `workspace` owns `defineConfig`, source/project descriptors, config loading,
   deterministic aggregation, artifact output, and the CLI binary. Keeping these
   together initially avoids separate `config`, `runner`, and `cli` packages

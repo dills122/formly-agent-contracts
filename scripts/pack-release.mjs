@@ -66,7 +66,7 @@ export function verifyPackedPackage({
   }
 
   if (
-    releasePackage.directory === 'packages/formly-adapter' &&
+    releasePackage.directory === 'packages/compiler' &&
     packedManifest.peerDependencies?.['@ngx-formly/core'] !==
       FORMLY_6_PEER_RANGE
   ) {
@@ -117,6 +117,16 @@ async function readPackedManifest(tarballPath) {
   return JSON.parse(stdout);
 }
 
+// Packages with a known required export get a specific regression check.
+// Any other released package still gets a generic "the tarball actually
+// imports" smoke test below, so adding a new published package never needs
+// this map to grow before it can release — only packages with a load-bearing
+// entry point worth pinning do.
+const REQUIRED_EXPORT_BY_PACKAGE_NAME = {
+  '@formly-contract/schema': 'parseFormContract',
+  '@formly-contract/compiler': 'extractFormContract',
+};
+
 async function smokeTestTarballs(packages, temporaryDirectory) {
   const installRoot = join(temporaryDirectory, 'packed-install');
   for (const packedPackage of packages) {
@@ -135,42 +145,27 @@ async function smokeTestTarballs(packages, temporaryDirectory) {
     ]);
   }
 
-  const contractSchema = packages.find(({ directory }) =>
-    directory.endsWith('/contract-schema'),
-  );
-  const formlyAdapter = packages.find(({ directory }) =>
-    directory.endsWith('/formly-adapter'),
-  );
-  if (contractSchema === undefined || formlyAdapter === undefined) {
-    throw new Error('Packed smoke test requires schema and adapter packages');
-  }
+  for (const packedPackage of packages) {
+    const module_ = await import(
+      pathToFileURL(
+        join(
+          installRoot,
+          'node_modules',
+          ...packedPackage.name.split('/'),
+          'dist/index.js',
+        ),
+      ).href
+    );
 
-  const schemaModule = await import(
-    pathToFileURL(
-      join(
-        installRoot,
-        'node_modules',
-        ...contractSchema.name.split('/'),
-        'dist/index.js',
-      ),
-    ).href
-  );
-  if (typeof schemaModule.parseFormContract !== 'function') {
-    throw new Error('Packed contract schema does not export parseFormContract');
-  }
-
-  const adapterModule = await import(
-    pathToFileURL(
-      join(
-        installRoot,
-        'node_modules',
-        ...formlyAdapter.name.split('/'),
-        'dist/index.js',
-      ),
-    ).href
-  );
-  if (typeof adapterModule.extractFormContract !== 'function') {
-    throw new Error('Packed Formly adapter does not export extractFormContract');
+    const requiredExport = REQUIRED_EXPORT_BY_PACKAGE_NAME[packedPackage.name];
+    if (
+      requiredExport !== undefined &&
+      typeof module_[requiredExport] !== 'function'
+    ) {
+      throw new Error(
+        `${packedPackage.name} does not export ${requiredExport}`,
+      );
+    }
   }
 }
 

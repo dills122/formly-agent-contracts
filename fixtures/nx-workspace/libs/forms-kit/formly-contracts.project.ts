@@ -1,4 +1,4 @@
-import { defineFormContractProject } from '@formly-agent-contracts/workspace';
+import { defineFormContractProject } from '@formly-contract/workspace';
 import { NX_SHARED_FORMS_SOURCE } from '@nx-fixture/forms-kit/contracts';
 
 export default defineFormContractProject({

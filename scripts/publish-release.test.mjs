@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { publishReleaseTarball } from './publish-release.mjs';
 
 const manifest = {
-  name: '@formly-contract/contract-schema',
+  name: '@formly-contract/schema',
   version: '0.4.0',
 };
 const tarball = Buffer.from('deterministic package bytes');
@@ -22,13 +22,13 @@ describe('publishReleaseTarball', () => {
       npmTag: 'latest',
       publish,
       tarball,
-      tarballPath: '/tmp/contract-schema.tgz',
+      tarballPath: '/tmp/schema.tgz',
     });
 
     expect(status).toBe('published');
     expect(publish).toHaveBeenCalledWith({
       npmTag: 'latest',
-      tarballPath: '/tmp/contract-schema.tgz',
+      tarballPath: '/tmp/schema.tgz',
     });
   });
 
@@ -41,7 +41,7 @@ describe('publishReleaseTarball', () => {
       npmTag: 'latest',
       publish,
       tarball,
-      tarballPath: '/tmp/contract-schema.tgz',
+      tarballPath: '/tmp/schema.tgz',
     });
 
     expect(status).toBe('existing');
@@ -56,10 +56,10 @@ describe('publishReleaseTarball', () => {
         npmTag: 'latest',
         publish: vi.fn(),
         tarball,
-        tarballPath: '/tmp/contract-schema.tgz',
+        tarballPath: '/tmp/schema.tgz',
       }),
     ).rejects.toThrow(
-      '@formly-contract/contract-schema@0.4.0 already exists with different integrity',
+      '@formly-contract/schema@0.4.0 already exists with different integrity',
     );
   });
 });

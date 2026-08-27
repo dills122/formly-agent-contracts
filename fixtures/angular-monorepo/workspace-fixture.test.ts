@@ -7,7 +7,7 @@ import {
   parseRootConfig,
   resolveWorkspaceProjectConfig,
   type FormContractProjectConfig,
-} from '@formly-agent-contracts/workspace';
+} from '@formly-contract/workspace';
 import { describe, expect, it } from 'vitest';
 
 const fixtureRoot = fileURLToPath(new URL('./', import.meta.url));

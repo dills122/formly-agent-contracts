@@ -1,4 +1,4 @@
-import { defineFormContractSource } from '@formly-agent-contracts/workspace';
+import { defineFormContractSource } from '@formly-contract/workspace';
 
 import { createNxClaimForm } from './claim.form.js';
 
