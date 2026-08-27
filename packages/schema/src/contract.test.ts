@@ -602,6 +602,93 @@ describe('parseFormContract', () => {
     ['autocomplete', genericProfileFixtures[4]],
     ['row-selection', genericProfileFixtures[5]],
   ] as const)(
+    'rejects generic %s execution when options contain a value outside the domain',
+    (_kind, profile) => {
+      const contract = contractWithInteractionProfile(profile);
+      const malformed = createFormContract({
+        ...contract,
+        nodes: [
+          {
+            ...contract.nodes[0]!,
+            options: [
+              { label: 'Example', value: { code: 'EXAMPLE' } },
+              { label: 'Extra', value: { code: 'EXTRA' } },
+            ],
+          },
+        ],
+      });
+
+      expect(() => parseFormContract(malformed)).toThrow(
+        'options[1] must map to exactly one valueDomain value',
+      );
+    },
+  );
+
+  it.each([
+    ['choice', genericProfileFixtures[1]],
+    ['autocomplete', genericProfileFixtures[4]],
+    ['row-selection', genericProfileFixtures[5]],
+  ] as const)(
+    'rejects generic %s execution when an option label contains only Unicode whitespace',
+    (_kind, profile) => {
+      const contract = contractWithInteractionProfile(profile);
+      const malformed = createFormContract({
+        ...contract,
+        nodes: [
+          {
+            ...contract.nodes[0]!,
+            options: [
+              { label: '\u00a0\u2003\t\n', value: { code: 'EXAMPLE' } },
+            ],
+          },
+        ],
+      });
+
+      expect(() => parseFormContract(malformed)).toThrow(
+        'options[0].label must contain visible text after whitespace normalization',
+      );
+    },
+  );
+
+  it.each([
+    ['choice', genericProfileFixtures[1]],
+    ['autocomplete', genericProfileFixtures[4]],
+    ['row-selection', genericProfileFixtures[5]],
+  ] as const)(
+    'rejects generic %s execution when whitespace-equivalent visible labels map to distinct values',
+    (_kind, profile) => {
+      const contract = contractWithInteractionProfile(profile);
+      const malformed = createFormContract({
+        ...contract,
+        nodes: [
+          {
+            ...contract.nodes[0]!,
+            options: [
+              { label: 'Same\u00a0label', value: 'A' },
+              { label: '  Same   label  ', value: 'B' },
+            ],
+            valueDomain: {
+              kind: 'enumerated',
+              source: 'adapter',
+              completeness: 'complete',
+              evidence: 'declared',
+              values: ['A', 'B'],
+            },
+          },
+        ],
+      });
+
+      expect(() => parseFormContract(malformed)).toThrow(
+        'options label "Same label" must identify exactly one value',
+      );
+    },
+  );
+
+  it.each([
+    ['choice', genericProfileFixtures[1]],
+    ['autocomplete', genericProfileFixtures[4]],
+    ['row-selection', genericProfileFixtures[5]],
+  ] as const)(
     'rejects generic %s execution with an unresolved dynamic value domain',
     (_kind, profile) => {
       const contract = contractWithInteractionProfile(profile);
@@ -1073,6 +1160,25 @@ describe('parseFormContract', () => {
     expect(() => parseFormContract(malformed)).toThrow(
       'diagnostics[0].code',
     );
+  });
+
+  it.each([
+    'UNMAPPED_FIELD_TYPE',
+    'UNMAPPED_PROFILE_VARIANT',
+    'UNMAPPED_WRAPPER_PROFILE',
+    'DUPLICATE_WRAPPER_REQUEST',
+    'PROFILE_PART_CONFLICT',
+    'WRAPPER_BLOCKS_GENERIC_DRIVER',
+    'VALUE_DOMAIN_PROJECTION_FAILED',
+    'AMBIGUOUS_VALUE_MAPPING',
+  ])('accepts the shared Task 5.1 diagnostic code %s', (code) => {
+    const draft = {
+      ...completeContract,
+      diagnostics: [{ ...completeContract.diagnostics[0]!, code }],
+    } as unknown as FormContractDraft;
+    const contract = createFormContract(draft);
+
+    expect(parseFormContract(contract)).toEqual(contract);
   });
 
   it('rejects unknown properties instead of silently expanding v0', () => {

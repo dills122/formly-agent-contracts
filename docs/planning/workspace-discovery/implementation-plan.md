@@ -2,8 +2,9 @@
 
 Status: in progress; Tasks 1–4, including project-owned field-type profile
 registries, the deep Task 6B consumer fixture, a real Nx integration anchor,
-and the Task 5.0 artifact/source contracts are implemented; Task 5.1
-profile-aware extraction is the next generic vertical slice
+and Tasks 5.0–5.1 artifact/source contracts and profile-aware extraction are
+implemented; Task 5.2 runner and workspace indexing is the next generic
+vertical slice
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)
@@ -117,8 +118,8 @@ contains explicit effects only.
 
 | Requirement | Decision | Tasks | Verification | Status |
 | --- | --- | --- | --- | --- |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery tests plus 2 consumer fixture tests; runner and CLI fixture assertions remain | Tasks 1–4, Task 5.0, and Task 6B fixture shell implemented; Tasks 5.1–6A and remaining 6B assertions planned |
-| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Task 5.0 artifact DTO implemented; profile-aware node projection follows in Task 5.1 |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery tests plus 2 consumer fixture tests; runner and CLI fixture assertions remain | Tasks 1–4, Tasks 5.0–5.1, and Task 6B fixture shell implemented; Tasks 5.2–6A and remaining 6B assertions planned |
+| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Tasks 5.0–5.1 implemented, including safe node projection and realistic Angular/Nx fixture coverage; executable drivers remain separate |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | Inventory and scaffolds are build-time evidence only | Tasks 7A–8B | Angular inventory, negative inference, and scenario tests | Planned; prototype complete |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Planned; architecture researched |
 
@@ -161,13 +162,13 @@ this task.
 
 **Acceptance criteria:**
 
-- [x] `@formly-agent-contracts/workspace` builds as ESM with declarations.
+- [x] `@formly-contract/workspace` builds as ESM with declarations.
 - [x] Its dependency graph includes schema/adapter but no Angular or Nx package.
 - [x] Package metadata and exports follow the two existing public packages.
 
 **Verification:**
 
-- [x] `pnpm --filter @formly-agent-contracts/workspace build`
+- [x] `pnpm --filter @formly-contract/workspace build`
 - [x] `pnpm lint`
 
 **Dependencies:** Task 1
@@ -378,7 +379,7 @@ Implement this vertical slice in three reviewable increments:
    to v0.4, add value-domain and resolved interaction-profile DTOs with strict
    validation/hashing, and require source factories to return the normalized
    declared Formly extraction input.
-2. **[ ] Task 5.1 — profile-aware extraction:** resolve the configured project
+2. **[x] Task 5.1 — profile-aware extraction:** resolve the configured project
    registry during declared extraction and project registry identity,
    interaction metadata, value domains, provenance, and stable unmapped-type
    diagnostics into contracts.

@@ -8,6 +8,11 @@ import {
   resolveWorkspaceProjectConfig,
   type FormContractProjectConfig,
 } from '@formly-contract/workspace';
+import {
+  extractFormContract,
+  type ExtractFormResult,
+  type FieldTypeProfileExtractionRegistry,
+} from '@formly-contract/compiler';
 import { describe, expect, it } from 'vitest';
 
 const fixtureRoot = fileURLToPath(new URL('./', import.meta.url));
@@ -44,6 +49,51 @@ function collectFields(fields: readonly FixtureField[]): FixtureField[] {
       ...collectFields(field.fieldGroup ?? []),
       ...(arrayTemplate === undefined ? [] : collectFields([arrayTemplate])),
     ];
+  });
+}
+
+function findContractNode(
+  nodes: ExtractFormResult['contract']['nodes'],
+  modelPath: string,
+): ExtractFormResult['contract']['nodes'][number] | undefined {
+  for (const node of nodes) {
+    if (node.modelPath.join('.') === modelPath) {
+      return node;
+    }
+    const nested = findContractNode(
+      [
+        ...node.children,
+        ...(node.arrayTemplate === undefined ? [] : [node.arrayTemplate]),
+      ],
+      modelPath,
+    );
+    if (nested !== undefined) {
+      return nested;
+    }
+  }
+  return undefined;
+}
+
+function extractFixtureDefinition(
+  definition: {
+    readonly id: string;
+    readonly create: () => {
+      readonly fields: readonly object[];
+      readonly model?: Readonly<Record<string, unknown>>;
+      readonly formState?: Readonly<Record<string, unknown>>;
+    };
+  },
+  fieldTypeProfiles: FieldTypeProfileExtractionRegistry,
+): ExtractFormResult {
+  const instance = definition.create();
+  return extractFormContract({
+    formId: definition.id,
+    fields: instance.fields,
+    ...(instance.model === undefined ? {} : { model: instance.model }),
+    ...(instance.formState === undefined
+      ? {}
+      : { formState: instance.formState }),
+    fieldTypeProfiles,
   });
 }
 
@@ -90,6 +140,188 @@ describe('Angular monorepo workspace fixture', () => {
         sourceIds: ['fixture/claims-feature'],
       },
     ]);
+  });
+
+  it('shares one canonical custom-field registry across source-owning projects', async () => {
+    const root = parseRootConfig(
+      await loadWorkspaceConfigModule(
+        resolve(fixtureRoot, 'formly-contracts.config.ts'),
+        { tsconfigPath: fixtureTsconfig },
+      ),
+    );
+    const formsKit = resolveWorkspaceProjectConfig(
+      root,
+      await loadProject('libs/forms-kit/formly-contracts.project.ts'),
+    );
+    const feature = resolveWorkspaceProjectConfig(
+      root,
+      await loadProject('libs/feature-lib/formly-contracts.project.ts'),
+    );
+
+    expect(formsKit.fieldTypeProfiles).toBeDefined();
+    expect(feature.fieldTypeProfiles).toEqual(formsKit.fieldTypeProfiles);
+    expect(
+      formsKit.fieldTypeProfiles?.registry.registrations.map(
+        ({ formlyType }) => formlyType,
+      ),
+    ).toEqual([
+      'cool-radio-btn-grp',
+      'dependent-select',
+      'entity-autocomplete',
+      'expandable-repeater',
+      'table-select',
+    ]);
+    expect(
+      formsKit.fieldTypeProfiles?.registry.registrations.some(
+        ({ formlyType }) => formlyType === 'date-range',
+      ),
+    ).toBe(false);
+    expect(
+      formsKit.fieldTypeProfiles?.registry.wrappers.map(
+        ({ wrapperName }) => wrapperName,
+      ),
+    ).toEqual(['fixture-expansion-panel']);
+  });
+
+  it('extracts the real custom-field matrix through the shared registry', async () => {
+    const root = parseRootConfig(
+      await loadWorkspaceConfigModule(
+        resolve(fixtureRoot, 'formly-contracts.config.ts'),
+        { tsconfigPath: fixtureTsconfig },
+      ),
+    );
+    const formsProject = await loadProject(
+      'libs/forms-kit/formly-contracts.project.ts',
+    );
+    const featureProject = await loadProject(
+      'libs/feature-lib/formly-contracts.project.ts',
+    );
+    const formsKit = resolveWorkspaceProjectConfig(root, formsProject);
+    const feature = resolveWorkspaceProjectConfig(root, featureProject);
+    const registry = formsKit.fieldTypeProfiles;
+    expect(registry).toBeDefined();
+    if (registry === undefined) {
+      return;
+    }
+
+    const sharedDefinitions = (await formsProject.sources?.[0]?.list()) ?? [];
+    const featureDefinitions = (await featureProject.sources?.[0]?.list()) ?? [];
+    const extract = (id: string) => {
+      const definition = [...sharedDefinitions, ...featureDefinitions].find(
+        (candidate) => candidate.id === id,
+      );
+      expect(definition).toBeDefined();
+      return extractFixtureDefinition(definition!, registry);
+    };
+
+    const shared = extract('shared.contact-preferences');
+    const radio = findContractNode(
+      shared.contract.nodes,
+      'claimant.contactPreference',
+    );
+    expect(radio).toMatchObject({
+      semanticType: 'single-choice',
+      wrappers: ['fixture-expansion-panel'],
+      valueDomain: {
+        kind: 'enumerated',
+        source: 'adapter',
+        completeness: 'complete',
+        values: ['email', 'phone'],
+      },
+      interactionProfile: {
+        profile: { id: 'fixture.cool-radio', version: 1 },
+        interaction: { kind: 'choice', operation: 'check' },
+        parts: [
+          {
+            name: 'group',
+            role: 'radiogroup',
+            evidence: 'declared',
+          },
+          { name: 'option', role: 'radio', evidence: 'declared' },
+          {
+            name: 'wrapper-expand',
+            role: 'button',
+            evidence: 'declared',
+          },
+        ],
+        preconditions: [
+          {
+            kind: 'activate',
+            part: 'wrapper-expand',
+            operation: 'click',
+            evidence: 'declared',
+          },
+        ],
+        provenance: [
+          'registry:fixture.angular-fields@1',
+          'type:cool-radio-btn-grp',
+          'wrapper:fixture-expansion-panel',
+        ],
+      },
+    });
+
+    const intake = extract('claims.intake');
+    const dependent = findContractNode(
+      intake.contract.nodes,
+      'claimDetails.caseType',
+    );
+    expect(dependent?.valueDomain).toEqual({
+      kind: 'dynamic',
+      source: 'function',
+      evidence: 'declared',
+    });
+    expect(dependent?.interactionProfile).toBeUndefined();
+
+    const assignment = extract('claims.assignment');
+    expect(
+      findContractNode(assignment.contract.nodes, 'assignment.adjusters'),
+    ).toMatchObject({
+      options: [
+        { label: 'Alex Morgan', value: 'adjuster-1' },
+        { label: 'Sam Rivera', value: 'adjuster-2' },
+      ],
+      interactionProfile: {
+        interaction: { kind: 'row-selection', operation: 'select-row' },
+      },
+    });
+
+    const customer = extract('customers.onboarding');
+    expect(
+      findContractNode(customer.contract.nodes, 'customer.account'),
+    ).toMatchObject({
+      valueDomain: {
+        values: [{ id: 'customer-ada' }, { id: 'customer-northwind' }],
+      },
+      interactionProfile: {
+        interaction: { kind: 'autocomplete', operation: 'type-and-pick' },
+      },
+    });
+    const unmapped = findContractNode(
+      customer.contract.nodes,
+      'customer.coveragePeriod',
+    );
+    expect(unmapped?.interactionProfile).toBeUndefined();
+    expect(customer.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'UNMAPPED_FIELD_TYPE',
+        nodeId: unmapped?.id,
+      }),
+    );
+
+    const incident = extract('operations.incident');
+    expect(
+      findContractNode(incident.contract.nodes, 'incident.followUps'),
+    ).toMatchObject({
+      kind: 'array',
+      semanticType: 'repeater',
+      interactionProfile: {
+        interaction: { kind: 'repeater', operation: 'expand-item' },
+      },
+    });
+    expect(feature.fieldTypeProfiles).toEqual(formsKit.fieldTypeProfiles);
+    expect(shared.contract.fieldTypeProfileRegistry).toEqual(
+      intake.contract.fieldTypeProfileRegistry,
+    );
   });
 
   it('composes reusable fragments and a custom field into a feature form', async () => {

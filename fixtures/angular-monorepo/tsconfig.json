@@ -20,6 +20,9 @@
       "@formly-contract/schema": [
         "../../packages/schema/src/index.ts"
       ],
+      "@formly-contract/compiler": [
+        "../../packages/compiler/src/index.ts"
+      ],
       "@formly-contract/workspace": [
         "../../packages/workspace/src/index.ts"
       ]

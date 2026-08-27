@@ -837,6 +837,10 @@ function nodeHasInteractionProfile(node: ContractNode): boolean {
   );
 }
 
+function normalizeVisibleOptionLabel(label: string): string {
+  return label.replace(/\p{White_Space}+/gu, ' ').trim();
+}
+
 function assertGenericDriverValueMapping(
   profile: ContractInteractionProfile,
   valueDomain: ContractValueDomain | undefined,
@@ -863,18 +867,28 @@ function assertGenericDriverValueMapping(
     { readonly count: number; readonly label: string }
   >();
   const optionCountsByLabel = new Map<string, number>();
-  for (const option of options) {
+  for (const [index, option] of options.entries()) {
     const key = canonicalStringify(option.value);
+    const normalizedLabel = normalizeVisibleOptionLabel(option.label);
+    if (normalizedLabel.length === 0) {
+      throw new TypeError(
+        `${path}.options[${index}].label must contain visible text after whitespace normalization`,
+      );
+    }
     const existing = optionsByValue.get(key);
     optionsByValue.set(key, {
       count: (existing?.count ?? 0) + 1,
-      label: existing?.label ?? option.label,
+      label: existing?.label ?? normalizedLabel,
     });
     optionCountsByLabel.set(
-      option.label,
-      (optionCountsByLabel.get(option.label) ?? 0) + 1,
+      normalizedLabel,
+      (optionCountsByLabel.get(normalizedLabel) ?? 0) + 1,
     );
   }
+
+  const domainValueKeys = new Set(
+    valueDomain.values.map((domainValue) => canonicalStringify(domainValue)),
+  );
 
   valueDomain.values.forEach((domainValue, index) => {
     const mapping = optionsByValue.get(canonicalStringify(domainValue));
@@ -886,6 +900,14 @@ function assertGenericDriverValueMapping(
     if (optionCountsByLabel.get(mapping.label) !== 1) {
       throw new TypeError(
         `${path}.options label ${JSON.stringify(mapping.label)} must identify exactly one value`,
+      );
+    }
+  });
+
+  options.forEach((option, index) => {
+    if (!domainValueKeys.has(canonicalStringify(option.value))) {
+      throw new TypeError(
+        `${path}.options[${index}] must map to exactly one valueDomain value`,
       );
     }
   });

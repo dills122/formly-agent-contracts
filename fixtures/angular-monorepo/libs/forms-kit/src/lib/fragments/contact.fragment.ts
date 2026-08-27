@@ -15,6 +15,7 @@ export function createContactFragment(): FormlyFieldConfig[] {
       key: 'claimant.contactPreference',
       type: 'cool-radio-btn-grp',
       id: 'contact-preference',
+      wrappers: ['fixture-expansion-panel'],
       props: {
         label: 'Preferred contact method',
         required: true,

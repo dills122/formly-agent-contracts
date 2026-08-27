@@ -10,6 +10,7 @@ import { DependentSelectComponent } from './custom-fields/dependent-select.compo
 import { EntityAutocompleteComponent } from './custom-fields/entity-autocomplete.component.js';
 import { ExpandableRepeaterComponent } from './custom-fields/expandable-repeater.component.js';
 import { TableSelectComponent } from './custom-fields/table-select.component.js';
+import { FixtureExpansionPanelWrapperComponent } from './fixture-expansion-panel.wrapper.js';
 
 @NgModule({
   declarations: [
@@ -19,6 +20,7 @@ import { TableSelectComponent } from './custom-fields/table-select.component.js'
     EntityAutocompleteComponent,
     ExpandableRepeaterComponent,
     TableSelectComponent,
+    FixtureExpansionPanelWrapperComponent,
   ],
   imports: [
     CommonModule,
@@ -38,6 +40,12 @@ import { TableSelectComponent } from './custom-fields/table-select.component.js'
           component: ExpandableRepeaterComponent,
         },
         { name: 'table-select', component: TableSelectComponent },
+      ],
+      wrappers: [
+        {
+          name: 'fixture-expansion-panel',
+          component: FixtureExpansionPanelWrapperComponent,
+        },
       ],
     }),
   ],
