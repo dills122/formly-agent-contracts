@@ -1,11 +1,11 @@
 # Implementation Plan: Distributed Workspace Form Discovery
 
-Status: in progress; Tasks 1–4, including project-owned field-type profile
-registries, the deep Task 6B consumer fixture, a real Nx integration anchor,
-and Tasks 5.0–5.2 artifact/source contracts, profile-aware extraction, runner,
-workspace index, the Task 6A pilot `generate` command, and Task 3C's strict
-project-owned cross-field effect registries are implemented; Task 5A effect
-resolution is the next contract-first vertical slice
+Status: in progress; Tasks 1–6B and the machine-verifiable portion of
+Checkpoint A are implemented, including project-owned field-type profiles and
+cross-field effects, resolved effect projection, deterministic workspace
+artifacts/indexes, all three generic CLI commands, canonical Angular-fixture
+goldens, and linked/packed consumer smokes. The remaining Checkpoint A gate is
+maintainer review of the real config and artifact UX before Angular APIs begin.
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)
@@ -118,7 +118,7 @@ contains explicit effects only.
 
 | Requirement | Decision | Tasks | Verification | Status |
 | --- | --- | --- | --- | --- |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery/runner/index tests plus real Angular consumer generation; CLI fixture assertions remain | Tasks 1–5.2, the Task 6A `generate` pilot, and the Task 6B fixture shell are implemented; `list`, `check`, golden artifacts, and linked/packed consumer assertions remain |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery/runner/index tests, canonical Angular goldens, and linked/packed CLI consumers | Implemented through Task 6B; maintainer UX review remains at Checkpoint A |
 | `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Tasks 5.0–5.1 implemented, including safe node projection and realistic Angular/Nx fixture coverage; executable drivers remain separate |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | Inventory and scaffolds are build-time evidence only | Tasks 7A–8B | Angular inventory, negative inference, and scenario tests | Planned; prototype complete |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Implemented with schema/config/compiler/workspace/anchor-fixture evidence |
@@ -442,7 +442,7 @@ only validated declared effects into artifacts and the workspace index.
 
 - [x] Focused integration tests cover valid sync/async effects, stable endpoint
       resolution, readiness/profile linkage, SCC diagnostics, and stale IDs.
-- [ ] Golden artifacts distinguish declared effects from dependency candidates,
+- [x] Golden artifacts distinguish declared effects from dependency candidates,
       opaque signals, and observed scenario deltas.
 
 **Dependencies:** Tasks 3C and 5
@@ -474,16 +474,16 @@ ordering and readiness semantics.
 **Description:** Add a `formly-contracts` binary with `generate`, `list`, and
 `check` commands over the workspace runner.
 
-**Current status:** the workspace-pilot `generate` slice is implemented with
-stable usage/generation exit behavior and concise provenance. `list`, `check`,
-and the linked/packed consumer smoke tests remain before Task 6A is complete.
+**Current status:** complete. The CLI exposes deterministic config inventory,
+generation, and exact non-mutating artifact checks with stable output and exit
+behavior.
 
 **Acceptance criteria:**
 
 - [x] `generate` writes the deterministic artifact set through the workspace
       runner.
-- [ ] `list` reports the inventory without running factories.
-- [ ] `check` validates committed/current artifacts.
+- [x] `list` reports the inventory without running factories.
+- [x] `check` validates committed/current artifacts.
 - [x] Pilot `generate` usage and generation failures have stable exit codes and
       concise project/source/form/output provenance.
 - [x] Pilot command help and failures omit stack traces and underlying callback
@@ -493,7 +493,7 @@ and the linked/packed consumer smoke tests remain before Task 6A is complete.
 
 - [x] CLI unit tests cover pilot `generate` parsing, forwarding, output, and exit
       behavior, including a real temporary workspace.
-- [ ] Focused CLI tests execute all three commands against temporary fixtures.
+- [x] Focused CLI tests execute all three commands against temporary fixtures.
 
 **Dependencies:** Task 5 for the `generate` pilot; Task 5A before Task 6A is
 complete
@@ -528,15 +528,15 @@ Node-oriented discovery descriptors.
 - [x] At least six forms are exposed through two bulk source patterns.
 - [x] At least one project config registers one field profile reused by
       multiple form instances without per-form profile declarations.
-- [ ] At least one form declares an explicit effect whose endpoints resolve to
+- [x] At least one form declares an explicit effect whose endpoints resolve to
       generated stable node IDs and profile capabilities.
-- [ ] Generated artifacts and the workspace index match committed golden files.
+- [x] Generated artifacts and the workspace index match committed golden files.
 
 **Verification:**
 
-- [ ] A linked-package smoke test executes `list`, `generate`, and `check`.
-- [ ] A packed-tarball smoke test executes `generate` outside this workspace.
-- [ ] `pnpm check` passes at Checkpoint A.
+- [x] A linked-package smoke test executes `list`, `generate`, and `check`.
+- [x] A packed-tarball smoke test executes `generate` outside this workspace.
+- [x] `pnpm check` passes at Checkpoint A.
 
 **Dependencies:** the Task 6A `generate` pilot for the implemented fixture
 boundary; all Task 6A commands for the remaining linked smoke test
@@ -559,9 +559,9 @@ fixture exports rather than duplicate files
 - [x] Bulk sources generate deterministic declared contracts and a safe index.
 - [x] Project-owned profile registries resolve deterministically and contribute
       their identity to the workspace index.
-- [ ] Explicit effects resolve against generated nodes and contribute their
+- [x] Explicit effects resolve against generated nodes and contribute their
       validated identity to form and workspace hashes.
-- [ ] Linked or packed packages work from the consumer fixture.
+- [x] Linked and packed packages work from isolated temporary consumers.
 - [x] Full lint, tests, builds, demo, and documentation checks pass.
 - [ ] Maintainer reviews the actual config and artifact UX before Angular/Nx API
       work begins.
@@ -1037,9 +1037,10 @@ project sources.
 architecture overview for generic config discovery and bulk source adapters.
 
 **Current status:** the root README, workspace configuration reference, and
-workplace pilot guide now cover the implemented `generate` path. A standalone
-workspace package README, an empty-directory consumer walkthrough, and linked
-example-command smoke tests remain before this release task is complete.
+workplace pilot guide cover `list`, `generate`, and `check`; linked and packed
+temporary consumers exercise the CLI. A standalone workspace package README
+and polished empty-directory release walkthrough remain before this release
+task is complete.
 
 **Acceptance criteria:**
 

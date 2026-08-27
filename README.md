@@ -42,11 +42,11 @@ It also includes:
 - deep compatibility coverage for the pinned Angular `20.3.29` and Formly
   `6.1.8` reference combination.
 
-The parser, contract, programmatic workspace runner, and pilot `generate` CLI
-are the current product. A production MCP server, automatic Playwright
-generation, browser observation, Angular-assisted application-source
-discovery, and the remaining generic CLI commands are future layers and are not
-shipped by this MVP.
+The parser, contract, programmatic workspace runner, and generic pilot CLI with
+`list`, `generate`, and non-mutating `check` commands are the current product.
+A production MCP server, automatic Playwright generation, browser observation,
+and Angular-assisted application-source discovery are future layers and are
+not shipped by this MVP.
 
 Evaluating the current product in a private application repository? Start with
 the [workplace pilot guide](docs/workplace-pilot.md). It provides one complete
@@ -137,11 +137,15 @@ For a repository-aware pilot, follow the
 need the full configuration semantics, then run:
 
 ```sh
+pnpm exec formly-contracts list
 pnpm exec formly-contracts generate
+pnpm exec formly-contracts check
 ```
 
-The command discovers every configured project and bulk source, writes
-content-addressed contracts, and publishes `workspace-index.json` last. The
+`list` reports configured project/source inventory without invoking source
+lists or form factories. `generate` writes content-addressed contracts and
+publishes `workspace-index.json` last. `check` reruns trusted extraction and
+exact-compares the expected canonical bytes without modifying output. The
 manual script below remains useful for a single-package or one-off extraction.
 
 ### 3. Generate contract artifacts

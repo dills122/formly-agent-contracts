@@ -14,7 +14,11 @@ import { dirname, join } from 'node:path';
 
 import { afterEach, describe, expect, it } from 'vitest';
 
-import { runWorkspace, WorkspaceGenerationError } from './run-workspace.js';
+import {
+  checkWorkspace,
+  runWorkspace,
+  WorkspaceGenerationError,
+} from './run-workspace.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -138,6 +142,136 @@ describe('runWorkspace', () => {
       ),
     ).resolves.toEqual(firstArtifactBytes);
     expect(firstIndexBytes).toBe(`${canonicalStringify(first.index)}\n`);
+  });
+
+  it('reports generated artifacts as current without rewriting them', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `export default {
+        projectId: 'forms',
+        sources: [{ sourceId: 'forms', list: () => [{
+          id: 'claims.form',
+          create: () => ({ fields: [{ key: 'name', type: 'input' }] })
+        }] }]
+      };`,
+    );
+    const generated = await runWorkspace(runnerOptions(workspaceRoot));
+    const indexPath = join(workspaceRoot, generated.indexPath);
+    const artifactPath = join(workspaceRoot, generated.artifactPaths[0]!);
+    const indexBytes = await readFile(indexPath, 'utf8');
+    const artifactBytes = await readFile(artifactPath, 'utf8');
+
+    const checked = await checkWorkspace(runnerOptions(workspaceRoot));
+
+    expect(checked).toEqual({
+      indexPath: generated.indexPath,
+      artifactPaths: generated.artifactPaths,
+      differences: [],
+    });
+    expect(await readFile(indexPath, 'utf8')).toBe(indexBytes);
+    expect(await readFile(artifactPath, 'utf8')).toBe(artifactBytes);
+  });
+
+  it('reports missing artifacts without creating output', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `export default {
+        projectId: 'forms',
+        sources: [{ sourceId: 'forms', list: () => [{
+          id: 'claims.form',
+          create: () => ({ fields: [{ key: 'name', type: 'input' }] })
+        }] }]
+      };`,
+    );
+
+    const checked = await checkWorkspace(runnerOptions(workspaceRoot));
+
+    expect(checked.differences).toEqual([
+      { path: checked.artifactPaths[0], status: 'missing' },
+      { path: checked.indexPath, status: 'missing' },
+    ]);
+    expect(await pathExists(join(workspaceRoot, 'dist'))).toBe(false);
+  });
+
+  it('reports stale artifact bytes without replacing them', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `export default {
+        projectId: 'forms',
+        sources: [{ sourceId: 'forms', list: () => [{
+          id: 'claims.form',
+          create: () => ({ fields: [{ key: 'name', type: 'input' }] })
+        }] }]
+      };`,
+    );
+    const generated = await runWorkspace(runnerOptions(workspaceRoot));
+    const artifactPath = join(workspaceRoot, generated.artifactPaths[0]!);
+    await writeFile(artifactPath, 'stale artifact bytes\n');
+
+    const checked = await checkWorkspace(runnerOptions(workspaceRoot));
+
+    expect(checked.differences).toEqual([
+      { path: generated.artifactPaths[0], status: 'stale' },
+    ]);
+    expect(await readFile(artifactPath, 'utf8')).toBe('stale artifact bytes\n');
+  });
+
+  it('reports distinct invalid UTF-8 bytes as stale without replacing them', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `export default {
+        projectId: 'forms',
+        sources: [{ sourceId: 'forms', list: () => [{
+          id: 'claims.form',
+          create: () => ({
+            fields: [{ key: 'name', type: 'input', props: { label: '\uFFFD' } }]
+          })
+        }] }]
+      };`,
+    );
+    const generated = await runWorkspace(runnerOptions(workspaceRoot));
+    const artifactPath = join(workspaceRoot, generated.artifactPaths[0]!);
+    const artifactBytes = await readFile(artifactPath);
+    const replacementCharacter = Buffer.from('\uFFFD');
+    const replacementOffset = artifactBytes.indexOf(replacementCharacter);
+    expect(replacementOffset).toBeGreaterThanOrEqual(0);
+    const corruptedBytes = Buffer.concat([
+      artifactBytes.subarray(0, replacementOffset),
+      Buffer.from([0xff]),
+      artifactBytes.subarray(replacementOffset + replacementCharacter.length),
+    ]);
+    await writeFile(artifactPath, corruptedBytes);
+
+    const checked = await checkWorkspace(runnerOptions(workspaceRoot));
+
+    expect(checked.differences).toEqual([
+      { path: generated.artifactPaths[0], status: 'stale' },
+    ]);
+    expect(await readFile(artifactPath)).toEqual(corruptedBytes);
+
+    await expect(runWorkspace(runnerOptions(workspaceRoot))).rejects.toMatchObject({
+      code: 'OUTPUT_WRITE_FAILED',
+      phase: 'output',
+      outputPath: generated.artifactPaths[0],
+    });
+    await expect(checkWorkspace(runnerOptions(workspaceRoot))).resolves.toMatchObject({
+      differences: [
+        { path: generated.artifactPaths[0], status: 'stale' },
+      ],
+    });
+    expect(await readFile(artifactPath)).toEqual(corruptedBytes);
   });
 
   it('rejects globally duplicate form IDs before invoking any factory or writing output', async () => {

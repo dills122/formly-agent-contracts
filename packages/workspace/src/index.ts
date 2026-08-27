@@ -57,11 +57,14 @@ export type {
   FormContractSource,
 } from './source.js';
 export {
+  checkWorkspace,
   runWorkspace,
   WorkspaceGenerationError,
 } from './run-workspace.js';
 export type {
   RunWorkspaceOptions,
+  WorkspaceCheckDifference,
+  WorkspaceCheckResult,
   WorkspaceGenerationErrorCode,
   WorkspaceGenerationPhase,
   WorkspaceRunResult,

@@ -45,5 +45,12 @@ pnpm fixture:angular:serve
 ```
 
 The focused test loads the real TypeScript configs, executes both source
-catalogs, and asserts the behavior matrix. The production build verifies the complete
-app → feature-lib → forms-kit → formly-kit browser composition.
+catalogs, asserts the behavior matrix, and generates the fixture in a temporary
+sibling workspace for a byte-for-byte comparison with `goldens/`. Golden
+contract filenames use the `.contract.golden.json` suffix so they remain
+reviewable repository fixtures rather than ignored runtime output. The golden
+index and the `claims.intake` contract preserve the complete declared effect
+DTOs, including their resolved source and target node IDs.
+
+The production build verifies the complete app → feature-lib → forms-kit →
+formly-kit browser composition.

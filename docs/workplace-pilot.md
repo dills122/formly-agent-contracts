@@ -23,17 +23,18 @@ The current `main` branch can show:
 - the possible values of static choice controls and safely projected custom
   controls;
 - project, source, configuration, plugin, and field-profile provenance; and
-- whether two identical runs produce the same canonical artifacts and hashes.
+- declared cross-field effects whose configured endpoints and capabilities can
+  be resolved safely; and
+- whether generated artifacts are current at byte level.
 
 The pilot cannot yet prove:
 
-- cross-field cause and effect such as “selecting product loads case types”;
+- that a declared cross-field effect actually occurs in the live browser;
 - runtime-only option values or lifecycle behavior that the controlled scenario
   compiler did not resolve;
 - the real DOM/ARIA output of an undeclared custom Angular component;
 - executable application-specific Playwright driver behavior;
-- automatic discovery of arbitrary form exports or routes; or
-- the planned `formly-contracts list` and `check` commands.
+- automatic discovery of arbitrary form exports or routes.
 
 Record those as findings rather than filling the gaps with guessed selectors or
 interaction verbs.
@@ -64,8 +65,9 @@ pnpm --filter @formly-contract/workspace build
 ```
 
 Run `pnpm check` when the machine can afford the complete repository gate. It
-runs lint, unit tests, package builds, both Angular fixture builds, package and
-release checks, the demo smoke test, and documentation validation.
+runs lint, unit tests, package builds, both Angular fixture builds, linked and
+packed workspace-consumer smokes, package and release checks, the demo smoke
+test, and documentation validation.
 
 For a fast known-good generation smoke from the Formly Contract root:
 
@@ -106,8 +108,13 @@ pnpm install
 pnpm exec formly-contracts --help
 ```
 
-The current binary accepts only `generate`. A successful help check starts with
-`Usage: formly-contracts generate [options]`.
+The binary accepts `list`, `generate`, and `check`. A successful help check
+starts with `Usage: formly-contracts <command> [options]`.
+
+Repository CI also packs the three built packages and runs the workspace CLI in
+an isolated temporary consumer. That is a technical tarball boundary check,
+not an npm release: `@formly-contract/workspace` remains private until the
+release-readiness work adds package documentation and publication metadata.
 
 ## 3. Add one root configuration
 
@@ -355,7 +362,16 @@ controls.
 Run from the workplace repository root:
 
 ```sh
+pnpm exec formly-contracts list \
+  --workspace-root . \
+  --config formly-contracts.config.ts
+
 pnpm exec formly-contracts generate \
+  --workspace-root . \
+  --config formly-contracts.config.ts \
+  --output dist/formly-contracts-pilot
+
+pnpm exec formly-contracts check \
   --workspace-root . \
   --config formly-contracts.config.ts \
   --output dist/formly-contracts-pilot
@@ -400,8 +416,13 @@ outside declared field metadata. Add stable attributes in the consumer when
 possible; for Formly controls, declare them under
 `props.attributes['data-testid']` so the contract can emit an exact locator.
 
-Run the command twice without changing inputs. The second run should retain the
-same index bytes, artifact paths, and content hashes.
+After generation, `check` recomputes the same trusted source/factory output and
+exact-compares the canonical artifacts and index without rewriting them. Run it
+again after any form/config/profile/effect change; missing output and a stale
+index can be refreshed by an intentional `generate` run. A stale
+content-addressed contract is an integrity failure and generation will not
+overwrite it: inspect the mismatch, remove the corrupt artifact only after
+confirming it is safe to do so, then regenerate.
 
 ## 7. Troubleshoot common pilot failures
 
@@ -425,8 +446,9 @@ use the more specific `CONFIG_*` classifications named below.
 | `DIAGNOSTIC_POLICY_FAILED` | Inspect the indexed diagnostic and adjust the form/profile. Relax `failOn` only when the warning is explicitly accepted for the pilot. |
 | `OUTPUT_PATH_OUTSIDE_WORKSPACE` or `OUTPUT_SYMLINK_UNSUPPORTED` | Use a normal workspace-relative output directory without `..`, an absolute path, or a symlink. |
 
-Generation failures exit with code `1`; command-usage failures exit with code
-`2`. The CLI intentionally omits stack traces and underlying callback details.
+Discovery, generation, stale-check, and check failures exit with code `1`;
+command-usage failures exit with code `2`. The CLI intentionally omits stack
+traces and underlying callback details.
 
 ## 8. Capture a useful, sanitized report
 
