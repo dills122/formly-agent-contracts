@@ -7,6 +7,8 @@
 - **Research baseline commit:** `d4ffdb517d0d506ed7cd55074c4eac720a145f8b`
 - **Initial retained research revision:**
   `d1f14d7e2fb542927af9226699383f1a99691fb4`
+- **Review-correction experiment revision:**
+  `6cbab4d5bf59793168468c47e7fa8590ae20eb6d`
 - **Branch:** `codex/rh-01-form-lineage-research`
 - **Authorized output:** This research artifact and the isolated experiment at
   [`scripts/research/form-lineage/symbol-resolution-experiment.mjs`](../../../scripts/research/form-lineage/symbol-resolution-experiment.mjs)
@@ -71,7 +73,7 @@ design is approved for production.
 | --- | --- | --- | --- |
 | `RH01-R1` Separate facts, observations, inferences, and unknowns | Evidence ledger below | Manual label review | Satisfied |
 | `RH01-R2` Compare options and recommend API/index/query/evidence behavior | Options and recommended design below | Design review | Satisfied; approval pending |
-| `RH01-R3` Prove or disprove aliases, re-exports, direct calls, constructors, and ambiguity | TypeScript experiment and repository fixture run | `node scripts/research/form-lineage/symbol-resolution-experiment.mjs` | Passed |
+| `RH01-R3` Prove or disprove aliases, re-exports, direct calls, constructors, callable `const` factories, annotation attachment, and ambiguity | TypeScript experiment and repository fixture run | `node scripts/research/form-lineage/symbol-resolution-experiment.mjs` | Passed |
 | `RH01-R4` Cover wrappers, multiple IDs, many usages, fragments, lazy ownership, route/page/step bounds | Edge-case and context matrices below | Experiment plus source review | Satisfied with explicit unknowns |
 | `RH01-R5` State consequences and ordered tasks without production changes | Implementation consequences below | `git status --short` and scoped diff review | Satisfied |
 
@@ -316,8 +318,9 @@ The initial experiment ran in an uncommitted worktree based on the baseline
 commit. The tested script and research document were then retained together,
 without an intervening content change, in `d1f14d7e2fb542927af9226699383f1a99691fb4`.
 Unlike the baseline, that retained revision contains the documented command and
-is the reproducible revision for the initial reported result. Review-correction
-provenance is recorded separately below after its retained commit exists.
+is the reproducible revision for the initial reported result. The expanded
+review-correction experiment is retained at
+`6cbab4d5bf59793168468c47e7fa8590ae20eb6d`.
 
 Dependencies were restored from the local pnpm store only:
 
@@ -342,6 +345,40 @@ anchor-precedence/near-miss checks, loaded exactly 46 Angular-fixture roots with
 zero pre-emit diagnostics, recognized two canonical fixture sources, asserted
 the complete recognized-anchor match set of four singleton direct usages, and
 reported two inline definitions without an explicit root anchor.
+
+### Review-correction rerun
+
+The four accepted independent-review findings were corrected and retained at
+this exact experiment revision:
+
+```text
+commit:     6cbab4d5bf59793168468c47e7fa8590ae20eb6d
+Node.js:    v22.22.1
+TypeScript: 5.9.3
+date:       2026-08-27
+```
+
+Commands run from that clean revision:
+
+```sh
+node scripts/research/form-lineage/symbol-resolution-experiment.mjs
+pnpm exec eslint scripts/research/form-lineage/symbol-resolution-experiment.mjs
+pnpm check:docs
+git diff --check HEAD^ HEAD
+```
+
+All commands exited 0. The expanded virtual program reported 18 true Boolean
+assertions, including canonical alias resolution for an exported callable
+`const` and explicit usage-marker attachment/failure behavior. It recorded five
+definition-creation invocations and 16 non-creation **form-root** invocations;
+the fragment-only call is now excluded from that count. Marker fixtures produced
+five exact attachments across `VariableStatement`, `ExpressionStatement`,
+`ReturnStatement`, and class `PropertyDeclaration`, plus the expected
+fail-closed results for one multiple-call property, one unsupported method, and
+one orphan marker. The repository Angular fixture result remained 46 roots,
+zero diagnostics, four exact direct usages, two recognized sources, and two
+inline definitions without explicit root anchors. Documentation checks passed
+for 57 files, ESLint passed, and the correction diff had no whitespace errors.
 
 ### Experiment interpretation
 
@@ -888,7 +925,7 @@ rebuilds, but the artifact hashes remain the correctness mechanism.
 | `rootSymbol` has no compatible call/construct result | Unrelated stable symbol becomes form authority | Reject with `INCOMPATIBLE_SOURCE_SYMBOL`; type compatibility is necessary but descriptor declaration remains authoritative |
 | Descriptor adapter invokes its root | Synthetic creation appears as a page usage | Retain `definition-creation` provenance on the anchor and exclude it from ordinary usage queries |
 | Wrapper body grows dynamic | Previously derived edge becomes unsafe | Version bounded grammar, downgrade to unknown, require annotation |
-| Usage marker is copied, malformed, nonliteral, or orphaned | Wrong business context attaches to a call | Strict versioned JSON grammar plus adjacent singleton symbol validation; fail generation |
+| Usage marker is copied, malformed, nonliteral, orphaned, on an unsupported container, or attached to multiple root calls | Wrong business context attaches to a call | Strict versioned JSON grammar plus explicit container and singleton symbol validation; fail generation |
 | Journey/step ID is missing, stale, or unrelated to form | Explicit-looking false context | Validate stable ID grammar and referential membership against the versioned journey registry, or reject journey keys |
 | Unrelated object resembles a route | False page/route context | Analyze only recognized Angular router entry points/type origins and registered route graphs |
 | Same component/route hosts several forms | Context mistaken as identity | Keep form resolution and context relations separate |
@@ -907,7 +944,7 @@ the following gates pass on a sanitized representative workplace slice:
 
 | Gate | Pass condition | Stop condition |
 | --- | --- | --- |
-| `GATE-SYM-01` Direct identity | 100% of enumerated direct calls/constructors for at least the three target conventions resolve to the expected compatible anchored symbol across local, path-alias, barrel, and namespace imports; same-named helpers/lookalikes are ignored and descriptor adapter calls are creation provenance | Any wrong unique match, incompatible root accepted, helper matched by name/path text rather than canonical identity, or creation call reported as application usage |
+| `GATE-SYM-01` Direct identity | 100% of enumerated direct calls/constructors for the target function, class, and exported callable-`const` conventions resolve to the expected compatible anchored symbol across local, path-alias, barrel, and namespace imports; same-named helpers/lookalikes are ignored and descriptor adapter calls are creation provenance | Any wrong unique match, incompatible root accepted, helper matched by name/path text rather than canonical identity, or creation call reported as application usage |
 | `GATE-PROG-01` Distributed programs | At least three leaf projects, one project reference, one declaration-output consumer, and one cross-project alias join to one portable anchor identity | Join depends on symbol spelling, absolute host path, or comparing `ts.Symbol` objects across programs |
 | `GATE-COVERAGE-01` Relevance and overlap | Multiple configs/options/hosts in one project, overlapping app/test roots, scope exclusions, an incomplete dependency graph, and conflicting resolution prove unique program IDs, conservative relevance, deduplication, retained contributor IDs, and incomplete-query behavior | Missing or unproven-excluded program produces an unscoped empty result, or overlap becomes false ambiguity/duplicate usage |
 | `GATE-AMB-01` Ambiguity | Multiple form IDs, multiple routes, and conditional wrappers always return sorted ambiguity/unknown and never a guessed exact result | Any input-order-dependent or first-match selection |
