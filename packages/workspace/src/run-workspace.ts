@@ -1,4 +1,5 @@
 import {
+  canonicalizeRuntimeProvenance,
   canonicalStringify,
   parseRuntimeProvenance,
   type ContractDiagnostic,
@@ -993,22 +994,23 @@ async function planWorkspaceRun(
     );
   }
   const projects = resolveProjects(discovered, options.cliOverrides);
-  const runtimeProvenance =
-    options.runtimeProvenance === undefined
-      ? await createInProcessRuntimeProvenance(
-          workspaceRoot,
-          {
-            rootConfig:
-              options.rootLoaderOptions?.tsconfigPath === undefined
-                ? 'disabled'
-                : 'configured',
-            projectConfigs:
-              discovered.root.config.tsconfigPath === undefined
-                ? 'disabled'
-                : 'configured',
-          },
-        )
-      : parseRuntimeProvenance(options.runtimeProvenance);
+  let runtimeProvenanceInput = options.runtimeProvenance;
+  runtimeProvenanceInput ??= await createInProcessRuntimeProvenance(
+    workspaceRoot,
+    {
+      rootConfig:
+        options.rootLoaderOptions?.tsconfigPath === undefined
+          ? 'disabled'
+          : 'configured',
+      projectConfigs:
+        discovered.root.config.tsconfigPath === undefined
+          ? 'disabled'
+          : 'configured',
+    },
+  );
+  const runtimeProvenance = JSON.parse(
+    canonicalizeRuntimeProvenance(runtimeProvenanceInput),
+  ) as RuntimeProvenance;
   const inventoried = await inventoryForms(projects);
   const extracted = extractContracts(workspaceRoot, inventoried);
   const aggregateOutputDirectory = canonicalOutputDirectory(

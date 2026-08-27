@@ -1,9 +1,10 @@
 # Implementation Plan: Distributed Workspace Form Discovery
 
 Status: in progress; Tasks 1–6B and Checkpoint A are complete. Task 7A.1 code
-and acceptance verification are complete after correcting both exact-provenance
-findings from independent review instance 1: effective root/project loader
-options and resolved executed-package versions. Completed work includes
+and acceptance verification are complete after correcting the exact-loader and
+resolved-package findings from independent review instance 1 plus the
+order-insensitive configuration-hash finding from instance 2. Completed work
+includes
 project-owned field-type profiles and cross-field effects, resolved effect
 projection, deterministic workspace artifacts/indexes, all three generic CLI
 commands, canonical Angular-fixture goldens, linked/packed consumer smokes, and

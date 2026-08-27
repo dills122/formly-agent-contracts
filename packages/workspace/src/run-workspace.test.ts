@@ -438,6 +438,65 @@ describe('runWorkspace', () => {
     ).toBe(firstArtifactBytes);
   });
 
+  it('normalizes set-like provenance before project and root configuration hashing', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `export default { projectId: 'forms' };`,
+    );
+    const provenance: RuntimeProvenance = {
+      ...runtimeProvenance(),
+      tools: [
+        { name: '@formly-contract/workspace', version: '0.1.0' },
+        { name: '@formly-contract/compiler', version: '0.4.0' },
+        { name: '@formly-contract/schema', version: '0.4.0' },
+      ],
+      loader: {
+        ...runtimeProvenance().loader,
+        options: {
+          ...runtimeProvenance().loader.options,
+          nativeModules: ['@angular/core', '@angular/compiler'],
+        },
+      },
+      runtimePackages: [
+        { name: '@ngx-formly/core', version: '6.1.8' },
+        { name: '@angular/core', version: '20.3.29' },
+      ],
+    };
+    const reordered: RuntimeProvenance = {
+      ...provenance,
+      tools: [...provenance.tools].reverse(),
+      loader: {
+        ...provenance.loader,
+        options: {
+          ...provenance.loader.options,
+          nativeModules: [...provenance.loader.options.nativeModules].reverse(),
+        },
+      },
+      runtimePackages: [...provenance.runtimePackages].reverse(),
+    };
+
+    const first = await runWorkspace({
+      ...runnerOptions(workspaceRoot),
+      runtimeProvenance: provenance,
+    });
+    const second = await runWorkspace({
+      ...runnerOptions(workspaceRoot),
+      runtimeProvenance: reordered,
+    });
+
+    expect(second.index.runtimeProvenance).toEqual(
+      first.index.runtimeProvenance,
+    );
+    expect(second.index.projects[0]?.configurationHash).toBe(
+      first.index.projects[0]?.configurationHash,
+    );
+    expect(second.index.configurationHash).toBe(first.index.configurationHash);
+    expect(second.index.contentHash).toBe(first.index.contentHash);
+  });
+
   it('reports missing artifacts without creating output', async () => {
     const workspaceRoot = await createTemporaryWorkspace();
     await seedRoot(workspaceRoot);
