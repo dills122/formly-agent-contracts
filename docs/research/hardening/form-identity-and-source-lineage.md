@@ -4,7 +4,9 @@
   started
 - **Decision owner:** Formly Contract maintainers
 - **Research date:** 2026-08-27
-- **Repository commit:** `d4ffdb517d0d506ed7cd55074c4eac720a145f8b`
+- **Research baseline commit:** `d4ffdb517d0d506ed7cd55074c4eac720a145f8b`
+- **Initial retained research revision:**
+  `d1f14d7e2fb542927af9226699383f1a99691fb4`
 - **Branch:** `codex/rh-01-form-lineage-research`
 - **Authorized output:** This research artifact and the isolated experiment at
   [`scripts/research/form-lineage/symbol-resolution-experiment.mjs`](../../../scripts/research/form-lineage/symbol-resolution-experiment.mjs)
@@ -277,10 +279,12 @@ tsconfigs, project references, declaration maps, generated files, path aliases,
 and build-tool overlays were not available. Cross-program source/declaration
 joining is unproven against the real topology.
 
-**`UNK-02` — Target factory conventions.** It is not known how often the target
-names are direct exported symbols versus object methods, bound functions,
-dependency-injected services, wrapper factories, inherited static methods, or
-generated registries.
+**`UNK-02` — Target factory conventions.** Named exported functions, classes,
+and callable `const` variables with direct arrow/function initializers are in
+the proposed first slice. It is not known how often the target names instead
+use object methods, bound functions, dependency-injected services, wrapper
+factories, inherited static methods, reassigned variables, or generated
+registries.
 
 **`UNK-03` — Route composition conventions.** The frequency of literal route
 arrays, custom route builders, lazy route indirection, module federation, and
@@ -299,13 +303,21 @@ returned over the eventual MCP surface in every deployment.
 ### Environment and command
 
 ```text
-commit:     d4ffdb517d0d506ed7cd55074c4eac720a145f8b
-OS/host:    macOS local Codex worktree
-Node.js:    v22.22.1
-pnpm:       10.23.0
-TypeScript: 5.9.3
-date:       2026-08-27
+baseline commit:         d4ffdb517d0d506ed7cd55074c4eac720a145f8b
+initial retained tree:   d1f14d7e2fb542927af9226699383f1a99691fb4
+OS/host:                 macOS local Codex worktree
+Node.js:                 v22.22.1
+pnpm:                    10.23.0
+TypeScript:              5.9.3
+date:                    2026-08-27
 ```
+
+The initial experiment ran in an uncommitted worktree based on the baseline
+commit. The tested script and research document were then retained together,
+without an intervening content change, in `d1f14d7e2fb542927af9226699383f1a99691fb4`.
+Unlike the baseline, that retained revision contains the documented command and
+is the reproducible revision for the initial reported result. Review-correction
+provenance is recorded separately below after its retained commit exists.
 
 Dependencies were restored from the local pnpm store only:
 
@@ -421,9 +433,13 @@ Rules:
   type-check the zero-argument `create`; an unconstrained identity helper is not
   sufficient.
 - The allowed `rootSymbol` syntax is exactly an identifier or property access
-  that the checker resolves to a named, exported function or class declaration.
-  Inline expressions, local/unexported declarations, `.bind`, `.call`,
-  `.apply`, computed access, and conditional expressions fail with
+  that the checker resolves to one of these named exported declarations: a
+  function, a class, or a `const` variable whose initializer is directly an
+  arrow function or function expression. This admits the common stable
+  `export const createForm = (...) => ...` convention without general value-flow
+  analysis. `let`/`var`, destructuring, indirect variable initializers, inline
+  expressions, local/unexported declarations, `.bind`, `.call`, `.apply`,
+  computed access, and conditional expressions fail with
   `UNSTABLE_SOURCE_SYMBOL` or `UNEXPORTED_SOURCE_SYMBOL`.
 - The checker must find a call or construct signature whose result is assignable
   to the approved form-root product. A stable but unrelated function/class fails
@@ -450,8 +466,8 @@ Rules:
 ### 3. Add an optional exact source annotation only when needed
 
 Direct calls with one candidate need no source change. Ambiguous roots and
-business context use a versioned source-only annotation immediately before the
-statement containing the actual call:
+business context use a versioned source-only annotation immediately before a
+supported usage container containing the actual call:
 
 ```ts
 /** @formlyContractUsage {"schemaVersion":"0.1.0","usageId":"orders.new.stepper","formId":"orders.entry","journeyId":"orders.new","stepId":"entry"} */
@@ -461,11 +477,23 @@ const instance = new OrderEntryStepperForm(input);
 The initial grammar is intentionally strict: one JSON object with only
 allowlisted literal string keys; no variables, spreads, computed properties,
 duplicate keys, extra keys, or multiple annotated invocations in the attached
-statement. The marker attaches only to the immediately following non-empty
-statement. The indexer must resolve exactly one nested direct invocation and
-verify that its candidate set contains the declared `formId`; mismatch,
-orphaning, copying onto a different symbol, and duplicate `usageId` are hard
-generation errors. The marker never overrides contradictory symbol evidence.
+container. The marker attaches to the immediately following node in the same
+source-file, block, or class-member list, with no intervening statement,
+declaration, or class member. The only supported containers are:
+
+- a `VariableStatement` in a source file or block;
+- an `ExpressionStatement` or `ReturnStatement` in a block; or
+- a class `PropertyDeclaration` with an initializer.
+
+This explicitly includes common Angular `readonly form = Factory(...)` class
+fields and statements inside constructors or methods. A marker before another
+node kind, at the end of a list/file, duplicated on one container, or attached
+to a container with zero or more than one nested direct anchored invocation is
+a hard generation error. For exactly one invocation, the indexer verifies that
+its candidate set contains the declared `formId`; mismatch, copying onto a
+different symbol, and duplicate `usageId` are also hard errors. The marker never
+overrides contradictory symbol evidence. The bounded experiment covers every
+supported container plus unsupported-method, orphan, and multiple-call cases.
 
 All IDs use the repository's stable-ID grammar, a bounded length, and reject
 empty strings, control characters, and non-normalized Unicode. `stepId` requires
@@ -716,6 +744,7 @@ locations with a warning.
 | Namespace import/property call | Canonicalize property symbol | TypeScript checker exact |
 | Direct factory call | Map declaration to all anchored form IDs | Descriptor + TypeScript |
 | Direct constructor | Same as call | Explicit class `rootSymbol` + TypeScript |
+| Direct call through exported callable `const` | Same as function call | Direct arrow/function initializer + TypeScript call compatibility |
 | Simple wrapper factory | At most derived candidate | Bounded body grammar or usage annotation |
 | Conditional wrapper/alias | Ambiguous candidate set or unknown | Usage annotation for exact selection |
 | Higher-order parameter call | Unknown at function body; call-edge candidates may be separate | Interprocedural analysis is out of initial scope |
@@ -855,7 +884,7 @@ rebuilds, but the artifact hashes remain the correctness mechanism.
 | Resolution input changes outside retained sources | Old alias/declaration relation appears current | Hash the instrumented semantic resolution closure or fail the program closed as incomplete |
 | Compiler API changes | Index behavior drifts across TypeScript versions | Pin supported versions, record version, run compatibility fixtures |
 | Programmatic descriptor hides literal form ID/root | Cannot establish exact anchor | Require explicit typed definition/lineage sidecar; emit `UNANCHORED_FORM_DEFINITION` |
-| `rootSymbol` is inline, local, bound, or unexported | Portable identity is false | Reject unsupported AST/declaration grammar; keep contract source Node-only and bundle-isolated |
+| `rootSymbol` is inline, local, bound, unexported, reassigned, or an indirect variable value | Portable identity is false | Accept only exported functions/classes and direct callable `const` initializers; keep contract source Node-only and bundle-isolated |
 | `rootSymbol` has no compatible call/construct result | Unrelated stable symbol becomes form authority | Reject with `INCOMPATIBLE_SOURCE_SYMBOL`; type compatibility is necessary but descriptor declaration remains authoritative |
 | Descriptor adapter invokes its root | Synthetic creation appears as a page usage | Retain `definition-creation` provenance on the anchor and exclude it from ordinary usage queries |
 | Wrapper body grows dynamic | Previously derived edge becomes unsafe | Version bounded grammar, downgrade to unknown, require annotation |
@@ -902,11 +931,12 @@ These are proposed follow-up units, not changes authorized by RH-01:
 
 1. **`RH01-T1` — Approve source-lineage contract.** Decide artifact ownership,
    evidence vocabulary, portable anchor identity, path modes, strict usage
-   marker grammar, and contract-source bundle isolation. Output: approved
-   spec/ADR update.
+   marker attachment nodes, exported callable-`const` support, and
+   contract-source bundle isolation. Output: approved spec/ADR update.
 2. **`RH01-T2` — Run workplace topology gate.** Add sanitized fixtures for leaf
    tsconfigs, project references, declaration maps, path aliases, barrels, and
-   lazy features. Measure cold/incremental resource use. Output: retained gate
+   lazy features, and inventory function/class/callable-`const` factory
+   conventions. Measure cold/incremental resource use. Output: retained gate
    evidence; no public API yet.
 3. **`RH01-T3` — Add typed definition anchors.** Add
    `defineFormContractDefinition` and optional `lineage.rootSymbol` in the
@@ -931,10 +961,12 @@ These are proposed follow-up units, not changes authorized by RH-01:
    and literal route grammars, retain candidate multiplicity, and keep dynamic
    cases unknown. Output: eager/lazy/nested/reuse/dynamic fixtures.
 8. **`RH01-T8` — Add optional usage annotation.** Parse the strict versioned
-   adjacent source marker for multiple-ID and journey/step cases and validate
-   singleton nested symbol/form agreement plus journey/step membership when a
-   journey registry exists. Output: malformed, orphaned, copied, stale-journey,
-   ambiguity-resolution, privacy, and duplicate-usage tests.
+   adjacent source marker for multiple-ID and journey/step cases across the
+   approved variable/expression/return/property containers. Validate singleton
+   nested symbol/form agreement plus journey/step membership when a journey
+   registry exists. Output: malformed, unsupported-container, orphaned,
+   multiple-call, copied, stale-journey, ambiguity-resolution, privacy, and
+   duplicate-usage tests.
 9. **`RH01-T9` — Reconcile runtime evidence later.** Join declared/static usages
    with explicitly scoped runtime capture without upgrading observed coverage
    to completeness. Dependency: runtime-capture decision and privacy approval.
@@ -966,9 +998,9 @@ Architecture consequences if approved:
 
 Maintainer decisions still required:
 
-1. Is `lineage.rootSymbol` acceptable as trusted function/class-valued authoring
-   metadata, or must the anchor be a module/export string validated by the
-   indexer?
+1. Is `lineage.rootSymbol` acceptable as trusted function/class/callable-`const`
+   authoring metadata, or must the anchor be a module/export string validated
+   by the indexer?
 2. Is the strict adjacent source comment acceptable for exceptional exact
    usage/journey declarations, or must those declarations live in project-owned
    sidecars at the cost of weaker callsite precision? A runtime helper is
