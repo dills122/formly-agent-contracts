@@ -4,7 +4,11 @@ import {
   type ContractNode,
   type FormContract,
 } from '@formly-contract/schema';
-import { extractFormContract } from '@formly-contract/compiler';
+import {
+  extractFormContract,
+  prepareCrossFieldEffectExtractionRegistry,
+  type CrossFieldEffectExtractionRegistry,
+} from '@formly-contract/compiler';
 import {
   lstat,
   mkdir,
@@ -396,6 +400,10 @@ function extractContracts(
 ): ExtractionOutput {
   const artifacts: PendingArtifact[] = [];
   const indexedForms: WorkspaceContractIndexDraft['forms'][number][] = [];
+  const preparedEffectRegistries = new WeakMap<
+    object,
+    CrossFieldEffectExtractionRegistry
+  >();
 
   for (const form of forms) {
     const provenance = {
@@ -445,6 +453,23 @@ function extractContracts(
         ...(form.project.resolved.fieldTypeProfiles === undefined
           ? {}
           : { fieldTypeProfiles: form.project.resolved.fieldTypeProfiles }),
+        ...(form.project.resolved.crossFieldEffects === undefined
+          ? {}
+          : {
+              crossFieldEffects: (() => {
+                const configured = form.project.resolved.crossFieldEffects;
+                const cached = preparedEffectRegistries.get(configured);
+                if (cached !== undefined) {
+                  return cached;
+                }
+                const prepared = prepareCrossFieldEffectExtractionRegistry(
+                  configured,
+                );
+                preparedEffectRegistries.set(configured, prepared);
+                return prepared;
+              })(),
+            }),
+        effectCyclePolicy: form.project.resolved.effectCyclePolicy,
       }).contract;
     } catch (error) {
       throw new WorkspaceGenerationError(
@@ -485,6 +510,12 @@ function extractContracts(
       diagnostics: contract.diagnostics.map((diagnostic) =>
         indexDiagnostic(contract, diagnostic),
       ),
+      ...(contract.crossFieldEffectRegistry === undefined
+        ? {}
+        : {
+            declaredEffects: contract.declaredEffects!,
+            effectAnalysis: contract.effectAnalysis!,
+          }),
     });
   }
 
@@ -532,6 +563,17 @@ function projectConfigurationHash(
             contentHash: project.fieldTypeProfiles.contentHash,
           },
         }),
+    ...(project.crossFieldEffects === undefined
+      ? {}
+      : {
+          crossFieldEffectRegistry: {
+            schemaVersion: project.crossFieldEffects.schemaVersion,
+            id: project.crossFieldEffects.id,
+            version: project.crossFieldEffects.version,
+            contentHash: project.crossFieldEffects.contentHash,
+          },
+        }),
+    effectCyclePolicy: project.effectCyclePolicy,
   });
 }
 
@@ -575,6 +617,8 @@ function buildIndex(
       ...(discovered.root.config.diagnostics === undefined
         ? {}
         : { failOn: discovered.root.config.diagnostics.failOn }),
+      effectCyclePolicy:
+        discovered.root.config.effects?.cyclePolicy ?? 'error',
       plugins: configurationPlugins,
       projects: projects.map(({ discovered: project, resolved }) => ({
         configPath: project.configPath,
@@ -597,6 +641,16 @@ function buildIndex(
               id: resolved.fieldTypeProfiles.id,
               version: resolved.fieldTypeProfiles.version,
               contentHash: resolved.fieldTypeProfiles.contentHash,
+            },
+          }),
+      ...(resolved.crossFieldEffects === undefined
+        ? {}
+        : {
+            crossFieldEffectRegistry: {
+              schemaVersion: resolved.crossFieldEffects.schemaVersion,
+              id: resolved.crossFieldEffects.id,
+              version: resolved.crossFieldEffects.version,
+              contentHash: resolved.crossFieldEffects.contentHash,
             },
           }),
     })),

@@ -58,6 +58,7 @@ function createRegistry(
           version: 1,
           capabilities: ['check'],
         },
+        effectCapabilities: { targetProperties: ['options'], readiness: [] },
         unknowns: [],
       },
     ],

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   FORM_CONTRACT_SCHEMA_VERSION,
   type ContractInteractionProfile,
+  type ContractNode,
   type FormContract,
   type FormContractDraft,
 } from './contract.js';
@@ -13,6 +14,24 @@ import type {
 } from './field-type-interaction.js';
 import { createFormContract } from './canonical-json.js';
 import { parseFormContract } from './validation.js';
+
+function minimalControl(id: string): ContractNode {
+  return {
+    id,
+    kind: 'control',
+    modelPath: [id],
+    formlyType: 'input',
+    semanticType: 'text',
+    evidence: 'declared',
+    wrappers: [],
+    constraints: [],
+    options: [],
+    conditions: [],
+    dynamicRules: [],
+    locators: [],
+    children: [],
+  };
+}
 
 const completeContract: FormContract = createFormContract({
   schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
@@ -79,6 +98,7 @@ const completeContract: FormContract = createFormContract({
           version: 1,
           capabilities: ['fill'],
         },
+        effectCapabilities: { targetProperties: [], readiness: [] },
         preconditions: [
           {
             kind: 'activate',
@@ -104,6 +124,7 @@ const completeContract: FormContract = createFormContract({
       },
       conditions: [
         {
+          id: 'applicant.profile::identity.legalName::rule:props.disabled',
           property: 'props.disabled',
           expression: 'formState.readonly',
           evidence: 'declared',
@@ -111,6 +132,7 @@ const completeContract: FormContract = createFormContract({
       ],
       dynamicRules: [
         {
+          id: 'applicant.profile::identity.legalName::rule:props.options',
           property: 'props.options',
           source: 'function',
           evidence: 'resolved',
@@ -170,6 +192,7 @@ function genericInteractionProfile(
     parts: input.parts,
     interaction: input.interaction,
     driver: input.driver,
+    effectCapabilities: { targetProperties: [], readiness: [] },
     preconditions: [],
     unknowns: [],
     provenance: ['registry:acme.formly-fields@2', 'type:test-field'],
@@ -1050,6 +1073,183 @@ describe('parseFormContract', () => {
     });
 
     expect(parseFormContract(displayContract)).toEqual(displayContract);
+  });
+
+  it('revalidates declared effect capabilities at the contract boundary', () => {
+    const invalidEffectContract = createFormContract({
+      schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
+      formId: 'effects.checkbox',
+      crossFieldEffectRegistry: {
+        schemaVersion: '0.4.0',
+        id: 'fixture.effects',
+        version: 1,
+        contentHash: `sha256:${'b'.repeat(64)}`,
+      },
+      declaredEffects: [
+        {
+          identity: { id: 'fixture.loads-checkbox', version: 1 },
+          trigger: {
+            nodeId: 'effects.checkbox::source',
+            event: 'valueChanged',
+          },
+          target: {
+            nodeId: 'effects.checkbox::target',
+            property: 'options',
+          },
+          kind: 'loads',
+          timing: { mode: 'sync' },
+          ordering: 'source-before-target',
+          evidence: 'declared',
+          opacity: 'transparent',
+        },
+      ],
+      effectAnalysis: { completeness: 'complete', reasons: [] },
+      nodes: [
+        {
+          id: 'effects.checkbox::source',
+          kind: 'control',
+          modelPath: ['source'],
+          formlyType: 'input',
+          semanticType: 'text',
+          evidence: 'declared',
+          wrappers: [],
+          constraints: [],
+          options: [],
+          conditions: [],
+          dynamicRules: [],
+          locators: [],
+          children: [],
+        },
+        {
+          id: 'effects.checkbox::target',
+          kind: 'control',
+          modelPath: ['target'],
+          formlyType: 'checkbox',
+          semanticType: 'boolean',
+          evidence: 'declared',
+          wrappers: [],
+          constraints: [],
+          options: [],
+          valueDomain: {
+            kind: 'enumerated',
+            source: 'semantic-type',
+            completeness: 'complete',
+            evidence: 'declared',
+            values: [false, true],
+          },
+          conditions: [],
+          dynamicRules: [],
+          locators: [],
+          children: [],
+        },
+      ],
+      diagnostics: [],
+    });
+
+    expect(() => parseFormContract(invalidEffectContract)).toThrow(
+      'unsupported-target',
+    );
+  });
+
+  it('rejects opaque dynamic rules as declared effect conditions', () => {
+    const invalidCondition = createFormContract({
+      schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
+      formId: 'effects.condition',
+      crossFieldEffectRegistry: {
+        schemaVersion: '0.4.0',
+        id: 'fixture.effects',
+        version: 1,
+        contentHash: `sha256:${'c'.repeat(64)}`,
+      },
+      declaredEffects: [
+        {
+          identity: { id: 'fixture.conditional', version: 1 },
+          trigger: {
+            nodeId: 'effects.condition::source',
+            event: 'valueChanged',
+          },
+          target: {
+            nodeId: 'effects.condition::target',
+            property: 'visibility',
+          },
+          kind: 'controls-state',
+          timing: { mode: 'sync' },
+          conditionRuleId: 'effects.condition::source::rule:opaque',
+          ordering: 'source-before-target',
+          evidence: 'declared',
+          opacity: 'transparent',
+        },
+      ],
+      effectAnalysis: { completeness: 'complete', reasons: [] },
+      nodes: ['source', 'target'].map((key) => ({
+        id: `effects.condition::${key}`,
+        kind: 'control' as const,
+        modelPath: [key],
+        formlyType: 'input',
+        semanticType: 'text',
+        evidence: 'declared' as const,
+        wrappers: [],
+        constraints: [],
+        options: [],
+        conditions: [],
+        dynamicRules:
+          key === 'source'
+            ? [
+                {
+                  id: 'effects.condition::source::rule:opaque',
+                  property: 'props.disabled',
+                  source: 'function' as const,
+                  evidence: 'declared' as const,
+                },
+              ]
+            : [],
+        locators: [],
+        children: [],
+      })),
+      diagnostics: [],
+    });
+
+    expect(() => parseFormContract(invalidCondition)).toThrow(
+      'unknown-condition',
+    );
+  });
+
+  it('rejects cyclic declared effects falsely marked as complete', () => {
+    const effect = (
+      id: string,
+      source: string,
+      target: string,
+    ) => ({
+      identity: { id, version: 1 },
+      trigger: { nodeId: source, event: 'valueChanged' as const },
+      target: { nodeId: target, property: 'visibility' as const },
+      kind: 'controls-state' as const,
+      timing: { mode: 'sync' as const },
+      ordering: 'source-before-target' as const,
+      evidence: 'declared' as const,
+      opacity: 'transparent' as const,
+    });
+    const cyclic = createFormContract({
+      schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
+      formId: 'effects.cycle',
+      crossFieldEffectRegistry: {
+        schemaVersion: '0.4.0',
+        id: 'fixture.effects',
+        version: 1,
+        contentHash: `sha256:${'d'.repeat(64)}`,
+      },
+      declaredEffects: [
+        effect('fixture.a-to-b', 'effects.cycle::a', 'effects.cycle::b'),
+        effect('fixture.b-to-a', 'effects.cycle::b', 'effects.cycle::a'),
+      ],
+      effectAnalysis: { completeness: 'complete', reasons: [] },
+      nodes: [minimalControl('effects.cycle::a'), minimalControl('effects.cycle::b')],
+      diagnostics: [],
+    });
+
+    expect(() => parseFormContract(cyclic)).toThrow(
+      'must report effect-cycle',
+    );
   });
 
   it('accepts multiple named locator targets for one composite field', () => {

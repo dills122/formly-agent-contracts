@@ -48,6 +48,7 @@ export const FIXTURE_FIELD_TYPE_PROFILES: FixtureFieldTypeProfiles = {
         version: 1,
         capabilities: ['check'],
       },
+      effectCapabilities: { targetProperties: ['options'], readiness: [] },
       unknowns: [],
     },
     {
@@ -97,6 +98,16 @@ export const FIXTURE_FIELD_TYPE_PROFILES: FixtureFieldTypeProfiles = {
         id: 'generic.choice',
         version: 1,
         capabilities: ['select-from-overlay'],
+      },
+      effectCapabilities: {
+        targetProperties: ['options'],
+        readiness: [
+          {
+            id: 'fixture.dependent-options-ready',
+            targetProperty: 'options',
+            evidence: 'declared',
+          },
+        ],
       },
       unknowns: [
         {
@@ -154,6 +165,7 @@ export const FIXTURE_FIELD_TYPE_PROFILES: FixtureFieldTypeProfiles = {
         version: 1,
         capabilities: ['type-and-pick'],
       },
+      effectCapabilities: { targetProperties: ['options'], readiness: [] },
       unknowns: [],
     },
     {
@@ -196,6 +208,7 @@ export const FIXTURE_FIELD_TYPE_PROFILES: FixtureFieldTypeProfiles = {
         version: 1,
         capabilities: ['select-row'],
       },
+      effectCapabilities: { targetProperties: ['options'], readiness: [] },
       unknowns: [],
     },
     {
@@ -237,6 +250,7 @@ export const FIXTURE_FIELD_TYPE_PROFILES: FixtureFieldTypeProfiles = {
         version: 1,
         capabilities: ['expand-item'],
       },
+      effectCapabilities: { targetProperties: [], readiness: [] },
       unknowns: [],
     },
   ],

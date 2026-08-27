@@ -254,6 +254,16 @@ const fieldTypeProfiles: FieldTypeProfileRegistry = {
         version: 1,
         capabilities: ['check'],
       },
+      effectCapabilities: {
+        targetProperties: ['options'],
+        readiness: [
+          {
+            id: 'claims.case-type-options-ready',
+            targetProperty: 'options',
+            evidence: 'declared',
+          },
+        ],
+      },
       unknowns: [],
     },
   ],
@@ -278,6 +288,9 @@ schema version, registry ID/version, and content hash. Reordering set-like
 registry input does not change that identity; changing semantic content or a
 profile version does. Registry data cannot contain Angular components,
 callbacks, Playwright locators, or executable drivers.
+Every profile declares an `effectCapabilities` block. Empty arrays explicitly
+mean that the profile contributes no custom effect target or readiness
+capabilities beyond the compiler's conservative built-in control baseline.
 
 `resolveFieldTypeProfile` in `@formly-contract/compiler` resolves an exact
 type/default or named variant and composes explicitly requested wrapper parts
@@ -334,6 +347,7 @@ const crossFieldEffects: CrossFieldEffectRegistry = {
   forms: [
     {
       formId: 'claims.intake',
+      coverage: 'complete',
       effects: [
         {
           identity: {
@@ -381,11 +395,24 @@ Semantic kinds are checked against their target property: `loads` and
 `controls-state` target visibility, enabled, or required state.
 
 Root configuration owns `effects.cyclePolicy`, which is `error` by default and
-may be reduced to `warning`. The current slice validates and resolves the
-registry as configuration only. Task 5A will resolve endpoint existence,
-condition rules, target/readiness capabilities, and strongly connected
-components before effects are allowed into form artifacts or the workspace
-index. Until then, configuring an effect does not make it actionable output.
+may be reduced to `warning`. Workspace generation resolves endpoint existence,
+stable condition-rule IDs, target/readiness capabilities, and strongly
+connected components before carrying an effect into the form artifact and
+workspace index. Error-policy cycles and invalid effects are diagnosed and
+omitted. Warning-policy cycles remain visible with warning diagnostics and an
+`effect-cycle` reason that keeps analysis incomplete. Existing non-effect
+diagnostics retain their extraction order; deterministic effect diagnostics
+are appended without reordering unrelated evidence.
+
+Each form registration must declare `coverage: 'complete' | 'partial'`.
+Complete is an application-owned claim, and the compiler still downgrades the
+artifact's `effectAnalysis` to incomplete when opaque dynamic rules or
+diagnostics show that undeclared behavior may remain. Effect conditions may
+reference serialized string conditions, not opaque dynamic-rule IDs. The
+workspace index carries the full validated effect DTO, not only its identity,
+so an index-only consumer retains trigger, target, timing, and ordering data.
+Consequently, a missing edge is never treated as proof of independence while
+analysis is incomplete.
 
 Dependency strings, opaque handlers, controlled scenario deltas, and future
 browser observations remain separate non-authoritative evidence. They cannot

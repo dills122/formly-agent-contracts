@@ -40,6 +40,7 @@ const registry: FieldTypeProfileRegistry = {
         version: 1,
         capabilities: ["fill"],
       },
+      effectCapabilities: { targetProperties: [], readiness: [] },
       unknowns: [],
     },
     {
@@ -82,6 +83,7 @@ const registry: FieldTypeProfileRegistry = {
         version: 1,
         capabilities: ["check"],
       },
+      effectCapabilities: { targetProperties: ["options"], readiness: [] },
       unknowns: [],
     },
     {
@@ -130,6 +132,16 @@ const registry: FieldTypeProfileRegistry = {
         id: "fixture.portal-choice",
         version: 2,
         capabilities: ["select-from-overlay"],
+      },
+      effectCapabilities: {
+        targetProperties: ["options"],
+        readiness: [
+          {
+            id: "fixture.portal-options-ready",
+            targetProperty: "options",
+            evidence: "declared",
+          },
+        ],
       },
       unknowns: [
         {
@@ -186,6 +198,7 @@ const registry: FieldTypeProfileRegistry = {
         version: 1,
         capabilities: ["type-and-pick"],
       },
+      effectCapabilities: { targetProperties: ["options"], readiness: [] },
       unknowns: [],
     },
     {
@@ -228,6 +241,7 @@ const registry: FieldTypeProfileRegistry = {
         version: 1,
         capabilities: ["select-row"],
       },
+      effectCapabilities: { targetProperties: ["options"], readiness: [] },
       unknowns: [],
     },
     {
@@ -269,6 +283,7 @@ const registry: FieldTypeProfileRegistry = {
         version: 1,
         capabilities: ["expand-item"],
       },
+      effectCapabilities: { targetProperties: [], readiness: [] },
       unknowns: [],
     },
   ],
@@ -333,6 +348,23 @@ const registry: FieldTypeProfileRegistry = {
 describe("parseFieldTypeProfileRegistry", () => {
   it("accepts the complete interaction, registration, and wrapper matrix", () => {
     expect(parseFieldTypeProfileRegistry(registry)).toEqual(registry);
+  });
+
+  it("requires readiness capabilities to reference declared target properties", () => {
+    const malformed = structuredClone(registry) as unknown as {
+      profiles: {
+        effectCapabilities: {
+          targetProperties: string[];
+          readiness: { targetProperty: string }[];
+        };
+      }[];
+    };
+    malformed.profiles[2]!.effectCapabilities.readiness[0]!.targetProperty =
+      "visibility";
+
+    expect(() => parseFieldTypeProfileRegistry(malformed)).toThrow(
+      "effectCapabilities.readiness[0].targetProperty must also appear in targetProperties"
+    );
   });
 
   it("accepts every non-projected value-domain branch explicitly", () => {

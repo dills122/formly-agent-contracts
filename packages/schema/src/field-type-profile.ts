@@ -10,6 +10,10 @@ import type {
   JsonValue,
 } from './contract.js';
 import type {
+  CrossFieldEffectTargetProperty,
+  FieldTypeEffectCapabilities,
+} from './cross-field-effect.js';
+import type {
   FieldTypeProfileDriver,
   FieldTypeProfileIdentity,
   FieldTypeProfileInteraction,
@@ -88,6 +92,7 @@ export interface FieldTypeProfile {
   readonly interaction: FieldTypeProfileInteraction;
   readonly valueDomain: FieldTypeProfileValueDomain;
   readonly driver: FieldTypeProfileDriver;
+  readonly effectCapabilities: FieldTypeEffectCapabilities;
   readonly unknowns: readonly FieldTypeProfileUnknown[];
 }
 
@@ -138,6 +143,7 @@ const PROFILE_KEYS = new Set([
   'interaction',
   'valueDomain',
   'driver',
+  'effectCapabilities',
   'unknowns',
 ]);
 const PART_KEYS = new Set(['name', 'role', 'cardinality', 'evidence']);
@@ -148,6 +154,12 @@ const DRIVER_KEYS = new Set([
   'capabilities',
 ]);
 const UNKNOWN_KEYS = new Set(['aspect', 'reason', 'evidence']);
+const EFFECT_CAPABILITIES_KEYS = new Set(['targetProperties', 'readiness']);
+const EFFECT_READINESS_KEYS = new Set([
+  'id',
+  'targetProperty',
+  'evidence',
+]);
 const REGISTRATION_KEYS = new Set([
   'formlyType',
   'defaultProfile',
@@ -254,6 +266,14 @@ const UNKNOWN_ASPECTS = [
   'locator-scope',
   'interaction-sequence',
 ] as const satisfies readonly FieldTypeProfileUnknownAspect[];
+
+const EFFECT_TARGET_PROPERTIES = [
+  'enabled',
+  'options',
+  'required',
+  'value',
+  'visibility',
+] as const satisfies readonly CrossFieldEffectTargetProperty[];
 
 function assertCanonicalJsonShape(
   value: unknown,
@@ -893,6 +913,64 @@ function validateUnknowns(
   });
 }
 
+function validateEffectCapabilities(
+  value: unknown,
+  path: string,
+): FieldTypeEffectCapabilities {
+  const capabilities = requireRecord(value, path);
+  rejectUnknownKeys(capabilities, EFFECT_CAPABILITIES_KEYS, path);
+  const targetProperties = requireArray(
+    capabilities.targetProperties,
+    `${path}.targetProperties`,
+  );
+  const targets = new Set<CrossFieldEffectTargetProperty>();
+  targetProperties.forEach((property, index) => {
+    const itemPath = `${path}.targetProperties[${index}]`;
+    if (
+      !EFFECT_TARGET_PROPERTIES.includes(
+        property as CrossFieldEffectTargetProperty,
+      )
+    ) {
+      throw new TypeError(`${itemPath} is unsupported`);
+    }
+    const target = property as CrossFieldEffectTargetProperty;
+    if (targets.has(target)) {
+      throw new TypeError(`${itemPath} duplicates target property "${target}"`);
+    }
+    targets.add(target);
+  });
+
+  const readiness = requireArray(
+    capabilities.readiness,
+    `${path}.readiness`,
+  );
+  const readinessIds = new Set<string>();
+  readiness.forEach((entry, index) => {
+    const itemPath = `${path}.readiness[${index}]`;
+    const capability = requireRecord(entry, itemPath);
+    rejectUnknownKeys(capability, EFFECT_READINESS_KEYS, itemPath);
+    const id = requireNamespacedId(capability.id, `${itemPath}.id`);
+    if (readinessIds.has(id)) {
+      throw new TypeError(`${itemPath}.id duplicates readiness ID "${id}"`);
+    }
+    readinessIds.add(id);
+    if (
+      !EFFECT_TARGET_PROPERTIES.includes(
+        capability.targetProperty as CrossFieldEffectTargetProperty,
+      )
+    ) {
+      throw new TypeError(`${itemPath}.targetProperty is unsupported`);
+    }
+    if (!targets.has(capability.targetProperty as CrossFieldEffectTargetProperty)) {
+      throw new TypeError(
+        `${itemPath}.targetProperty must also appear in targetProperties`,
+      );
+    }
+    requireDeclaredEvidence(capability.evidence, `${itemPath}.evidence`);
+  });
+  return value as FieldTypeEffectCapabilities;
+}
+
 function validateProfile(value: unknown, path: string): FieldTypeProfile {
   const profile = requireRecord(value, path);
   rejectUnknownKeys(profile, PROFILE_KEYS, path);
@@ -927,6 +1005,10 @@ function validateProfile(value: unknown, path: string): FieldTypeProfile {
     valueDomain,
     parts,
     unknowns,
+  );
+  validateEffectCapabilities(
+    profile.effectCapabilities,
+    `${path}.effectCapabilities`,
   );
   return value as FieldTypeProfile;
 }
@@ -1121,6 +1203,14 @@ function canonicalProfile(profile: FieldTypeProfile): FieldTypeProfile {
     driver: {
       ...profile.driver,
       capabilities: [...profile.driver.capabilities].sort(compareText),
+    },
+    effectCapabilities: {
+      targetProperties: [...profile.effectCapabilities.targetProperties].sort(
+        compareText,
+      ),
+      readiness: [...profile.effectCapabilities.readiness].sort((left, right) =>
+        compareText(left.id, right.id),
+      ),
     },
     unknowns: [...profile.unknowns].sort((left, right) =>
       compareText(left.aspect, right.aspect),

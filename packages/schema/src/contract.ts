@@ -6,6 +6,10 @@ import type {
   FieldTypeProfileUnknownAspect,
   FieldTypeWrapperPrecondition,
 } from './field-type-interaction.js';
+import type {
+  DeclaredCrossFieldEffect,
+  FieldTypeEffectCapabilities,
+} from './cross-field-effect.js';
 
 export const FORM_CONTRACT_SCHEMA_VERSION = '0.4.0' as const;
 
@@ -28,6 +32,12 @@ export const CONTRACT_DIAGNOSTIC_CODES = [
   ...FIELD_TYPE_PROFILE_RESOLUTION_DIAGNOSTIC_CODES,
   'VALUE_DOMAIN_PROJECTION_FAILED',
   'AMBIGUOUS_VALUE_MAPPING',
+  'UNKNOWN_EFFECT_SOURCE',
+  'UNKNOWN_EFFECT_TARGET',
+  'UNSUPPORTED_EFFECT_TARGET',
+  'UNKNOWN_EFFECT_READINESS',
+  'UNKNOWN_EFFECT_CONDITION',
+  'EFFECT_CYCLE',
 ] as const;
 
 export type ContractDiagnosticCode =
@@ -95,6 +105,7 @@ export interface ContractDisplay {
 export type ContractDynamicRuleSource = 'function' | 'async';
 
 export interface ContractDynamicRule {
+  readonly id: string;
   readonly property: string;
   readonly source: ContractDynamicRuleSource;
   readonly evidence: ContractEvidence;
@@ -131,6 +142,26 @@ export interface ContractFieldTypeProfileRegistryIdentity {
   readonly contentHash: string;
 }
 
+export interface ContractCrossFieldEffectRegistryIdentity {
+  readonly schemaVersion: '0.4.0';
+  readonly id: string;
+  readonly version: number;
+  readonly contentHash: string;
+}
+
+export type ContractEffectAnalysisReason =
+  | 'declared-partial'
+  | 'effect-cycle'
+  | 'form-not-declared'
+  | 'invalid-declared-effect'
+  | 'opaque-dynamic-rule'
+  | 'opaque-diagnostic';
+
+export interface ContractEffectAnalysis {
+  readonly completeness: 'complete' | 'incomplete';
+  readonly reasons: readonly ContractEffectAnalysisReason[];
+}
+
 export interface ContractInteractionProfileUnknown {
   readonly scope: 'profile' | 'wrapper';
   readonly source: string;
@@ -147,6 +178,7 @@ export interface ContractInteractionProfile {
   readonly parts: readonly FieldTypeProfilePart[];
   readonly interaction: FieldTypeProfileInteraction;
   readonly driver: FieldTypeProfileDriver;
+  readonly effectCapabilities: FieldTypeEffectCapabilities;
   readonly preconditions: readonly FieldTypeWrapperPrecondition[];
   readonly unknowns: readonly ContractInteractionProfileUnknown[];
   readonly provenance: readonly string[];
@@ -181,6 +213,7 @@ export type ContractLocator =
     });
 
 export interface ContractCondition {
+  readonly id: string;
   readonly property: string;
   readonly expression: string;
   readonly evidence: ContractEvidence;
@@ -223,6 +256,9 @@ export interface FormContractDraft {
   readonly schemaVersion: typeof FORM_CONTRACT_SCHEMA_VERSION;
   readonly formId: string;
   readonly fieldTypeProfileRegistry?: ContractFieldTypeProfileRegistryIdentity;
+  readonly crossFieldEffectRegistry?: ContractCrossFieldEffectRegistryIdentity;
+  readonly declaredEffects?: readonly DeclaredCrossFieldEffect[];
+  readonly effectAnalysis?: ContractEffectAnalysis;
   readonly nodes: readonly ContractNode[];
   readonly diagnostics: readonly ContractDiagnostic[];
 }

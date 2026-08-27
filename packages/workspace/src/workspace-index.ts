@@ -2,12 +2,17 @@ import { createHash } from 'node:crypto';
 
 import {
   CONTRACT_DIAGNOSTIC_CODES,
+  CROSS_FIELD_EFFECT_SCHEMA_VERSION,
   FIELD_TYPE_PROFILE_SCHEMA_VERSION,
   FORM_CONTRACT_SCHEMA_VERSION,
   canonicalStringify,
+  contractEffectCycleComponents,
+  parseCrossFieldEffectRegistry,
   type ContractDiagnosticCode,
   type ContractDiagnosticSeverity,
   type ContractEvidence,
+  type ContractEffectAnalysis,
+  type DeclaredCrossFieldEffect,
   type ModelPathSegment,
 } from '@formly-contract/schema';
 
@@ -32,6 +37,13 @@ export interface WorkspaceIndexFieldTypeProfileRegistryIdentity {
   readonly contentHash: string;
 }
 
+export interface WorkspaceIndexCrossFieldEffectRegistryIdentity {
+  readonly schemaVersion: typeof CROSS_FIELD_EFFECT_SCHEMA_VERSION;
+  readonly id: string;
+  readonly version: number;
+  readonly contentHash: string;
+}
+
 export interface WorkspaceIndexProject {
   readonly configPath: string;
   readonly projectId: string;
@@ -39,6 +51,7 @@ export interface WorkspaceIndexProject {
   readonly outputDirectory: string;
   readonly configurationHash: string;
   readonly fieldTypeProfileRegistry?: WorkspaceIndexFieldTypeProfileRegistryIdentity;
+  readonly crossFieldEffectRegistry?: WorkspaceIndexCrossFieldEffectRegistryIdentity;
 }
 
 export interface WorkspaceIndexedDiagnostic {
@@ -60,6 +73,8 @@ export interface WorkspaceIndexForm {
   readonly contractSchemaVersion: typeof FORM_CONTRACT_SCHEMA_VERSION;
   readonly contentHash: string;
   readonly diagnostics: readonly WorkspaceIndexedDiagnostic[];
+  readonly declaredEffects?: readonly DeclaredCrossFieldEffect[];
+  readonly effectAnalysis?: ContractEffectAnalysis;
 }
 
 export interface WorkspaceContractIndexDraft {
@@ -99,6 +114,7 @@ const PROJECT_KEYS = new Set([
   'outputDirectory',
   'configurationHash',
   'fieldTypeProfileRegistry',
+  'crossFieldEffectRegistry',
 ]);
 const PROFILE_REGISTRY_KEYS = new Set([
   'schemaVersion',
@@ -106,6 +122,7 @@ const PROFILE_REGISTRY_KEYS = new Set([
   'version',
   'contentHash',
 ]);
+const EFFECT_REGISTRY_KEYS = PROFILE_REGISTRY_KEYS;
 const FORM_KEYS = new Set([
   'projectId',
   'sourceId',
@@ -115,7 +132,10 @@ const FORM_KEYS = new Set([
   'contractSchemaVersion',
   'contentHash',
   'diagnostics',
+  'declaredEffects',
+  'effectAnalysis',
 ]);
+const EFFECT_ANALYSIS_KEYS = new Set(['completeness', 'reasons']);
 const DIAGNOSTIC_KEYS = new Set([
   'code',
   'severity',
@@ -326,6 +346,35 @@ function parseProfileRegistry(
   };
 }
 
+function parseEffectRegistry(
+  input: unknown,
+  path: string,
+): WorkspaceIndexCrossFieldEffectRegistryIdentity {
+  const record = readRecord(input, path, EFFECT_REGISTRY_KEYS);
+  if (
+    required(record, 'schemaVersion', path) !==
+    CROSS_FIELD_EFFECT_SCHEMA_VERSION
+  ) {
+    fail(
+      `${path}.schemaVersion`,
+      `must be ${CROSS_FIELD_EFFECT_SCHEMA_VERSION}.`,
+    );
+  }
+  const version = required(record, 'version', path);
+  if (!Number.isSafeInteger(version) || Number(version) <= 0) {
+    fail(`${path}.version`, 'must be a positive safe integer.');
+  }
+  return {
+    schemaVersion: CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+    id: stableId(required(record, 'id', path), `${path}.id`),
+    version: Number(version),
+    contentHash: contentHash(
+      required(record, 'contentHash', path),
+      `${path}.contentHash`,
+    ),
+  };
+}
+
 function assertNoDuplicates(
   values: readonly string[],
   path: string,
@@ -367,6 +416,15 @@ function parseProject(input: unknown, path: string): WorkspaceIndexProject {
         `${path}.fieldTypeProfileRegistry`,
       )
     : undefined;
+  const crossFieldEffectRegistry = Object.hasOwn(
+    record,
+    'crossFieldEffectRegistry',
+  )
+    ? parseEffectRegistry(
+        record.crossFieldEffectRegistry,
+        `${path}.crossFieldEffectRegistry`,
+      )
+    : undefined;
 
   return {
     configPath: relativePath(
@@ -389,6 +447,9 @@ function parseProject(input: unknown, path: string): WorkspaceIndexProject {
     ...(fieldTypeProfileRegistry === undefined
       ? {}
       : { fieldTypeProfileRegistry }),
+    ...(crossFieldEffectRegistry === undefined
+      ? {}
+      : { crossFieldEffectRegistry }),
   };
 }
 
@@ -464,8 +525,69 @@ function parseDiagnostic(
   };
 }
 
+function parseDeclaredEffects(
+  input: unknown,
+  formId: string,
+  path: string,
+): readonly DeclaredCrossFieldEffect[] {
+  const effects = JSON.parse(
+    canonicalStringify(readArray(input, path)),
+  ) as readonly unknown[];
+  try {
+    return parseCrossFieldEffectRegistry({
+      schemaVersion: CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+      id: 'workspace.index-effects',
+      version: 1,
+      forms: [{ formId, coverage: 'complete', effects }],
+    }).forms[0]!.effects;
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'is invalid';
+    fail(path, message);
+  }
+}
+
+function parseEffectAnalysis(
+  input: unknown,
+  path: string,
+): ContractEffectAnalysis {
+  const record = readRecord(input, path, EFFECT_ANALYSIS_KEYS);
+  const completeness = required(record, 'completeness', path);
+  if (completeness !== 'complete' && completeness !== 'incomplete') {
+    fail(`${path}.completeness`, 'is unsupported.');
+  }
+  const allowedReasons = new Set([
+    'declared-partial',
+    'effect-cycle',
+    'form-not-declared',
+    'invalid-declared-effect',
+    'opaque-dynamic-rule',
+    'opaque-diagnostic',
+  ]);
+  const reasons = readArray(
+    required(record, 'reasons', path),
+    `${path}.reasons`,
+  ).map((reason, index) => {
+    if (typeof reason !== 'string' || !allowedReasons.has(reason)) {
+      fail(`${path}.reasons[${index}]`, 'is unsupported.');
+    }
+    return reason as ContractEffectAnalysis['reasons'][number];
+  });
+  assertNoDuplicates(reasons, `${path}.reasons`, 'analysis reason');
+  if (completeness === 'complete' && reasons.length > 0) {
+    fail(`${path}.reasons`, 'must be empty for complete analysis.');
+  }
+  if (completeness === 'incomplete' && reasons.length === 0) {
+    fail(`${path}.reasons`, 'must explain incomplete analysis.');
+  }
+  return { completeness, reasons };
+}
+
 function parseForm(input: unknown, path: string): WorkspaceIndexForm {
   const record = readRecord(input, path, FORM_KEYS);
+  const formId = contractIdentifier(
+    required(record, 'formId', path),
+    `${path}.formId`,
+  );
   if (required(record, 'evidence', path) !== 'declared') {
     fail(`${path}.evidence`, 'must be "declared".');
   }
@@ -484,16 +606,45 @@ function parseForm(input: unknown, path: string): WorkspaceIndexForm {
   ).map((diagnostic, index) =>
     parseDiagnostic(diagnostic, `${path}.diagnostics[${index}]`),
   );
+  const hasDeclaredEffects = Object.hasOwn(record, 'declaredEffects');
+  const hasEffectAnalysis = Object.hasOwn(record, 'effectAnalysis');
+  if (hasDeclaredEffects !== hasEffectAnalysis) {
+    fail(path, 'declaredEffects and effectAnalysis must appear together.');
+  }
+  const declaredEffects = hasDeclaredEffects
+    ? parseDeclaredEffects(
+        record.declaredEffects,
+        formId,
+        `${path}.declaredEffects`,
+      )
+    : undefined;
+  if (declaredEffects !== undefined) {
+    assertNoDuplicates(
+      declaredEffects.map(({ identity }) => identity.id),
+      `${path}.declaredEffects`,
+      'effect ID',
+    );
+  }
+  const effectAnalysis = hasEffectAnalysis
+    ? parseEffectAnalysis(record.effectAnalysis, `${path}.effectAnalysis`)
+    : undefined;
+  if (
+    declaredEffects !== undefined &&
+    contractEffectCycleComponents(declaredEffects).length > 0 &&
+    !effectAnalysis?.reasons.includes('effect-cycle')
+  ) {
+    fail(
+      `${path}.effectAnalysis`,
+      'must report effect-cycle for cyclic declaredEffects.',
+    );
+  }
   return {
     projectId: stableId(
       required(record, 'projectId', path),
       `${path}.projectId`,
     ),
     sourceId: stableId(required(record, 'sourceId', path), `${path}.sourceId`),
-    formId: contractIdentifier(
-      required(record, 'formId', path),
-      `${path}.formId`,
-    ),
+    formId,
     evidence: 'declared',
     artifactPath: relativePath(
       required(record, 'artifactPath', path),
@@ -505,6 +656,8 @@ function parseForm(input: unknown, path: string): WorkspaceIndexForm {
       `${path}.contentHash`,
     ),
     diagnostics,
+    ...(declaredEffects === undefined ? {} : { declaredEffects }),
+    ...(effectAnalysis === undefined ? {} : { effectAnalysis }),
   };
 }
 
@@ -573,6 +726,15 @@ function assertReferences(
       fail(
         `workspaceIndex.forms[${index}].sourceId`,
         'must reference an indexed project source.',
+      );
+    }
+    if (
+      (project.crossFieldEffectRegistry === undefined) !==
+      (form.declaredEffects === undefined)
+    ) {
+      fail(
+        `workspaceIndex.forms[${index}].declaredEffects`,
+        'must match the project cross-field effect registry configuration.',
       );
     }
     const expectedArtifactPath = workspaceContractArtifactPath({
@@ -668,6 +830,23 @@ function parseIndexDraft(
         `${path}.projects[${index}].sourceIds`,
       );
     }
+    for (const [index, form] of forms.entries()) {
+      if (form.declaredEffects !== undefined) {
+        assertCanonicalOrder(
+          form.declaredEffects,
+          (left, right) =>
+            compareCodeUnit(left.identity.id, right.identity.id),
+          `${path}.forms[${index}].declaredEffects`,
+        );
+      }
+      if (form.effectAnalysis !== undefined) {
+        assertCanonicalOrder(
+          form.effectAnalysis.reasons,
+          compareCodeUnit,
+          `${path}.forms[${index}].effectAnalysis.reasons`,
+        );
+      }
+    }
   }
 
   const hash = includeHash
@@ -731,7 +910,22 @@ export function createWorkspaceContractIndex(
         sourceIds: [...project.sourceIds].sort(compareCodeUnit),
       }))
       .sort(compareProjects),
-    forms: [...parsed.forms].sort(compareForms),
+    forms: [...parsed.forms]
+      .map((form) => ({
+        ...form,
+        ...(form.declaredEffects === undefined
+          ? {}
+          : {
+              declaredEffects: [...form.declaredEffects].sort((left, right) =>
+                compareCodeUnit(left.identity.id, right.identity.id),
+              ),
+              effectAnalysis: {
+                ...form.effectAnalysis!,
+                reasons: [...form.effectAnalysis!.reasons].sort(compareCodeUnit),
+              },
+            }),
+      }))
+      .sort(compareForms),
   };
   return {
     ...normalized,

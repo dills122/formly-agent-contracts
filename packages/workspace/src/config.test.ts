@@ -78,6 +78,7 @@ function createEffectRegistry(reversed = false): CrossFieldEffectRegistry {
     forms: [
       {
         formId: 'claims.intake',
+        coverage: 'complete',
         effects: reversed ? [...effects].reverse() : effects,
       },
     ],
@@ -114,6 +115,7 @@ function createProfileRegistry(
         version: 1,
         capabilities: ['fill'],
       },
+      effectCapabilities: { targetProperties: [], readiness: [] },
       unknowns: [],
     },
     {
@@ -141,6 +143,7 @@ function createProfileRegistry(
         version: 1,
         capabilities: ['fill'],
       },
+      effectCapabilities: { targetProperties: [], readiness: [] },
       unknowns: [],
     },
   ];

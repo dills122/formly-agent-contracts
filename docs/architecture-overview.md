@@ -6,11 +6,11 @@ The implemented generic pilot now includes schema v0.4, declared and trusted
 scenario compilation, project-owned custom-field profiles, repository-aware
 root/project/source configuration, deterministic multi-project discovery and
 artifact generation, a workspace index, the pilot `formly-contracts generate`
-command, and strict project-owned cross-field effect registries.
+command, strict project-owned cross-field effect registries, and deterministic
+resolution of validated effects into form artifacts and workspace indexes.
 
-The long-term architecture below remains the intended direction. Resolving
-declared effects against generated nodes and readiness capabilities, the
-remaining `list`/`check` CLI commands, Angular-assisted profile inventory,
+The long-term architecture below remains the intended direction. The remaining
+`list`/`check` CLI commands, Angular-assisted profile inventory,
 optional Nx task integration, production MCP delivery, typed Playwright
 execution, browser observation, runtime parity, and change analysis remain
 later layers. They must consume or extend the same contracts rather than move
