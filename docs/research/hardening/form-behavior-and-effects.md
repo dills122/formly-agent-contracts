@@ -1135,7 +1135,7 @@ pnpm exec vitest run packages/schema/src/cross-field-effect.test.ts packages/com
   Tests       33 passed (33)
 
 pnpm check:docs
-  Documentation checks passed for 57 files.
+  Documentation checks passed for 60 files.
 
 pnpm exec eslint scripts/research/form-effects/form-effects.test.mjs
   exited 0 with no output
@@ -1144,8 +1144,8 @@ pnpm lint
   exited 0 with no lint findings
 
 pnpm check
-  Test Files  35 passed (35)
-  Tests       458 passed (458)
+  Test Files  37 passed (37)
+  Tests       481 passed (481)
   Builds, linked/packed workspace consumers, release manifest, package check,
   demo smoke check, and documentation checks passed.
 
