@@ -114,8 +114,10 @@ Facts, inferences, and unknowns are kept separate throughout this artifact.
     or omit invocation. The same pinned runtime automatically subscribes to an
     Observable returned by `onInit`, `afterContentInit`, or `afterViewInit` and
     unsubscribes those subscriptions before invoking `onDestroy`. These are
-    pinned-package observations from `formly.attributes.mjs`,
-    `formly.field.mjs`, and `fieldconfig.d.ts`, not cross-version guarantees.
+    pinned-package observations, not cross-version guarantees. Versioned source:
+    [Formly attributes](https://github.com/ngx-formly/ngx-formly/blob/v6.1.8/src/core/src/lib/templates/formly.attributes.ts),
+    [field lifecycle](https://github.com/ngx-formly/ngx-formly/blob/v6.1.8/src/core/src/lib/components/formly.field.ts),
+    and [field configuration](https://github.com/ngx-formly/ngx-formly/blob/v6.1.8/src/core/src/lib/models/fieldconfig.ts).
 
 ## Workplace examples and capability matrix
 
@@ -153,14 +155,20 @@ can safely say â€œproduct filters case type asynchronously and is ready when X.â
 
 ## Bounded experiment results
 
-The focused suite contains five tests and passed as follows:
+The focused suite contains six tests and passed as follows:
 
 ```text
 pnpm exec vitest run scripts/research/form-effects/form-effects.test.mjs
 
 Test Files  1 passed (1)
-Tests       5 passed (5)
+Tests       6 passed (6)
 ```
+
+The callback analyzer first compiles each supplied research snippet with
+Node's JavaScript parser without running it, then performs TypeScript-AST
+candidate analysis only if the snippet is valid JavaScript. Malformed syntax
+and TypeScript-only parameter annotations are rejected before candidate
+extraction.
 
 ### `Other` visibility and required branch
 
@@ -202,11 +210,13 @@ options, so the operational effect is explicit-only.
 ### Lifecycle subscription and cleanup
 
 For a direct `onInit`-shaped subscription to `valueChanges`, the AST experiment
-found literal dependent targets for `markAsTouched()` and
-`updateValueAndValidity()`. It also reported helper/pipeline and lifecycle
-semantics as unknown. The runtime probe observed one touched/revalidation
-mutation before teardown and no further mutation after unsubscribe; observer
-count fell from one to zero.
+found the literal source control's `valueChanges` stream and literal dependent
+targets for `markAsTouched()` and `updateValueAndValidity()`. It also reported
+helper/pipeline and lifecycle semantics as unknown. A computed source lookup is
+refused. The emitted control key is review syntax, not a stable contract node
+ID; compiler path normalization is still required. The runtime probe observed
+one touched/revalidation mutation before teardown and no further mutation after
+unsubscribe; observer count fell from one to zero.
 
 This proves the mechanics of the research example, not a general Formly hook
 contract. A trusted `FormlyFormBuilder.build()` does not by itself render the
@@ -225,10 +235,12 @@ review scaffold.
 
 ## Proposed normalized behavior model
 
-Use one normalized graph record for planner-facing behavior, regardless of
-whether the producer was a rule, explicit effect, scenario, observation,
-lifecycle hook, or repeater profile. Store evidence separately from the
-actionable semantic core.
+Use one normalized, discriminated record family for the planner-facing behavior
+graph. A causal edge and an acausal target-state snapshot are different members
+of that family: scenarios and observations may establish state without
+inventing a trigger, while rules, explicit effects, lifecycle hooks, and
+repeater profiles may establish edges. Store evidence separately from the
+semantic core and require kind-specific evidence identifiers.
 
 ```ts
 type BehaviorFacet =
@@ -268,14 +280,13 @@ type BehaviorTransition =
   | 'expands-item'
   | 'unknown';
 
-interface ContractBehavior {
+interface ContractBehaviorEdge {
+  readonly recordKind: 'edge';
   readonly identity: { readonly id: string; readonly version: number };
   readonly trigger: BehaviorTrigger;
   readonly target: { readonly nodeId: string; readonly facet: BehaviorFacet };
   readonly transition: BehaviorTransition;
-  readonly guard?:
-    | { readonly kind: 'rule'; readonly ruleId: string }
-    | { readonly kind: 'scenario'; readonly scenarioId: string };
+  readonly guard?: { readonly kind: 'rule'; readonly ruleId: string };
   readonly expected?: JsonValue;
   readonly timing:
     | { readonly mode: 'sync' }
@@ -290,21 +301,70 @@ interface ContractBehavior {
     readonly starts: 'onInit' | 'interaction';
     readonly ends: 'onDestroy' | 'completion' | 'unknown';
   };
-  readonly authority: 'actionable' | 'candidate' | 'observation';
-  readonly evidence: readonly BehaviorEvidenceRef[];
+  readonly authority: 'actionable' | 'candidate';
+  readonly evidence: readonly [
+    CausalBehaviorEvidenceRef,
+    ...BehaviorEvidenceRef[],
+  ];
 }
 
-interface BehaviorEvidenceRef {
-  readonly kind: 'declared' | 'derived' | 'scenario' | 'observed';
+type BehaviorState =
+  | { readonly kind: 'json'; readonly value: JsonValue }
+  | { readonly kind: 'undefined' }
+  | { readonly kind: 'node-absent' };
+
+interface ContractTargetState {
+  readonly recordKind: 'state';
+  readonly identity: { readonly id: string; readonly version: number };
+  readonly target: { readonly nodeId: string; readonly facet: BehaviorFacet };
+  readonly state: BehaviorState;
+  readonly authority: 'actionable' | 'candidate' | 'observation';
+  readonly evidence: readonly [BehaviorEvidenceRef, ...BehaviorEvidenceRef[]];
+}
+
+type ContractBehaviorRecord = ContractBehaviorEdge | ContractTargetState;
+
+interface BehaviorEvidenceBase {
   readonly producer: string;
   readonly sourcePath?: readonly (string | number)[];
-  readonly scenarioId?: string;
-  readonly observationId?: string;
 }
+
+type DeclaredBehaviorEvidence = BehaviorEvidenceBase & {
+  readonly kind: 'declared';
+};
+
+type DerivedBehaviorEvidence = BehaviorEvidenceBase & {
+  readonly kind: 'derived';
+  readonly sourcePath: readonly (string | number)[];
+};
+
+type ScenarioBehaviorEvidence = BehaviorEvidenceBase & {
+  readonly kind: 'scenario';
+  readonly scenarioId: string;
+};
+
+type ObservedBehaviorEvidence = BehaviorEvidenceBase & {
+  readonly kind: 'observed';
+  readonly observationId: string;
+  readonly scenarioId?: string;
+};
+
+type CausalBehaviorEvidenceRef =
+  | DeclaredBehaviorEvidence
+  | DerivedBehaviorEvidence;
+
+type BehaviorEvidenceRef =
+  | CausalBehaviorEvidenceRef
+  | ScenarioBehaviorEvidence
+  | ObservedBehaviorEvidence;
 ```
 
-The DTO intentionally does not store function text, callback names as semantic
-verbs, arbitrary RxJS pipelines, or executable readiness code.
+An edge requires declared or derived evidence for its causal source/trigger;
+scenario and observed evidence may corroborate an independently established
+edge but cannot create one. A state record needs no trigger and can retain an
+explicit JSON value, meaningful `undefined`, or node absence. The DTO
+intentionally does not store function text, callback names as semantic verbs,
+arbitrary RxJS pipelines, or executable readiness code.
 
 ### Normalized conditions
 
@@ -330,13 +390,13 @@ Most v0.4 records map directly:
 
 | Current record | Normalized mapping |
 | --- | --- |
-| `ContractCondition` | `BehaviorTrigger.rule` plus a normalized condition; raw expression remains provenance |
-| `ContractDynamicRule` | Candidate behavior with known target facet and opaque condition/source |
-| `DeclaredCrossFieldEffect` | Actionable node-event behavior; `kind` maps to `transition` |
-| Trusted resolved node state/domain | Scenario evidence with required `scenarioId` |
-| Field-profile wrapper precondition | Actionable reachability behavior |
-| Repeater `add-item` / `expand-item` profile | Actionable reachability trigger/transition |
-| Future browser/runtime delta | Observation evidence attached to a declared, derived, or candidate behavior |
+| `ContractCondition` | Edge with `BehaviorTrigger.rule` plus a normalized condition; raw expression remains provenance |
+| `ContractDynamicRule` | Candidate edge with known target facet and opaque condition/source |
+| `DeclaredCrossFieldEffect` | Actionable node-event edge; `kind` maps to `transition` |
+| Trusted resolved node state/domain | Acausal state record with required scenario evidence and `scenarioId` |
+| Field-profile wrapper precondition | Actionable reachability edge |
+| Repeater `add-item` / `expand-item` profile | Actionable reachability edge |
+| Future browser/runtime delta | Observed state record, or corroborating evidence on an independently established edge |
 
 Exact schema changes are required; the current strict v0.4 validators cannot
 accept these as additive unknown properties:
@@ -347,12 +407,15 @@ accept these as additive unknown properties:
    user-interaction state.
 3. Add `revalidates`, `marks-touched`, `marks-untouched`, `adds-item`, and
    `expands-item` transitions. Keep `loads` and `filters` declaration-only.
-4. Replace the single trigger shape with the discriminated trigger union above.
-   A planner-facing lifecycle or repeater prerequisite cannot be represented by
+4. Add the discriminated edge/state record family, then replace the effect
+   edge's single trigger shape with the trigger union above. Scenario-resolved
+   state must use an acausal state record rather than an invented trigger. A
+   planner-facing lifecycle or repeater prerequisite cannot be represented by
    current `valueChanged | selectionChanged` alone.
-5. Add first-class evidence references and authority. Do not add `derived`,
-   `scenario`, or `observed` to the existing `DeclaredCrossFieldEffect`; that
-   registry must remain declaration-only.
+5. Add the discriminated evidence union and authority. Require `scenarioId` on
+   scenario evidence and `observationId` on observed evidence. Do not add
+   `derived`, `scenario`, or `observed` to the existing
+   `DeclaredCrossFieldEffect`; that registry must remain declaration-only.
 6. Add normalized conditions separately from current raw
    `ContractCondition.expression`. Only normalized conditions may authorize an
    automatic positive/negative branch.
@@ -518,32 +581,34 @@ RxJS interpretation as contract authority.
 
 ## Ordered implementation tasks
 
-1. Specify the closed normalized-condition grammar, JavaScript semantics,
+1. Approve the causal-edge/acausal-state record union, evidence-origin rules,
+   and discriminated evidence identifiers before versioning the schema.
+2. Specify the closed normalized-condition grammar, JavaScript semantics,
    stable relative-path resolution, legacy precedence, and refusal tests.
-2. Version the schema and add behavior facets, transitions, evidence references,
+3. Version the schema and add behavior facets, transitions, evidence references,
    authority, stable scenario IDs, and facet-local completeness/unknown DTOs.
-3. Project current `DeclaredCrossFieldEffect` and field-profile repeater
+4. Project current `DeclaredCrossFieldEffect` and field-profile repeater
    preconditions into the normalized behavior view without weakening their
    declaration-only authority.
-4. Implement automatic derived rules for static and bounded string expressions,
+5. Implement automatic derived rules for static and bounded string expressions,
    including the `Other` visibility/required matrix and hide/reset-policy
    separation.
-5. Add a conservative callback/hook scaffold producer for only direct literal
+6. Add a conservative callback/hook scaffold producer for only direct literal
    control access and allowlisted mutations. Refuse helpers, aliases, imports,
    computed paths, writes outside the allowlist, and arbitrary pipelines.
-6. Add named differential-scenario evidence with one-axis input declarations,
+7. Add named differential-scenario evidence with one-axis input declarations,
    stable scenario IDs, JSON projection, structural delta diagnostics, and no
    automatic business verbs.
-7. Add explicit `validity`, `touched`, and lifecycle/repeater declarations to
+8. Add explicit `validity`, `touched`, and lifecycle/repeater declarations to
    registry validation and planner projection; keep readiness as a profile-owned
    serializable capability.
-8. Add rendered Angular lifecycle tests covering returned Observable teardown,
+9. Add rendered Angular lifecycle tests covering returned Observable teardown,
    manual `onDestroy` cleanup, emitted-event feedback, and hook non-execution in
    builder-only scenarios.
-9. Add browser conformance events only after the normalized evidence schema is
+10. Add browser conformance events only after the normalized evidence schema is
    stable; compare observations to declarations without promoting observations
    to global facts.
-10. Measure construct frequencies and scaffold acceptance on a redacted
+11. Measure construct frequencies and scaffold acceptance on a redacted
     workplace corpus before increasing AST coverage.
 
 ## Limitations and open decisions
@@ -581,7 +646,7 @@ RxJS interpretation as contract authority.
 ```text
 pnpm exec vitest run scripts/research/form-effects/form-effects.test.mjs
   Test Files  1 passed (1)
-  Tests       5 passed (5)
+  Tests       6 passed (6)
 
 pnpm exec vitest run apps/formly-test-app/src/app/forms/effects-spike/*.test.ts
   Test Files  2 passed (2)
