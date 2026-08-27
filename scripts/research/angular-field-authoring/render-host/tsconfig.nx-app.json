@@ -1,0 +1,25 @@
+{
+  "extends": "../../../../fixtures/nx-workspace/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../../../..",
+    "declaration": false,
+    "declarationMap": false,
+    "experimentalDecorators": true,
+    "lib": ["ES2022", "DOM"],
+    "module": "ES2022",
+    "moduleResolution": "Bundler",
+    "noEmit": false,
+    "paths": {
+      "@angular/*": ["fixtures/nx-workspace/node_modules/@angular/*"],
+      "@ngx-formly/core": ["fixtures/nx-workspace/node_modules/@ngx-formly/core"]
+    },
+    "types": []
+  },
+  "angularCompilerOptions": {
+    "strictInjectionParameters": true,
+    "strictTemplates": true
+  },
+  "files": ["main.ts"],
+  "include": [],
+  "exclude": []
+}

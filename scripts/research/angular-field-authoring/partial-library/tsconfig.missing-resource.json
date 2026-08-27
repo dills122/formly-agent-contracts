@@ -1,0 +1,9 @@
+{
+  "extends": "./tsconfig.lib.json",
+  "compilerOptions": {
+    "outDir": "../.generated/missing-resource"
+  },
+  "files": ["src/negative/missing-resource.component.ts"],
+  "include": [],
+  "exclude": []
+}
