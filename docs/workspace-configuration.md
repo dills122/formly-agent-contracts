@@ -1,8 +1,8 @@
 # Workspace Configuration
 
 Status: experimental; deterministic project discovery, project-owned field-type
-profile registries, and programmatic workspace artifact generation are
-implemented, while the generic CLI remains planned
+profile registries, programmatic workspace artifact generation, and the pilot
+`generate` CLI are implemented, while `list` and `check` remain planned
 
 `@formly-contract/workspace` is the framework-neutral configuration
 layer for repository-aware Formly Contract tooling. It provides trusted config
@@ -178,6 +178,28 @@ Failures are reported as `WorkspaceGenerationError` with a stable `code`,
 retained as `cause` for trusted build tooling but is not serialized into the
 workspace index.
 
+### Generate from the pilot CLI
+
+After building or linking the workspace package, run the same boundary through
+the `formly-contracts` binary:
+
+```sh
+pnpm exec formly-contracts generate
+pnpm exec formly-contracts generate \
+  --workspace-root ../claims-workspace \
+  --config formly-contracts.config.ts \
+  --output dist/formly-contracts-pilot
+```
+
+Successful generation prints the contract count and workspace-relative index
+path. Usage failures exit with status `2`; generation failures exit with status
+`1` and print stable phase/project/source/form provenance without a stack trace
+or underlying callback error. `--fail-on warning` and `--fail-on error` may be
+repeated to override diagnostic policy.
+
+This is intentionally the first pilot slice of the generic CLI. `list` and
+`check` remain part of Task 6A and are not accepted commands yet.
+
 ## Project-owned custom-field profiles
 
 A project may declare a versioned `fieldTypeProfiles` registry. The registry
@@ -341,9 +363,9 @@ configuration.
 
 ## Current boundary
 
-The programmatic runner executes trusted source catalogs and declared form
-factories, resolves project field-type profile registries, and writes the
-deterministic artifact set. Application driver identities remain data and do
-not execute code. Cross-field effects, CLI execution, Angular-assisted
-inventory, and observed runtime capture remain later increments on the same
-configuration bedrock.
+The programmatic runner and pilot `generate` command execute trusted source
+catalogs and declared form factories, resolve project field-type profile
+registries, and write the deterministic artifact set. Application driver
+identities remain data and do not execute code. Cross-field effects, the CLI
+`list`/`check` commands, Angular-assisted inventory, and observed runtime
+capture remain later increments on the same configuration bedrock.

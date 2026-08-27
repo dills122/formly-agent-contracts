@@ -459,6 +459,10 @@ only validated declared effects into artifacts and the workspace index.
 **Description:** Add a `formly-contracts` binary with `generate`, `list`, and
 `check` commands over the workspace runner.
 
+**Current status:** the workspace-pilot `generate` slice is implemented with
+stable usage/generation exit behavior and concise provenance. `list`, `check`,
+and the linked/packed consumer smoke tests remain before Task 6A is complete.
+
 **Acceptance criteria:**
 
 - [ ] `generate` writes artifacts, `list` reports the inventory without running
