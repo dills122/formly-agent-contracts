@@ -24,13 +24,15 @@ behavior automatically. The valuable boundary is:
 3. Use named, isolated trusted scenarios to record **scenario** outcomes. A
    scenario establishes that a state was reached for that input; it does not
    establish causality, global completeness, or whether an option change was a
-   load versus a filter.
+   load versus a filter. It can generate E2E steps only when a versioned case
+   separately declares replayable node operations and values.
 4. Use browser/runtime traces as **observed** conformance evidence for visited
    paths. Observation can validate a declaration or scenario expectation but
    cannot invent unvisited branches.
-5. Require a minimal **declared** behavior when an E2E author needs ordering,
-   semantic effect kind, readiness, lifecycle scope, or repeater activation and
-   those facts are not already guaranteed by a field profile or bounded rule.
+5. Require a minimal **declared** behavior or access prerequisite when an E2E
+   author needs ordering, semantic effect kind, readiness, lifecycle scope, or
+   repeater activation and those facts are not already guaranteed by a field
+   profile or bounded rule.
 
 This is high-value even if automatic coverage is modest. An E2E author needs a
 source operation/value, target expectation, access prerequisites, and a
@@ -71,12 +73,12 @@ The proposed terms have fixed meanings:
 | --- | --- | --- |
 | `declared` | The application owner asserts normalized source, target, outcome, timing, and completeness | Actionable after schema/reference validation |
 | `derived` | A bounded adapter rule deterministically normalized supported inert syntax or static configuration | Actionable only for the exact normalized rule; otherwise candidate |
-| `scenario` | A named controlled compilation produced a particular state for explicit inputs | Scenario-local candidate or expectation |
+| `scenario` | A versioned controlled case produced a particular artifact/state; replay operations are declared separately | Scenario-local expectation, E2E-runnable only when the case is replayable |
 | `observed` | A runtime/browser trace saw a transition on one visited path | Conformance evidence, never global completeness |
 
 `resolved`, used by the current schema, describes a materialized field value,
 not how its behavioral claim was obtained. The behavioral model should call
-this evidence `scenario` and retain the scenario ID.
+this evidence `scenario` and retain the versioned axis, case, and artifact hash.
 
 Facts, inferences, and unknowns are kept separate throughout this artifact.
 
@@ -138,7 +140,7 @@ static construct proves.
 | Inline callback assigning a literal target's option collection | Candidate target and assignment shape | **scaffold-only** | Never infer `loads` versus `filters`; scenario delta can show the resulting set |
 | Inline helper call, alias, destructuring, imported symbol, service call, closure, or computed `get(path)` | Declaration location and opacity dimensions | **scaffold-only** | Whole-program interpretation is intentionally unsupported |
 | External callback reference such as `callbacks.updateCaseTypes` | Callback property and symbol spelling only | **explicit-only** | Names imply nothing; declare target/kind/readiness if ordering matters |
-| Option set differs between isolated product scenarios | Source input pair and scenario-local target delta | **scenario-resolvable** | Can generate per-product choices; cannot claim load/filter/causality/completeness |
+| Option set differs between isolated product scenarios | Versioned scenario case, replay inputs when declared, and scenario-local target delta | **scenario-resolvable** | Replayable cases can generate per-product expectations; compile-only cases remain evidence and cannot claim load/filter/causality |
 | Runtime `fieldChanges`, Angular control event, or browser trace | Visited target transition with timestamp/step and actual state | **observed-only** | Validates reachable outcome and readiness on the visited path |
 | `hooks.onInit` directly subscribing to literal sibling/parent `valueChanges` | Candidate source, subscription phase, candidate mutations in direct subscriber | **scaffold-only** | Pipeline, initial emission, renderer lifecycle, aliases, and cleanup require declaration/observation |
 | `onInit` returning an Observable plus Formly-owned teardown | Lifecycle scope and pinned auto-cleanup convention | **observed-only** for an app | Pinned source suggests cleanup, but the application build must prove the hook is rendered and destroyed |
@@ -146,7 +148,7 @@ static construct proves.
 | `markAsTouched`, `markAsUntouched`, `setErrors`, validator mutation, or revalidation | Candidate state/validity mutation and literal target when direct | **scaffold-only** | These are distinct E2E facets and must not be collapsed into `required` |
 | Object `fieldArray` template | Array structure and child template | **automatic** | Describes potential children, not how a runtime row becomes reachable |
 | Function `fieldArray` | Dynamic-array opacity and owning array node | **scenario-resolvable** | Named row scenarios may materialize structure; global shape remains unknown |
-| Repeater profile with declared add/expand parts and operations | `add-item` / `expand-item` access prerequisite | **automatic** from the declared profile | Planner may add/expand before targeting a child |
+| Repeater profile with preferred operation, validated driver capability, and required item witness | Stable wildcard template access prerequisite plus transient instance binding | **automatic** only after all access gates validate | Planner may use the preferred add/expand action without persisting a runtime row ID |
 | Unprofiled or custom expandable repeater | Structural array plus unknown access sequence | **explicit-only** | Browser observation can inform review but cannot make a stable driver contract |
 
 There is one deliberate nuance: a construct can be scenario-resolvable for a
@@ -156,13 +158,13 @@ can safely say â€œproduct filters case type asynchronously and is ready when X.â
 
 ## Bounded experiment results
 
-The focused suite contains six tests and passed as follows:
+The focused suite contains eight tests and passed as follows:
 
 ```text
 pnpm exec vitest run scripts/research/form-effects/form-effects.test.mjs
 
 Test Files  1 passed (1)
-Tests       6 passed (6)
+Tests       8 passed (8)
 ```
 
 The callback analyzer first compiles each supplied research snippet with
@@ -232,10 +234,33 @@ field component and trigger renderer lifecycle hooks. Lifecycle behavior needs
 a rendered Angular scenario or browser observation, plus an explicit effect if
 test ordering depends on it.
 
+### Replayable scenario cases
+
+The scenario experiment declares one versioned axis with a replayable `Other`
+case and a provider-seeded compile-only case. Exact axis/case evidence recovers
+the `select-option('Other')` input only for the replayable case. The compile-only
+case yields no browser steps. This proves the DTO can retain trusted compilation
+evidence without pretending that synthetic provider or `formState` setup has a
+UI equivalent.
+
+### Repeater access and instance binding
+
+The repeater experiment keeps the profile's preferred operation separate from
+the driver's eligible capabilities. An expand-preferred profile with only
+`expand-item` capability produces no access prerequisite until a versioned
+scenario-item witness selects an existing row. With that witness, the target is
+the stable wildcard template node and the result is a transient instance
+handle. An add-preferred profile with both capabilities still executes only the
+declared preferred `add-item`; the additional capability is retained as
+eligibility, not promoted to an equivalent plan. A mismatched capability is
+refused. Generic execution retains both the action part and `itemPart`, while an
+application driver retains its allowlisted ID/version and owns the sequence.
+
 ### Helpers and aliases
 
-The analyzer refused both `revalidateDependent(field)` and a local alias
-followed by `dependent.updateValueAndValidity()`. Adding symbol resolution could
+The analyzer refused `revalidateDependent(field)`, a local alias followed by
+`dependent.updateValueAndValidity()`, and both foreign or argument-less
+`.get()` calls. Adding symbol resolution could
 increase candidate coverage, but would introduce imports, overloads, closures,
 DI, higher-order functions, and build-configuration dependence without making
 the semantic claim authoritative. The recommended implementation stops at a
@@ -244,11 +269,12 @@ review scaffold.
 ## Proposed normalized behavior model
 
 Use one normalized, discriminated record family for the planner-facing behavior
-graph. A causal edge and an acausal target-state snapshot are different members
-of that family: scenarios and observations may establish state without
-inventing a trigger, while rules, explicit effects, lifecycle hooks, and
-repeater profiles may establish edges. Store evidence separately from the
-semantic core and require kind-specific evidence identifiers.
+graph. Causal edges, acausal target-state snapshots, and access prerequisites
+are different members: scenarios and observations may establish state without
+inventing a trigger, while rules and explicit effects establish edges, and
+profiles establish access plans without pretending that activation is a
+business effect. Store evidence separately from the semantic core and require
+kind-specific evidence identifiers.
 
 ```ts
 type BehaviorFacet =
@@ -285,29 +311,62 @@ type BehaviorInputWitnessEvidence =
       readonly declarationVersion: number;
     }
   | {
-      readonly kind: 'scenario';
-      readonly scenarioId: string;
-      readonly scenarioVersion: number;
+      readonly kind: 'scenario-case';
+      readonly axis: { readonly id: string; readonly version: number };
+      readonly scenarioCase: {
+        readonly id: string;
+        readonly version: number;
+      };
     };
+
+interface BehaviorCaseInput {
+  readonly nodeId: string;
+  readonly operation: BehaviorInputOperation;
+  readonly value: JsonValue;
+  readonly evidence: BehaviorInputWitnessEvidence;
+}
 
 interface BehaviorRuleCase {
   readonly id: string;
-  readonly outcome: boolean;
-  readonly inputs: readonly [
-    {
-      readonly nodeId: string;
-      readonly operation: BehaviorInputOperation;
-      readonly value: JsonValue;
-      readonly evidence: BehaviorInputWitnessEvidence;
-    },
-    ...{
-      readonly nodeId: string;
-      readonly operation: BehaviorInputOperation;
-      readonly value: JsonValue;
-      readonly evidence: BehaviorInputWitnessEvidence;
-    }[],
-  ];
+  readonly outcome: BehaviorState;
+  readonly inputs: readonly [BehaviorCaseInput, ...BehaviorCaseInput[]];
 }
+
+type NormalizedConditionOperand =
+  | { readonly kind: 'node-value'; readonly nodeId: string }
+  | { readonly kind: 'form-state'; readonly path: readonly string[] }
+  | { readonly kind: 'literal'; readonly value: JsonValue };
+
+type NormalizedCondition =
+  | {
+      readonly operator:
+        | 'strict-equals'
+        | 'strict-not-equals'
+        | 'less-than'
+        | 'less-than-or-equal'
+        | 'greater-than'
+        | 'greater-than-or-equal';
+      readonly left: NormalizedConditionOperand;
+      readonly right: NormalizedConditionOperand;
+    }
+  | {
+      readonly operator: 'in';
+      readonly operand: NormalizedConditionOperand;
+      readonly values: readonly [JsonValue, ...JsonValue[]];
+    }
+  | {
+      readonly operator: 'present' | 'empty';
+      readonly operand: NormalizedConditionOperand;
+    }
+  | { readonly operator: 'not'; readonly condition: NormalizedCondition }
+  | {
+      readonly operator: 'and' | 'or';
+      readonly conditions: readonly [
+        NormalizedCondition,
+        NormalizedCondition,
+        ...NormalizedCondition[],
+      ];
+    };
 
 type BehaviorTrigger =
   | {
@@ -318,18 +377,13 @@ type BehaviorTrigger =
   | {
       kind: 'rule';
       ruleId: string;
+      condition: NormalizedCondition;
       cases: readonly [BehaviorRuleCase, ...BehaviorRuleCase[]];
     }
   | {
       kind: 'lifecycle';
       nodeId: string;
       phase: 'onInit' | 'afterContentInit' | 'afterViewInit' | 'onDestroy';
-    }
-  | {
-      kind: 'profile-operation';
-      nodeId: string;
-      part: string;
-      operation: 'click' | 'check' | 'add-item' | 'expand-item';
     };
 
 type BehaviorTransition =
@@ -342,8 +396,6 @@ type BehaviorTransition =
   | 'revalidates'
   | 'marks-touched'
   | 'marks-untouched'
-  | 'adds-item'
-  | 'expands-item'
   | 'unknown';
 
 type BehaviorState =
@@ -361,6 +413,16 @@ type DeclaredBehaviorOrigin =
     }
   | {
       readonly kind: 'field-profile';
+      readonly registryId: string;
+      readonly registryVersion: number;
+      readonly profileId: string;
+      readonly profileVersion: number;
+      readonly sourcePath: readonly (string | number)[];
+    }
+  | {
+      readonly kind: 'wrapper-profile';
+      readonly registryId: string;
+      readonly registryVersion: number;
       readonly profileId: string;
       readonly profileVersion: number;
       readonly sourcePath: readonly (string | number)[];
@@ -369,6 +431,22 @@ type DeclaredBehaviorOrigin =
 type DeclaredBehaviorEvidence = {
   readonly kind: 'declared';
   readonly origin: DeclaredBehaviorOrigin;
+};
+
+type ProfileBehaviorEvidence = {
+  readonly kind: 'declared';
+  readonly origin: Extract<
+    DeclaredBehaviorOrigin,
+    { readonly kind: 'field-profile' | 'wrapper-profile' }
+  >;
+};
+
+type CrossFieldBehaviorEvidence = {
+  readonly kind: 'declared';
+  readonly origin: Extract<
+    DeclaredBehaviorOrigin,
+    { readonly kind: 'cross-field-effect' }
+  >;
 };
 
 type DerivedBehaviorEvidence = {
@@ -380,8 +458,9 @@ type DerivedBehaviorEvidence = {
 
 type ScenarioBehaviorEvidence = {
   readonly kind: 'scenario';
-  readonly scenarioId: string;
-  readonly scenarioVersion: number;
+  readonly axis: { readonly id: string; readonly version: number };
+  readonly scenarioCase: { readonly id: string; readonly version: number };
+  readonly artifactHash: string;
   readonly sourcePath?: readonly (string | number)[];
 };
 
@@ -389,15 +468,19 @@ type ObservedBehaviorEvidence = {
   readonly kind: 'observed';
   readonly observationId: string;
   readonly observer: { readonly id: string; readonly version: number };
-  readonly scenario?: { readonly id: string; readonly version: number };
+  readonly scenario?: {
+    readonly axis: { readonly id: string; readonly version: number };
+    readonly scenarioCase: { readonly id: string; readonly version: number };
+  };
 };
 
 type CausalBehaviorEvidenceRef =
-  | DeclaredBehaviorEvidence
+  | CrossFieldBehaviorEvidence
   | DerivedBehaviorEvidence;
 
 type BehaviorEvidenceRef =
-  | CausalBehaviorEvidenceRef
+  | DeclaredBehaviorEvidence
+  | DerivedBehaviorEvidence
   | ScenarioBehaviorEvidence
   | ObservedBehaviorEvidence;
 
@@ -407,6 +490,17 @@ interface BehaviorEvidenceSet<
 > {
   readonly primary: Primary;
   readonly corroborating: readonly Corroborating[];
+}
+
+interface AccessEvidenceSet {
+  readonly declarations: readonly [
+    ProfileBehaviorEvidence,
+    ...ProfileBehaviorEvidence[],
+  ];
+  readonly corroborating: readonly (
+    | ScenarioBehaviorEvidence
+    | ObservedBehaviorEvidence
+  )[];
 }
 
 interface ContractBehaviorEdge {
@@ -423,7 +517,6 @@ interface ContractBehaviorEdge {
     | { readonly mode: 'unknown' };
   readonly ordering:
     | 'source-before-target'
-    | 'activate-before-child'
     | 'none'
     | 'unknown';
   readonly lifecycle?: {
@@ -467,7 +560,112 @@ type ContractTargetState = ContractTargetStateCore &
       }
   );
 
-type ContractBehaviorRecord = ContractBehaviorEdge | ContractTargetState;
+interface ContractScenarioCase {
+  readonly identity: { readonly id: string; readonly version: number };
+  readonly compilationScenario: {
+    readonly id: string;
+    readonly version: number;
+  };
+  readonly artifactHash: string;
+  readonly replay:
+    | {
+        readonly kind: 'e2e-replayable';
+        readonly inputs: readonly [BehaviorCaseInput, ...BehaviorCaseInput[]];
+      }
+    | { readonly kind: 'compile-only'; readonly reason: string };
+}
+
+interface ContractScenarioAxis {
+  readonly identity: { readonly id: string; readonly version: number };
+  readonly coverage: 'sampled' | 'declared-complete';
+  readonly cases: readonly [ContractScenarioCase, ...ContractScenarioCase[]];
+  readonly evidence: 'declared';
+}
+
+type RepeaterItemWitness = {
+  readonly kind: 'scenario-item';
+  readonly axis: { readonly id: string; readonly version: number };
+  readonly scenarioCase: { readonly id: string; readonly version: number };
+  readonly itemIndex: number;
+};
+
+type ContractAccessExecutor =
+  | {
+      readonly kind: 'generic-parts';
+      readonly operationPart: string;
+      readonly itemPart: string;
+    }
+  | {
+      readonly kind: 'application-driver';
+      readonly driverId: string;
+      readonly driverVersion: number;
+    };
+
+type ContractAccessPrerequisite =
+  | {
+      readonly recordKind: 'access-prerequisite';
+      readonly identity: { readonly id: string; readonly version: number };
+      readonly ownerNodeId: string;
+      readonly target: { readonly kind: 'node'; readonly nodeId: string };
+      readonly steps: readonly [
+        {
+          readonly kind: 'wrapper-activation';
+          readonly part: string;
+          readonly operation: 'click' | 'check';
+        },
+        ...{
+          readonly kind: 'wrapper-activation';
+          readonly part: string;
+          readonly operation: 'click' | 'check';
+        }[],
+      ];
+      readonly output: {
+        readonly kind: 'node-ready';
+        readonly readyWhen: 'activation-steps-complete';
+      };
+      readonly evidence: AccessEvidenceSet;
+    }
+  | {
+      readonly recordKind: 'access-prerequisite';
+      readonly identity: { readonly id: string; readonly version: number };
+      readonly ownerNodeId: string;
+      readonly target: {
+        readonly kind: 'array-template';
+        readonly arrayNodeId: string;
+        readonly templateNodeId: string;
+      };
+      readonly wrapperSteps: readonly {
+        readonly kind: 'wrapper-activation';
+        readonly part: string;
+        readonly operation: 'click' | 'check';
+      }[];
+      readonly preferredOperation: 'add-item' | 'expand-item';
+      readonly eligibleOperations: readonly (
+        | 'add-item'
+        | 'expand-item'
+      )[];
+      readonly repeaterStep: {
+        readonly operation: 'add-item' | 'expand-item';
+        readonly executor: ContractAccessExecutor;
+        readonly instanceBinding:
+          | { readonly kind: 'operation-result' }
+          | {
+              readonly kind: 'existing-item';
+              readonly witness: RepeaterItemWitness;
+            };
+      };
+      readonly output: {
+        readonly kind: 'transient-instance-handle';
+        readonly templateNodeId: string;
+        readonly readyWhen: 'driver-result';
+      };
+      readonly evidence: AccessEvidenceSet;
+    };
+
+type ContractBehaviorRecord =
+  | ContractBehaviorEdge
+  | ContractTargetState
+  | ContractAccessPrerequisite;
 ```
 
 An edge is emitted only when declared or fully normalized derived evidence
@@ -482,11 +680,32 @@ version, and reject corroborating evidence that attempts to raise authority.
 The DTO intentionally does not store function text, callback names as semantic
 verbs, arbitrary RxJS pipelines, or executable readiness code.
 
-A rule trigger contains only witnessed cases. Each input value must resolve to
-the cited domain slot in the named contract hash or to the declared/scenario
-case before serialization. A rule may therefore expose only a positive case or
-only a negative case; a missing witness is a localized unknown, never
-permission to invent the other input.
+A rule trigger retains the closed normalized condition and only witnessed
+cases. Each case carries the expected target state, and each input value must
+resolve to the cited domain slot in the named contract hash or to the
+declared/scenario case before serialization. A rule may therefore expose only
+a positive case or only a negative case; a missing witness is a localized
+unknown, never permission to invent the other input.
+
+Scenario state evidence resolves an exact axis, case, and compiled artifact
+hash. The case then says whether it is reproducible through explicit E2E input
+operations or compile-only because provider/form-state setup has no declared UI
+equivalent. A compile-only state remains useful scenario evidence but cannot
+generate a browser test step. The case's artifact hash and the state evidence's
+artifact hash must match. Scenario-case input witnesses must resolve to a
+replayable case without creating a dependency cycle; compile-only or circular
+case evidence cannot authorize an input.
+
+Access prerequisites target either a stable node ID or the contract's stable
+wildcard array-template node ID. Repeater execution returns a transient runtime
+instance handle scoped to the driver step; that handle is never serialized as
+a contract node ID. `add-item` binds the operation result. `expand-item` needs
+an explicit scenario-item witness (or a future declared item-key witness) to
+select an existing row. Wrapper steps retain declaration order. Every field or
+wrapper declaration that contributes a step is jointly authoritative in the
+access evidence set; scenario and observed records may only corroborate it.
+Completing the activation sequence or receiving the driver result is the
+access-readiness boundary, with no implicit timeout or arbitrary sleep.
 
 ### Normalized conditions
 
@@ -499,6 +718,13 @@ string reference list. The minimum useful grammar is:
   in a literal list, `present`, `empty`, `not`, `and`, and `or`; and
 - outcomes: a boolean state for visibility/required/readonly/enabled, or a
   JSON-serializable value for a supported state target.
+
+The serialized `NormalizedCondition` above is this grammar's contract form.
+The validator must restrict ordered comparison operands to supported scalar
+types, require every `node-value` to resolve in the same contract, and require
+every `form-state` path to be allowlisted. `BehaviorRuleCase.outcome` holds the
+target state produced for that exact witnessed input set; the condition alone
+does not authorize an unwitnessed branch.
 
 Calls, assignment, `new`, getters, optional invocation, dynamic element access,
 template strings with expressions, regex execution, nested functions, and
@@ -515,9 +741,9 @@ Most v0.4 records map directly:
 | `ContractCondition` | Edge with `BehaviorTrigger.rule` plus a normalized condition; raw expression remains provenance |
 | `ContractDynamicRule` | Review scaffold with known owner/target facet and opaque condition/source; never an edge |
 | `DeclaredCrossFieldEffect` | Actionable node-event edge with lossless effect-kind projection below |
-| Trusted resolved node state/domain | Acausal state record with required scenario evidence and `scenarioId` |
-| Field-profile wrapper precondition | Profile-operation reachability edge retaining `nodeId`, named `part`, and `click` / `check` |
-| Repeater `add-item` / `expand-item` profile | Profile-operation reachability edge retaining the profile's add/expand part and operation |
+| Trusted resolved node state/domain | Acausal state record whose evidence references the exact axis, case, and compiled artifact hash |
+| Field-profile wrapper precondition | Node access prerequisite retaining ordered named `part` and `click` / `check` steps |
+| Repeater interaction profile | Array-template access prerequisite retaining the preferred operation, eligible driver capabilities, executor, and transient instance-binding rule |
 | Future browser/runtime delta | Observed state record, or corroborating evidence on an independently established edge |
 
 The existing effect-kind mapping is deliberately lossless:
@@ -530,12 +756,31 @@ The existing effect-kind mapping is deliberately lossless:
 | `controls-state` | `controls-state` | Preserve target facet and optional condition guard; do not infer polarity |
 | `toggles` | `toggles` | Preserve target facet; do not convert it to an idempotent set operation |
 
-Wrapper activation and repeater access remain profile-owned declarations. For
-example, `{ kind: 'activate', part: 'panel-header', operation: 'click' }` maps
-to a `profile-operation` trigger with the same part and operation and a
-`reachability` target. Repeater `addPart`/`expandPart` map the same way to
-`add-item`/`expand-item`. This retains the planner operation instead of asking
-consumers to reconstruct it from a generic reachability edge.
+Wrapper activation and repeater access remain profile-owned prerequisites, not
+behavior edges. Ordered wrapper preconditions map directly to access steps.
+Repeater projection follows this closed algorithm:
+
+1. `interaction.operation` is the declared preferred access operation; it is
+   not reconstructed from which part names happen to exist.
+2. The preferred operation must be present in `driver.capabilities`. The
+   complete capability list is retained as eligibility evidence, but an
+   alternative capability is not assumed to be an equivalent access plan.
+3. A generic executor is emitted only after the current profile validator has
+   surface-checked that exact capability, its action part, `itemPart`, and their
+   cardinalities. Both part names remain in the access record. An application
+   driver emits only its allowlisted driver ID/version and owns the sequence
+   internally.
+4. `add-item` binds the newly created group returned by the driver.
+   `expand-item` requires a versioned scenario-item witness (or a future
+   explicit declared item-key witness); the presence of an `expandPart` alone
+   does not select a row.
+5. The serialized target is the array node plus stable wildcard template node
+   ID already emitted by v0.4. The driver returns a transient instance handle
+   for that template. A runtime row ID/index is never persisted as a contract
+   endpoint.
+
+If any gate fails, the compiler emits a localized repeater access unknown and
+does not produce a runnable prerequisite.
 
 Exact schema changes are required; the current strict v0.4 validators cannot
 accept these as additive unknown properties:
@@ -544,32 +789,40 @@ accept these as additive unknown properties:
 2. Add `readonly`, `validity`, `touched`, and `reachability` target facets.
    Current `enabled` cannot represent readonly, validation recalculation, or
    user-interaction state.
-3. Add `revalidates`, `marks-touched`, `marks-untouched`, `adds-item`, and
-   `expands-item` transitions while retaining all five v0.4 effect kinds
-   losslessly. Keep `loads` and `filters` declaration-only.
-4. Add the discriminated edge/state record family, then replace the effect
-   edge's single trigger shape with the trigger union above. Scenario-resolved
-   state must use an acausal state record rather than an invented trigger. A
-   planner-facing lifecycle or repeater prerequisite cannot be represented by
-   current `valueChanged | selectionChanged` alone.
+3. Add `revalidates`, `marks-touched`, and `marks-untouched` transitions while
+   retaining all five v0.4 effect kinds losslessly. Keep `loads` and `filters`
+   declaration-only; keep repeater operations in access prerequisites.
+4. Add the discriminated edge/state/access-prerequisite record family, then
+   replace the effect edge's single trigger shape with the trigger union above.
+   Scenario-resolved state must use an acausal state record, and profile-owned
+   activation must use an access prerequisite rather than an invented effect.
 5. Add the discriminated evidence union and authority/evidence matrix. Require
-   registry/profile declaration identity, normalizer and derivation versions,
-   scenario identity/version, and observation plus observer identity/version.
-   Do not add `derived`, `scenario`, or `observed` to the existing
-   `DeclaredCrossFieldEffect`; that registry must remain declaration-only.
+   registry/field-profile/wrapper-profile declaration identity, normalizer and
+   derivation versions, scenario axis/case identity plus compiled artifact
+   hash, and observation plus observer identity/version. Model access evidence
+   as a non-empty joint declaration set, not one primary profile with the other
+   required profiles mislabeled as corroboration. Do not add `derived`,
+   `scenario`, or `observed` to the existing `DeclaredCrossFieldEffect`; that
+   registry must remain declaration-only.
 6. Add normalized conditions separately from current raw
    `ContractCondition.expression`. Only normalized conditions with resolved
    source nodes and domain/declared/scenario-backed case inputs may authorize
    an automatic branch. Positive and negative cases are authorized separately.
-7. Require stable scenario IDs on scenario-derived values and deltas. Current
-   `evidence: 'resolved'` and `completeness: 'scenario'` do not identify which
-   scenario produced the value.
+7. Version the workspace scenario surface or add a schema-owned sidecar with
+   versioned axes/cases and explicit replay metadata. Keep the existing
+   trusted `create()` callback build-only; never serialize its arbitrary return
+   value. Current `evidence: 'resolved'` and `completeness: 'scenario'` identify
+   neither the producing case nor its reproducible UI inputs.
 8. Replace or supplement `effectAnalysis` with facet completeness and localized
    unknowns. The current reasons are form-wide and cannot say that rules are
    covered while lifecycle timing remains unknown.
 9. Preserve the current explicit registry and field profiles as authoring
    inputs and project them losslessly into the new normalized view. Do not force
    application authors to duplicate current declarations during migration.
+   Retain registry/profile identity for field evidence and registry/wrapper
+   identity on each flattened wrapper precondition; the current contract's
+   precondition array plus string provenance is not enough for an exact
+   wrapper-profile evidence reference.
 
 ### Completeness and unknowns
 
@@ -577,18 +830,17 @@ A single `complete | incomplete` bit is inadequate for mixed behavior. Use:
 
 ```ts
 interface ContractBehaviorAnalysis {
-  readonly scenarioAxes: readonly {
-    readonly identity: { readonly id: string; readonly version: number };
-    readonly inputNodeIds: readonly [string, ...string[]];
-    readonly scenarioIds: readonly [string, ...string[]];
-    readonly coverage: 'sampled' | 'declared-complete';
-    readonly evidence: 'declared';
-  }[];
+  readonly scenarioAxes: readonly ContractScenarioAxis[];
   readonly completeness: readonly {
     readonly targetFacet: BehaviorFacet;
     readonly scope:
       | { readonly kind: 'form' }
-      | { readonly kind: 'node'; readonly nodeId: string };
+      | { readonly kind: 'node'; readonly nodeId: string }
+      | {
+          readonly kind: 'scenario-axis';
+          readonly axis: { readonly id: string; readonly version: number };
+          readonly nodeId?: string;
+        };
     readonly aggregate: 'complete' | 'partial' | 'unknown';
     readonly producers: readonly [
       {
@@ -597,7 +849,8 @@ interface ContractBehaviorAnalysis {
           | 'rule'
           | 'cross-field'
           | 'lifecycle'
-          | 'repeater';
+          | 'repeater'
+          | 'scenario';
         readonly status: 'complete' | 'partial' | 'unknown';
       },
       ...{
@@ -606,7 +859,8 @@ interface ContractBehaviorAnalysis {
           | 'rule'
           | 'cross-field'
           | 'lifecycle'
-          | 'repeater';
+          | 'repeater'
+          | 'scenario';
         readonly status: 'complete' | 'partial' | 'unknown';
       }[],
     ];
@@ -623,7 +877,9 @@ interface ContractBehaviorAnalysis {
       | 'hook'
       | 'observable'
       | 'validator'
-      | 'repeater';
+      | 'repeater'
+      | 'profile'
+      | 'scenario';
     readonly dimensions: readonly (
       | 'source'
       | 'target'
@@ -633,6 +889,8 @@ interface ContractBehaviorAnalysis {
       | 'readiness'
       | 'cleanup'
       | 'coverage'
+      | 'replay'
+      | 'instance-binding'
     )[];
     readonly reason: string;
   }[];
@@ -651,8 +909,16 @@ Completeness rules:
   producer complete only after every declaration validates and no opaque
   surface claims that target facet.
 - A scenario set is never globally complete merely because it has no unknown
-  deltas. It may be complete only for a versioned finite scenario axis whose
-  input nodes and exhaustive scenario IDs are explicitly declared.
+  deltas. The `scenario` producer may be complete only in a matching
+  `scenario-axis` scope whose versioned case list is explicitly declared
+  complete and whose cases all produced the referenced artifacts. It never
+  makes the form/node aggregate globally complete.
+- Replay completeness is independent of compilation coverage. Compile-only
+  cases can close a declared compilation axis but cannot generate E2E steps;
+  only `e2e-replayable` cases meet the planner's input requirement.
+- Scenario case hashes must match the referenced compiled artifacts, and the
+  replay dependency graph must be acyclic. A missing artifact, circular replay,
+  or replay input backed only by a compile-only case makes that case non-runnable.
 - Observed evidence never raises global completeness.
 - Opaque callbacks, hooks, validators, and option functions localize unknowns;
   they do not erase reliable static rules elsewhere in the form.
@@ -708,19 +974,23 @@ Minimal application declarations for the unresolved workplace examples are:
   not the implementation hook. Add lifecycle scope only if initialization,
   teardown, or replay behavior changes the test plan.
 - **Repeater child:** use the existing field-profile operation and part names
-  for add/expand. Add a behavior declaration only for additional business
-  effects such as loading row options after expansion.
+  through an access prerequisite. Preserve the preferred operation, gate it by
+  the selected driver's declared capability, and supply an existing-item
+  witness for expansion. Add a behavior declaration only for additional
+  business effects such as loading row options after expansion.
 
 ## What an E2E author needs
 
 For each generated positive or negative case, expose only:
 
-1. how to reach the source and target, including add/expand prerequisites;
+1. how to reach the source and target, including access prerequisites and the
+   transient repeater-instance binding rule;
 2. which source operation and input activates the branch;
 3. the target facet and expected outcome;
 4. when the outcome is ready or that readiness is unknown;
 5. evidence and authority; and
-6. facet-local completeness and blocking unknowns.
+6. facet/scope-local completeness and blocking unknowns, including whether a
+   scenario case is replayable or compile-only.
 
 Do not expose callback bodies, imported helper paths, subscription ownership,
 operator sequences, or speculative effect verbs to the E2E author. Those are
@@ -734,6 +1004,7 @@ review provenance, not executable intent.
 | TypeScript-only syntax in a Formly string | Reject because pinned Formly executes JavaScript strings |
 | Assignment, increment, delete, getter, or side-effecting call | No automatic condition/effect |
 | Dynamic path, alias, destructuring, parent traversal, or repeated-row-relative lookup | Scaffold with target/source-resolution unknown |
+| Missing control lookup argument such as `get()` | Scaffold with target/source-resolution unknown; analyzer must not throw |
 | Helper, imported callback, service/DI call, closure, higher-order function | Scaffold only; never follow arbitrary source for authority |
 | Function name such as `loadOptions`, `clearOther`, or `updateCaseTypes` | No semantic inference from the name |
 | `change`/`optionSelected` on a custom field | Invocation unknown until the field profile or browser proves event wiring |
@@ -746,9 +1017,12 @@ review provenance, not executable intent.
 | Lazy rendering | Hidden target may be absent; browser reachability differs from state alone |
 | Options contain functions, class instances, Observables, or unstable object identity | Reject non-JSON evidence or use an application codec/profile |
 | Differential scenario changes multiple inputs, time, or providers | No causal source edge |
+| Trusted scenario has no explicit replay operations/values | Compile-only scenario evidence; no generated E2E steps |
 | Rule branch has no domain, declared-case, or scenario-backed input | Retain the normalized rule but emit no E2E case for that branch |
 | Added/removed nodes across scenarios | Structural delta with local unknown, not a normal target-property effect |
 | Repeater row IDs or indices shift after add/remove | Do not persist instance IDs as stable template endpoints |
+| Repeater part exists but operation is absent from driver capabilities | No runnable access prerequisite |
+| Preferred repeater operation is expand without an item witness | Access unknown until a versioned scenario item or declared key selects the row |
 | `onInit` not rendered by a builder-only scenario | Lifecycle remains unobserved |
 | Missing or incomplete `onDestroy` cleanup | Report cleanup unknown; do not assume leak-free readiness |
 | Effect cycle or feedback through emitted Angular events | Deterministic SCC diagnostic; convergence remains undeclared |
@@ -760,14 +1034,14 @@ review provenance, not executable intent.
 | Bounded string rules can generate useful positive/negative branch scaffolds | 0.85 | Existing string extraction plus closed-grammar/path-resolution design; implementation still required |
 | Static callback AST can find useful review candidates | 0.80 | Direct revalidation experiment succeeds; alias/helper negatives are explicit |
 | Static callback AST can authoritatively recover workplace effects | 0.25 | Event wiring, symbols, closures, RxJS, DI, and timing dominate |
-| Trusted scenarios can provide actionable scenario-local target states | 0.90 | Existing Formly scenario compiler and current differential experiment |
+| Trusted scenarios can provide replayable scenario-local target states when cases declare E2E inputs | 0.90 | Existing compiler plus retained replayable/compile-only case experiment |
 | Scenario deltas can infer `loads` versus `filters` | 0.15 | Identical deltas can arise from loading, filtering, caching, replacement, or fixtures |
-| Explicit effects plus field profiles cover E2E ordering/readiness/repeater needs | 0.90 | Current validated registry and interaction-profile ownership already compose |
+| Explicit effects plus validated access prerequisites cover E2E ordering/readiness/repeater needs | 0.90 | Current registry/profile capability gates plus transient-binding design |
 | Runtime/browser observations can verify visited paths | 0.90 | Direct observation is strong for the path, weak for global coverage |
 | The normalized graph is worth implementing | 0.85 | It removes consumer-specific joins while retaining evidence and opacity |
 
 Overall recommendation: **go** for normalized rule/behavior projection,
-localized completeness, stable scenario IDs, and scaffold generation;
+localized completeness, versioned scenario axes/cases, and scaffold generation;
 **conditional go** for bounded string-condition automation after expanding the
 retained pinned-Formly differential test across the closed grammar and legacy
 precedence cases; **no-go** for whole-program callback or RxJS interpretation
@@ -775,18 +1049,18 @@ as contract authority.
 
 ## Ordered implementation tasks
 
-1. Approve the causal-edge/acausal-state record union, authority/evidence
-   matrix, versioned evidence origins, rule-case input witnesses, true
-   facet/scope completeness, and lossless v0.4/profile mappings before
-   versioning the schema.
+1. Approve the causal-edge/acausal-state/access-prerequisite record family,
+   authority/evidence matrix, replayable scenario cases, transient repeater
+   binding, true facet/scope completeness, and lossless v0.4/profile mappings
+   before versioning the schema.
 2. Specify the closed normalized-condition grammar, JavaScript semantics,
    stable relative-path resolution, legacy precedence, and refusal tests.
 3. Version the schema and add behavior facets, transitions, evidence sets,
-   stable scenario IDs, witnessed rule cases, and facet/scope-local
-   completeness/unknown DTOs with the validator matrix above.
-4. Project current `DeclaredCrossFieldEffect`, wrapper activation, and repeater
-   operations losslessly into the normalized behavior view without weakening
-   their declaration-only authority or dropping named parts.
+   versioned scenario axes/cases, witnessed rule cases, access prerequisites,
+   and facet/scope-local completeness/unknown DTOs with the validator matrix.
+4. Project current `DeclaredCrossFieldEffect`, ordered wrapper activation, and
+   the preferred validated repeater operation losslessly without dropping
+   named parts, capability evidence, or stable wildcard template targets.
 5. Implement automatic derived rules for static and bounded string expressions,
    including domain-backed `Other` visibility/required cases and
    hide/reset-policy separation. Differential-test every grammar form against
@@ -794,12 +1068,13 @@ as contract authority.
 6. Add a conservative callback/hook scaffold producer for only direct literal
    control access and allowlisted mutations. Refuse helpers, aliases, imports,
    computed paths, writes outside the allowlist, and arbitrary pipelines.
-7. Add named differential-scenario evidence with one-axis input declarations,
-   stable scenario IDs, JSON projection, structural delta diagnostics, and no
-   automatic business verbs.
-8. Add explicit `validity`, `touched`, and lifecycle/repeater declarations to
-   registry validation and planner projection; keep readiness as a profile-owned
-   serializable capability.
+7. Version the workspace scenario authoring surface or add its schema-owned
+   sidecar; retain trusted compile callbacks separately from JSON-safe replay
+   cases. Add differential evidence, structural delta diagnostics, artifact
+   hashes, and no automatic business verbs.
+8. Add explicit `validity`, `touched`, and lifecycle declarations to registry
+   validation and planner projection; keep readiness and repeater access as
+   profile-owned serializable capabilities.
 9. Add rendered Angular lifecycle tests covering returned Observable teardown,
    manual `onDestroy` cleanup, emitted-event feedback, and hook non-execution in
    builder-only scenarios.
@@ -818,7 +1093,13 @@ as contract authority.
   provide complementary scenario evidence only.
 - The normalized DTO is a research proposal, not a committed public contract.
 - Relative model scope and repeated-row identity remain the largest blockers
-  for safe automatic path-to-node resolution.
+  for safe automatic path-to-node resolution. The proposed first slice binds
+  wildcard templates to transient handles and uses scenario-local item indices;
+  stable business-key selection needs an explicit future witness type.
+- The current workspace `FormContractScenario` exposes only `id`, optional
+  description, and an arbitrary trusted `create()` callback. Replay metadata
+  therefore requires a versioned schema-owned sidecar or a deliberate source
+  contract version; it cannot be inferred from the callback return value.
 - Readiness error, cancellation, timeout, and retry semantics remain profile or
   application declarations.
 - Whether `readonly` should be a baseline control capability or profile-owned
@@ -830,20 +1111,20 @@ as contract authority.
 
 | Decision or claim | Repository evidence | External authority | Experiment |
 | --- | --- | --- | --- |
-| Declared/scenario/MCP execution boundary | `docs/decisions/0005-trusted-scenario-resolution.md`; `packages/compiler/src/extract-form.ts` | Formly builder/API links above | Existing Formly scenario tests |
+| Declared/scenario/MCP execution boundary | `docs/decisions/0005-trusted-scenario-resolution.md`; `packages/compiler/src/extract-form.ts`; `packages/workspace/src/source.ts` | Formly builder/API links above | Replayable versus compile-only scenario case |
 | Explicit semantic effects own ordering/readiness | `packages/schema/src/cross-field-effect.ts`; `packages/compiler/src/resolve-effects.ts`; `docs/research/v0.4-cross-field-effects.md` | Angular/Formly expose state APIs, not a business effect graph | Direct/indirect callback comparison |
 | Modern and legacy rules remain relevant | `packages/compiler/src/extract-form.ts`; edge-case fixtures | Formly v6 expressions/API/migration | `Other` branch and AST cases |
 | Validation and touched are distinct facets | Current schema lacks both target facets | Angular `updateValueAndValidity` and `markAsTouched` docs | Direct and lifecycle probes |
 | Lifecycle timing and cleanup are not builder facts | Hook diagnostics in extractor; access-request fixture | Formly v6 docs and pinned 6.1.8 bundle | Subscription teardown probe |
 | Options deltas do not imply load/filter | Existing v0.4 differential scenario spike | Formly reports target expression changes only | Indirect option-update probe |
-| Repeaters require access prerequisites | Field interaction/profile schemas and expandable-repeater fixture | Formly `fieldArray` API | Existing field-profile/browser research |
+| Repeaters require access prerequisites | Field interaction/profile schemas, generic capability validator, wildcard array-template extraction, and expandable-repeater fixture | Formly `fieldArray` API | Preferred-capability and transient-binding experiment |
 
 ## Verification record
 
 ```text
 pnpm exec vitest run scripts/research/form-effects/form-effects.test.mjs
   Test Files  1 passed (1)
-  Tests       6 passed (6)
+  Tests       8 passed (8)
 
 pnpm exec vitest run apps/formly-test-app/src/app/forms/effects-spike/*.test.ts
   Test Files  2 passed (2)
@@ -861,6 +1142,12 @@ pnpm exec eslint scripts/research/form-effects/form-effects.test.mjs
 
 pnpm lint
   exited 0 with no lint findings
+
+pnpm check
+  Test Files  35 passed (35)
+  Tests       458 passed (458)
+  Builds, linked/packed workspace consumers, release manifest, package check,
+  demo smoke check, and documentation checks passed.
 
 git diff --check
   exited 0 with no output

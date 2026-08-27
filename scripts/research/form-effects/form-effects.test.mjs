@@ -97,7 +97,9 @@ function literalGetTarget(call) {
     return undefined;
   }
   const argument = call.arguments[0];
-  return ts.isStringLiteral(argument) ? argument.text : undefined;
+  return argument !== undefined && ts.isStringLiteral(argument)
+    ? argument.text
+    : undefined;
 }
 
 function analyzeCallback(expression) {
@@ -276,6 +278,87 @@ function deriveBranchWitnesses(
   }));
 }
 
+function replayScenarioCase(axis, evidence) {
+  if (
+    axis.identity.id !== evidence.axis.id ||
+    axis.identity.version !== evidence.axis.version
+  ) {
+    return undefined;
+  }
+  const scenarioCase = axis.cases.find(
+    ({ identity }) =>
+      identity.id === evidence.scenarioCase.id &&
+      identity.version === evidence.scenarioCase.version,
+  );
+  return scenarioCase?.replay.kind === 'e2e-replayable'
+    ? scenarioCase.replay.inputs
+    : undefined;
+}
+
+function repeaterAccessPrerequisite({
+  arrayNodeId,
+  targetTemplateNodeId,
+  profile,
+  existingItemWitness,
+}) {
+  if (profile.interaction.kind !== 'repeater') {
+    return undefined;
+  }
+  const preferredOperation = profile.interaction.operation;
+  if (!profile.driver.capabilities.includes(preferredOperation)) {
+    return undefined;
+  }
+  const executor =
+    profile.driver.kind === 'application'
+      ? {
+          kind: 'application-driver',
+          driverId: profile.driver.id,
+          driverVersion: profile.driver.version,
+        }
+      : {
+          kind: 'generic-parts',
+          operationPart:
+            preferredOperation === 'add-item'
+              ? profile.interaction.addPart
+              : profile.interaction.expandPart,
+          itemPart: profile.interaction.itemPart,
+        };
+  if (
+    executor.kind === 'generic-parts' &&
+    (executor.operationPart === undefined || executor.itemPart === undefined)
+  ) {
+    return undefined;
+  }
+  const instanceBinding =
+    preferredOperation === 'add-item'
+      ? { kind: 'operation-result' }
+      : existingItemWitness === undefined
+        ? undefined
+        : { kind: 'existing-item', witness: existingItemWitness };
+  if (instanceBinding === undefined) {
+    return undefined;
+  }
+  return {
+    recordKind: 'access-prerequisite',
+    ownerNodeId: arrayNodeId,
+    target: {
+      kind: 'array-template',
+      arrayNodeId,
+      templateNodeId: targetTemplateNodeId,
+    },
+    preferredOperation,
+    eligibleOperations: profile.driver.capabilities.filter(
+      (operation) => operation === 'add-item' || operation === 'expand-item',
+    ),
+    step: { operation: preferredOperation, executor, instanceBinding },
+    output: {
+      kind: 'transient-instance-handle',
+      templateNodeId: targetTemplateNodeId,
+      readyWhen: 'driver-result',
+    },
+  };
+}
+
 class ControlProbe {
   constructor(value) {
     this.value = value;
@@ -402,6 +485,225 @@ describe('RH-04 bounded form-effects experiments', () => {
     ]);
   });
 
+  it('replays scenario state only from a versioned case with explicit E2E inputs', () => {
+    const axis = {
+      identity: { id: 'reason-branches', version: 1 },
+      coverage: 'declared-complete',
+      cases: [
+        {
+          identity: { id: 'other', version: 1 },
+          compilationScenario: { id: 'other', version: 1 },
+          artifactHash: 'sha256:other',
+          replay: {
+            kind: 'e2e-replayable',
+            inputs: [
+              {
+                nodeId: 'claims.reason',
+                operation: 'select-option',
+                value: 'Other',
+                evidence: {
+                  kind: 'domain',
+                  contractHash: 'sha256:research-form-v1',
+                  nodeId: 'claims.reason',
+                  valueIndex: 1,
+                },
+              },
+            ],
+          },
+        },
+        {
+          identity: { id: 'service-seeded', version: 1 },
+          compilationScenario: { id: 'service-seeded', version: 1 },
+          artifactHash: 'sha256:service-seeded',
+          replay: {
+            kind: 'compile-only',
+            reason: 'Provider state has no declared UI operation.',
+          },
+        },
+      ],
+    };
+
+    expect(
+      replayScenarioCase(axis, {
+        axis: { id: 'reason-branches', version: 1 },
+        scenarioCase: { id: 'other', version: 1 },
+      }),
+    ).toEqual([
+      {
+        nodeId: 'claims.reason',
+        operation: 'select-option',
+        value: 'Other',
+        evidence: {
+          kind: 'domain',
+          contractHash: 'sha256:research-form-v1',
+          nodeId: 'claims.reason',
+          valueIndex: 1,
+        },
+      },
+    ]);
+    expect(
+      replayScenarioCase(axis, {
+        axis: { id: 'reason-branches', version: 1 },
+        scenarioCase: { id: 'service-seeded', version: 1 },
+      }),
+    ).toBeUndefined();
+    expect(
+      replayScenarioCase(axis, {
+        axis: { id: 'reason-branches', version: 2 },
+        scenarioCase: { id: 'other', version: 1 },
+      }),
+    ).toBeUndefined();
+    expect(
+      replayScenarioCase(axis, {
+        axis: { id: 'reason-branches', version: 1 },
+        scenarioCase: { id: 'other', version: 2 },
+      }),
+    ).toBeUndefined();
+  });
+
+  it('derives repeater access only from the preferred validated capability', () => {
+    const expandProfile = {
+      interaction: {
+        kind: 'repeater',
+        operation: 'expand-item',
+        addPart: 'add',
+        itemPart: 'item',
+        expandPart: 'expand',
+      },
+      driver: {
+        kind: 'generic',
+        id: 'generic.repeater',
+        version: 1,
+        capabilities: ['expand-item'],
+      },
+    };
+    const existingItemWitness = {
+      kind: 'scenario-item',
+      axis: { id: 'existing-rows', version: 1 },
+      scenarioCase: { id: 'one-row', version: 1 },
+      itemIndex: 0,
+    };
+
+    expect(
+      repeaterAccessPrerequisite({
+        arrayNodeId: 'claims::path:s_items',
+        targetTemplateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        profile: expandProfile,
+      }),
+    ).toBeUndefined();
+
+    const mismatchedCapabilityProfile = {
+      ...expandProfile,
+      driver: { ...expandProfile.driver, capabilities: ['add-item'] },
+    };
+    expect(
+      repeaterAccessPrerequisite({
+        arrayNodeId: 'claims::path:s_items',
+        targetTemplateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        profile: mismatchedCapabilityProfile,
+        existingItemWitness,
+      }),
+    ).toBeUndefined();
+    expect(
+      repeaterAccessPrerequisite({
+        arrayNodeId: 'claims::path:s_items',
+        targetTemplateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        profile: expandProfile,
+        existingItemWitness,
+      }),
+    ).toEqual({
+      recordKind: 'access-prerequisite',
+      ownerNodeId: 'claims::path:s_items',
+      target: {
+        kind: 'array-template',
+        arrayNodeId: 'claims::path:s_items',
+        templateNodeId: 'claims::path:s_items.s_%2A.s_name',
+      },
+      preferredOperation: 'expand-item',
+      eligibleOperations: ['expand-item'],
+      step: {
+        operation: 'expand-item',
+        executor: {
+          kind: 'generic-parts',
+          operationPart: 'expand',
+          itemPart: 'item',
+        },
+        instanceBinding: {
+          kind: 'existing-item',
+          witness: existingItemWitness,
+        },
+      },
+      output: {
+        kind: 'transient-instance-handle',
+        templateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        readyWhen: 'driver-result',
+      },
+    });
+
+    const addProfile = {
+      interaction: { ...expandProfile.interaction, operation: 'add-item' },
+      driver: {
+        ...expandProfile.driver,
+        capabilities: ['add-item', 'expand-item'],
+      },
+    };
+    expect(
+      repeaterAccessPrerequisite({
+        arrayNodeId: 'claims::path:s_items',
+        targetTemplateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        profile: addProfile,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        preferredOperation: 'add-item',
+        eligibleOperations: ['add-item', 'expand-item'],
+        step: {
+          operation: 'add-item',
+          executor: {
+            kind: 'generic-parts',
+            operationPart: 'add',
+            itemPart: 'item',
+          },
+          instanceBinding: { kind: 'operation-result' },
+        },
+      }),
+    );
+
+    const applicationProfile = {
+      ...expandProfile,
+      driver: {
+        kind: 'application',
+        id: 'claims.repeater',
+        version: 3,
+        capabilities: ['expand-item'],
+      },
+    };
+    expect(
+      repeaterAccessPrerequisite({
+        arrayNodeId: 'claims::path:s_items',
+        targetTemplateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        profile: applicationProfile,
+        existingItemWitness,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        preferredOperation: 'expand-item',
+        step: {
+          operation: 'expand-item',
+          executor: {
+            kind: 'application-driver',
+            driverId: 'claims.repeater',
+            driverVersion: 3,
+          },
+          instanceBinding: {
+            kind: 'existing-item',
+            witness: existingItemWitness,
+          },
+        },
+      }),
+    );
+  });
+
   it('finds a direct revalidation target and confirms the callback mutation', () => {
     const source = `(field) =>
       field.parent.formControl.get('dependent').updateValueAndValidity()`;
@@ -509,6 +811,16 @@ describe('RH-04 bounded form-effects experiments', () => {
     expect(
       analyzeCallback(`() =>
         logger.get('dependent').updateValueAndValidity()`),
+    ).toEqual({
+      classification: 'inline-callback',
+      sources: [],
+      candidates: [],
+      localUnknowns: ['target-resolution-required'],
+      contextUnknowns: CALLBACK_CONTEXT_UNKNOWNS,
+    });
+    expect(
+      analyzeCallback(`(field) =>
+        field.parent.formControl.get().updateValueAndValidity()`),
     ).toEqual({
       classification: 'inline-callback',
       sources: [],
