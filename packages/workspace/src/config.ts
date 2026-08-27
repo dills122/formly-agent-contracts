@@ -167,7 +167,10 @@ function requireRelativePath(value: unknown, path: string): string {
 
 function requireLiteralRelativePath(value: unknown, path: string): string {
   const literalPath = requireRelativePath(value, path);
-  if (literalPath === '.' || /[*?[\]{}]/u.test(literalPath)) {
+  const resolvesToWorkspaceRoot = literalPath
+    .split(/[\\/]/u)
+    .every((segment) => segment === '' || segment === '.');
+  if (resolvesToWorkspaceRoot || /[*?[\]{}]/u.test(literalPath)) {
     invalid(path, 'must be a literal workspace-relative path.');
   }
   return literalPath;

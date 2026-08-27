@@ -54,4 +54,26 @@ export type {
   FormContractScenario,
   FormContractSource,
 } from './source.js';
+export {
+  runWorkspace,
+  WorkspaceGenerationError,
+} from './run-workspace.js';
+export type {
+  RunWorkspaceOptions,
+  WorkspaceGenerationErrorCode,
+  WorkspaceGenerationPhase,
+  WorkspaceRunResult,
+} from './run-workspace.js';
+export {
+  parseWorkspaceContractIndex,
+  WORKSPACE_INDEX_SCHEMA_VERSION,
+} from './workspace-index.js';
+export type {
+  WorkspaceContractIndex,
+  WorkspaceIndexFieldTypeProfileRegistryIdentity,
+  WorkspaceIndexForm,
+  WorkspaceIndexedDiagnostic,
+  WorkspaceIndexPluginIdentity,
+  WorkspaceIndexProject,
+} from './workspace-index.js';
 export { WorkspaceConfigValidationError } from './validation-error.js';

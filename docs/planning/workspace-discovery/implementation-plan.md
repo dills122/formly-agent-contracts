@@ -2,9 +2,9 @@
 
 Status: in progress; Tasks 1–4, including project-owned field-type profile
 registries, the deep Task 6B consumer fixture, a real Nx integration anchor,
-and Tasks 5.0–5.1 artifact/source contracts and profile-aware extraction are
-implemented; Task 5.2 runner and workspace indexing is the next generic
-vertical slice
+and Tasks 5.0–5.2 artifact/source contracts, profile-aware extraction, runner,
+and workspace index are implemented; Task 5A cross-field effect resolution is
+the next contract-first vertical slice
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)
@@ -118,7 +118,7 @@ contains explicit effects only.
 
 | Requirement | Decision | Tasks | Verification | Status |
 | --- | --- | --- | --- | --- |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery tests plus 2 consumer fixture tests; runner and CLI fixture assertions remain | Tasks 1–4, Tasks 5.0–5.1, and Task 6B fixture shell implemented; Tasks 5.2–6A and remaining 6B assertions planned |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery/runner/index tests plus real Angular consumer generation; CLI fixture assertions remain | Tasks 1–5.2 and Task 6B fixture shell implemented; Task 6A and remaining packed-consumer assertions planned |
 | `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Tasks 5.0–5.1 implemented, including safe node projection and realistic Angular/Nx fixture coverage; executable drivers remain separate |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | Inventory and scaffolds are build-time evidence only | Tasks 7A–8B | Angular inventory, negative inference, and scenario tests | Planned; prototype complete |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Planned; architecture researched |
@@ -252,9 +252,9 @@ precedence/conflict rules
 
 **Files likely touched:**
 
-- `packages/contract-schema/src/field-type-profile.ts`
-- `packages/contract-schema/src/field-type-profile.test.ts`
-- `packages/contract-schema/src/index.ts`
+- `packages/schema/src/field-type-profile.ts`
+- `packages/schema/src/field-type-profile.test.ts`
+- `packages/schema/src/index.ts`
 
 **Estimated scope:** Medium
 
@@ -288,8 +288,8 @@ become a central list of application field types.
 
 - `packages/workspace/src/config.ts`
 - `packages/workspace/src/config.test.ts`
-- `packages/formly-adapter/src/field-type-profiles.ts`
-- `packages/formly-adapter/src/field-type-profiles.test.ts`
+- `packages/compiler/src/field-type-profiles.ts`
+- `packages/compiler/src/field-type-profiles.test.ts`
 - affected public indexes
 
 **Estimated scope:** Medium
@@ -324,8 +324,8 @@ cycle policy, readiness vocabulary, and condition-rule linkage
 
 **Files likely touched:**
 
-- `packages/contract-schema/src/cross-field-effect.ts`
-- `packages/contract-schema/src/cross-field-effect.test.ts`
+- `packages/schema/src/cross-field-effect.ts`
+- `packages/schema/src/cross-field-effect.test.ts`
 - `packages/workspace/src/config.ts`
 - `packages/workspace/src/config.test.ts`
 - affected public indexes
@@ -383,27 +383,27 @@ Implement this vertical slice in three reviewable increments:
    registry during declared extraction and project registry identity,
    interaction metadata, value domains, provenance, and stable unmapped-type
    diagnostics into contracts.
-3. **[ ] Task 5.2 — runner and workspace index:** enumerate normalized sources,
+3. **[x] Task 5.2 — runner and workspace index:** enumerate normalized sources,
    enforce global identities/output containment, write canonical artifacts,
    and emit the deterministic index.
 
 **Acceptance criteria:**
 
-- [ ] One bulk factory-map source and one registry-adapter source generate
+- [x] One bulk factory-map source and one registry-adapter source generate
       contracts without individual root-config entries.
-- [ ] Form IDs are globally unique and output paths cannot escape the configured
+- [x] Form IDs are globally unique and output paths cannot escape the configured
       artifact directory.
-- [ ] The workspace index records contract hashes, source/project IDs, evidence,
+- [x] The workspace index records contract hashes, source/project IDs, evidence,
       config/plugin/profile-registry identities, and diagnostics without model
       values.
-- [ ] Unmapped custom field types remain discoverable but non-operable and are
+- [x] Unmapped custom field types remain discoverable but non-operable and are
       reported with stable project/form/type provenance.
 
 **Verification:**
 
-- [ ] Runner tests compare generated artifacts with canonical snapshots.
-- [ ] Consecutive runs produce byte-identical files and index ordering.
-- [ ] A duplicate form ID and a throwing factory leave no falsely successful
+- [x] Runner tests compare generated artifacts with canonical expectations.
+- [x] Consecutive runs produce byte-identical files and index ordering.
+- [x] A duplicate form ID and a throwing factory leave no falsely successful
       aggregate index.
 
 **Dependencies:** Tasks 3B and 4
@@ -446,8 +446,8 @@ only validated declared effects into artifacts and the workspace index.
 
 **Files likely touched:**
 
-- `packages/formly-adapter/src/resolve-effects.ts`
-- `packages/formly-adapter/src/resolve-effects.test.ts`
+- `packages/compiler/src/resolve-effects.ts`
+- `packages/compiler/src/resolve-effects.test.ts`
 - `packages/workspace/src/run-workspace.ts`
 - `packages/workspace/src/run-workspace.test.ts`
 - workspace index/golden fixtures
@@ -458,6 +458,10 @@ only validated declared effects into artifacts and the workspace index.
 
 **Description:** Add a `formly-contracts` binary with `generate`, `list`, and
 `check` commands over the workspace runner.
+
+**Current status:** the workspace-pilot `generate` slice is implemented with
+stable usage/generation exit behavior and concise provenance. `list`, `check`,
+and the linked/packed consumer smoke tests remain before Task 6A is complete.
 
 **Acceptance criteria:**
 

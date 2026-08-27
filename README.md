@@ -28,7 +28,7 @@ This repository currently provides schema v0.4 and three packages:
 | --- | --- |
 | `@formly-contract/schema` | Contract DTOs, runtime validation, canonical JSON, and SHA-256 content hashing |
 | `@formly-contract/compiler` | Safe declared extraction and trusted scenario compilation for Formly 6.x |
-| `@formly-contract/workspace` | Experimental trusted config loading, strict root/project/source descriptors, and deterministic policy resolution |
+| `@formly-contract/workspace` | Experimental trusted config loading, strict root/project/source descriptors, policy resolution, and deterministic multi-project artifact generation |
 
 It also includes:
 
@@ -42,11 +42,11 @@ It also includes:
 - deep compatibility coverage for the pinned Angular `20.3.29` and Formly
   `6.1.8` reference combination.
 
-The parser and contract are the current product. A production MCP server,
-automatic Playwright generation, browser observation, application-source
-discovery, and artifact generation are future layers and are not shipped by
-this MVP. The workspace package currently provides their configuration bedrock,
-not a discovery runner or CLI.
+The parser, contract, programmatic workspace runner, and pilot `generate` CLI
+are the current product. A production MCP server, automatic Playwright
+generation, browser observation, Angular-assisted application-source
+discovery, and the remaining generic CLI commands are future layers and are not
+shipped by this MVP.
 
 ## Use it in your own Angular/Formly codebase
 
@@ -67,7 +67,7 @@ application-owned Formly factories
 ### 1. Add the packages
 
 The packages are not published to npm yet. Until the first release, clone this
-repository next to the consuming application and build the two packages:
+repository next to the consuming application and build the three packages:
 
 ```sh
 git clone https://github.com/dills122/formly-contract.git
@@ -75,6 +75,7 @@ cd formly-contract
 pnpm install --frozen-lockfile
 pnpm --filter @formly-contract/schema build
 pnpm --filter @formly-contract/compiler build
+pnpm --filter @formly-contract/workspace build
 ```
 
 Then link them from the consuming application's `package.json` (adjust the
@@ -84,7 +85,8 @@ relative path for your checkout):
 {
   "devDependencies": {
     "@formly-contract/schema": "link:../formly-contract/packages/schema",
-    "@formly-contract/compiler": "link:../formly-contract/packages/compiler"
+    "@formly-contract/compiler": "link:../formly-contract/packages/compiler",
+    "@formly-contract/workspace": "link:../formly-contract/packages/workspace"
   }
 }
 ```
@@ -123,6 +125,17 @@ export const contractForms: ContractFormTarget[] = [
 Each factory should return a fresh field tree. If a factory needs application
 inputs, wrap it in a closure with synthetic values that are safe to use in
 local development and CI.
+
+For a repository-aware pilot, define the root/project/source descriptors in
+[the workspace configuration guide](docs/workspace-configuration.md), then run:
+
+```sh
+pnpm exec formly-contracts generate
+```
+
+The command discovers every configured project and bulk source, writes
+content-addressed contracts, and publishes `workspace-index.json` last. The
+manual script below remains useful for a single-package or one-off extraction.
 
 ### 3. Generate contract artifacts
 
