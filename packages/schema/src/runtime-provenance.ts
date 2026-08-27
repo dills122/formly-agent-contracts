@@ -33,7 +33,10 @@ export interface RuntimeLoaderProvenance {
     readonly fsCache: boolean;
     readonly interopDefault: boolean;
     readonly moduleCache: boolean;
-    readonly tsconfigPaths: 'disabled' | 'configured';
+    readonly tsconfigPaths: {
+      readonly rootConfig: 'disabled' | 'configured';
+      readonly projectConfigs: 'disabled' | 'configured';
+    };
     readonly nativeModules: readonly string[];
   };
 }
@@ -103,6 +106,7 @@ const LOADER_OPTIONS_KEYS = new Set([
   'tsconfigPaths',
   'nativeModules',
 ]);
+const TSCONFIG_PATHS_KEYS = new Set(['rootConfig', 'projectConfigs']);
 const NODE_KEYS = new Set(['version', 'platform', 'architecture']);
 const EXECUTION_PROFILE_KEYS = new Set(['id', 'version', 'network']);
 const DEPENDENCY_SNAPSHOT_KEYS = new Set([
@@ -291,10 +295,21 @@ function parseLoader(input: unknown): RuntimeLoaderProvenance {
     optionsPath,
     LOADER_OPTIONS_KEYS,
   );
-  const tsconfigPaths = required(options, 'tsconfigPaths', optionsPath);
-  if (tsconfigPaths !== 'disabled' && tsconfigPaths !== 'configured') {
-    fail(`${optionsPath}.tsconfigPaths`, 'is unsupported.');
-  }
+  const tsconfigPathsPath = `${optionsPath}.tsconfigPaths`;
+  const tsconfigPaths = record(
+    required(options, 'tsconfigPaths', optionsPath),
+    tsconfigPathsPath,
+    TSCONFIG_PATHS_KEYS,
+  );
+  const tsconfigPathState = (
+    key: 'rootConfig' | 'projectConfigs',
+  ): 'disabled' | 'configured' => {
+    const state = required(tsconfigPaths, key, tsconfigPathsPath);
+    if (state !== 'disabled' && state !== 'configured') {
+      fail(`${tsconfigPathsPath}.${key}`, 'is unsupported.');
+    }
+    return state;
+  };
   const nativeModuleNames = new Set<string>();
   const nativeModules = array(
     required(options, 'nativeModules', optionsPath),
@@ -324,7 +339,10 @@ function parseLoader(input: unknown): RuntimeLoaderProvenance {
         required(options, 'moduleCache', optionsPath),
         `${optionsPath}.moduleCache`,
       ),
-      tsconfigPaths,
+      tsconfigPaths: {
+        rootConfig: tsconfigPathState('rootConfig'),
+        projectConfigs: tsconfigPathState('projectConfigs'),
+      },
       nativeModules,
     },
   };

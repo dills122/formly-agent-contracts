@@ -165,17 +165,24 @@ directories. A trusted runtime-host parent may instead pass a validated
 `runtimeProvenance` DTO through the programmatic API. Root/project config data
 and the generic CLI cannot supply that override.
 
+Default provenance resolves the module entries actually used for the compiler,
+schema, and Jiti packages and reads the owning package manifests for their exact
+versions. Dependency declarations are not treated as executed-package
+identities. Loader provenance records `tsconfigPaths` separately for the root
+config loader and project config loaders because the programmatic root loader
+option and the root config's project-loader option can differ.
+
 Artifacts use content-addressed project/form paths beneath the resolved output
 directories. The aggregate `workspace-index.json` contains workspace-relative
 paths, contract hashes, source/project IDs, declared evidence, diagnostic
 provenance, configuration/plugin/profile-registry identities, and strict
 runtime provenance for the parent and each project. Runtime provenance schema
 `1.0.0` includes exact worker/adapter/tool/Jiti/Node/execution-profile/package
-identities, canonical loader options, platform/architecture, and the selected
-lock digest. Plugin options participate in configuration hashes but are not
-emitted. Model values, form state, callbacks, timestamps, absolute paths,
-module URLs, PIDs, timings, environment values, temporary directories, and full
-profile registries are excluded from the index.
+identities, canonical stage-specific loader options, platform/architecture, and
+the selected lock digest. Plugin options participate in configuration hashes
+but are not emitted. Model values, form state, callbacks, timestamps, absolute
+paths, module URLs, PIDs, timings, environment values, temporary directories,
+and full profile registries are excluded from the index.
 
 This is an intentional compatibility break for derived workspace output:
 workspace configuration and index schemas are `0.2.0`, and readers reject

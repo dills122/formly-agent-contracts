@@ -43,6 +43,7 @@ import {
   type FormContractSource,
 } from './source.js';
 import { WorkspaceConfigValidationError } from './validation-error.js';
+import { readRuntimeToolVersions } from './runtime-tool-versions.js';
 import {
   canonicalizeWorkspaceContractIndex,
   computeWorkspaceConfigurationHash,
@@ -216,15 +217,22 @@ async function findPnpmDependencySnapshot(
 
 async function createInProcessRuntimeProvenance(
   workspaceRoot: string,
-  tsconfigPaths: 'disabled' | 'configured',
+  tsconfigPaths: RuntimeProvenance['loader']['options']['tsconfigPaths'],
 ): Promise<RuntimeProvenance> {
   const dependencySnapshot = await findPnpmDependencySnapshot(workspaceRoot);
-  const {
-    workspaceVersion,
-    compilerVersion,
-    schemaVersion,
-    jitiVersion,
-  } = await readInProcessToolVersions();
+  let toolVersions;
+  try {
+    toolVersions = await readRuntimeToolVersions();
+  } catch (error) {
+    throw new WorkspaceGenerationError(
+      'RUNTIME_PROVENANCE_UNAVAILABLE',
+      'inventory',
+      {},
+      error,
+    );
+  }
+  const { workspaceVersion, compilerVersion, schemaVersion, jitiVersion } =
+    toolVersions;
   return parseRuntimeProvenance({
     schemaVersion: '1.0.0',
     worker: {
@@ -266,86 +274,6 @@ async function createInProcessRuntimeProvenance(
     dependencySnapshot,
     runtimePackages: [],
   });
-}
-
-interface PackageManifest {
-  readonly name?: unknown;
-  readonly version?: unknown;
-  readonly dependencies?: Readonly<Record<string, unknown>>;
-}
-
-async function readPackageManifest(
-  packageJsonUrl: URL,
-): Promise<PackageManifest> {
-  return JSON.parse(await readFile(packageJsonUrl, 'utf8')) as PackageManifest;
-}
-
-async function readInProcessToolVersions(): Promise<{
-  readonly workspaceVersion: string;
-  readonly compilerVersion: string;
-  readonly schemaVersion: string;
-  readonly jitiVersion: string;
-}> {
-  try {
-    const parsed = await readPackageManifest(
-      new URL('../package.json', import.meta.url),
-    );
-    if (
-      parsed.name !== '@formly-contract/workspace' ||
-      typeof parsed.version !== 'string' ||
-      parsed.version.length === 0
-    ) {
-      throw new TypeError('Invalid workspace package metadata.');
-    }
-    const dependencyVersion = async (
-      name: '@formly-contract/compiler' | '@formly-contract/schema',
-      sourceManifestUrl: URL,
-    ): Promise<string> => {
-      const declared = parsed.dependencies?.[name];
-      if (typeof declared !== 'string' || declared.length === 0) {
-        throw new TypeError(`Missing dependency metadata for ${name}.`);
-      }
-      if (!declared.startsWith('workspace:')) {
-        return declared;
-      }
-      const sourceManifest = await readPackageManifest(sourceManifestUrl);
-      if (
-        sourceManifest.name !== name ||
-        typeof sourceManifest.version !== 'string' ||
-        sourceManifest.version.length === 0
-      ) {
-        throw new TypeError(`Invalid source package metadata for ${name}.`);
-      }
-      return sourceManifest.version;
-    };
-    const jitiVersion = parsed.dependencies?.jiti;
-    if (typeof jitiVersion !== 'string' || jitiVersion.length === 0) {
-      throw new TypeError('Missing dependency metadata for jiti.');
-    }
-    const [compilerVersion, schemaVersion] = await Promise.all([
-      dependencyVersion(
-        '@formly-contract/compiler',
-        new URL('../../compiler/package.json', import.meta.url),
-      ),
-      dependencyVersion(
-        '@formly-contract/schema',
-        new URL('../../schema/package.json', import.meta.url),
-      ),
-    ]);
-    return {
-      workspaceVersion: parsed.version,
-      compilerVersion,
-      schemaVersion,
-      jitiVersion,
-    };
-  } catch (error) {
-    throw new WorkspaceGenerationError(
-      'RUNTIME_PROVENANCE_UNAVAILABLE',
-      'inventory',
-      {},
-      error,
-    );
-  }
 }
 
 function normalizeRelativePath(path: string): string {
@@ -1069,9 +997,16 @@ async function planWorkspaceRun(
     options.runtimeProvenance === undefined
       ? await createInProcessRuntimeProvenance(
           workspaceRoot,
-          discovered.root.config.tsconfigPath === undefined
-            ? 'disabled'
-            : 'configured',
+          {
+            rootConfig:
+              options.rootLoaderOptions?.tsconfigPath === undefined
+                ? 'disabled'
+                : 'configured',
+            projectConfigs:
+              discovered.root.config.tsconfigPath === undefined
+                ? 'disabled'
+                : 'configured',
+          },
         )
       : parseRuntimeProvenance(options.runtimeProvenance);
   const inventoried = await inventoryForms(projects);

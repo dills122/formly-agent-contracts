@@ -1,12 +1,14 @@
 # Implementation Plan: Distributed Workspace Form Discovery
 
-Status: in progress; Tasks 1–6B, Checkpoint A, and Task 7A.1 are complete,
-including
+Status: in progress; Tasks 1–6B and Checkpoint A are complete. Task 7A.1 code
+and acceptance verification are complete after correcting both exact-provenance
+findings from independent review instance 1: effective root/project loader
+options and resolved executed-package versions. Completed work includes
 project-owned field-type profiles and cross-field effects, resolved effect
 projection, deterministic workspace artifacts/indexes, all three generic CLI
 commands, canonical Angular-fixture goldens, linked/packed consumer smokes, and
 the schema-owned portable runtime/dependency provenance foundation. Task 7A.2
-is the next implementation slice.
+begins only after the independent review loop returns a ready verdict.
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)

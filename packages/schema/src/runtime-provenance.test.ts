@@ -35,7 +35,10 @@ function createProvenance(): RuntimeProvenance {
         fsCache: false,
         interopDefault: false,
         moduleCache: false,
-        tsconfigPaths: 'configured',
+        tsconfigPaths: {
+          rootConfig: 'disabled',
+          projectConfigs: 'configured',
+        },
         nativeModules: [],
       },
     },
@@ -126,6 +129,32 @@ describe('runtime provenance', () => {
       {
         ...provenance,
         loader: { ...provenance.loader, version: '2.7.1' },
+      },
+      {
+        ...provenance,
+        loader: {
+          ...provenance.loader,
+          options: {
+            ...provenance.loader.options,
+            tsconfigPaths: {
+              ...provenance.loader.options.tsconfigPaths,
+              rootConfig: 'configured',
+            },
+          },
+        },
+      },
+      {
+        ...provenance,
+        loader: {
+          ...provenance.loader,
+          options: {
+            ...provenance.loader.options,
+            tsconfigPaths: {
+              ...provenance.loader.options.tsconfigPaths,
+              projectConfigs: 'disabled',
+            },
+          },
+        },
       },
       {
         ...provenance,
@@ -230,6 +259,18 @@ describe('runtime provenance', () => {
         runtimePackages: [],
       }),
     ).toThrow(/must record JIT runtime package.*angular\/compiler/u);
+    expect(() =>
+      parseRuntimeProvenance({
+        ...provenance,
+        loader: {
+          ...provenance.loader,
+          options: {
+            ...provenance.loader.options,
+            tsconfigPaths: 'configured',
+          },
+        },
+      }),
+    ).toThrow(/tsconfigPaths.*object/u);
     expect(() =>
       parseRuntimeProvenance({
         ...provenance,

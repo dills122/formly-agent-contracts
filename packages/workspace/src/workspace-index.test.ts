@@ -43,7 +43,10 @@ function runtimeProvenance(): RuntimeProvenance {
         fsCache: false,
         interopDefault: false,
         moduleCache: false,
-        tsconfigPaths: 'configured',
+        tsconfigPaths: {
+          rootConfig: 'disabled',
+          projectConfigs: 'configured',
+        },
         nativeModules: [],
       },
     },

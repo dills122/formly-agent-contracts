@@ -95,7 +95,10 @@ function runtimeProvenance(
         fsCache: false,
         interopDefault: false,
         moduleCache: false,
-        tsconfigPaths: 'disabled',
+        tsconfigPaths: {
+          rootConfig: 'disabled',
+          projectConfigs: 'disabled',
+        },
         nativeModules: [],
       },
     },
@@ -180,7 +183,10 @@ describe('runWorkspace', () => {
           fsCache: false,
           interopDefault: false,
           moduleCache: false,
-          tsconfigPaths: 'disabled',
+          tsconfigPaths: {
+            rootConfig: 'disabled',
+            projectConfigs: 'disabled',
+          },
           nativeModules: [],
         },
       },
@@ -207,6 +213,63 @@ describe('runWorkspace', () => {
       result.index.runtimeProvenance,
     );
   });
+
+  it.each([
+    {
+      label: 'neither loader stage',
+      rootConfigured: false,
+      projectsConfigured: false,
+    },
+    {
+      label: 'only the root-config loader',
+      rootConfigured: true,
+      projectsConfigured: false,
+    },
+    {
+      label: 'only the project-config loaders',
+      rootConfigured: false,
+      projectsConfigured: true,
+    },
+    {
+      label: 'both loader stages',
+      rootConfigured: true,
+      projectsConfigured: true,
+    },
+  ])(
+    'records effective tsconfig-path use for $label',
+    async ({ rootConfigured, projectsConfigured }) => {
+      const workspaceRoot = await createTemporaryWorkspace();
+      await seedRoot(
+        workspaceRoot,
+        projectsConfigured ? `, tsconfigPath: 'project-tsconfig.json'` : '',
+      );
+      await writeModule(
+        workspaceRoot,
+        'projects/forms.project.mjs',
+        `export default { projectId: 'forms' };`,
+      );
+      await writeModule(workspaceRoot, 'root-tsconfig.json', `{}`);
+      await writeModule(workspaceRoot, 'project-tsconfig.json', `{}`);
+
+      const result = await runWorkspace({
+        ...runnerOptions(workspaceRoot),
+        ...(rootConfigured
+          ? {
+              rootLoaderOptions: {
+                tsconfigPath: join(workspaceRoot, 'root-tsconfig.json'),
+              },
+            }
+          : {}),
+      });
+
+      expect(result.index.runtimeProvenance.loader.options.tsconfigPaths).toEqual(
+        {
+          rootConfig: rootConfigured ? 'configured' : 'disabled',
+          projectConfigs: projectsConfigured ? 'configured' : 'disabled',
+        },
+      );
+    },
+  );
 
   it('fails generation when the workspace-root dependency lock is unavailable', async () => {
     const workspaceRoot = await createTemporaryWorkspace();

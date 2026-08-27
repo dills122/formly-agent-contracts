@@ -160,9 +160,13 @@ the worker ID/version/protocol, adapter ID/version/mode, exact workspace,
 compiler, and schema tool versions, Jiti version and canonical loader options,
 Node version/platform/architecture, execution-profile identity and network
 claim, selected dependency snapshot, and canonically ordered runtime-package
-identities. The dependency snapshot is the SHA-256 of the selected lockfile's
-exact bytes and stores only its safe workspace-relative path. It attests the
-declared lock state, not installed package bytes.
+identities. Jiti provenance distinguishes effective `tsconfigPaths` use while
+loading the root config from effective use while loading project configs. Tool
+and Jiti versions come from the package manifests that own the resolved module
+entries rather than from dependency declarations. The dependency snapshot is
+the SHA-256 of the selected lockfile's exact bytes and stores only its safe
+workspace-relative path. It attests the declared lock state, not installed
+package bytes.
 
 Workspace configuration and index schemas move together from `0.1.0` to
 `0.2.0` for this provenance boundary. Runtime provenance participates in every
