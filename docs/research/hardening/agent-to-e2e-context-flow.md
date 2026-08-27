@@ -1,6 +1,7 @@
 # RH-05: Agent-to-Contract-to-Playwright Context Flow
 
-**Status:** Research complete; conditional implementation recommendation
+**Status:** Research complete; independent-review findings addressed;
+conditional implementation recommendation
 
 **Research date:** 2026-08-27
 
@@ -383,13 +384,21 @@ interface E2eSlice {
 ### 5. `validate_test_intent` and `compile_test_intent`
 
 **Inference — purpose:** Validation is pure/read-only and returns either a
-fully resolved execution plan or structured blockers. Compilation accepts only
-the validated plan plus the exact same context reference. It never accepts raw
-selectors, arbitrary driver imports, or expressions.
+fully resolved execution plan or structured blockers. Compilation is stateless:
+the caller resubmits the validated plan, its hash, and the exact same context
+reference. The compiler canonicalizes the submitted plan, recomputes its hash,
+and rejects any hash or context mismatch before resolving trusted drivers. It
+never accepts raw selectors, arbitrary driver imports, or expressions.
 
 ```ts
 interface ValidateTestIntentInput {
   readonly intent: TestIntent;
+}
+
+interface ValidatedExecutionPlan {
+  readonly schemaVersion: '0.1.0';
+  readonly contextRef: ContractContextRef;
+  readonly steps: readonly ValidatedExecutionStep[];
 }
 
 type ValidateTestIntentResult =
@@ -406,14 +415,20 @@ type ValidateTestIntentResult =
 
 interface CompileTestIntentInput {
   readonly contextRef: ContractContextRef;
+  readonly plan: ValidatedExecutionPlan;
   readonly planHash: `sha256:${string}`;
   readonly output: 'driver-calls' | 'playwright-test';
 }
 ```
 
-**Inference:** `compile_test_intent` should be idempotent for the same plan hash
-and tool version. In the first slice it should return driver calls for review,
-not write files.
+**Inference:** A server-side plan handle is a credible later optimization, but
+it would add storage, expiry, authorization, and replay semantics that the
+smallest flow does not need. Resubmission keeps the boundary explicit and
+reversible. `compile_test_intent` should be idempotent for the same canonical
+plan, context, and tool version. `planHash` covers the canonical serialized
+`ValidatedExecutionPlan`, including its embedded `contextRef`; compilation
+requires the separately submitted `contextRef` to equal the embedded one. In
+the first slice it should return driver calls for review, not write files.
 
 ## Progressive disclosure
 
@@ -489,6 +504,11 @@ type TestIntentStep =
       readonly actionId: string;
     }
   | {
+      readonly op: 'activateValidation';
+      readonly nodeId: string;
+      readonly validationId: string;
+    }
+  | {
       readonly op: 'expectValidation';
       readonly nodeId: string;
       readonly constraint: string;
@@ -531,11 +551,39 @@ Repeater descendants require an item context plus explicit `addItem` or
 `expandItem` when the profile says activation is needed. An array wildcard is
 never converted to row zero by convention.
 
+**Inference:** Validation assertions do not authorize activation. A declared,
+node-local activation such as blur requires an explicit `activateValidation`
+step and may not navigate, submit, persist data, or invoke a usage action.
+`next`, `submit`, and every other journey-changing action require an explicit
+`invokeUsageAction` step naming an allowlisted `actionId`; the compiler never
+inserts one to make a later assertion pass.
+
 ## Diagnostic model and failure UX
 
 ```ts
+type IntentDiagnosticCode =
+  | 'AMBIGUOUS_FORM_USAGE'
+  | 'AMBIGUOUS_NODE'
+  | 'STALE_CONTEXT'
+  | 'CONTEXT_MISMATCH'
+  | 'PLAN_HASH_MISMATCH'
+  | 'SCENARIO_REQUIRED'
+  | 'VALUE_OUT_OF_DOMAIN'
+  | 'VALUE_CLASSIFICATION_UNKNOWN'
+  | 'UNSUPPORTED_INTERACTION'
+  | 'MISSING_LOCATOR_TARGET'
+  | 'LOCATOR_PARITY_MISMATCH'
+  | 'ORDERING_PRECONDITION_MISSING'
+  | 'READINESS_UNAVAILABLE'
+  | 'HIDDEN_NODE_UNREACHABLE'
+  | 'REPEATER_CONTEXT_REQUIRED'
+  | 'VALIDATION_ASSERTION_UNSUPPORTED'
+  | 'EFFECT_COVERAGE_INCOMPLETE'
+  | 'RUNTIME_PARITY_MISMATCH';
+
 interface IntentDiagnostic {
-  readonly code: string;
+  readonly schemaVersion: '0.1.0';
+  readonly code: IntentDiagnosticCode;
   readonly severity: 'warning' | 'error';
   readonly phase: 'discovery' | 'context' | 'validation' | 'compile' | 'runtime';
   readonly message: string; // stable template; untrusted text kept separate
@@ -559,10 +607,19 @@ interface IntentDiagnostic {
 }
 ```
 
+**Inference:** The code union is the closed vocabulary for schema version
+`0.1.0`. Adding a code is an additive schema-version change; changing a code's
+meaning, severity contract, or remediation shape requires a breaking version.
+Machine consumers may exhaustively handle known codes and must reject an
+unsupported diagnostic schema version rather than treating arbitrary strings
+as executable guidance.
+
 | Failure | Required diagnostic behavior | Example stable message | Evidence class |
 | --- | --- | --- | --- |
 | Multiple usage matches | Block and return match reasons, not a winner. | `AMBIGUOUS_FORM_USAGE: 2 usages match; choose an exact usageId.` | Inference |
 | Source/artifact drift | Block compile; search may still return stale candidates. | `STALE_CONTEXT: form contract was generated from a different input digest.` | Inference |
+| Submitted context differs from validated plan | Block before driver resolution. | `CONTEXT_MISMATCH: compile context does not equal the plan's pinned context.` | Inference |
+| Submitted plan does not reproduce its hash | Block before driver resolution. | `PLAN_HASH_MISMATCH: canonical submitted plan does not match planHash.` | Inference |
 | Scenario absent for a dynamic node | Block concrete set. | `SCENARIO_REQUIRED: node ... has a dynamic domain and no resolved scenario artifact.` | Repository observation + inference |
 | Value outside selected domain | Block before browser execution. | `VALUE_OUT_OF_DOMAIN: canonical value is absent from scenario ...` | Inference |
 | Literal cannot be classified | Block; do not downgrade to warning. | `VALUE_CLASSIFICATION_UNKNOWN: opaque validator or codec prevents classification.` | Inference |
@@ -605,19 +662,26 @@ one” to its symbol or catalog entry, the supplier value source is async, and
 the custom `currency` type has no production interaction profile in the
 workspace artifact set. Current artifacts cannot compile this test reliably.
 
-### Minimum paper supplement
+### Complete paper prerequisites
 
-**Inference:** A successful proposed flow needs only these additions for this
-case:
+**Inference:** This walkthrough is valid only with the following global and
+case-specific inputs; these are prerequisites, not optional enrichment:
 
+- one compatible immutable context envelope containing the workspace, usage,
+  form, scenario, and driver-registry identities and freshness digests;
 - usage `test-app.catalog/operations.purchase-order@1`, joined to the source
-  symbol and form ID;
-- step `details@1` with member nodes `supplier`, `currency`, and `total`;
+  symbol and form ID, plus step `details@1` with member nodes `supplier`,
+  `currency`, and `total`;
 - an allowlisted catalog-entry driver keyed by the exact form ID;
-- a safe synthetic scenario with a driver capability for “supplier options
-  ready” and stable runtime enumeration; and
-- a reviewed `currency` profile with a scalar decimal codec and `fill`
-  operation.
+- executable profiles and supported drivers for the supplier select, currency
+  select, and custom currency field, including strict node-scoped locator
+  targets and canonical value codecs;
+- the complete static `currency` domain and a safe synthetic supplier scenario
+  with “supplier options ready,” stable runtime enumeration, and privacy-safe
+  candidate identity; and
+- a reviewed scalar decimal codec and `fill` operation for `total`, plus a
+  declared locator/assertion surface capable of observing its canonical value
+  and the absence of the `min` validation state.
 
 **Inference:** The supplier can use `first-enabled` because the positive test
 does not assert supplier-specific business behavior. The total cannot use an
@@ -739,19 +803,31 @@ not generate a resolved scenario artifact.
 but no validation trigger or assertion target. The current artifact can explain
 why this is a candidate regression test; it cannot execute it.
 
-### Minimum paper supplement
+### Complete paper prerequisites
 
-**Inference:** The negative flow needs:
+**Inference:** This walkthrough is valid only with the following global and
+case-specific inputs; these are prerequisites, not optional enrichment:
 
-- usage/component/step metadata for the claim-intake page;
+- one compatible immutable context envelope containing the workspace, usage,
+  form, scenario, and driver-registry identities and freshness digests;
+- usage/component/step metadata for the claim-intake page and an allowlisted
+  usage-entry driver;
 - a trusted resolved scenario `auto-other` whose basis is the declared hash and
   whose `caseType` domain contains canonical value `"other"`;
-- the resolved `dependent-select` interaction profile with complete part scope
-  and a supported driver;
-- the two already declared sync ordering/effect edges;
-- an explicit visibility outcome for the scenario/effect; and
-- a validation surface for the other-details `required` rule, including the
-  trigger (`blur`, `next`, or submit) and observable target/state.
+- executable profiles and supported drivers for the native product control,
+  custom `dependent-select`, and native other-details control, including value
+  codecs and strict node/part-scoped locator targets;
+- the two already declared sync ordering/effect edges and an explicit
+  visibility outcome for the scenario/effect; and
+- a validation record `otherDetails.required.on-blur` with a bounded,
+  node-local blur activation and an observable error target/state for the
+  other-details `required` rule.
+
+**Inference:** The paper walkthrough deliberately chooses node-local blur. If
+the application exposes the error only on `next` or `submit`, the usage
+contract must instead declare that action and its expected blocked-navigation
+outcome, and the intent must contain an explicit `invokeUsageAction`; the
+compiler may not substitute it for `activateValidation`.
 
 ### Query storyboard
 
@@ -818,6 +894,11 @@ claim that no other effect can interfere.
       "value": {"kind": "constraint-violation", "constraint": "required"}
     },
     {
+      "op": "activateValidation",
+      "nodeId": "claims.intake::path:s_claimDetails.s_otherDetails",
+      "validationId": "otherDetails.required.on-blur"
+    },
+    {
       "op": "expectValidation",
       "nodeId": "claims.intake::path:s_claimDetails.s_otherDetails",
       "constraint": "required",
@@ -833,8 +914,28 @@ claim that no other effect can interfere.
 for the declared sync effect, checks `"other"` against the selected resolved
 scenario domain, compiles the custom overlay operation through the pinned
 profile/driver, waits for visible other-details through a web-first assertion,
-clears/omits its value through the required-violation capability, invokes the
-declared validation trigger, and asserts the declared error surface.
+clears/omits its value through the required-violation capability, verifies that
+`otherDetails.required.on-blur` is node-local and non-navigating, and asserts
+the declared error surface. Compilation emits trusted calls conceptually
+equivalent to:
+
+```ts
+await formDriver.openUsage(contextRef);
+await formDriver.set(productNode, 'auto');
+await formDriver.set(caseTypeNode, 'other');
+await formDriver.expectState(otherDetailsNode, 'visible');
+await formDriver.setConstraintViolation(otherDetailsNode, 'required');
+await formDriver.activateValidation(
+  otherDetailsNode,
+  'otherDetails.required.on-blur',
+);
+await formDriver.expectValidation(otherDetailsNode, 'required', 'present');
+```
+
+**Inference:** `expectValidation` is assertion-only. Compilation cannot add a
+blur, `next`, submit, or any other activation that is absent from the validated
+plan. A journey-changing action compiles only from an explicit
+`invokeUsageAction` and must carry its own declared outcome/preconditions.
 
 **Inference — important refusal:** If the agent reverses product and case type,
 validation returns `ORDERING_PRECONDITION_MISSING`. If it uses the current
@@ -933,18 +1034,29 @@ reachable.
 | Bounded read surface | Cap result size, node/value counts, recursive depth, and query complexity; paginate deterministically. | Inference |
 | Hash and schema pinning | Validate schema versions and all referenced hashes before intent validation and again before compilation/runtime. | Inference |
 
-**Documented fact:** Playwright documents traces, screenshots, and video as
-test artifacts and notes that tracing can include browser operations and
-network activity. This supports treating failure artifacts as potentially
-sensitive rather than enabling them indiscriminately.
+**Documented fact:** Playwright can record screenshots, video, and traces as
+test artifacts. Its Trace Viewer documentation says traces can contain action
+screenshots, complete DOM snapshots, and network requests; request details can
+include headers plus request and response bodies.
 
-**Documented fact:** W3C WCAG guidance requires automatically detected input
-errors to identify the item and describe the error in text, and distinguishes
-status messages for success, waiting, progress, and errors. A negative-test
-contract should therefore prefer a programmatically associated error
-role/name/description target over brittle visual text adjacency; it must still
-verify the product's actual accessible error behavior rather than manufacture
-one.
+**Inference:** Those documented contents can expose rendered or transported
+sensitive data. Projects should therefore define retention, access, and
+redaction policy before enabling failure artifacts, rather than treating
+traces as harmless diagnostics.
+
+**Documented fact:** W3C WCAG 2.2 SC 3.3.1 requires an automatically detected
+input error to identify the item and describe the error in text. Its
+understanding document says programmatic information can complement that
+description but is not required by SC 3.3.1. W3C technique ARIA21 demonstrates
+one sufficient, non-mandatory pattern using `aria-invalid` and
+`aria-describedby` to connect a field and message.
+
+**Inference:** A negative-test contract should prefer an application-declared,
+programmatically associated error state/description when the product provides
+one, because it is more semantic than visual adjacency. It must also support a
+different declared observable surface when that is the product's actual
+accessible behavior; the contract cannot infer association from WCAG or
+manufacture one in the browser.
 
 ## Alternatives compared consistently
 
@@ -1005,19 +1117,24 @@ one large form.
 
 **Inference:** Add intent DTO/runtime validation, value classification,
 ordering/reachability checks, profile/driver/locator coverage, validation
-surface checks, structured diagnostics, and a canonical plan hash. Return no
-Playwright code.
+surface checks, a versioned closed diagnostic vocabulary, and a canonical plan
+plus hash. Expected-valid intents produce complete executable plans and
+warnings; expected-invalid intents produce only blocking diagnostics and never
+a plan. Return no Playwright code.
 
-**Gate:** Valid fixture intents pass; reversed ordering, stale hashes, missing
-scenarios, unknown values, missing part locators, hidden/repeater ambiguity, and
-unsupported validation fail with stable diagnostics. This slice alone tests the
-central value proposition.
+**Gate:** Separately assert that valid fixture intents produce canonical plans
+whose hashes reproduce, while reversed ordering, stale hashes, missing
+scenarios, unknown values, missing part locators, hidden/repeater ambiguity,
+and unsupported validation produce no plan and fail with stable diagnostics.
+This slice alone tests the central value proposition.
 
 ### Slice 3 — One native positive/negative driver vertical
 
 **Inference:** Add one usage-entry driver and built-in fill/select/check
 profiles plus validation surfaces for native controls. Compile only validated
-plans to stable driver calls, then Playwright tests. Retain strict uniqueness,
+plans to stable driver calls, then Playwright tests. The caller resubmits the
+plan, hash, and context; compilation recomputes the canonical hash and rejects
+context drift or tampering before driver resolution. Retain strict uniqueness,
 actionability, and web-first assertions.
 
 **Gate:** One positive and one negative native fixture test pass repeatedly
@@ -1079,8 +1196,8 @@ the first workplace sample.
 
 | Acceptance criterion | Evidence in this artifact | Result |
 | --- | --- | --- |
-| 1. Two end-to-end walkthroughs cover positive and negative tests, including a custom/dynamic field and conditional branch. | “Walkthrough 1” covers a positive order-entry flow with async runtime choice and custom currency control; “Walkthrough 2” covers a negative custom dependent-select and conditional required field. Both include query, intent, validation, and conceptual driver calls/refusals. | Met as paper walkthrough; current artifacts are explicitly shown insufficient. |
-| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Query/API, progressive disclosure, typed intent, diagnostic/failure UX, security/privacy, and alternatives sections. | Met. |
+| 1. Two end-to-end walkthroughs cover positive and negative tests, including a custom/dynamic field and conditional branch. | “Walkthrough 1” covers a positive order-entry flow with async runtime choice and custom currency control; “Walkthrough 2” covers a negative custom dependent-select and conditional required field. Both enumerate complete execution prerequisites and include query, intent, validation, and conceptual driver calls/refusals. | Met as paper walkthrough; current artifacts are explicitly shown insufficient. |
+| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Query/API, progressive disclosure, typed intent with explicit validation/action authority, stateless plan handoff, versioned diagnostic/failure UX, security/privacy, and alternatives sections. | Met. |
 | 3. Explicit required/optional/not-useful RH-01–RH-04 metadata list. | “RH-01–RH-04 metadata dependency audit.” | Met without assuming lane success. |
 | 4. Feasibility/value recommendation, confidence, UX failure modes, ordered implementation slices. | Executive decision, alternatives, UX table, slices/stop gates, and feasibility/value section. | Met. |
 
@@ -1111,6 +1228,39 @@ $ git diff --check
 No output; exit 0.
 ```
 
+### Independent-review correction verification
+
+**Repository observation:** On 2026-08-27, the five findings from independent
+review instance 1 of 3 were addressed in this artifact only. The correction
+worktree was based on commit
+`9bb07180535b2ff22e38680f838151303d63eb7d` on branch
+`codex/rh-05-agent-e2e-context-flow` with the environment recorded above.
+
+```text
+$ pnpm check:docs
+Documentation checks passed for 57 files.
+Exit 0.
+
+$ pnpm exec vitest run fixtures/angular-monorepo/workspace-fixture.test.ts
+Test Files  1 passed (1)
+Tests       7 passed (7)
+Duration    14.88s
+Exit        0
+
+$ git diff --check
+No output; exit 0.
+
+$ git diff --name-only
+docs/research/hardening/agent-to-e2e-context-flow.md
+Exit 0.
+```
+
+**Documented fact — source readback:** Official Playwright Trace Viewer
+documentation was checked for trace screenshot, DOM snapshot, and network
+request contents. W3C WCAG 2.2 SC 3.3.1 and technique ARIA21 were checked to
+separate the normative text-error requirement from the optional programmatic
+association technique.
+
 ## Primary sources
 
 ### Repository sources
@@ -1135,9 +1285,11 @@ No output; exit 0.
 - Playwright, [Auto-waiting and actionability](https://playwright.dev/docs/actionability)
 - Playwright, [Assertions](https://playwright.dev/docs/test-assertions)
 - Playwright, [Test configuration and artifacts](https://playwright.dev/docs/test-configuration)
+- Playwright, [Trace Viewer](https://playwright.dev/docs/trace-viewer)
 - W3C WAI, [Providing Accessible Names and Descriptions](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/)
 - W3C WAI, [Understanding SC 3.3.1: Error Identification](https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html)
 - W3C WAI, [Understanding SC 4.1.3: Status Messages](https://www.w3.org/WAI/WCAG22/Understanding/status-messages)
+- W3C WAI, [Technique ARIA21: Using `aria-invalid` to Indicate an Error Field](https://www.w3.org/WAI/WCAG22/Techniques/aria/ARIA21.html)
 
 ## Limitations and next evidence
 
