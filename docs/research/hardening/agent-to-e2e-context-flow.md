@@ -248,10 +248,14 @@ type E2eCapability =
   | 'invoke-usage-action'
   | 'assert-outcome';
 
-interface PageProjection {
-  readonly truncated: boolean;
-  readonly nextCursor?: string;
+interface PageRequestProjection {
+  readonly limit?: number; // server-capped
+  readonly cursor?: string; // opaque and bound to the exact context/query
 }
+
+type PageProjection =
+  | { readonly truncated: false; readonly nextCursor?: never }
+  | { readonly truncated: true; readonly nextCursor: string };
 
 type ContractDiagnosticCodeProjection =
   | 'OPAQUE_FUNCTION'
@@ -287,23 +291,46 @@ type DiagnosticIdentityProjection =
       readonly code: IntentDiagnosticCode;
     };
 
-interface DiagnosticSummary {
-  readonly identity: DiagnosticIdentityProjection;
-  readonly severity: 'warning' | 'error';
-  readonly phase: 'discovery' | 'context' | 'validation' | 'compile' | 'runtime';
-  readonly count: number;
-  readonly blocking: boolean;
-  readonly evidenceRefs: readonly string[];
-}
+type DiagnosticSummary =
+  | {
+      readonly source: 'form-contract';
+      readonly identity: Extract<
+        DiagnosticIdentityProjection,
+        { readonly source: 'form-contract' }
+      >;
+      readonly severity: 'warning' | 'error';
+      readonly count: number;
+      readonly blocking: boolean;
+      readonly evidenceRefs: readonly string[];
+    }
+  | {
+      readonly source: 'agent-context';
+      readonly diagnostic: IntentDiagnostic;
+      readonly count: number;
+    };
 
-interface QueryDiagnosticProjection {
-  readonly identity: DiagnosticIdentityProjection;
-  readonly severity: 'warning' | 'error';
-  readonly phase: 'discovery' | 'context';
-  readonly message: string;
-  readonly blocking: boolean;
-  readonly evidenceRefs: readonly string[];
-}
+type AgentContextQueryDiagnostic = Extract<
+  IntentDiagnostic,
+  { readonly phase: 'discovery' | 'context' }
+>;
+
+type QueryDiagnosticProjection =
+  | {
+      readonly source: 'form-contract';
+      readonly identity: Extract<
+        DiagnosticIdentityProjection,
+        { readonly source: 'form-contract' }
+      >;
+      readonly severity: 'warning' | 'error';
+      readonly phase: 'discovery' | 'context';
+      readonly message: string;
+      readonly blocking: boolean;
+      readonly evidenceRefs: readonly string[];
+    }
+  | {
+      readonly source: 'agent-context';
+      readonly diagnostic: AgentContextQueryDiagnostic;
+    };
 
 interface UsageDriverProjection {
   readonly kind: 'application';
@@ -329,6 +356,7 @@ interface UsageActionProjection {
 interface UsageOutcomeProjection {
   readonly id: string;
   readonly kind: 'remains-on-step' | 'step-changed' | 'navigation' | 'message';
+  readonly assertionDriver: UsageDriverProjection;
   readonly assertionTargetRef: string;
   readonly evidenceRefs: readonly string[];
 }
@@ -391,7 +419,13 @@ interface ValidationSurfaceProjection {
   readonly constraint: string;
   readonly activation:
     | { readonly kind: 'none' }
-    | { readonly kind: 'node-local'; readonly activationId: string }
+    | {
+        readonly kind: 'node-local';
+        readonly activationId: string;
+        readonly mechanic: 'blur' | 'click' | 'check';
+        readonly partRef: string;
+        readonly locatorTargetRef: string;
+      }
     | { readonly kind: 'usage-action'; readonly actionId: string };
   readonly assertionTargetRef: string;
   readonly evidenceRefs: readonly string[];
@@ -560,10 +594,16 @@ candidate references. The API never resolves ambiguity with array order.
 candidate is selected.
 
 ```ts
-interface GetFormContextInput {
-  readonly contextRef: ContractContextRef;
-  readonly view: 'summary' | 'diagnostics' | 'journey';
-}
+type GetFormContextInput =
+  | {
+      readonly contextRef: ContractContextRef;
+      readonly view: 'summary' | 'diagnostics';
+      readonly page?: PageRequestProjection;
+    }
+  | {
+      readonly contextRef: ContractContextRef;
+      readonly view: 'journey';
+    };
 
 interface FormContextSummary {
   readonly contextRef: ContractContextRef;
@@ -595,6 +635,7 @@ type GetFormContextResult =
       readonly schemaVersion: '0.1.0';
       readonly view: 'summary';
       readonly summary: FormContextSummary;
+      readonly page: PageProjection; // pages summary.usage.steps
     }
   | {
       readonly schemaVersion: '0.1.0';
@@ -606,11 +647,35 @@ type GetFormContextResult =
   | {
       readonly schemaVersion: '0.1.0';
       readonly view: 'journey';
+      readonly status: 'complete';
       readonly contextRef: ContractContextRef;
       readonly journey: UsageJourneyProjection;
       readonly diagnostics: readonly QueryDiagnosticProjection[];
+    }
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly view: 'journey';
+      readonly status: 'refused';
+      readonly contextRef: ContractContextRef;
+      readonly diagnostics: readonly [
+        Extract<
+          AgentContextQueryDiagnostic,
+          { readonly code: 'ATOMIC_VIEW_TOO_LARGE' }
+        >,
+        ...Extract<
+          AgentContextQueryDiagnostic,
+          { readonly code: 'ATOMIC_VIEW_TOO_LARGE' }
+        >[],
+      ];
     };
 ```
+
+**Inference — bounded-result rule:** `summary` pages only the ordered step
+summaries and `diagnostics` pages only diagnostics; both accept and return the
+same opaque cursor protocol. A journey is a referentially complete atomic view:
+the server either returns its entry, steps, actions, and outcomes together or
+returns `ATOMIC_VIEW_TOO_LARGE` with no partial journey. This avoids a cursor
+that strands an action away from its step or outcome.
 
 ### 3. `find_form_nodes`
 
@@ -662,22 +727,57 @@ surfaces, readiness, and blocking unknowns.
 ```ts
 interface GetE2eSliceInput {
   readonly contextRef: ContractContextRef;
+  readonly withinStepId: string;
   readonly nodeIds: readonly string[];
   readonly goal: 'positive' | 'negative' | 'boundary';
   readonly includeOutgoingEffects?: boolean;
 }
 
-interface E2eSlice {
-  readonly schemaVersion: '0.1.0';
-  readonly contextRef: ContractContextRef;
-  readonly entry: UsageEntryProjection;
-  readonly step: UsageStepProjection;
-  readonly nodes: readonly E2eNodeProjection[];
-  readonly prerequisites: readonly E2ePrerequisite[];
-  readonly effects: readonly DeclaredEffectProjection[];
-  readonly blockers: readonly DiagnosticSummary[];
-}
+type GetE2eSliceResult =
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly status: 'complete';
+      readonly contextRef: ContractContextRef;
+      readonly entry: UsageEntryProjection;
+      readonly step: UsageStepProjection;
+      readonly nodes: readonly E2eNodeProjection[];
+      readonly prerequisites: readonly E2ePrerequisite[];
+      readonly effects: readonly DeclaredEffectProjection[];
+      readonly effectAnalysis: 'complete' | 'incomplete' | 'absent';
+      readonly blockers: readonly DiagnosticSummary[];
+    }
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly status: 'refused';
+      readonly contextRef: ContractContextRef;
+      readonly diagnostics: readonly [
+        Extract<
+          AgentContextQueryDiagnostic,
+          {
+            readonly code:
+              | 'STEP_SCOPE_MISMATCH'
+              | 'ATOMIC_VIEW_TOO_LARGE';
+          }
+        >,
+        ...Extract<
+          AgentContextQueryDiagnostic,
+          {
+            readonly code:
+              | 'STEP_SCOPE_MISMATCH'
+              | 'ATOMIC_VIEW_TOO_LARGE';
+          }
+        >[],
+      ];
+    };
 ```
+
+**Inference — single-step and atomicity rule:** `withinStepId` is mandatory and
+every focused `nodeId` must belong to that exact step. A cross-step request
+returns `STEP_SCOPE_MISMATCH`; the server never chooses a step from array order.
+The prerequisite/effect closure is atomic because truncating it could omit an
+execution-safety edge. A server cap therefore returns `ATOMIC_VIEW_TOO_LARGE`
+with no partial slice. A later multi-step tool would need an ordered `steps`
+array and explicit node membership; it is not part of the minimum journey.
 
 ### 5. `validate_test_intent` and `compile_test_intent`
 
@@ -701,9 +801,45 @@ interface ApprovedNodeBinding {
     readonly id: string;
     readonly version: number;
   };
-  readonly operation: E2eCapability;
-  readonly partRefs: readonly string[];
-  readonly locatorTargetRefs: readonly string[];
+  readonly operations: readonly [E2eCapability, ...E2eCapability[]];
+  readonly targets: readonly [
+    {
+      readonly purpose:
+        | 'control'
+        | 'trigger'
+        | 'popup'
+        | 'option'
+        | 'row'
+        | 'selection'
+        | 'add'
+        | 'item'
+        | 'expand'
+        | 'wrapper';
+      readonly partRef: string;
+      readonly locatorTargetRef: string;
+    },
+    ...{
+      readonly purpose:
+        | 'control'
+        | 'trigger'
+        | 'popup'
+        | 'option'
+        | 'row'
+        | 'selection'
+        | 'add'
+        | 'item'
+        | 'expand'
+        | 'wrapper';
+      readonly partRef: string;
+      readonly locatorTargetRef: string;
+    }[],
+  ];
+  readonly itemContext?: {
+    readonly kind: 'index';
+    readonly repeaterNodeId: string;
+    readonly index: number;
+    readonly establishedByPlanStepId: string;
+  };
 }
 
 type ResolvedPlanValue =
@@ -722,10 +858,13 @@ type ResolvedPlanValue =
     };
 
 type ValidatedPlanStepOrigin =
-  | { readonly kind: 'intent'; readonly intentStepIndex: number }
+  | {
+      readonly kind: 'intent';
+      readonly intentStepIndexes: readonly [number, ...number[]];
+    }
   | {
       readonly kind: 'declared-expansion';
-      readonly parentIntentStepIndex: number;
+      readonly parentIntentStepIndexes: readonly [number, ...number[]];
       readonly prerequisiteRef: string;
     };
 
@@ -734,6 +873,36 @@ interface ValidatedPlanStepBase {
   readonly origin: ValidatedPlanStepOrigin;
   readonly evidenceRefs: readonly string[];
 }
+
+type ApprovedCommitResolution =
+  | {
+      readonly kind: 'included-in-set';
+      readonly commitId: string;
+      readonly mode: 'immediate' | 'blur';
+      readonly physicalOperationId: string;
+    }
+  | {
+      readonly kind: 'node-operation';
+      readonly commitId: string;
+      readonly mode: 'immediate' | 'blur';
+      readonly physicalOperationId: string;
+      readonly planStepId: string;
+    }
+  | {
+      readonly kind: 'usage-action';
+      readonly commitId: string;
+      readonly actionId: string;
+      readonly physicalOperationId: string;
+      readonly planStepId: string;
+    };
+
+type ApprovedNodeOperationAuthority =
+  | { readonly kind: 'value-commit'; readonly commitId: string }
+  | {
+      readonly kind: 'validation-activation';
+      readonly validationId: string;
+      readonly activationId: string;
+    };
 
 type ValidatedExecutionStep = ValidatedPlanStepBase &
   (
@@ -745,7 +914,10 @@ type ValidatedExecutionStep = ValidatedPlanStepBase &
     | {
         readonly op: 'activate-wrapper';
         readonly binding: ApprovedNodeBinding;
+        readonly physicalOperationId: string;
         readonly partRef: string;
+        readonly locatorTargetRef: string;
+        readonly mechanic: 'click' | 'check';
       }
     | {
         readonly op: 'wait-readiness';
@@ -755,22 +927,36 @@ type ValidatedExecutionStep = ValidatedPlanStepBase &
     | {
         readonly op: 'set-value';
         readonly binding: ApprovedNodeBinding;
+        readonly physicalOperationId: string;
         readonly value: ResolvedPlanValue;
+        readonly commit: ApprovedCommitResolution;
+        readonly validationActivations: readonly {
+          readonly validationId: string;
+          readonly activationId: string;
+        }[];
       }
     | {
-        readonly op: 'commit-value';
+        readonly op: 'perform-node-operation';
         readonly binding: ApprovedNodeBinding;
-        readonly commit: {
-          readonly id: string;
-          readonly kind: 'node-local';
-          readonly mode: 'immediate' | 'blur';
-          readonly execution: 'explicit-intent';
-        };
+        readonly physicalOperationId: string;
+        readonly mechanic: 'blur' | 'click' | 'check';
+        readonly partRef: string;
+        readonly locatorTargetRef: string;
+        readonly authorities: readonly [
+          ApprovedNodeOperationAuthority,
+          ...ApprovedNodeOperationAuthority[],
+        ];
       }
     | {
         readonly op: 'add-item' | 'expand-item';
         readonly binding: ApprovedNodeBinding;
+        readonly physicalOperationId: string;
         readonly item?: { readonly index: number };
+        readonly establishesItemContext?: {
+          readonly kind: 'index';
+          readonly repeaterNodeId: string;
+          readonly index: number;
+        };
       }
     | {
         readonly op: 'expect-state';
@@ -794,13 +980,13 @@ type ValidatedExecutionStep = ValidatedPlanStepBase &
         readonly op: 'invoke-usage-action';
         readonly actionId: string;
         readonly driver: UsageDriverProjection;
+        readonly physicalOperationId: string;
+        readonly commitIds: readonly string[];
+        readonly validationActivations: readonly {
+          readonly nodeId: string;
+          readonly validationId: string;
+        }[];
         readonly expectedOutcomeIds: readonly string[];
-      }
-    | {
-        readonly op: 'activate-validation';
-        readonly binding: ApprovedNodeBinding;
-        readonly validationId: string;
-        readonly activationId: string;
       }
     | {
         readonly op: 'expect-validation';
@@ -831,13 +1017,17 @@ type ValidateTestIntentResult =
       readonly contextRef: ContractContextRef;
       readonly planHash: `sha256:${string}`;
       readonly plan: ValidatedExecutionPlan;
-      readonly warnings: readonly IntentDiagnostic[];
+      readonly warnings: readonly IntentWarning[];
     }
   | {
       readonly schemaVersion: '0.1.0';
       readonly status: 'invalid';
       readonly contextRef: ContractContextRef;
-      readonly diagnostics: readonly IntentDiagnostic[];
+      readonly diagnostics: readonly [
+        IntentBlockingDiagnostic,
+        ...IntentBlockingDiagnostic[],
+      ];
+      readonly warnings: readonly IntentWarning[];
     };
 
 interface CompileTestIntentInput {
@@ -855,7 +1045,7 @@ interface CompiledDriverCall {
     readonly id: string;
     readonly version: number;
   };
-  readonly operation: E2eCapability;
+  readonly operations: readonly [E2eCapability, ...E2eCapability[]];
   readonly approvedStep: ValidatedExecutionStep;
 }
 
@@ -871,14 +1061,18 @@ type CompileTestIntentResult =
             readonly calls: readonly CompiledDriverCall[];
           }
         | { readonly kind: 'playwright-test'; readonly source: string };
-      readonly warnings: readonly IntentDiagnostic[];
+      readonly warnings: readonly IntentWarning[];
     }
   | {
       readonly schemaVersion: '0.1.0';
       readonly status: 'rejected';
       readonly contextRef: ContractContextRef;
       readonly planHash: `sha256:${string}`;
-      readonly diagnostics: readonly IntentDiagnostic[];
+      readonly diagnostics: readonly [
+        IntentBlockingDiagnostic,
+        ...IntentBlockingDiagnostic[],
+      ];
+      readonly warnings: readonly IntentWarning[];
     };
 ```
 
@@ -900,6 +1094,37 @@ The driver-call review output pairs the selected trusted driver with the exact
 closed `ValidatedExecutionStep`; it has no secondary free-form argument bag
 that could reintroduce selectors, code, or unvalidated driver options.
 
+**Inference — losslessness invariants:** Runtime schemas and validator tests
+must additionally prove all of the following before returning `status: valid`:
+
+- every `set-value.commit` selects exactly one declared commit record;
+  `included-in-set` names that set's `physicalOperationId`, while node-event and
+  usage-action commits point to an existing later `planStepId` with the same
+  physical operation and commit ID;
+- every `perform-node-operation.authorities` entry is independently approved,
+  unique, and compatible with the serialized mechanic/part/target. When one
+  blur satisfies both commit and validation activation, the validator merges
+  the adjacent intent authorities into one plan step whose `origin` names both
+  intent indexes; the compiler emits the physical blur exactly once;
+- every node binding contains the exact selected capability set and a
+  purpose-to-part-to-locator-target mapping. Multiple strings are never passed
+  as unordered candidate lists from which the compiler may choose;
+- every wrapper expansion serializes `click` versus `check`, its exact part and
+  target, and its physical-operation identity; registry lookup may rehydrate
+  only those selected IDs;
+- every binding for a wildcard descendant carries an exact `itemContext` whose
+  establishing plan step precedes the descendant operation. No descendant
+  driver may receive a default index; and
+- every usage-action commit is bidirectionally linked: the set points to the
+  action plan step and that action's `commitIds` contains the selected commit.
+- every validation activation is assigned to exactly one serialized physical
+  operation: the approving set, a node operation, or an explicit usage action.
+  Usage-action activations name both node and validation ID on that action.
+
+Hash-pinned lookup is compression, not decision-making: it may retrieve an
+immutable record named by the plan, but it may not choose a commit, mechanic,
+row, activation, action, or assertion record that the plan omitted.
+
 ## Progressive disclosure
 
 | Level | Agent receives | Default exclusions | Promotion trigger | Evidence class |
@@ -910,9 +1135,19 @@ that could reintroduce selectors, code, or unvalidated driver options.
 | 3 — explanation | One node/effect/diagnostic with provenance and safe source references | Callback source, model values, secrets, arbitrary DOM | Validator failure or explicit explanation request | Inference |
 | 4 — full artifact | Immutable contract resource | Nothing except prohibited sensitive/executable material | Explicit expert/debug request with size pagination | Documented fact from the architecture's large-form boundary |
 
-**Inference:** Every response needs bounded arrays, deterministic ordering,
-continuation cursors, and the same `contextRef`. A model should not need the
-whole contract to add a two-field regression test.
+**Documented fact:** MCP pagination uses opaque cursors: a response includes an
+optional `nextCursor`, and a client continues by sending that cursor in the
+next request. MCP tools may also declare output schemas; when present, servers
+must conform and clients should validate the structured result.
+
+**Inference:** Every response needs bounded arrays, deterministic ordering, and
+the same `contextRef`, but not every response is safely pageable. Search,
+summary steps, diagnostics, and node lists use the discriminated cursor shape.
+Journey and E2E-slice closures are atomic: they return complete or refuse with
+`ATOMIC_VIEW_TOO_LARGE`, never truncate. Cursors are opaque, integrity-protected,
+expire within a bounded interval, and bind the context hash, normalized query,
+sort order, and privacy scope so they cannot continue a different request. A
+model should not need the whole contract to add a two-field regression test.
 
 ## Minimal typed test intent
 
@@ -945,17 +1180,28 @@ type IntentValue =
       readonly expectedClassification: 'valid' | 'invalid';
     };
 
+interface TestIntentNodeTarget {
+  readonly nodeId: string;
+  readonly itemContext?: {
+    readonly kind: 'index';
+    readonly repeaterNodeId: string;
+    readonly index: number;
+  };
+}
+
 type TestIntentStep =
   | { readonly op: 'openUsage' }
-  | { readonly op: 'set'; readonly nodeId: string; readonly value: IntentValue }
+  | (TestIntentNodeTarget & {
+      readonly op: 'set';
+      readonly value: IntentValue;
+    })
   | {
       readonly op: 'addItem' | 'expandItem';
       readonly nodeId: string;
       readonly item?: { readonly index: number };
     }
-  | {
+  | (TestIntentNodeTarget & {
       readonly op: 'expectState';
-      readonly nodeId: string;
       readonly state:
         | 'visible'
         | 'hidden'
@@ -963,34 +1209,30 @@ type TestIntentStep =
         | 'disabled'
         | 'valid'
         | 'invalid';
-    }
-  | {
+    })
+  | (TestIntentNodeTarget & {
       readonly op: 'expectValue';
-      readonly nodeId: string;
       readonly assertionId: string;
       readonly value: IntentValue;
-    }
-  | {
+    })
+  | (TestIntentNodeTarget & {
       readonly op: 'commitValue';
-      readonly nodeId: string;
       readonly commitId: string;
-    }
+    })
   | {
       readonly op: 'invokeUsageAction';
       readonly actionId: string;
     }
-  | {
+  | (TestIntentNodeTarget & {
       readonly op: 'activateValidation';
-      readonly nodeId: string;
       readonly validationId: string;
-    }
-  | {
+    })
+  | (TestIntentNodeTarget & {
       readonly op: 'expectValidation';
-      readonly nodeId: string;
       readonly validationId: string;
       readonly constraint: string;
       readonly state: 'present' | 'absent';
-    }
+    })
   | {
       readonly op: 'expectOutcome';
       readonly outcomeId: string;
@@ -1018,13 +1260,15 @@ authorize a value domain.
 **Inference:** Cross-field ordering is not silently repaired. If an effect says
 source-before-target and intent sets the target first, validation returns
 `ORDERING_PRECONDITION_MISSING` with a machine-readable required source node.
-After the source step, the compiler may insert only the declared readiness
-capability; it may not add a fixed sleep.
+After the source step, the validator may expand only the declared readiness
+capability into the plan; the compiler executes that serialized step and may
+not add a fixed sleep.
 
 **Inference:** Wrapper activation preconditions are mechanical and may be
-expanded by compilation after locator-target validation. Hidden fields require
-an explicit reachable trigger path and an `expectState` before interaction.
-Repeater descendants require an item context plus explicit `addItem` or
+expanded only by validation after mechanic/part/locator-target approval; the
+compiler consumes the serialized expansion. Hidden fields require an explicit
+reachable trigger path and an `expectState` before interaction. Repeater
+descendants require a serialized item context plus explicit `addItem` or
 `expandItem` when the profile says activation is needed. An array wildcard is
 never converted to row zero by convention.
 
@@ -1043,101 +1287,270 @@ from `commitValue`; it requires `invokeUsageAction`. The validator rejects a
 duplicate explicit commit when `set` already owns it, preventing accidental
 double blur or duplicate side effects.
 
+**Inference:** Separate authority does not require duplicate browser events.
+When the selected commit and validation activation records require the same
+node, mechanic, part, and target, validation may coalesce the adjacent intent
+steps into one `perform-node-operation` carrying both authority records and
+both intent origins. If those physical facts differ or are unknown, validation
+keeps separate operations or refuses; the compiler never discovers or merges
+them on its own.
+
 ## Diagnostic model and failure UX
 
 ```ts
-type IntentDiagnosticCode =
-  | 'AMBIGUOUS_FORM_USAGE'
-  | 'AMBIGUOUS_NODE'
-  | 'FORM_USAGE_NOT_FOUND'
-  | 'NODE_NOT_FOUND'
-  | 'STALE_CONTEXT'
-  | 'CONTEXT_MISMATCH'
-  | 'PLAN_HASH_MISMATCH'
-  | 'USAGE_ACTION_NOT_FOUND'
-  | 'USAGE_ACTION_UNSUPPORTED'
-  | 'OUTCOME_NOT_FOUND'
-  | 'VALIDATION_NOT_FOUND'
-  | 'VALIDATION_ACTIVATION_UNSUPPORTED'
-  | 'COMMIT_SEMANTICS_UNAVAILABLE'
-  | 'VALUE_ASSERTION_UNSUPPORTED'
-  | 'SCENARIO_REQUIRED'
-  | 'VALUE_OUT_OF_DOMAIN'
-  | 'VALUE_CLASSIFICATION_UNKNOWN'
-  | 'UNSUPPORTED_INTERACTION'
-  | 'MISSING_LOCATOR_TARGET'
-  | 'LOCATOR_PARITY_MISMATCH'
-  | 'ORDERING_PRECONDITION_MISSING'
-  | 'READINESS_UNAVAILABLE'
-  | 'HIDDEN_NODE_UNREACHABLE'
-  | 'REPEATER_CONTEXT_REQUIRED'
-  | 'VALIDATION_ASSERTION_UNSUPPORTED'
-  | 'EFFECT_COVERAGE_INCOMPLETE'
-  | 'RUNTIME_PARITY_MISMATCH';
-
-interface IntentDiagnostic {
+interface IntentDiagnosticBase {
   readonly schemaVersion: '0.1.0';
-  readonly code: IntentDiagnosticCode;
-  readonly severity: 'warning' | 'error';
-  readonly phase: 'discovery' | 'context' | 'validation' | 'compile' | 'runtime';
-  readonly message: string; // stable template; untrusted text kept separate
-  readonly at?: {
-    readonly stepIndex?: number;
-    readonly usageId?: string;
-    readonly nodeId?: string;
-    readonly actionId?: string;
-    readonly outcomeId?: string;
-    readonly validationId?: string;
-    readonly commitId?: string;
-  };
+  readonly message: string; // rendered from the code-owned stable template
   readonly evidenceRefs: readonly string[];
-  readonly remediation: readonly (
-    | { readonly kind: 'choose-candidate'; readonly usageIds: readonly string[] }
-    | { readonly kind: 'register-usage'; readonly usageId: string }
-    | { readonly kind: 'choose-node'; readonly nodeIds: readonly string[] }
-    | { readonly kind: 'regenerate-artifacts' }
-    | { readonly kind: 'choose-scenario'; readonly scenarioIds: readonly string[] }
-    | { readonly kind: 'set-before'; readonly nodeId: string }
-    | { readonly kind: 'wait-for'; readonly readinessId: string }
-    | { readonly kind: 'declare-profile'; readonly formlyType: string }
-    | { readonly kind: 'declare-locator-target'; readonly target: string }
-    | { readonly kind: 'declare-action'; readonly actionId: string }
-    | { readonly kind: 'declare-outcome'; readonly outcomeId: string }
-    | { readonly kind: 'declare-validation'; readonly validationId: string }
-    | { readonly kind: 'declare-commit'; readonly commitId: string }
-    | { readonly kind: 'declare-value-assertion'; readonly assertionId: string }
-    | { readonly kind: 'inspect-source'; readonly sourceRefs: readonly string[] }
-  )[];
 }
+
+interface SearchDiagnosticLocation {
+  readonly kind: 'search';
+  readonly queryRef: string;
+}
+
+interface ContextDiagnosticLocation {
+  readonly kind: 'context';
+  readonly usageId: string;
+  readonly view?: 'summary' | 'diagnostics' | 'journey' | 'e2e-slice';
+}
+
+interface IntentStepDiagnosticLocation {
+  readonly kind: 'intent-step';
+  readonly stepIndex: number;
+  readonly usageId: string;
+}
+
+interface PlanDiagnosticLocation {
+  readonly kind: 'plan';
+  readonly planStepId?: string;
+}
+
+interface RuntimeDiagnosticLocation {
+  readonly kind: 'runtime';
+  readonly planStepId: string;
+  readonly nodeId?: string;
+}
+
+interface IntentDiagnosticPolicyByCode {
+  readonly AMBIGUOUS_FORM_USAGE: {
+    readonly phase: 'discovery'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: SearchDiagnosticLocation;
+    readonly remediation: readonly [{ readonly kind: 'choose-candidate'; readonly usageIds: readonly string[] }];
+  };
+  readonly AMBIGUOUS_NODE: {
+    readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: ContextDiagnosticLocation & { readonly queryRef: string };
+    readonly remediation: readonly [{ readonly kind: 'choose-node'; readonly nodeIds: readonly string[] }];
+  };
+  readonly FORM_USAGE_NOT_FOUND: {
+    readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: ContextDiagnosticLocation;
+    readonly remediation: readonly [{ readonly kind: 'register-usage'; readonly usageId: string }];
+  };
+  readonly NODE_NOT_FOUND: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'choose-node'; readonly nodeIds: readonly string[] }];
+  };
+  readonly STALE_CONTEXT: {
+    readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: ContextDiagnosticLocation;
+    readonly remediation: readonly [{ readonly kind: 'regenerate-artifacts' }];
+  };
+  readonly CONTEXT_MISMATCH: {
+    readonly phase: 'compile'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: PlanDiagnosticLocation;
+    readonly remediation: readonly [{ readonly kind: 'revalidate-intent' }];
+  };
+  readonly PLAN_HASH_MISMATCH: {
+    readonly phase: 'compile'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: PlanDiagnosticLocation;
+    readonly remediation: readonly [{ readonly kind: 'revalidate-intent' }];
+  };
+  readonly USAGE_ENTRY_UNSUPPORTED: {
+    readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: ContextDiagnosticLocation & { readonly entryId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-entry-driver'; readonly entryId: string }];
+  };
+  readonly USAGE_ACTION_NOT_FOUND: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly actionId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-action'; readonly actionId: string }];
+  };
+  readonly USAGE_ACTION_UNSUPPORTED: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly actionId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-action-driver'; readonly actionId: string }];
+  };
+  readonly OUTCOME_NOT_FOUND: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly outcomeId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-outcome'; readonly outcomeId: string }];
+  };
+  readonly OUTCOME_ASSERTION_UNSUPPORTED: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly outcomeId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-outcome-assertion'; readonly outcomeId: string }];
+  };
+  readonly VALIDATION_NOT_FOUND: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly validationId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-validation'; readonly validationId: string }];
+  };
+  readonly VALIDATION_ACTIVATION_UNSUPPORTED: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly validationId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-validation-activation'; readonly validationId: string }];
+  };
+  readonly VALIDATION_ASSERTION_UNSUPPORTED: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly validationId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-validation-assertion'; readonly validationId: string }];
+  };
+  readonly COMMIT_NOT_FOUND: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly commitId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-commit'; readonly commitId: string }];
+  };
+  readonly COMMIT_UNSUPPORTED: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly commitId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-commit-driver'; readonly commitId: string }];
+  };
+  readonly COMMIT_AUTHORITY_AMBIGUOUS: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'choose-commit'; readonly commitIds: readonly string[] }];
+  };
+  readonly VALUE_ASSERTION_NOT_FOUND: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly assertionId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-value-assertion'; readonly assertionId: string }];
+  };
+  readonly VALUE_ASSERTION_UNSUPPORTED: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly assertionId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-value-assertion-driver'; readonly assertionId: string }];
+  };
+  readonly SCENARIO_REQUIRED: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'choose-scenario'; readonly scenarioIds: readonly string[] }];
+  };
+  readonly VALUE_OUT_OF_DOMAIN: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'choose-domain-value'; readonly candidateIds: readonly string[] }];
+  };
+  readonly VALUE_CLASSIFICATION_UNKNOWN: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'inspect-source'; readonly sourceRefs: readonly string[] }];
+  };
+  readonly UNSUPPORTED_INTERACTION: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-profile'; readonly formlyType: string }];
+  };
+  readonly MISSING_LOCATOR_TARGET: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-locator-target'; readonly target: string }];
+  };
+  readonly LOCATOR_PARITY_MISMATCH: {
+    readonly phase: 'runtime'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: RuntimeDiagnosticLocation;
+    readonly remediation: readonly [{ readonly kind: 'inspect-source'; readonly sourceRefs: readonly string[] }];
+  };
+  readonly ORDERING_PRECONDITION_MISSING: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'set-before'; readonly nodeId: string }];
+  };
+  readonly READINESS_UNAVAILABLE: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'declare-readiness'; readonly readinessId: string }];
+  };
+  readonly HIDDEN_NODE_UNREACHABLE: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'inspect-source'; readonly sourceRefs: readonly string[] }];
+  };
+  readonly REPEATER_CONTEXT_REQUIRED: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'choose-item-context'; readonly repeaterNodeId: string }];
+  };
+  readonly EFFECT_COVERAGE_INCOMPLETE: {
+    readonly phase: 'validation'; readonly severity: 'warning'; readonly blocking: false;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string };
+    readonly remediation: readonly [{ readonly kind: 'inspect-source'; readonly sourceRefs: readonly string[] }];
+  };
+  readonly STEP_SCOPE_MISMATCH: {
+    readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: ContextDiagnosticLocation & { readonly requestedStepId: string };
+    readonly remediation: readonly [{ readonly kind: 'choose-step'; readonly stepIds: readonly string[] }];
+  };
+  readonly ATOMIC_VIEW_TOO_LARGE: {
+    readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: ContextDiagnosticLocation;
+    readonly remediation: readonly [{ readonly kind: 'narrow-slice'; readonly maximumItems: number }];
+  };
+  readonly RUNTIME_PARITY_MISMATCH: {
+    readonly phase: 'runtime'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: RuntimeDiagnosticLocation;
+    readonly remediation: readonly [{ readonly kind: 'inspect-source'; readonly sourceRefs: readonly string[] }];
+  };
+}
+
+type IntentDiagnosticCode = keyof IntentDiagnosticPolicyByCode;
+
+type IntentDiagnostic = IntentDiagnosticBase & {
+  readonly [Code in IntentDiagnosticCode]: {
+    readonly code: Code;
+  } & IntentDiagnosticPolicyByCode[Code];
+}[IntentDiagnosticCode];
+
+type IntentWarning = Extract<
+  IntentDiagnostic,
+  { readonly severity: 'warning'; readonly blocking: false }
+>;
+
+type IntentBlockingDiagnostic = Extract<
+  IntentDiagnostic,
+  { readonly blocking: true }
+>;
 ```
 
-**Inference:** The code union is the closed vocabulary for schema version
-`0.1.0`. Adding a code is an additive schema-version change; changing a code's
-meaning, severity contract, or remediation shape requires a breaking version.
-Machine consumers may exhaustively handle known codes and must reject an
-unsupported diagnostic schema version rather than treating arbitrary strings
-as executable guidance.
+**Inference:** `keyof IntentDiagnosticPolicyByCode` is the closed vocabulary for
+schema version `0.1.0`; the mapping above is normative and exhaustive, not an
+illustrative subset. Each code structurally fixes phase, severity, blocking,
+permitted location, and exactly one remediation shape. Producers supply only
+the code-specific location/remediation data and privacy-safe evidence; they do
+not choose a policy tuple. The implementation must materialize the same mapping
+as an exhaustive runtime constant using `satisfies Record<IntentDiagnosticCode,
+...>` and generate a strict discriminated runtime schema from it. A unit test
+must compare runtime-policy keys to schema variants in both directions.
 
-**Inference:** A schema-owned code policy fixes phase and severity per code;
-producers do not choose them independently. The semantic-reference refusals
-exposed by `TestIntent` have these mandatory mappings:
-
-| Reference failure | Code | Fixed phase / severity | Required remediation |
-| --- | --- | --- | --- |
-| Exact usage is absent | `FORM_USAGE_NOT_FOUND` | `context` / `error` | `register-usage` with the requested ID, plus source evidence when available |
-| Exact node is absent | `NODE_NOT_FOUND` | `validation` / `error` | `choose-node` with bounded same-step candidates |
-| Usage action ID is absent | `USAGE_ACTION_NOT_FOUND` | `validation` / `error` | `declare-action` with the requested ID |
-| Usage action exists but has no supported driver/capability | `USAGE_ACTION_UNSUPPORTED` | `validation` / `error` | `declare-action` for the affected binding |
-| Outcome ID is absent | `OUTCOME_NOT_FOUND` | `validation` / `error` | `declare-outcome` with the requested ID |
-| Validation record is absent | `VALIDATION_NOT_FOUND` | `validation` / `error` | `declare-validation` with the requested ID |
-| Requested validation activation is not supported | `VALIDATION_ACTIVATION_UNSUPPORTED` | `validation` / `error` | `declare-validation` for the affected activation |
-| Required value commit is absent or ambiguous | `COMMIT_SEMANTICS_UNAVAILABLE` | `validation` / `error` | `declare-commit` with the requested ID |
-| Committed-value assertion surface is absent | `VALUE_ASSERTION_UNSUPPORTED` | `validation` / `error` | `declare-value-assertion` with the requested ID |
+Adding a code is an additive schema-version change; changing any existing
+code's phase, severity, blocking behavior, location, template, or remediation
+shape requires a breaking version. Machine consumers must reject an unsupported
+diagnostic schema version rather than treating arbitrary strings as executable
+guidance. `USAGE_ENTRY_UNSUPPORTED` and `OUTCOME_ASSERTION_UNSUPPORTED` cover
+existing records whose trusted drivers are absent; missing, unsupported, and
+ambiguous commit/value-assertion cases have distinct codes rather than one
+catch-all refusal.
 
 | Failure | Required diagnostic behavior | Example stable message | Evidence class |
 | --- | --- | --- | --- |
 | Multiple usage matches | Block and return match reasons, not a winner. | `AMBIGUOUS_FORM_USAGE: 2 usages match; choose an exact usageId.` | Inference |
 | Exact semantic reference is absent/unsupported | Block according to the schema-owned semantic-reference policy above. | `NODE_NOT_FOUND: node ... is absent from the pinned context.` | Inference |
+| Usage exists but entry cannot execute | Block before authoring an intent. | `USAGE_ENTRY_UNSUPPORTED: entry ... has no trusted open-usage driver.` | Inference |
+| Outcome exists but cannot be asserted | Block the outcome assertion. | `OUTCOME_ASSERTION_UNSUPPORTED: outcome ... has no trusted assertion driver.` | Inference |
+| Focus nodes cross the requested step | Refuse the whole slice; return exact step candidates. | `STEP_SCOPE_MISMATCH: all focus nodes must belong to step ...` | Inference |
+| Atomic journey/slice exceeds its safe cap | Refuse without partial data and suggest a narrower focus. | `ATOMIC_VIEW_TOO_LARGE: requested closure exceeds ... items.` | Inference |
 | Source/artifact drift | Block compile; search may still return stale candidates. | `STALE_CONTEXT: form contract was generated from a different input digest.` | Inference |
 | Submitted context differs from validated plan | Block before driver resolution. | `CONTEXT_MISMATCH: compile context does not equal the plan's pinned context.` | Inference |
 | Submitted plan does not reproduce its hash | Block before driver resolution. | `PLAN_HASH_MISMATCH: canonical submitted plan does not match planHash.` | Inference |
@@ -1151,8 +1564,8 @@ exposed by `TestIntent` have these mandatory mappings:
 | Async target lacks readiness | Block; no sleep suggestion. | `READINESS_UNAVAILABLE: effect requires an undeclared or unsupported readiness capability.` | Inference |
 | Hidden branch lacks witness | Block interaction, allow explicit source inspection. | `HIDDEN_NODE_UNREACHABLE: selected context does not prove a visible path.` | Inference |
 | Repeater wildcard lacks row context | Block. | `REPEATER_CONTEXT_REQUIRED: choose/add an item before addressing wildcard descendant.` | Inference |
-| Value commit absent or ambiguous | Block post-set execution. | `COMMIT_SEMANTICS_UNAVAILABLE: total requires a declared commit owner.` | Repository observation + inference |
-| Committed-value assertion absent | Block the assertion. | `VALUE_ASSERTION_UNSUPPORTED: no committed-value surface exists for total.` | Inference |
+| Value commit ID absent, driver unsupported, or authority ambiguous | Block post-set execution with the distinct fixed policy. | `COMMIT_NOT_FOUND`, `COMMIT_UNSUPPORTED`, or `COMMIT_AUTHORITY_AMBIGUOUS`. | Repository observation + inference |
+| Committed-value assertion ID absent or driver unsupported | Block the assertion with the distinct fixed policy. | `VALUE_ASSERTION_NOT_FOUND` or `VALUE_ASSERTION_UNSUPPORTED`. | Inference |
 | Validation record absent | Block activation/assertion. | `VALIDATION_NOT_FOUND: validation ID ... is absent from the pinned context.` | Repository observation + inference |
 | Validation activation unsupported | Block activation. | `VALIDATION_ACTIVATION_UNSUPPORTED: validation ... has no supported node-local activation.` | Inference |
 | Validation assertion target unsupported | Block assertion. | `VALIDATION_ASSERTION_UNSUPPORTED: required is known but its assertion surface is not executable.` | Repository observation + inference |
@@ -1239,7 +1652,8 @@ valid.
 **Inference — expected candidate:** `search_form_usages` returns the one usage
 with match evidence such as source symbol/title/step metadata, not its full
 contract. The agent pins the returned context, requests the three nodes, then
-asks for an E2E slice with goal `positive`.
+asks for an E2E slice with the exact returned step ID, those node IDs, and goal
+`positive`. If discovery cannot supply that step ID, the slice is not called.
 
 ### Typed intent
 
@@ -1286,6 +1700,11 @@ asks for an E2E slice with goal `positive`.
       "commitId": "operations.purchase-order.total.commit-on-blur"
     },
     {
+      "op": "activateValidation",
+      "nodeId": "operations.purchase-order::path:s_total",
+      "validationId": "operations.purchase-order.total.min"
+    },
+    {
       "op": "expectValue",
       "nodeId": "operations.purchase-order::path:s_total",
       "assertionId": "operations.purchase-order.total.committed-value",
@@ -1310,17 +1729,94 @@ readiness capability, lets the driver select the first enabled runtime option,
 validates `CAD` against its enumerated domain, classifies `125` through the
 reviewed decimal codec plus `min: 0`, proves that the selected profile requires
 the explicit node-local blur commit, and verifies post-commit value and
-validation assertion surfaces. Compilation emits trusted calls conceptually
-equivalent to:
+validation activation/assertion surfaces. Because the commit and validation
+records select the same blur mechanic, part, and target, the validated plan
+contains one `perform-node-operation` with both intent-step origins and both
+authorities. The relevant lossless plan fragment is:
+
+```json
+[
+  {
+    "planStepId": "total.set",
+    "origin": {"kind": "intent", "intentStepIndexes": [3]},
+    "evidenceRefs": ["fixture:operations.purchase-order.total"],
+    "op": "set-value",
+    "physicalOperationId": "total.set.1",
+    "binding": {
+      "nodeId": "operations.purchase-order::path:s_total",
+      "profile": {"id": "native.currency", "version": 1},
+      "driver": {"kind": "application", "id": "test-app.currency", "version": 1},
+      "operations": ["fill"],
+      "targets": [
+        {"purpose": "control", "partRef": "control", "locatorTargetRef": "total.control"}
+      ]
+    },
+    "value": {"kind": "canonical", "value": 125},
+    "commit": {
+      "kind": "node-operation",
+      "commitId": "operations.purchase-order.total.commit-on-blur",
+      "mode": "blur",
+      "physicalOperationId": "total.blur.1",
+      "planStepId": "total.blur"
+    },
+    "validationActivations": []
+  },
+  {
+    "planStepId": "total.blur",
+    "origin": {"kind": "intent", "intentStepIndexes": [4, 5]},
+    "evidenceRefs": ["fixture:operations.purchase-order.total.updateOn"],
+    "op": "perform-node-operation",
+    "binding": {
+      "nodeId": "operations.purchase-order::path:s_total",
+      "profile": {"id": "native.currency", "version": 1},
+      "driver": {"kind": "application", "id": "test-app.currency", "version": 1},
+      "operations": ["commit-value", "activate-validation"],
+      "targets": [
+        {"purpose": "control", "partRef": "control", "locatorTargetRef": "total.control"}
+      ]
+    },
+    "physicalOperationId": "total.blur.1",
+    "mechanic": "blur",
+    "partRef": "control",
+    "locatorTargetRef": "total.control",
+    "authorities": [
+      {"kind": "value-commit", "commitId": "operations.purchase-order.total.commit-on-blur"},
+      {
+        "kind": "validation-activation",
+        "validationId": "operations.purchase-order.total.min",
+        "activationId": "operations.purchase-order.total.min.on-blur"
+      }
+    ]
+  }
+]
+```
+
+Compilation emits that physical blur once, conceptually equivalent to:
 
 ```ts
 await formDriver.openUsage(contextRef);
 await formDriver.setRuntimeChoice(supplierNode, 'first-enabled');
 await formDriver.set(currencyNode, 'CAD');
 await formDriver.set(totalNode, 125);
-await formDriver.commitValue(
+await formDriver.performNodeOperation(
   totalNode,
-  'operations.purchase-order.total.commit-on-blur',
+  {
+    physicalOperationId: 'total.blur.1',
+    mechanic: 'blur',
+    partRef: 'control',
+    locatorTargetRef: 'total.control',
+    authorities: [
+      {
+        kind: 'value-commit',
+        commitId: 'operations.purchase-order.total.commit-on-blur',
+      },
+      {
+        kind: 'validation-activation',
+        validationId: 'operations.purchase-order.total.min',
+        activationId: 'operations.purchase-order.total.min.on-blur',
+      },
+    ],
+  },
 );
 await formDriver.expectValue(
   totalNode,
@@ -1339,7 +1835,9 @@ from the agent. If runtime option order is not declared stable, validation must
 reject `first-enabled` and require a resolved exact domain value instead.
 Generic `fill` does not imply blur: if commit metadata or the post-commit
 assertion surface is absent, validation blocks rather than accepting a DOM-only
-value assertion or a vacuously absent error.
+value assertion or a vacuously absent error. If the commit and activation
+records do not prove the same physical blur, the validator must not coalesce
+them; it serializes two approved operations or refuses the intent.
 
 ## Walkthrough 2 — negative conditional/custom-field test
 
@@ -1410,11 +1908,12 @@ compiler may not substitute it for `activateValidation`.
 }
 ```
 
-**Inference:** `get_e2e_slice` for `caseType` and `otherDetails` must include
-the incoming product-to-options effect even if the agent did not name product.
-It also returns `effectAnalysis: incomplete` because of opaque rules. That
-warning does not invalidate this explicitly declared path, but it forbids a
-claim that no other effect can interfere.
+**Inference:** `get_e2e_slice` names the exact claim-intake step ID and focuses
+`caseType` plus `otherDetails`; it must include the incoming
+product-to-options effect even if the agent did not name product. It also
+returns `effectAnalysis: incomplete` because of opaque rules. That warning does
+not invalidate this explicitly declared path, but it forbids a claim that no
+other effect can interfere.
 
 ### Typed intent
 
@@ -1496,9 +1995,21 @@ await formDriver.set(productNode, 'auto');
 await formDriver.set(caseTypeNode, 'other');
 await formDriver.expectState(otherDetailsNode, 'visible');
 await formDriver.setConstraintViolation(otherDetailsNode, 'required');
-await formDriver.activateValidation(
+await formDriver.performNodeOperation(
   otherDetailsNode,
-  'otherDetails.required.on-blur',
+  {
+    physicalOperationId: 'other-details.blur.1',
+    mechanic: 'blur',
+    partRef: 'control',
+    locatorTargetRef: 'other-details.control',
+    authorities: [
+      {
+        kind: 'validation-activation',
+        validationId: 'otherDetails.required.on-blur',
+        activationId: 'otherDetails.required.on-blur',
+      },
+    ],
+  },
 );
 await formDriver.expectValidation(
   otherDetailsNode,
@@ -1648,6 +2159,15 @@ fallback for blocked/rare cases, and use C only as observed parity evidence.
 Do not ship B as “safe agent generation,” because it preserves the most
 failure-prone last mile.
 
+### Review-instance-3 remediation decisions
+
+| Finding | Credible options considered | Selected correction and constraint fit | Failure modes / reversibility | Confidence and evidence that would change it |
+| --- | --- | --- | --- | --- |
+| Lossy validated plan | Re-derive from pinned metadata; duplicate every record; serialize stable selections and rehydrate exact IDs. | Serialize commit linkage, physical-operation authority, wrapper mechanic, and item context; allow lookup only by selected immutable ID. Preserves stateless compilation without copying locator recipes. | More plan bytes and referential-integrity checks; fully versionable and reversible before production schemas exist. | 0.94. A proof that every omitted choice is globally unique and immutable across registry versions could justify less serialization. |
+| Non-exhaustive diagnostics | Generic envelope plus prose table; hand-written discriminated union; schema-owned policy map generating type/runtime variants. | Use the exhaustive policy map as the normative source for code, phase, severity, blocking, location, and remediation. It is compact enough to test bidirectionally. | Policy changes become versioned contract changes; code generation adds modest tooling. Reversible by versioning, not silent mutation. | 0.93. If the runtime-schema library cannot preserve exact mapped variants, generate an explicit union from the same data and snapshot it. |
+| Incomplete pagination | Page every nested array; silently cap; page safe lists and atomically refuse integrity-sensitive closures. | Cursor-page independent lists; return journey/slice closures complete or refuse. Matches progressive disclosure without severing prerequisites from nodes. | Atomic refusal can block unusually large steps; the user must narrow focus. Reversible through a future separate multi-step/chunked closure protocol. | 0.90. Measured workplace closures regularly exceeding the cap would justify a graph-continuation design with dependency proofs. |
+| Ambiguous slice step | Infer from first node; return multiple steps; require exact step. | Require `withinStepId` and reject cross-step focus. It is the smallest truthful shape for the stated step-one request. | Cross-step tests need multiple slices or a later tool; no silent membership loss. Additive future extension is straightforward. | 0.96. Representative tests that inherently assert across several steps would justify an ordered multi-step result sooner. |
+
 ## UX failure modes
 
 | User-visible problem | Likely cause | Good agent response | Bad fallback to prohibit | Evidence class |
@@ -1662,7 +2182,7 @@ failure-prone last mile.
 | Test times out after source change | Locator/role/readiness parity drift | Report expected target and redacted observed count/state; point to source/profile. | Increase timeout or force action. | Documented fact + inference |
 | Negative test cannot assert error | Constraint known but activation/surface missing | Offer source inspection and metadata addition; do not generate partial assertion. | Assert any nearby text or CSS class. | Repository observation + inference |
 | Repeater child resolves ambiguously | Missing item identity/index/activation | Require explicit item context and add/expand step. | Assume row zero or call `.nth(0)`. | Inference |
-| Large form overwhelms context | Whole artifact returned eagerly | Fall back to summary and one-hop E2E slices with cursors. | Truncate without saying what was omitted. | Inference |
+| Large form overwhelms context | Whole artifact returned eagerly | Page independent summaries/nodes; narrow an atomic E2E slice or surface `ATOMIC_VIEW_TOO_LARGE`. | Truncate a journey or prerequisite closure. | Inference |
 
 ## Ordered implementation slices and stop/go gates
 
@@ -1682,13 +2202,20 @@ metadata, revisit the source-lineage design before proceeding.
 
 **Inference:** Implement `search_form_usages`, `get_form_context`,
 `find_form_nodes`, and `get_e2e_slice` over immutable validated artifacts.
-Enforce strict schemas, bounded/paginated results, path confinement, untrusted
-presentation data, and no trusted-code loading.
+Enforce strict schemas, cursor pagination for independent lists, complete-or-
+refuse caps for atomic closures, path confinement, untrusted presentation data,
+and no trusted-code loading.
 
 **Gate:** The two paper journeys can obtain all relevant nodes/prerequisites
 without reading a full contract. Measure result size and ambiguity on at least
 one large form. Validate every closed result variant, including summary,
 diagnostics, journey, node-search pagination, and the complete E2E slice.
+Property-test the `PageProjection` union so `truncated: true` always has a
+cursor and `false` never does; replay every cursor only with its pinned query
+and context. Verify complete continuation for each pageable view. For atomic
+journey/slice views, exceed the cap and assert refusal with no partial payload.
+Request nodes from two steps and assert `STEP_SCOPE_MISMATCH`; a same-step
+request must return the exact requested `withinStepId`.
 
 ### Slice 2 — Pure typed-intent schema and validator
 
@@ -1702,13 +2229,17 @@ a plan. Return no Playwright code.
 **Gate:** Separately assert that valid fixture intents produce canonical plans
 whose hashes reproduce, while reversed ordering, stale hashes, missing
 scenarios, unknown values, missing part locators, hidden/repeater ambiguity,
-unknown usage/node/action/outcome/validation/commit/assertion references, and
-unsupported validation activation produce no plan and fail with their fixed
-code/phase/severity/remediation policies. Assert that every valid plan step is
-one member of the closed discriminated union and contains all approved binding,
-target, value, precondition, readiness, activation, action, and outcome
-references required by compilation. This slice alone tests the central value
-proposition.
+unknown usage/node/action/outcome/validation/commit/assertion references,
+unsupported usage entry/action/outcome assertion/commit/value assertion,
+ambiguous commit authority, and unsupported validation activation/assertion
+produce no plan and fail with their exact discriminated policies. Assert that
+the runtime diagnostic policy and schema have identical exhaustive code sets
+and reject every wrong code/phase/severity/blocking/location/remediation pair.
+Assert that every valid plan step is one member of the closed discriminated
+union and contains all approved binding, target, value, commit, wrapper
+mechanic, item context, precondition, readiness, activation, action, and
+outcome references required by compilation. This slice alone tests the central
+value proposition.
 
 ### Slice 3 — One native positive/negative driver vertical
 
@@ -1723,6 +2254,11 @@ actionability, and web-first assertions.
 without raw selectors in intent or generated source. Cover immediate,
 explicit-blur, and usage-action commit modes; reject missing and duplicate
 commit authority; and prove post-commit rather than DOM-only value state.
+Round-trip representative plans through canonical JSON, then compile them with
+a registry API instrumented to fail if it performs selection instead of exact
+ID lookup. Prove wrapper click/check preservation, repeater descendant item
+binding, bidirectional usage-action commit linkage, and that a shared
+blur-commit/validation activation emits exactly one browser event.
 Compare author/review time and first-run rate against an ordinary hand-written
 Playwright test.
 
@@ -1781,8 +2317,8 @@ the first workplace sample.
 
 | Acceptance criterion | Evidence in this artifact | Result |
 | --- | --- | --- |
-| 1. Two end-to-end walkthroughs cover positive and negative tests, including a custom/dynamic field and conditional branch. | “Walkthrough 1” covers a positive order-entry flow with async runtime choice, custom currency control, explicit blur commit, and post-commit assertions; “Walkthrough 2” covers a negative custom dependent-select and conditional required field. Both enumerate complete execution prerequisites and include query, intent, validation, and conceptual driver calls/refusals. | Met as paper walkthrough; current artifacts are explicitly shown insufficient. |
-| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Closed query results, progressive disclosure, typed intent with distinct commit/validation/action authority, a discriminated stateless plan/compile handoff, fixed semantic-refusal policies, security/privacy, and alternatives sections. | Met. |
+| 1. Two end-to-end walkthroughs cover positive and negative tests, including a custom/dynamic field and conditional branch. | “Walkthrough 1” covers a positive order-entry flow with async runtime choice, custom currency control, explicit blur commit, a separately approved validation activation coalesced into one serialized physical event, and post-commit assertions; “Walkthrough 2” covers a negative custom dependent-select and conditional required field. Both enumerate complete execution prerequisites and include query, intent, validation, and conceptual driver calls/refusals. | Met as paper walkthrough; current artifacts are explicitly shown insufficient. |
+| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Closed query results; cursor-safe independent lists and complete-or-refuse atomic closures; exact single-step slice scope; progressive disclosure; typed intent with distinct commit/validation/action authority; a lossless discriminated stateless plan/compile handoff; an exhaustive code-policy mapping; security/privacy; and alternatives/remediation-decision sections. | Met as a proposed contract, pending production-schema tests in Slice 2. |
 | 3. Explicit required/optional/not-useful RH-01–RH-04 metadata list. | “RH-01–RH-04 metadata dependency audit.” | Met without assuming lane success. |
 | 4. Feasibility/value recommendation, confidence, UX failure modes, ordered implementation slices. | Executive decision, alternatives, UX table, slices/stop gates, and feasibility/value section. | Met. |
 
@@ -1883,6 +2419,72 @@ repository schema.
 and Playwright `Locator.fill` documentation were checked to distinguish blur
 commit semantics from Playwright's documented focus/fill/input behavior.
 
+### Review-instance-3 findings correction and adversarial self-review
+
+**Repository observation:** On 2026-08-27, the four findings from independent
+review instance 3 of 3 were accepted and addressed in this artifact only. The
+correction worktree started from commit
+`37f76f13717a9f292d651f17e4a2c74b3e3df863` on branch
+`codex/rh-05-agent-e2e-context-flow`.
+
+| Accepted finding | Retained correction | Adversarial self-check |
+| --- | --- | --- |
+| Plan loses commit, wrapper, repeater, or shared-event authority | Required commit linkage on every set; physical-operation identity/authorities; exact wrapper mechanic/target; exact item context; bidirectional usage-action commit linkage; exact purpose-mapped targets. | Type-negative checks reject a set without commit and a wrapper without mechanic/target. Walkthrough 1 serializes one blur with two independently approved authorities. Prose search found and removed the remaining compiler-owned readiness expansion. |
+| Diagnostic policy is incomplete or freely combinable | `IntentDiagnosticPolicyByCode` is the exhaustive discriminant map; 34 codes each fix phase, severity, blocking, location, and one remediation shape. Missing/unsupported/ambiguous commit and value assertion are distinct; usage-entry, outcome-assertion, and validation-assertion policies are explicit. | AST audit found 34 complete entries and all required refusal codes. Type-negative checks reject the wrong phase and wrong remediation for `VALIDATION_ASSERTION_UNSUPPORTED`; warning and blocker result arrays are distinct. |
+| Pagination is inconsistent or cannot continue | Discriminated page states; matching cursor request for summary/diagnostics; cursor-bound search/node lists; complete-or-refuse journey/slice closures. | Type-negative checks reject both invalid page states. Slice 1 gates cursor replay/binding and atomic overflow with no partial payload. Current MCP cursor/output-schema behavior was rechecked against the official 2025-11-25 specification. |
+| E2E slice cannot represent cross-step focus | Mandatory `withinStepId`, exact membership validation, fixed `STEP_SCOPE_MISMATCH`, and an explicitly single-step complete result. | Type-negative check rejects a slice request without the step. Slice 1 gate requires a cross-step refusal and exact same-step success. |
+
+```text
+$ pnpm check:docs
+Documentation checks passed for 57 files.
+Exit 0.
+
+$ pnpm exec vitest run fixtures/angular-monorepo/workspace-fixture.test.ts
+Test Files  1 passed (1)
+Tests       7 passed (7)
+Duration    13.27s
+Exit        0
+
+$ pnpm check
+First sandboxed run: lint, 34 test files / 450 tests, and builds passed; the
+workspace-consumer check then failed because pnpm could not write its external
+store (`ERR_PNPM_EPERM`). This was an environment limitation, not a test
+failure.
+Approved rerun: lint passed; 34 test files / 450 tests passed; all demo/app/
+fixture builds passed; workspace consumers, release manifest, package checks,
+demo smoke, and 57-file documentation checks passed. Exit 0.
+
+$ node <in-memory TypeScript contract-fence audit>
+Contract fences  9
+TypeScript lines 1118
+Unexpected syntax/semantic diagnostics  0
+Exit 0.
+
+$ node <in-memory negative type/assertion audit>
+Negative type assertions  7
+Unexpected diagnostics    0
+Exit 0.
+
+$ node <in-memory diagnostic-policy AST audit>
+Policy codes               34
+Incomplete policy entries  0
+Required refusal codes     all present
+Exit 0.
+
+$ git diff --check
+No output; exit 0.
+
+$ git diff --name-only
+docs/research/hardening/agent-to-e2e-context-flow.md
+Exit 0.
+```
+
+**Documented fact — source readback:** The MCP 2025-11-25 pagination page was
+checked for opaque cursor request/continuation semantics, and the tools page was
+checked for output-schema conformance requirements. Current official Angular
+and Playwright sources were rechecked for `updateOn`, `fill`, `blur`, strict
+locator, and actionability behavior.
+
 ## Primary sources
 
 ### Repository sources
@@ -1903,6 +2505,8 @@ commit semantics from Playwright's documented focus/fill/input behavior.
 
 ### Official external sources
 
+- Model Context Protocol 2025-11-25, [Pagination](https://modelcontextprotocol.io/specification/2025-11-25/server/utilities/pagination)
+- Model Context Protocol 2025-11-25, [Tools and structured output](https://modelcontextprotocol.io/specification/2025-11-25/server/tools)
 - Playwright, [Locators](https://playwright.dev/docs/locators)
 - Playwright, [Auto-waiting and actionability](https://playwright.dev/docs/actionability)
 - Playwright, [Assertions](https://playwright.dev/docs/test-assertions)
