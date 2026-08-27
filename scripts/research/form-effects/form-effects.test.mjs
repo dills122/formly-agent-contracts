@@ -1,16 +1,28 @@
+import { Script } from 'node:vm';
+
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 function parseExpression(expression) {
+  const sourceText = `const candidate = ${expression};`;
+  try {
+    new Script(sourceText);
+  } catch {
+    return { expression: undefined, reason: 'callback-not-javascript' };
+  }
+
   const sourceFile = ts.createSourceFile(
     'form-effect.js',
-    `const candidate = ${expression};`,
+    sourceText,
     ts.ScriptTarget.Latest,
     true,
     ts.ScriptKind.JS,
   );
+  if (sourceFile.parseDiagnostics.length > 0) {
+    return { expression: undefined, reason: 'callback-parse-error' };
+  }
   const declaration = sourceFile.statements[0]?.declarationList?.declarations[0];
-  return { sourceFile, expression: declaration?.initializer };
+  return { expression: declaration?.initializer };
 }
 
 function propertyName(node) {
@@ -27,11 +39,33 @@ function propertyName(node) {
   return undefined;
 }
 
+function isPropertyPath(node, expected) {
+  const segments = [];
+  let current = node;
+  while (ts.isPropertyAccessExpression(current)) {
+    segments.unshift(current.name.text);
+    current = current.expression;
+  }
+  if (ts.isIdentifier(current)) {
+    segments.unshift(current.text);
+  }
+  return JSON.stringify(segments) === JSON.stringify(expected);
+}
+
 function literalGetTarget(call) {
   if (!ts.isPropertyAccessExpression(call.expression)) {
     return undefined;
   }
   if (call.expression.name.text !== 'get') {
+    return undefined;
+  }
+  if (
+    !isPropertyPath(call.expression.expression, [
+      'field',
+      'parent',
+      'formControl',
+    ])
+  ) {
     return undefined;
   }
   const argument = call.arguments[0];
@@ -42,11 +76,17 @@ function analyzeCallback(expression) {
   const parsed = parseExpression(expression);
   const root = parsed.expression;
   if (root === undefined) {
-    return { classification: 'parse-error', candidates: [], unknowns: [] };
+    return {
+      classification: 'parse-error',
+      sources: [],
+      candidates: [],
+      unknowns: [parsed.reason ?? 'callback-parse-error'],
+    };
   }
   if (ts.isIdentifier(root) || ts.isPropertyAccessExpression(root)) {
     return {
       classification: 'external-reference',
+      sources: [],
       candidates: [],
       unknowns: ['implementation-outside-declaration'],
     };
@@ -54,14 +94,31 @@ function analyzeCallback(expression) {
   if (!ts.isArrowFunction(root) && !ts.isFunctionExpression(root)) {
     return {
       classification: 'unsupported-value',
+      sources: [],
       candidates: [],
       unknowns: ['callback-shape-unsupported'],
     };
   }
 
+  const sources = new Map();
   const candidates = [];
   const unknowns = new Set();
   const visit = (node) => {
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      node.name.text === 'valueChanges'
+    ) {
+      if (ts.isCallExpression(node.expression)) {
+        const controlKey = literalGetTarget(node.expression);
+        if (controlKey === undefined) {
+          unknowns.add('source-resolution-required');
+        } else {
+          sources.set(controlKey, { controlKey, stream: 'valueChanges' });
+        }
+      } else {
+        unknowns.add('source-resolution-required');
+      }
+    }
     if (ts.isCallExpression(node)) {
       if (ts.isIdentifier(node.expression)) {
         unknowns.add('helper-call-indirection');
@@ -95,6 +152,7 @@ function analyzeCallback(expression) {
   visit(root.body);
   return {
     classification: 'inline-callback',
+    sources: [...sources.values()],
     candidates,
     unknowns: [...unknowns].sort(),
   };
@@ -143,6 +201,17 @@ function otherScenario(reason) {
 }
 
 describe('RH-04 bounded form-effects experiments', () => {
+  it('rejects malformed and TypeScript-only callback syntax before AST analysis', () => {
+    for (const source of ['(field) => {', '(field: any) => field']) {
+      expect(analyzeCallback(source)).toEqual({
+        classification: 'parse-error',
+        sources: [],
+        candidates: [],
+        unknowns: ['callback-not-javascript'],
+      });
+    }
+  });
+
   it('resolves the Other branch only for the controlled scenarios that were run', () => {
     const standard = otherScenario('Transfer');
     const other = otherScenario('Other');
@@ -156,6 +225,7 @@ describe('RH-04 bounded form-effects experiments', () => {
       field.parent.formControl.get('dependent').updateValueAndValidity()`;
     expect(analyzeCallback(source)).toEqual({
       classification: 'inline-callback',
+      sources: [],
       candidates: [
         { target: 'dependent', mutation: 'updateValueAndValidity' },
       ],
@@ -174,6 +244,7 @@ describe('RH-04 bounded form-effects experiments', () => {
   it('refuses to infer an indirect update callback even when a scenario observes options', () => {
     expect(analyzeCallback('externalCallbacks.updateCaseTypes')).toEqual({
       classification: 'external-reference',
+      sources: [],
       candidates: [],
       unknowns: ['implementation-outside-declaration'],
     });
@@ -198,6 +269,7 @@ describe('RH-04 bounded form-effects experiments', () => {
         })`;
     expect(analyzeCallback(onInitSource)).toEqual({
       classification: 'inline-callback',
+      sources: [{ controlKey: 'source', stream: 'valueChanges' }],
       candidates: [
         { target: 'dependent', mutation: 'markAsTouched' },
         { target: 'dependent', mutation: 'updateValueAndValidity' },
@@ -232,6 +304,7 @@ describe('RH-04 bounded form-effects experiments', () => {
   it('keeps helpers and aliases as review scaffolds instead of source interpretation', () => {
     expect(analyzeCallback('(field) => revalidateDependent(field)')).toEqual({
       classification: 'inline-callback',
+      sources: [],
       candidates: [],
       unknowns: ['helper-call-indirection'],
     });
@@ -242,8 +315,31 @@ describe('RH-04 bounded form-effects experiments', () => {
       }`),
     ).toEqual({
       classification: 'inline-callback',
+      sources: [],
       candidates: [],
       unknowns: ['alias-resolution-required'],
+    });
+    expect(
+      analyzeCallback(`() =>
+        logger.get('dependent').updateValueAndValidity()`),
+    ).toEqual({
+      classification: 'inline-callback',
+      sources: [],
+      candidates: [],
+      unknowns: ['target-resolution-required'],
+    });
+    expect(
+      analyzeCallback(`(field) =>
+        field.parent.formControl.get(field.props.source).valueChanges
+          .subscribe(() => undefined)`),
+    ).toEqual({
+      classification: 'inline-callback',
+      sources: [],
+      candidates: [],
+      unknowns: [
+        'source-resolution-required',
+        'subscription-lifecycle-and-pipeline-semantics',
+      ],
     });
   });
 });
