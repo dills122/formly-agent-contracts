@@ -29,6 +29,9 @@ Options:
   --fail-on <severity>     Fail on warning or error; generate or check only
   -h, --help               Show this help
 `;
+const CONFIG_LOAD_HINT =
+  'Hint: verify tsconfigPath and import a Node-safe contracts entry point; ' +
+  'Angular browser barrels may require a dedicated contracts shim.\n';
 
 interface CliWriter {
   write(value: string): unknown;
@@ -159,18 +162,16 @@ function formatWorkspaceError(
   return `${operation} failed [${error.code}] ${provenance}\n${error.message}\n${hint}`;
 }
 
-function configLoadHint(error: WorkspaceGenerationError): string {
-  if (
-    error.code !== 'WORKSPACE_DISCOVERY_FAILED' ||
-    !(error.cause instanceof WorkspaceConfigLoadError) ||
-    error.cause.code !== 'CONFIG_LOAD_FAILED'
-  ) {
-    return '';
-  }
-  return (
-    'Hint: verify tsconfigPath and import a Node-safe contracts entry point; ' +
-    'Angular browser barrels may require a dedicated contracts shim.\n'
-  );
+function configLoadHint(error: unknown): string {
+  const cause =
+    error instanceof WorkspaceGenerationError &&
+    error.code === 'WORKSPACE_DISCOVERY_FAILED'
+      ? error.cause
+      : error;
+  return cause instanceof WorkspaceConfigLoadError &&
+    cause.code === 'CONFIG_LOAD_FAILED'
+    ? CONFIG_LOAD_HINT
+    : '';
 }
 
 function workspaceOptions(
@@ -261,13 +262,8 @@ export async function runWorkspaceCli(
       stdout.write(formatInventory(result.inventory));
       return 0;
     } catch (error) {
-      const hint =
-        error instanceof WorkspaceConfigLoadError &&
-        error.code === 'CONFIG_LOAD_FAILED'
-          ? 'Hint: verify tsconfigPath and import a Node-safe contracts entry point; Angular browser barrels may require a dedicated contracts shim.\n'
-          : '';
       stderr.write(
-        `List failed [WORKSPACE_DISCOVERY_FAILED]\nWorkspace discovery failed.\n${hint}`,
+        `List failed [WORKSPACE_DISCOVERY_FAILED]\nWorkspace discovery failed.\n${configLoadHint(error)}`,
       );
       return 1;
     }
