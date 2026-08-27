@@ -34,8 +34,9 @@ Something has to decide how a release is still triggered and published.
    [scripts/release-manifest.mjs](../../scripts/release-manifest.mjs) without
    a separate ignore list.
 2. Add [.github/workflows/changesets.yml](../../.github/workflows/changesets.yml),
-   triggered on push to `main`, running `changesets/action` with no
-   `publish-script` configured. It only ever opens or updates a
+   manually triggered when a maintainer is preparing a release, running
+   `changesets/action` with no `publish-script` configured. Automatic runs on
+   pushes to `main` are disabled. It only ever opens or updates a
    "Version Packages" pull request that bumps affected packages' versions and
    writes their changelogs. **It never publishes.**
 3. Keep the existing tag-triggered
