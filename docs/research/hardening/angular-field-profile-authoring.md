@@ -1,9 +1,10 @@
 # RH-03: Angular/Formly Field-Profile Authoring and Conformance Bridge
 
-**Status:** production design recommended; implementation not authorized by this
-artifact
+**Status:** candidate production design; implementation is blocked on the
+retained compilation/linking/resource compatibility gate defined below
 
-**Inference — decision:** proceed in phases with workspace-aware Formly inventory and
+**Inference — decision:** proceed to a retained build-substrate compatibility
+gate, then—only if it passes—workspace-aware Formly inventory and
 review-required scaffolds. Add rendered conformance only as a separate,
 optional verification lane. Keep the reviewed project-owned profile registry as
 the sole semantic authority.
@@ -14,9 +15,10 @@ the sole semantic authority.
 
 ## Executive decision
 
-**Inference — feasibility:** The retained spike can be hardened into a useful
-authoring bridge without inventing selectors or interaction semantics. The
-production-safe boundary is narrower than the earlier research implied:
+**Inference — feasibility:** The retained spike makes a useful authoring bridge
+plausible without inventing selectors or interaction semantics, but it does not
+yet prove the production execution substrate. The safe boundary is narrower
+than the earlier research implied:
 Angular's stable `reflectComponentType` API is suitable for shallow runtime
 metadata, but `@angular/compiler` template AST APIs are explicitly unstable.
 Template analysis must therefore be optional, version-gated, and unable to
@@ -32,10 +34,13 @@ still a pilot gate, not a proven result.
 
 **Inference — decision:** Use a four-part design:
 
-1. a Node-safe project config points to a separate trusted Angular authoring
-   entry and supplies the exact tsconfig and source roots;
-2. isolated Angular workers build one application-equivalent root or explicitly
-   named feature scope at a time and inventory the public Formly registry;
+1. a Node-safe project config points to an application-owned Angular
+   application build target, separate trusted authoring entry, exact tsconfig,
+   and source roots;
+2. the Angular CLI/Nx application build performs normal AOT resource resolution
+   and partial-library linking, after which fresh browser workers build one
+   application-equivalent root or explicitly named feature scope at a time and
+   inventory the public Formly registry;
 3. an optional, Angular-version-gated source analyzer emits derived evidence and
    review scaffolds with explicit unknowns; and
 4. optional TestBed and browser conformance compares reviewed declarations with
@@ -54,8 +59,12 @@ Every material conclusion below uses one of these labels:
 - **Documented fact:** supported by a repository contract or an official
   Angular, Formly, TypeScript, Angular Material/CDK, Playwright, or Nx source.
 - **Repository observation:** directly observed in the pinned repository,
-  installed declarations/build output, focused tests, or the local synthetic
-  fixtures.
+  installed declarations/build output, or a retained test/fixture that another
+  checkout can inspect or rerun.
+- **Author testimony:** observed during this research run but not reproducible
+  from the retained commit, such as a removed experiment or bounded manual
+  browser session. It may motivate a gate but cannot satisfy a retained-proof
+  claim.
 - **Inference:** a design conclusion drawn from documented facts and repository
   observations.
 - **Unknown:** evidence is insufficient; the design preserves the uncertainty
@@ -203,8 +212,9 @@ pnpm exec vitest run \
   apps/formly-test-app/src/app/formly-types/angular-host-risk.spike.test.ts
 ```
 
-**Repository observation:** Passed, 1 file and 4 tests. The exact test cases
-were:
+**Author testimony:** Passed, 1 file and 4 tests in the author worktree. The
+test file was removed and these results are not retained, so an independent
+checkout cannot rerun them. The reported test cases were:
 
 1. Configure a root TestBed with `FormlyModule.forRoot` and verify a lazy alias
    is absent; create a feature NgModule containing `FormlyModule.forChild` with
@@ -220,9 +230,11 @@ were:
    `interaction-operation` unknown.
 
 **Inference:** Feature scopes must run in fresh workers or fresh test
-environments. Creating a feature module mutates the root Formly registry, so
-sequentially loading every feature into one injector would lose scope
-boundaries and make alias conflicts order-dependent.
+environments. The reported mutation result is consistent with Formly's shared
+configuration and Angular's injector model, but it remains unverified retained
+evidence until the compatibility gate includes the lazy-scope case. Sequentially
+loading every feature into one injector risks losing scope boundaries and
+making alias conflicts order-dependent.
 
 ### Bounded rendered observations
 
@@ -236,7 +248,7 @@ pnpm --filter @formly-contract/angular-monorepo-fixture serve
 The in-app browser then used role/name locators against
 `http://127.0.0.1:4200/` and `http://127.0.0.1:4300/`.
 
-**Repository observation:** The browser accessibility snapshot exposed:
+**Author testimony:** The bounded browser accessibility snapshot exposed:
 
 - `radiogroup "Synthetic toggle choice"` with `radio "Alpha mode"` and
   `radio "Beta mode"`;
@@ -248,8 +260,7 @@ The in-app browser then used role/name locators against
 - wrapper button `Expand Preferred contact method`; and
 - `group "Coverage period"` with named `Start` and `End` textbox parts.
 
-**Repository observation:** The following actions produced the following model
-values:
+**Author testimony:** The following actions produced the following model values:
 
 | Action | Observed model result |
 | --- | --- |
@@ -259,9 +270,10 @@ values:
 | Check `Select Synthetic row B` | `interaction.selectedRows = ["row-b"]` |
 | Fill `Start`/`End` with ISO dates | `coveragePeriod = {"start":"2026-01-01","end":"2026-01-31"}` |
 
-**Repository observation:** A global `option` locator also returned unrelated
+**Author testimony:** A global `option` locator also returned unrelated
 native-select options while the custom overlay was open. A role/name pair does
-not establish node or popup scope.
+not establish node or popup scope. A retained browser scenario must reproduce
+this ambiguity before the browser lane is considered implemented.
 
 **Inference:** Generic execution and conformance must resolve each declared part
 inside a node-local root, a declared popup root, or the document root for a
@@ -301,12 +313,33 @@ and [Creating libraries](https://angular.dev/tools/libraries/creating-libraries)
 experimental/private even though `parseTemplate` is exported. Source:
 [Angular compiler entry point](https://github.com/angular/angular/blob/main/packages/compiler/src/compiler.ts).
 
+**Documented fact:** Angular CLI application targets use the application build
+system, and Angular CLI integrates the linker automatically for partial-Ivy
+dependencies. Angular Architect targets are explicit `project:target` or
+`project:target:configuration` build inputs. Sources:
+[Creating libraries—consuming partial-Ivy code](https://angular.dev/tools/libraries/creating-libraries#consuming-partial-ivy-code-outside-the-angular-cli)
+and [Angular CLI builders](https://angular.dev/tools/cli/cli-builder).
+
+**Documented fact:** Angular 20's `@angular/build:unit-test` Vitest integration
+uses the application build system but is explicitly experimental. It is useful
+as an exact-version TestBed compatibility lane, not a durable cross-version
+execution contract. Source:
+[Angular 20 experimental unit testing](https://v20.angular.dev/guide/testing/unit-tests).
+
 **Repository observation:** The installed Angular `20.3.29` declaration exports
 `parseTemplate`, the template AST classes used by the spike, and public stable
 runtime reflection. It exports component resource resolution only under an
 `ɵ`-prefixed private name.
 
-**Inference — decision:** Runtime inventory may depend on stable reflection. Source-template
+**Inference — decision:** The primary runtime substrate is an
+application-owned Angular CLI `@angular/build:application` or Nx
+`@nx/angular:application` AOT browser target. That target compiles a small
+authoring browser entry that imports the trusted entry; it performs the normal
+application resource resolution and partial-library linking. The generic Node
+orchestrator may schedule and serve that target, but it never imports Angular
+application code. Angular 20's unit-test builder may provide a secondary
+TestBed lane only after the same exact-version compatibility gate passes.
+Runtime inventory may then depend on stable reflection. Source-template
 analysis may depend on `parseTemplate` only behind an exact compatibility
 adapter and focused tests. No implementation may read `ɵcmp`, `ɵmod`,
 `ɵinj`, `ɵfac`, or any private resource-resolution API.
@@ -408,11 +441,25 @@ export default defineFormContractProject({
   fieldTypeProfiles: CLAIMS_FIELD_TYPE_PROFILES,
   angularAuthoring: {
     entry: './formly-contracts.angular.ts',
+    runtime: {
+      kind: 'angular-application-target',
+      buildTarget: 'claims:formly-authoring:production',
+      // Optional developer convenience; CI serves the confined build output.
+      serveTarget: 'claims:serve-formly-authoring:development',
+    },
     tsconfigPath: 'apps/claims/tsconfig.app.json',
     sourceRoots: [
       'apps/claims/src',
       'libs/forms-kit/src',
       'libs/workplace-fields/src',
+    ],
+    typeDispositions: [
+      {
+        formlyType: 'add-nigo-info-panel',
+        disposition: 'intentionally-non-interactive',
+        classification: 'display-only',
+        reason: 'Renders reviewed case guidance; it does not mutate the model.',
+      },
     ],
   },
 });
@@ -422,8 +469,14 @@ Required validation:
 
 - paths are literal, workspace-relative, realpath-confined, and deterministic;
 - `entry` and `tsconfigPath` are files;
+- `buildTarget` resolves to the supported Angular CLI or Nx application
+  executor, its effective tsconfig matches `tsconfigPath`, and its browser entry
+  is the application-owned authoring shell that imports `entry`;
+- `serveTarget`, when present, resolves to the same application build target;
 - source roots are non-overlapping after normalization or duplicates collapse
   canonically;
+- each `typeDispositions` item has a unique exact Formly alias, one of the
+  closed dispositions, and a non-empty review reason;
 - the Angular entry is not imported by generic `list`, MCP, or schema/compiler
   code; and
 - resolved paths and file hashes contribute to authoring-run identity, while
@@ -466,6 +519,14 @@ The entry accepts:
   stable IDs; and
 - optional explicit harness bindings.
 
+The authoring browser entry is a small application entry point compiled by the
+configured target. It bootstraps only the authoring shell and imports the
+trusted definition above. The target may share normal application styles,
+polyfills, file replacements, and provider modules, but it must not bootstrap
+the production router or start network/authentication workflows. The
+compatibility gate validates that the effective target really consumes the
+declared entry and tsconfig; target-name inference alone is insufficient.
+
 It does not accept a second list of Formly type registrations. The imported
 application modules/providers execute their existing `forRoot`, `forChild`, or
 standalone Formly registration.
@@ -481,19 +542,64 @@ Formly configuration modules, not copy individual type entries.
 composition. For Formly 6 it can import `FormlyModule.forRoot/forChild` through
 an application module. For newer Formly versions it can accept the application's
 standalone providers. Support is claimed only for tested Angular/Formly pairs;
-the current evidence proves Angular `20.3.29` with Formly `6.1.8`.
+the retained tests/builds cover Angular `20.3.29` with Formly `6.1.8`, while the
+application-target host claim remains blocked on the retained gate.
+
+### Chosen compilation/loading substrate and retained gate
+
+**Inference — decision:** Do not implement the host API or worker protocol until
+a retained fixture proves the application-target substrate. The fixture is a
+normal consuming Angular application with:
+
+- an application-owned authoring browser entry and configured
+  `@angular/build:application` target;
+- one source NgModule type and one standalone type;
+- one installed fixture library built in partial compilation mode;
+- one component from that library with an external template and style;
+- root and explicitly loaded `FormlyModule.forChild` registrations; and
+- one opaque child and one deliberately missing external resource for refusal
+  behavior.
+
+The exact gate command must build the partial library, run the authoring
+application target, start its confined static output, and use a real browser to
+request root and feature-scope inventory. The retained assertions must prove:
+
+1. the application target linked the partial library and rendered/reflected its
+   component without a private-Ivy read;
+2. the external template/resource was resolved by the application build;
+3. NgModule and standalone imports both load;
+4. root and feature registries are observed in fresh browser contexts without
+   cross-scope contamination;
+5. opaque and missing-resource cases produce stable refusal diagnostics; and
+6. the emitted result passes the strict report schema and canonical round trip.
+
+The gate records the effective builder/executor, Angular/Formly/TypeScript
+versions, target configuration hash, and fixture-library package hash. Failure
+blocks the package shell and worker tasks. It is not deferred to the broad
+control-family acceptance matrix.
+
+**Inference — decision:** A successful application build may be reused across
+scopes, but each scope runs in a fresh browser context/page that creates a fresh
+Angular platform and injector. The Node parent serves only the confined build
+output, selects a configured scope ID, reads one strict JSON result, then closes
+the context. It does not evaluate application source or parse console logs as
+the report protocol.
 
 ## Process boundaries
 
 ```text
 generic workspace process
-  reads Node-safe paths/policy only
+  validates Node-safe paths/target/policy only
           |
           v
-isolated Angular worker (one root or feature scope)
-  imports trusted entry, creates fresh TestBed, inventories Formly
+Angular CLI/Nx application build target
+  links partial libraries, resolves resources, emits authoring browser shell
           |
-          +----> JSON-safe raw/effective inventory
+          v
+fresh browser worker (one root or feature scope)
+  loads compiled trusted entry, creates fresh platform/injector, inventories Formly
+          |
+          +----> strict JSON raw/effective inventory
           |
 optional source worker (TypeScript Program + version adapter)
   reads configured sources/templates, emits derived candidates/unknowns
@@ -510,10 +616,14 @@ maintainer-owned reviewed FieldTypeProfileRegistry
           +----> optional AOT gallery + Playwright conformance
 ```
 
-Each Angular scope runs in a new child process or equivalent hard-isolated
-worker. The parent receives strict JSON on stdout or an IPC channel, enforces a
-time/memory limit, and converts crashes into stable scope diagnostics. Worker
-logs and underlying callback exceptions do not enter canonical artifacts.
+Each Angular scope runs in a fresh browser context/page or an equivalently
+proven hard-isolated application-build worker. The parent receives a value that
+passes the strict report schema through an explicit browser bridge, enforces a
+time limit and output-size limit, and converts build, navigation, bootstrap,
+schema, and timeout failures into stable scope diagnostics. Console logs and
+underlying callback exceptions do not enter canonical artifacts. A secondary
+TestBed worker may use the exact-version Angular unit-test builder, but it is
+not a fallback for a failed application-target compatibility gate.
 
 ## Inventory and evidence model
 
@@ -522,7 +632,12 @@ logs and underlying callback exceptions do not enter canonical artifacts.
 Every report fact uses a common envelope:
 
 ```ts
-interface AuthoringEvidence<T> {
+type JsonPrimitive = null | boolean | number | string;
+type JsonValue = JsonPrimitive | JsonObject | readonly JsonValue[];
+interface JsonObject { readonly [key: string]: JsonValue }
+
+interface AuthoringEvidence<T extends JsonValue = JsonValue> {
+  readonly id: string;
   readonly source:
     | 'formly-registry'
     | 'angular-reflection'
@@ -635,7 +750,126 @@ is `configuredScopeCoverage: complete | incomplete | unknown`.
 
 ### Coverage report
 
+The first implementation must turn these TypeScript sketches into schema-owned
+strict runtime validators before emitting artifacts. All object schemas reject
+unknown keys; every referenced type below is closed and JSON-safe.
+
 ```ts
+type ConfiguredScopeCoverageStatus = 'complete' | 'incomplete' | 'unknown';
+type ScopeLoadStatus =
+  | 'loaded'
+  | 'build-failed'
+  | 'navigation-failed'
+  | 'bootstrap-failed'
+  | 'timed-out'
+  | 'invalid-output';
+type JoinStatus = 'joined' | 'ambiguous' | 'outside-roots' | 'declaration-only' | 'missing';
+type ConformanceStatus = 'pass' | 'fail' | 'inconclusive' | 'not-configured';
+
+interface ConfiguredScopeCoverage {
+  readonly status: ConfiguredScopeCoverageStatus;
+  readonly configuredScopeIds: readonly string[];
+  readonly loadedScopeIds: readonly string[];
+  readonly failedScopeIds: readonly string[];
+  readonly reasons: readonly string[];
+}
+
+interface ScopeCoverage {
+  readonly id: string;
+  readonly kind: 'root' | 'feature';
+  readonly loadStatus: ScopeLoadStatus;
+  readonly registrationCount: number;
+  readonly typeCoverageIds: readonly string[];
+  readonly diagnosticIds: readonly string[];
+}
+
+interface ComponentIdentity {
+  readonly status: 'known' | 'missing' | 'ambiguous';
+  readonly selector?: string;
+  readonly sourceId?: string;
+  readonly exportName?: string;
+}
+
+interface RawRegistrationCoverage {
+  readonly extends?: string;
+  readonly component: ComponentIdentity;
+  readonly wrappers: readonly string[];
+  readonly jsonSafeDefaultOptions?: JsonObject;
+  readonly fingerprint: string;
+}
+
+interface EffectiveRegistrationCoverage {
+  readonly status: 'resolved' | 'missing-base' | 'cycle' | 'error';
+  readonly inheritanceChain: readonly string[];
+  readonly component: ComponentIdentity;
+  readonly wrappers: readonly string[];
+  readonly jsonSafeDefaultOptions?: JsonObject;
+}
+
+interface ReviewedProfileCoverage {
+  readonly status: 'reviewed' | 'missing' | 'intentionally-non-interactive';
+  readonly registrationId?: string;
+  readonly profileId?: string;
+  readonly profileVersion?: number;
+  readonly disposition?: {
+    readonly source: 'project-angular-authoring-config';
+    readonly classification: 'display-only' | 'assertion-only';
+    readonly reason: string;
+    readonly configurationHash: string;
+  };
+}
+
+interface SourceJoinCoverage {
+  readonly status: JoinStatus;
+  readonly sourceId?: string;
+  readonly template: 'inline' | 'external' | 'dynamic' | 'unavailable' | 'parse-error';
+  readonly childSelectors: readonly string[];
+  readonly opaqueChildSelectors: readonly string[];
+  readonly propCandidates: readonly string[];
+}
+
+interface TypeConformanceCoverage {
+  readonly scenarioIds: readonly string[];
+  readonly status: ConformanceStatus;
+  readonly diagnosticIds: readonly string[];
+}
+
+interface TypeCoverage {
+  readonly id: string; // canonical `${scopeId}\u0000${formlyType}`
+  readonly scopeId: string;
+  readonly formlyType: string;
+  readonly raw: RawRegistrationCoverage;
+  readonly effective: EffectiveRegistrationCoverage;
+  readonly reviewedProfile: ReviewedProfileCoverage;
+  readonly reflectionEvidenceIds: readonly string[];
+  readonly source: SourceJoinCoverage;
+  readonly evidenceIds: readonly string[];
+  readonly unknownIds: readonly string[];
+  readonly scaffoldId?: string;
+  readonly conformance: TypeConformanceCoverage;
+}
+
+interface WrapperCoverage {
+  readonly id: string;
+  readonly wrapperName: string;
+  readonly scopeIds: readonly string[];
+  readonly source: SourceJoinCoverage;
+  readonly reviewedProfileId?: string;
+  readonly evidenceIds: readonly string[];
+  readonly unknownIds: readonly string[];
+}
+
+interface AuthoringDiagnostic {
+  readonly id: string;
+  readonly code: string;
+  readonly severity: 'error' | 'warning' | 'information';
+  readonly scopeId?: string;
+  readonly typeCoverageId?: string;
+  readonly scenarioId?: string;
+  readonly message: string;
+  readonly evidenceIds: readonly string[];
+}
+
 interface AngularFieldAuthoringReport {
   readonly schemaVersion: '0.1.0';
   readonly run: {
@@ -644,10 +878,16 @@ interface AngularFieldAuthoringReport {
     readonly angularVersion: string;
     readonly formlyVersion: string;
     readonly typescriptVersion: string;
+    readonly builder: '@angular/build:application' | '@nx/angular:application';
+    readonly buildTarget: string;
+    readonly targetConfigurationHash: string;
   };
+  readonly configuredScopeCoverage: ConfiguredScopeCoverage;
   readonly scopes: readonly ScopeCoverage[];
   readonly types: readonly TypeCoverage[];
   readonly wrappers: readonly WrapperCoverage[];
+  readonly evidence: readonly AuthoringEvidence[];
+  readonly unknowns: readonly ReviewUnknown[];
   readonly diagnostics: readonly AuthoringDiagnostic[];
   readonly summary: {
     readonly registeredAliases: number;
@@ -662,18 +902,78 @@ interface AngularFieldAuthoringReport {
 }
 ```
 
-The report is canonical JSON. Ordering is by stable scope/alias/profile IDs.
-Absolute workspace paths are normalized to workspace-relative paths. It contains
-no source text, template text, model values, functions, Angular types, or
-injectors.
+`configuredScopeCoverage.status` is computed, not authored:
+
+- `complete` means every configured scope has exactly one `loaded` record and a
+  schema-valid result;
+- `incomplete` means at least one configured scope has a terminal failure;
+- `unknown` means the configured scope set itself cannot be validated or a
+  result cannot be attributed to exactly one configured scope.
+
+It never means workspace completeness. The configured/loaded/failed arrays are
+sorted unique sets; their union and intersection invariants are runtime-schema
+refinements. Every referenced ID must resolve exactly once. Summary counts are
+derived from the `types` and `conformance` records, never supplied by a worker.
+`intentionallyNonInteractive` counts only exact aliases with a valid persisted
+project-config disposition and never counts an inferred display candidate.
+
+The report is canonical JSON. Arrays with set semantics sort by stable
+scope/type/profile/evidence IDs; declaration-order arrays such as wrappers and
+inheritance chains preserve their declared order. Absolute workspace paths are
+normalized to workspace-relative paths. The report contains no source text,
+template text, model values, functions, Angular types, injectors, secrets, or
+timestamps. Configuration, target, and registration fingerprints use the
+repository's canonical hash conventions.
 
 ### Review scaffold
 
 The scaffold is deliberately not a `FieldTypeProfileRegistry`:
 
 ```ts
+interface SuggestedPart {
+  readonly id: string;
+  readonly role?: string;
+  readonly cardinality?: 'one' | 'many';
+  readonly candidateScope?: 'scenario-root' | 'popup-root' | 'document-root';
+  readonly evidenceIds: readonly string[];
+}
+
+interface SuggestedInteraction {
+  readonly operation?: string;
+  readonly partIds: readonly string[];
+  readonly readinessCandidate?: string;
+  readonly evidenceIds: readonly string[];
+}
+
+interface SuggestedValueDomainItem {
+  readonly label: string;
+  readonly modelValue?: JsonValue;
+  readonly evidenceIds: readonly string[];
+}
+
+interface SuggestedValueDomain {
+  readonly kind: 'static' | 'scenario-observed' | 'unknown';
+  readonly items: readonly SuggestedValueDomainItem[];
+}
+
+interface SuggestedDriver {
+  readonly kind: 'generic-candidate' | 'application-required';
+  readonly id?: string;
+  readonly version?: number;
+  readonly evidenceIds: readonly string[];
+}
+
+interface ReviewUnknown {
+  readonly id: string;
+  readonly code: string;
+  readonly blocking: boolean;
+  readonly message: string;
+  readonly evidenceIds: readonly string[];
+}
+
 interface FieldProfileReviewScaffold {
   readonly schemaVersion: '0.1.0';
+  readonly id: string;
   readonly projectId: string;
   readonly formlyType: string;
   readonly scopeIds: readonly string[];
@@ -690,15 +990,21 @@ interface FieldProfileReviewScaffold {
     readonly valueDomain?: SuggestedValueDomain;
     readonly driver?: SuggestedDriver;
   };
-  readonly evidence: readonly AuthoringEvidence<unknown>[];
+  readonly evidence: readonly AuthoringEvidence[];
   readonly unknowns: readonly ReviewUnknown[];
   readonly requiredDecisions: readonly string[];
 }
 ```
 
-The production profile parser rejects this shape. Promotion requires an
-explicit maintainer edit into the project-owned registry followed by normal
-schema validation and versioning.
+Scaffold parts, evidence, unknowns, and decisions sort by ID/code. All evidence
+references resolve exactly once. A suggested interaction or generic driver is
+omitted when any blocking unknown affects its operation, codec, scope, or
+action sequence. A `display-only` suggestion alone does not increment the
+non-interactive summary; only the persisted exact-type disposition does.
+
+The production profile parser rejects this shape and unknown keys. Promotion
+requires an explicit maintainer edit into the project-owned registry followed
+by normal schema validation and versioning.
 
 ## Conservative scaffold rules
 
@@ -742,24 +1048,35 @@ schema validation and versioning.
 nodes, but the field-profile schema requires an interaction and driver for a
 mapped custom Formly type.
 
-**Inference — decision:** The authoring report immediately supports an
-`intentionallyNonInteractive` disposition so coverage does not pressure authors
-to invent a driver. Production actionability should later add a reviewed
-`display-only`/`assertion-only` profile branch with no executable driver. Until
-that schema change is approved, such a custom type remains non-actionable and
-must not be forced into an interactive profile.
+**Inference — decision:** The Node-safe `angularAuthoring.typeDispositions`
+array is the reviewed, committed authority for authoring-coverage treatment
+until the profile schema gains a no-interaction branch. Each entry names one
+exact Formly alias, classifies it as display-only or assertion-only, and records
+a non-empty review reason. It is hashed with project configuration and cannot
+be sourced from a scaffold suggestion or component/template heuristic.
+
+This disposition affects only authoring coverage: the type is counted as
+`intentionallyNonInteractive`, receives no driver candidate, and remains
+non-actionable in compiled contracts. It does not create display semantics in
+the profile registry. Production actionability may later add a reviewed
+`display-only`/`assertion-only` profile branch with no executable driver; after
+that schema exists, the registry replaces the temporary authoring disposition.
+Until one of those explicit inputs exists, the alias remains `missingProfile`,
+not intentionally non-interactive.
 
 ## Review workflow and ownership
 
-1. The project owner adds one Node-safe Angular authoring pointer and one
-   application-equivalent composition entry.
+1. The project owner adds one Node-safe Angular authoring pointer, its proven
+   application build target, one application-equivalent composition entry, and
+   any reviewed exact-type non-interactive dispositions.
 2. `formly-contracts angular inventory --project <id>` runs isolated configured
    scopes and writes only the report.
 3. `formly-contracts angular scaffold --project <id>` writes review scaffolds
    for missing aliases and changed evidence. Existing reviewed profiles are not
    regenerated.
 4. A maintainer reviews semantic type, value shape, parts, codec/value domain,
-   operation, wrapper preconditions, driver ID/version, and every unknown.
+   operation, wrapper preconditions, driver ID/version, every unknown, and any
+   non-interactive disposition or browser scenario expectation.
 5. The maintainer edits the existing project-owned
    `FieldTypeProfileRegistry`, increments appropriate identities, and runs the
    normal schema/config checks.
@@ -778,17 +1095,90 @@ existing declared variant mechanism.
 
 ### Inputs
 
-Conformance receives:
+Conformance receives a trusted executable factory and a separate strict,
+serializable reviewed expectation. The expectation is configuration input, not
+an observed output:
 
-- the reviewed resolved profile registry;
-- a stable synthetic scenario ID and fresh factory;
-- the configured root/feature scope;
-- a node-local scenario root locator/host anchor;
-- optional reviewed action vectors and expected model values; and
-- optional explicit CDK harness or application-driver binding.
+```ts
+type NameExpectation =
+  | { readonly kind: 'exact'; readonly value: string }
+  | { readonly kind: 'pattern'; readonly source: string; readonly flags: '' | 'i' };
 
-Scenario inputs are trusted executable build inputs but are never serialized.
-Reports contain scenario IDs and allowlisted observations only.
+interface PartExpectation {
+  readonly id: string;
+  readonly role: string;
+  readonly name: NameExpectation;
+  readonly root:
+    | 'scenario-root'
+    | 'document-root'
+    | { readonly popupPartId: string };
+  readonly cardinality: { readonly min: number; readonly max: number };
+  readonly testId?: string; // explicit application-owned contract only
+}
+
+type PopupAssociation =
+  | {
+      readonly kind: 'aria-controls' | 'aria-owns';
+      readonly triggerPartId: string;
+      readonly popupPartId: string;
+    }
+  | {
+      readonly kind: 'scenario-contract-id';
+      readonly triggerPartId: string;
+      readonly popupPartId: string;
+      readonly attribute: 'data-formly-contract-popup';
+      readonly value: string;
+    }
+  | {
+      readonly kind: 'harness-binding';
+      readonly triggerPartId: string;
+      readonly popupPartId: string;
+      readonly bindingId: string;
+    };
+
+interface ReviewedActionVector {
+  readonly id: string;
+  readonly driverBindingId: string;
+  readonly intent: JsonObject;
+  readonly expectedModelValue: JsonValue;
+}
+
+interface BrowserScenarioExpectation {
+  readonly schemaVersion: '0.1.0';
+  readonly id: string;
+  readonly scopeId: string;
+  readonly formlyType: string;
+  readonly profile: { readonly id: string; readonly version: number };
+  readonly scenarioRootTestId: string;
+  readonly parts: readonly PartExpectation[];
+  readonly popupAssociations: readonly PopupAssociation[];
+  readonly actionVectors: readonly ReviewedActionVector[];
+}
+
+defineAngularFieldScenario({
+  expectation: claimsOverlaySelectExpectation,
+  create: createFreshClaimsOverlayFieldState,
+});
+```
+
+The expectation validator requires unique part/action IDs, exactly one
+scenario root anchor, every popup-root reference and association to resolve,
+and every `document-root` popup to have exactly one reviewed association.
+Non-popup parts may not declare `document-root`. `aria-controls`/`aria-owns`
+must resolve the trigger's attribute to the observed popup element after the
+reviewed open action. `scenario-contract-id` requires the trigger and popup to
+share the exact committed value; the runner never invents it. A harness binding
+must be registered under the exact ID and profile version. Test IDs are allowed
+only when supplied by the application in this reviewed contract.
+
+Part names are mandatory and exact/pattern expectations are validated before
+the browser runs. Option parts must use `{ popupPartId }`, never
+`document-root` directly. Multiple or missing matching popups yield
+`OVERLAY_SCOPE_AMBIGUOUS`; the runner does not choose the first match.
+
+The executable factory, providers, model sink, and harness callbacks are
+trusted build inputs but are never serialized. Reports contain the expectation
+ID, binding IDs, allowlisted observations, and diagnostics only.
 
 ### TestBed lane
 
@@ -813,15 +1203,16 @@ declared part it records:
 
 - role and computed accessible name;
 - cardinality and visible/enabled/selected/expanded state;
-- node-root, popup-root, or document-root scope;
+- scenario-root, associated-popup-root, or popup-only document-root scope;
 - declared action outcome;
 - allowlisted visible option labels; and
 - an explicitly approved JSON-safe model sink for codec vectors.
 
-Overlay checks first activate the declared trigger, then resolve the popup in
-the declared scope. A portal may live outside the scenario root, but its popup
-and options must still be uniquely associated with the scenario by a reviewed
-contract. Global option enumeration is forbidden.
+Overlay checks first execute the reviewed open vector against the declared
+trigger, then resolve and validate the configured `PopupAssociation`. A portal
+may live outside the scenario root, but its popup and option parts are scoped
+through the associated popup part. Global option enumeration and unassociated
+document-root popup queries are forbidden.
 
 ### Names, codecs, and actions
 
@@ -834,6 +1225,8 @@ Codec checks use reviewed vectors:
 
 ```ts
 {
+  id: 'choose-amber',
+  driverBindingId: 'claims-autocomplete-driver-v1',
   intent: { optionLabel: 'Amber record' },
   expectedModelValue: { id: 'amber' },
 }
@@ -880,10 +1273,16 @@ scenario correction, or a reviewed profile/driver version change.
 
 ### Supported path
 
-- Runtime inventory executes the consuming application's source/configuration
-  under an exact tested Angular/Formly pair.
-- Browser conformance uses the application's Angular CLI/Nx AOT build, which
-  performs normal resource resolution and partial-library linking.
+- Runtime inventory and browser conformance execute only from the configured
+  application-owned Angular CLI/Nx AOT application target under an exact tested
+  Angular/Formly pair. That build performs normal resource resolution and
+  partial-library linking.
+- The authoring target compiles a small browser shell that imports the trusted
+  entry. The Node process schedules/serves the build and opens fresh browser
+  contexts; it does not import Angular source or partial output.
+- TestBed/CDK conformance may additionally use an exact-version Angular
+  unit-test target after the retained compatibility gate passes; the Angular 20
+  experimental unit-test builder is not the primary substrate.
 - Stable reflection is the only runtime metadata dependency.
 - Optional template AST support is implemented by an adapter keyed to an exact
   supported Angular minor and guarded by fixture tests.
@@ -901,16 +1300,24 @@ scenario correction, or a reviewed profile/driver version change.
 
 ### Version gate
 
-Before supporting a pair, CI must prove:
+Before implementing the host API for the first pair—and before supporting every
+later pair—CI must retain and prove:
 
-1. stable reflection against source and a partial-compiled library;
-2. NgModule and standalone host composition;
-3. root and explicit feature-scope Formly registration;
-4. inline/external template source analysis;
-5. opaque-child and parse-failure refusal;
-6. application production build/linking;
-7. TestBed creation and browser gallery render; and
-8. no private-Ivy imports/property reads in the package.
+1. the application-owned target consumes the declared authoring entry and
+   effective tsconfig;
+2. its normal AOT build links a partial-compiled fixture library and resolves
+   an external component template/resource;
+3. stable reflection works for source and linked partial-library components;
+4. NgModule and standalone host composition both load;
+5. root and explicit feature-scope Formly registrations remain isolated across
+   fresh browser contexts;
+6. inline/external template source analysis and opaque/missing-resource refusal
+   produce schema-valid deterministic output;
+7. the strict report passes canonical serialization and rejects malformed or
+   cross-scope output;
+8. the optional TestBed target and AOT browser scenario render when those lanes
+   are enabled; and
+9. no private-Ivy imports/property reads occur in the package or fixture gate.
 
 Template analysis disables itself with `UNSUPPORTED_ANGULAR_COMPILER_VERSION`
 when no exact adapter exists. Runtime inventory and manual review remain usable.
@@ -923,9 +1330,9 @@ when no exact adapter exists. Runtime inventory and manual review remain usable.
 | Formly runtime inventory only | Public registry boundary; requires configured host | Good ownership/gap coverage | No roles, props API, codec, template, or operations; lazy scopes incomplete | High; optional package | High | Formly removes/publicly hides registry surface in supported version |
 | Inventory + version-gated source scaffolds | Fits if derived-only and exact-version tested | Highest likely boilerplate reduction | AST churn, source unavailable, ambiguous joins, false confidence | High; analyzer can disable | Medium-high | Pilot finds few useful candidates or maintenance breaks each patch |
 | One cumulative TestBed loading all features | Simple implementation | Broad union inventory | Registry mutation loses scope/alias conflict provenance; side effects accumulate | Medium | Low | A public Formly scope snapshot API appears and proves isolation |
-| Fresh worker per declared root/feature scope | Honest lazy ownership and deterministic failures | High | More startup cost; explicit scope manifest required | High | High | Startup cost is prohibitive and a safe reusable isolated host is proven |
+| Fresh browser worker per declared root/feature scope | Honest lazy ownership and deterministic failures if the retained gate passes | High | More startup cost; explicit scope manifest and proven application target required | High | Medium | Retained gate fails to isolate scopes, or startup cost is prohibitive and a safe reusable host is proven |
 | JIT TestBed as sole conformance | Fast and harness-friendly | Medium | External resources, partial linking, accessibility/overlay/browser gaps | High | Medium-low | Representative workplace controls prove browser parity across all required facts |
-| AOT application gallery + Playwright, optional TestBed/CDK | Real build/browser behavior and computed accessibility | High assurance | Heavier setup; scenario-specific; gallery drift | Medium-high; optional target | High | Build integration cannot isolate providers/data or provides little additional signal |
+| AOT application gallery + Playwright, optional TestBed/CDK | Real build/browser behavior and computed accessibility | High assurance | Heavier setup; scenario-specific; gallery drift | Medium-high; optional target | Medium | Retained gallery checks fail to associate overlays or isolate providers/data, or provide little additional signal |
 | Private Ivy metadata mining | Could expose compiled template internals | Superficially high | Patch breakage, unsupported API, still no semantic truth | Low | High reject | No evidence should reverse this under current constraints |
 
 **Inference — recommendation:** Fresh-scope Formly inventory plus optional version-gated
@@ -936,84 +1343,115 @@ next, then an opt-in AOT browser gallery for profiles that justify the cost.
 
 | Conclusion | Classification | Confidence | Basis / limit |
 | --- | --- | --- | --- |
-| Public runtime inventory is production-feasible on the pinned pair | Inference | High (0.90) | Existing integration test, lazy probe, production builds, official APIs |
-| Source scaffolding is feasible as an optional exact-version adapter | Inference | Medium-high (0.80) | Existing matrix works; compiler API instability creates maintenance risk |
-| Fresh feature scopes honestly cover lazy `forChild` registrations | Inference | High (0.90) | Official injector model and focused mutation probe; manifest completeness remains unknown |
-| Browser conformance can validate roles, names, parts, overlay behavior, and reviewed codecs | Inference | High (0.88) | Rendered observations and official Playwright model; CI automation not yet retained |
-| TestBed can reuse explicit CDK harness bindings | Inference | Medium (0.70) | Official supported pattern; repository has no retained CDK example |
-| The bridge will materially reduce workplace manual setup | Inference | Medium (0.65) | Strong mechanical value, but no workplace corpus/time measurement |
+| Application-target runtime inventory is plausible on the pinned pair, not yet production-proven | Inference | Medium (0.60) | Retained integration tests/builds and official build/linker model; author-only lazy/partial/resource probe; required retained gate not yet implemented |
+| Source scaffolding is feasible as an optional exact-version adapter | Inference | Medium (0.70) | Retained spike matrix works; compiler API instability creates maintenance risk |
+| Fresh feature scopes can honestly cover configured lazy `forChild` registrations | Inference | Medium (0.65) | Official injector model plus author testimony; retained isolation gate and manifest completeness remain open |
+| Browser conformance can validate reviewed roles, names, parts, overlay associations, and codecs | Inference | Medium (0.65) | Official Playwright model plus author testimony; retained scenario and CI checks do not yet exist |
+| TestBed can reuse explicit CDK harness bindings | Inference | Medium-low (0.55) | Official supported pattern; repository has no retained CDK example and Angular 20 unit-test builder is experimental |
+| The bridge will materially reduce workplace manual setup | Inference | Medium-low (0.55) | Likely mechanical value, but no workplace corpus/time measurement |
 | Automatic semantic profile generation is safe | Inference | Very low; reject (0.05) | Codec, overlay, opaque-child, compound control, and operation boundaries remain intrinsic |
 
 ## Failure and stop gates
 
 Stop or narrow productionization when any gate fails:
 
-1. **Private API gate:** if inventory or rendering requires reading `ɵ` metadata,
+1. **Substrate gate:** if the retained application target cannot link the
+   partial fixture library, resolve its external resource, isolate root/feature
+   registries, and emit strict canonical output, do not implement the host API.
+2. **Private API gate:** if inventory or rendering requires reading `ɵ` metadata,
    stop that approach.
-2. **Duplication gate:** if the authoring entry must repeat most individual
+3. **Duplication gate:** if the authoring entry must repeat most individual
    Formly registrations instead of importing existing composition modules,
    redesign the host boundary.
-3. **Isolation gate:** if representative feature imports trigger real network,
+4. **Isolation gate:** if representative feature imports trigger real network,
    authentication, persistence, or irreversible workflows that synthetic
-   providers cannot replace, do not run TestBed inventory for that scope; use an
-   application-owned gallery or manual declaration.
-4. **Lazy honesty gate:** if configured scopes cannot be distinguished, report
+   providers cannot replace, do not run automated inventory/conformance for
+   that scope; use a side-effect-free application-owned gallery or manual
+   declaration.
+5. **Lazy honesty gate:** if configured scopes cannot be distinguished, report
    incomplete coverage and do not publish a union as complete.
-5. **Compiler maintenance gate:** if an Angular minor breaks the source adapter
+6. **Report-contract gate:** if worker output cannot pass strict schemas,
+   reference invariants, derived-count checks, and canonical round trips, retain
+   a scope failure rather than emitting a partial report.
+7. **Disposition-authority gate:** if a display/assertion-only alias lacks an
+   exact reviewed config disposition or future no-interaction profile, count it
+   as missing rather than non-interactive.
+8. **Compiler maintenance gate:** if an Angular minor breaks the source adapter
    without a small localized fix and focused tests, disable template analysis
    for that version rather than couple to Ivy.
-6. **Partial-build gate:** if a library can be loaded only as unlinked partial
+9. **Partial-build gate:** if a library can be loaded only as unlinked partial
    output in bare Node, move the observation into the consuming Angular build.
-7. **Conformance safety gate:** if verifying a codec requires indiscriminate
+10. **Overlay-association gate:** if a reviewed popup association is missing,
+    invalid, or non-unique, emit `OVERLAY_SCOPE_AMBIGUOUS`; do not search the
+    document globally or select the first match.
+11. **Conformance safety gate:** if verifying a codec requires indiscriminate
    clicking or real business effects, require reviewed synthetic vectors or
    leave it unverified.
-8. **False-confidence gate:** if an unknown is required to authorize a generic
+12. **False-confidence gate:** if an unknown is required to authorize a generic
    driver, the scaffold remains non-actionable.
-9. **Value gate:** run a workplace pilot. Continue source scaffolding only if it
+13. **Value gate:** run a workplace pilot. Continue source scaffolding only if it
    produces useful non-semantic evidence for a substantial share of custom
    types and saves more review time than the host/scenario upkeep costs. Record
    elapsed setup/review time rather than claiming a percentage in advance.
-10. **Drift-noise gate:** if browser scenarios fail frequently for unrelated
+14. **Drift-noise gate:** if browser scenarios fail frequently for unrelated
     layout/content changes, narrow expectations to contract-relevant
     role/name/part/codec facts instead of weakening mismatch policy.
 
 ## Ordered implementation tasks
 
-1. **Approve authoring contracts.** Review report/scaffold DTOs, evidence tags,
-   diagnostics, configured-scope terminology, and artifact privacy rules.
-2. **Resolve schema gaps.** Decide whether v0.4.x adds explicit
+1. **Retain the application-target compatibility gate.** Before a package shell
+   or host API, add the consuming application fixture, partial-compiled fixture
+   library, authoring browser entry, external resource, NgModule/standalone
+   cases, isolated root/lazy scopes, opaque/missing-resource refusals, strict
+   output validation, and exact Angular CLI/Nx build commands described above.
+   Stop if normal application linking/resource resolution cannot support them
+   without private Ivy.
+2. **Approve complete authoring contracts.** Move the closed report/scaffold,
+   evidence, unknown, diagnostic, configured-scope, disposition, and scenario
+   expectation shapes into schema-owned strict validators. Add canonical
+   round-trip, unknown-key rejection, ID-reference, set-ordering, count, and
+   configured-scope refinement tests.
+3. **Resolve schema gaps.** Decide whether v0.4.x adds explicit
    display/assertion-only profiles, compound fill/date range, and multi-select
-   semantics. Until approved, keep those non-generic.
-3. **Add the optional Angular package shell and compatibility matrix.** Pin the
-   first Angular/Formly pair and add a private-Ivy lint/grep gate.
-4. **Add Node-safe workspace pointers.** Validate entry/tsconfig/source-root
-   paths without importing Angular during generic discovery.
-5. **Implement isolated host workers.** Support NgModule and standalone
-   composition, timeouts, clean stdout JSON, and fresh root/feature scope runs.
-6. **Implement Formly inventory.** Preserve raw/effective registration,
+   semantics. Until approved, keep those non-generic. Implement and validate
+   the exact-type authoring disposition as the temporary coverage authority.
+4. **Add the optional Angular package shell.** Pin the first
+   Angular/Formly/TypeScript and builder/executor tuple, schedule only the proven
+   application target, and add a private-Ivy import/property lint gate.
+5. **Add Node-safe workspace pointers.** Validate build/serve target,
+   entry/tsconfig/source-root paths, and exact-type dispositions without
+   importing Angular during generic discovery.
+6. **Implement isolated browser workers.** Serve the confined AOT authoring
+   output, support NgModule/standalone composition, enforce time/output limits,
+   validate the explicit browser bridge, and create fresh root/feature scope
+   contexts.
+7. **Implement Formly inventory.** Preserve raw/effective registration,
    inheritance, defaults, wrappers, scope provenance, alias conflicts, and
    profile coverage.
-7. **Implement the TypeScript source index.** Join registrations/components,
+8. **Implement the TypeScript source index.** Join registrations/components,
    collect props candidates, and handle inline/external templates through an
    exact Angular adapter with refusal tests.
-8. **Implement canonical coverage/scaffold output.** No registry writes; add
+9. **Implement canonical coverage/scaffold output.** No registry writes; add
    stable diffs and explicit unknowns.
-9. **Run the workplace value pilot.** Measure configuration effort, custom-type
+10. **Run the workplace value pilot.** Measure configuration effort, custom-type
    coverage, review time, ambiguous joins, and saved mechanical work without
    retaining workplace source.
-10. **Add TestBed conformance.** Verify parts, wrapper gates, reviewed action
-    vectors, model sinks, and explicit CDK harness bindings.
-11. **Add the AOT gallery/browser lane.** Reuse the application build target;
-    verify computed roles/names, popup scope, overlays, and codecs with normal
-    Playwright locators.
-12. **Retain a full synthetic acceptance matrix.** Include native and Material-
+11. **Add TestBed conformance.** Through the exact-version application-backed
+    unit-test target, verify parts, wrapper gates, reviewed action vectors,
+    model sinks, and explicit CDK harness bindings.
+12. **Add the reviewed browser-conformance contract.** Implement strict
+    scenario expectation and popup-association validation, then use the proven
+    AOT authoring target to verify computed roles/names, overlay association,
+    popup-local options, and reviewed codecs with normal Playwright locators.
+13. **Expand the retained synthetic acceptance matrix.** The gate in Task 1
+    already owns external-template, partial-library, standalone/NgModule,
+    opaque/refusal, and lazy-scope cases. Add native and Material-
     like button toggles, autocomplete, text editor, display-only info panel,
     overlay single/multi-select, table selection, date range, expandable
-    repeater, wrapper, opaque child, external template, inheritance, standalone,
-    partial library, and lazy `forChild` cases.
-13. **Document review and CI workflows.** Explain authority, version increments,
+    repeater, wrapper, inheritance, dynamic-name, and ambiguous-overlay cases.
+14. **Document review and CI workflows.** Explain authority, version increments,
     optional conformance, failure policy, and unsupported-version behavior.
-14. **Require independent review before Checkpoint B.** Review security/trusted
+15. **Require independent review before Checkpoint B.** Review security/trusted
     execution, determinism, public API use, schema fit, and workplace value
     evidence.
 
@@ -1022,8 +1460,8 @@ Stop or narrow productionization when any gate fails:
 | Acceptance criterion | Evidence / design location | Status |
 | --- | --- | --- |
 | 1. Distinguish spike proof from unproven work | “What the retained spike proves—and does not prove”; focused packet | Satisfied |
-| 2. Workspace/Angular API, process boundaries, evidence model, report/scaffold, conformance | Proposed API; process diagram; evidence/report/scaffold; conformance sections | Satisfied as production design |
-| 3. Lazy, external template, opaque child, overlay, display-only, partial/JIT risks | Four-test temporary probe; browser observations; template/opaque rules; partial/JIT policy | Satisfied for design decision; automated browser CI and CDK reuse remain implementation gates |
+| 2. Workspace/Angular API, process boundaries, evidence model, report/scaffold, conformance | Proposed API; process diagram; evidence/report/scaffold; conformance sections | Satisfied as a candidate production design; runtime validators remain implementation work |
+| 3. Lazy, external template, opaque child, overlay, display-only, partial/JIT risks | Author testimony identifies risks; selected application target; retained gate; strict disposition and popup contracts; template/opaque rules; partial/JIT policy | Satisfied as a bounded design with explicit unknowns; production feasibility remains blocked until retained Task 1 checks pass |
 | 4. Options, feasibility/value, confidence, stop gates, ordered tasks | Final four decision sections | Satisfied |
 
 ## Residual unknowns
@@ -1032,6 +1470,9 @@ Stop or narrow productionization when any gate fails:
   feature scopes.
 - **Unknown:** Whether workplace Angular libraries are consumed from source,
   linked partial distributions, or both.
+- **Unknown:** Whether the selected application-target substrate passes the
+  retained partial-library, external-resource, and isolated-scope gate without
+  application-specific side effects.
 - **Unknown:** Whether existing custom fields ship CDK harnesses.
 - **Unknown:** Whether application build targets can host a synthetic gallery
   without authentication/network side effects.
@@ -1042,15 +1483,16 @@ Stop or narrow productionization when any gate fails:
 - **Unknown:** Measured author-time savings and ongoing scenario maintenance
   cost.
 
-These unknowns do not block the inventory/scaffold slice. They block broad
-value claims, generic-driver approval for the affected families, and any claim
-of workspace-complete conformance.
+The substrate unknown blocks the package shell and inventory/scaffold slice
+until Task 1 passes. The remaining unknowns block broad value claims,
+generic-driver approval for the affected families, and any claim of
+workspace-complete conformance.
 
 ## Recommended next action
 
-Approve a short implementation spike for Tasks 1–6 only: authoring DTO review,
-Node-safe pointer, isolated root/lazy workers, public Formly inventory, and the
-canonical coverage report. Run it against the two existing fixtures and a
-metadata-only workplace census. Do not implement template heuristics or browser
-conformance until the report proves that scope-aware inventory removes enough
-mechanical work to justify the optional complexity.
+Authorize Task 1 only: retain the application-owned authoring entry,
+partial-compiled fixture library, external resource, root/lazy isolation, and
+strict-output compatibility gate under the selected Angular CLI/Nx application
+target. If it passes, approve Tasks 2–7 as the first inventory slice. Do not
+implement source heuristics, TestBed/CDK, or browser conformance until the
+substrate and report contracts are retained and independently reviewable.
