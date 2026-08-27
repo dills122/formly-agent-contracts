@@ -12,8 +12,8 @@ artifacts and workspace indexes. Canonical Angular-fixture goldens plus linked
 and packed consumers verify the generic pilot outside package-source imports.
 
 The long-term architecture below remains the intended direction. The remaining
-Angular-assisted profile inventory, optional Nx task integration, production
-MCP delivery, typed Playwright
+controlled Angular project host, Angular-assisted profile inventory, optional
+Nx task integration, production MCP delivery, typed Playwright
 execution, browser observation, runtime parity, and change analysis remain
 later layers. They must consume or extend the same contracts rather than move
 trusted application execution into routine agent requests.
@@ -104,6 +104,74 @@ The compiler runs in a controlled build or CI environment. It:
 8. Produces a deterministic, content-addressed bundle.
 
 The compiler must not serialize live field objects. Built fields contain circular parent references, Angular controls, injectors, functions, subscriptions, and other runtime-only state.
+
+#### Controlled project execution hosts
+
+Trusted project configuration and Formly/Angular execution must not run in the
+root orchestrator, Nx daemon, or MCP request process. The workspace package owns
+a versioned, serializable runtime-host protocol:
+
+1. The parent loads only a Node-safe root config, expands project config paths,
+   and creates a validated request containing the project config path, project
+   root, runtime package-resolution base, effective tsconfig, root policy, and a
+   parent-selected runtime-host module descriptor.
+2. One fresh child process per project imports the trusted host module by its
+   already resolved file URL, evaluates the project config, inventories IDs, and
+   waits. No executable module URL may come from config data.
+3. The parent rejects cross-project duplicate identities before allowing form
+   factories to run. Children then compile and return only JSON-safe artifacts,
+   diagnostics, and provenance; live configs, injectors, modules, and functions
+   never cross IPC.
+4. The parent validates and hashes every result, sorts independently of worker
+   completion order, and performs content-addressed artifact publication with
+   the workspace index replaced last.
+
+Optional Nx integration must preserve that single orchestration and publication
+owner. The first Nx contract therefore attaches one aggregate target to an
+explicitly selected coordinator project and delegates one complete workspace
+run. It may cache and select that aggregate target from project inputs, but it
+must not launch independent per-project publishers: doing so would either bypass
+the pre-factory global duplicate gate or contend for the same generation lock
+and index. Finer-grained Nx sharding requires a separate protocol design that
+retains those invariants.
+
+`@formly-contract/workspace` is the publishable framework-neutral host and
+orchestrator. `@formly-contract/angular` is a compatible workspace peer and owns
+the dependency-light Angular JIT wrapper/worker; schema owns the portable host
+provenance DTO. Angular packages are resolved from the explicit project runtime
+base without TypeScript aliases. The initial JIT host supports peer-correct
+Angular graphs with one project-visible core/compiler pair. Because Jiti 2.7 and
+the supported Node 22.13 loader surface cannot observe every transitive
+resolution, anchor preflight must not be described as whole-graph singleton
+enforcement; private/bundled Angular copies remain unsupported.
+
+A project child contains compiler-facade/module-cache state, crashes, timeouts,
+and failed-import contamination, but it is not a hostile-code or network
+sandbox. Trusted local execution uses a scrubbed environment and records that
+network denial is not enforced. Reproducible CI generation requires a configured
+external isolation provider and fails closed when network denial is requested
+but unavailable. Portable provenance records exact tool/loader/runtime versions,
+the worker and execution-profile versions, and a canonical dependency-lock
+digest; machine paths, module URLs, PIDs, timings, and raw environment never
+enter hashes.
+
+The portable contract starts at runtime-provenance schema `1.0.0`. It records
+the worker ID/version/protocol, adapter ID/version/mode, exact workspace,
+compiler, and schema tool versions, Jiti version and canonical loader options,
+Node version/platform/architecture, execution-profile identity and network
+claim, selected dependency snapshot, and canonically ordered runtime-package
+identities. The dependency snapshot is the SHA-256 of the selected lockfile's
+exact bytes and stores only its safe workspace-relative path. It attests the
+declared lock state, not installed package bytes.
+
+Workspace configuration and index schemas move together from `0.1.0` to
+`0.2.0` for this provenance boundary. Runtime provenance participates in every
+project configuration hash; the root configuration hash includes the parent
+provenance plus the resulting project hashes. Readers reject prior workspace
+index/configuration schema versions and require regeneration rather than
+silently interpreting provenance-free indexes. Form Contract schema `0.4.0`
+does not change, so this migration cannot change content-addressed form
+artifact bytes or paths.
 
 ### 3. Source indexer
 
@@ -316,8 +384,11 @@ Bundles also record source commit, compiler version, Formly version, adapter-reg
 
 ## Security and privacy
 
-- Build only explicitly registered forms in an isolated process.
-- Disable network access by default and use synthetic fixtures.
+- Build only explicitly registered forms in a fresh project process. Process
+  isolation contains runtime state but is not itself a network sandbox.
+- Require an externally enforced network-denying profile for reproducible CI
+  generation; trusted local mode must state that network denial is not enforced.
+  Use synthetic fixtures in both profiles.
 - Do not include customer values, secrets, unrestricted option sets, or internal service credentials.
 - Treat labels, help text, and remotely supplied options as untrusted data when presenting them to a model.
 - Validate form IDs, resource URIs, context, and tool inputs against allowlists and schemas.

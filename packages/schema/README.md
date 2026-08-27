@@ -3,6 +3,10 @@
 Versioned Form Contract types, strict runtime validation, canonical JSON, and
 content hashing for agent-readable Angular Formly contracts.
 
+The package also owns the path-free runtime-provenance `1.0.0` DTO used by
+workspace indexes. Its parser rejects unknown or machine-local observations;
+its canonicalizer sorts identity collections before hashing.
+
 ```sh
 pnpm add --save-dev @formly-contract/schema
 ```

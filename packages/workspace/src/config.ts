@@ -20,7 +20,7 @@ import {
   requireStableId,
 } from './validation-error.js';
 
-export const WORKSPACE_CONFIG_SCHEMA_VERSION = '0.1.0' as const;
+export const WORKSPACE_CONFIG_SCHEMA_VERSION = '0.2.0' as const;
 
 const DEFAULT_OUTPUT_DIRECTORY = 'dist/formly-contracts';
 const DEFAULT_TEST_ID_ATTRIBUTES = [

@@ -1,8 +1,11 @@
 import {
   canonicalStringify,
+  parseRuntimeProvenance,
   type ContractDiagnostic,
   type ContractNode,
   type FormContract,
+  type RuntimeDependencySnapshot,
+  type RuntimeProvenance,
 } from '@formly-contract/schema';
 import {
   extractFormContract,
@@ -18,6 +21,7 @@ import {
   unlink,
   writeFile,
 } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
 import { isAbsolute, relative, resolve, sep } from 'node:path';
 import { posix } from 'node:path';
 
@@ -65,6 +69,8 @@ export type WorkspaceGenerationErrorCode =
   | 'FORM_INSTANCE_INVALID'
   | 'CONTRACT_EXTRACTION_FAILED'
   | 'DIAGNOSTIC_POLICY_FAILED'
+  | 'DEPENDENCY_SNAPSHOT_UNAVAILABLE'
+  | 'RUNTIME_PROVENANCE_UNAVAILABLE'
   | 'OUTPUT_PATH_OUTSIDE_WORKSPACE'
   | 'OUTPUT_SYMLINK_UNSUPPORTED'
   | 'OUTPUT_WRITE_FAILED';
@@ -90,6 +96,10 @@ const ERROR_MESSAGES: Readonly<Record<WorkspaceGenerationErrorCode, string>> = {
     'A form contract factory returned an invalid instance.',
   CONTRACT_EXTRACTION_FAILED: 'Form contract extraction failed.',
   DIAGNOSTIC_POLICY_FAILED: 'A generated contract violates diagnostic policy.',
+  DEPENDENCY_SNAPSHOT_UNAVAILABLE:
+    'A pnpm dependency snapshot could not be selected.',
+  RUNTIME_PROVENANCE_UNAVAILABLE:
+    'Runtime toolchain provenance could not be determined.',
   OUTPUT_PATH_OUTSIDE_WORKSPACE: 'An output path is outside the workspace.',
   OUTPUT_SYMLINK_UNSUPPORTED: 'Symlinked output paths are not supported.',
   OUTPUT_WRITE_FAILED: 'Workspace contract output could not be written.',
@@ -130,6 +140,8 @@ export class WorkspaceGenerationError extends Error {
 
 export interface RunWorkspaceOptions extends DiscoverWorkspaceProjectsOptions {
   readonly cliOverrides?: WorkspaceCliOverrides;
+  /** Trusted parent override used by versioned runtime-host composition. */
+  readonly runtimeProvenance?: RuntimeProvenance;
 }
 
 export interface WorkspaceRunResult {
@@ -180,6 +192,160 @@ function compareCodeUnits(left: string, right: string): number {
     return 0;
   }
   return left < right ? -1 : 1;
+}
+
+async function findPnpmDependencySnapshot(
+  workspaceRoot: string,
+): Promise<RuntimeDependencySnapshot> {
+  try {
+    const bytes = await readFile(resolve(workspaceRoot, 'pnpm-lock.yaml'));
+    return {
+      kind: 'pnpm-lock',
+      workspaceRelativePath: 'pnpm-lock.yaml',
+      sha256: `sha256:${createHash('sha256').update(bytes).digest('hex')}`,
+    };
+  } catch (error) {
+    throw new WorkspaceGenerationError(
+      'DEPENDENCY_SNAPSHOT_UNAVAILABLE',
+      'inventory',
+      {},
+      error,
+    );
+  }
+}
+
+async function createInProcessRuntimeProvenance(
+  workspaceRoot: string,
+  tsconfigPaths: 'disabled' | 'configured',
+): Promise<RuntimeProvenance> {
+  const dependencySnapshot = await findPnpmDependencySnapshot(workspaceRoot);
+  const {
+    workspaceVersion,
+    compilerVersion,
+    schemaVersion,
+    jitiVersion,
+  } = await readInProcessToolVersions();
+  return parseRuntimeProvenance({
+    schemaVersion: '1.0.0',
+    worker: {
+      id: '@formly-contract/workspace/in-process',
+      version: workspaceVersion,
+      protocolVersion: '1',
+    },
+    adapter: {
+      id: '@formly-contract/compiler/declared',
+      version: compilerVersion,
+      mode: 'declared',
+    },
+    tools: [
+      { name: '@formly-contract/workspace', version: workspaceVersion },
+      { name: '@formly-contract/compiler', version: compilerVersion },
+      { name: '@formly-contract/schema', version: schemaVersion },
+    ],
+    loader: {
+      id: 'jiti',
+      version: jitiVersion,
+      options: {
+        fsCache: false,
+        interopDefault: false,
+        moduleCache: false,
+        tsconfigPaths,
+        nativeModules: [],
+      },
+    },
+    node: {
+      version: process.versions.node,
+      platform: process.platform,
+      architecture: process.arch,
+    },
+    executionProfile: {
+      id: 'trusted-local-v1',
+      version: '1',
+      network: 'not-enforced',
+    },
+    dependencySnapshot,
+    runtimePackages: [],
+  });
+}
+
+interface PackageManifest {
+  readonly name?: unknown;
+  readonly version?: unknown;
+  readonly dependencies?: Readonly<Record<string, unknown>>;
+}
+
+async function readPackageManifest(
+  packageJsonUrl: URL,
+): Promise<PackageManifest> {
+  return JSON.parse(await readFile(packageJsonUrl, 'utf8')) as PackageManifest;
+}
+
+async function readInProcessToolVersions(): Promise<{
+  readonly workspaceVersion: string;
+  readonly compilerVersion: string;
+  readonly schemaVersion: string;
+  readonly jitiVersion: string;
+}> {
+  try {
+    const parsed = await readPackageManifest(
+      new URL('../package.json', import.meta.url),
+    );
+    if (
+      parsed.name !== '@formly-contract/workspace' ||
+      typeof parsed.version !== 'string' ||
+      parsed.version.length === 0
+    ) {
+      throw new TypeError('Invalid workspace package metadata.');
+    }
+    const dependencyVersion = async (
+      name: '@formly-contract/compiler' | '@formly-contract/schema',
+      sourceManifestUrl: URL,
+    ): Promise<string> => {
+      const declared = parsed.dependencies?.[name];
+      if (typeof declared !== 'string' || declared.length === 0) {
+        throw new TypeError(`Missing dependency metadata for ${name}.`);
+      }
+      if (!declared.startsWith('workspace:')) {
+        return declared;
+      }
+      const sourceManifest = await readPackageManifest(sourceManifestUrl);
+      if (
+        sourceManifest.name !== name ||
+        typeof sourceManifest.version !== 'string' ||
+        sourceManifest.version.length === 0
+      ) {
+        throw new TypeError(`Invalid source package metadata for ${name}.`);
+      }
+      return sourceManifest.version;
+    };
+    const jitiVersion = parsed.dependencies?.jiti;
+    if (typeof jitiVersion !== 'string' || jitiVersion.length === 0) {
+      throw new TypeError('Missing dependency metadata for jiti.');
+    }
+    const [compilerVersion, schemaVersion] = await Promise.all([
+      dependencyVersion(
+        '@formly-contract/compiler',
+        new URL('../../compiler/package.json', import.meta.url),
+      ),
+      dependencyVersion(
+        '@formly-contract/schema',
+        new URL('../../schema/package.json', import.meta.url),
+      ),
+    ]);
+    return {
+      workspaceVersion: parsed.version,
+      compilerVersion,
+      schemaVersion,
+      jitiVersion,
+    };
+  } catch (error) {
+    throw new WorkspaceGenerationError(
+      'RUNTIME_PROVENANCE_UNAVAILABLE',
+      'inventory',
+      {},
+      error,
+    );
+  }
 }
 
 function normalizeRelativePath(path: string): string {
@@ -585,6 +751,7 @@ function crossFieldEffectRegistryIdentity(
 
 function projectConfigurationHash(
   project: ResolvedWorkspaceProjectConfig,
+  runtimeProvenance: RuntimeProvenance,
 ): string {
   const fieldTypeProfileRegistry = fieldTypeProfileRegistryIdentity(project);
   const crossFieldEffectRegistry = crossFieldEffectRegistryIdentity(project);
@@ -610,10 +777,14 @@ function projectConfigurationHash(
       ? {}
       : { crossFieldEffectRegistry }),
     effectCyclePolicy: project.effectCyclePolicy,
+    runtimeProvenance,
   });
 }
 
-function indexProject(project: ResolvedProject): WorkspaceIndexProject {
+function indexProject(
+  project: ResolvedProject,
+  runtimeProvenance: RuntimeProvenance,
+): WorkspaceIndexProject {
   const { discovered, resolved } = project;
   const fieldTypeProfileRegistry = fieldTypeProfileRegistryIdentity(resolved);
   const crossFieldEffectRegistry = crossFieldEffectRegistryIdentity(resolved);
@@ -622,7 +793,8 @@ function indexProject(project: ResolvedProject): WorkspaceIndexProject {
     projectId: resolved.projectId,
     sourceIds: resolved.sourceIds,
     outputDirectory: normalizeRelativePath(resolved.outputDirectory),
-    configurationHash: projectConfigurationHash(resolved),
+    configurationHash: projectConfigurationHash(resolved, runtimeProvenance),
+    runtimeProvenance,
     ...(fieldTypeProfileRegistry === undefined
       ? {}
       : { fieldTypeProfileRegistry }),
@@ -637,9 +809,12 @@ function buildIndex(
   projects: readonly ResolvedProject[],
   forms: WorkspaceContractIndexDraft['forms'],
   aggregateOutputDirectory: string,
+  runtimeProvenance: RuntimeProvenance,
 ): WorkspaceContractIndex {
   const plugins = discovered.inventory.plugins.map((plugin) => ({ ...plugin }));
-  const indexedProjects = projects.map(indexProject);
+  const indexedProjects = projects.map((project) =>
+    indexProject(project, runtimeProvenance),
+  );
   const configurationPlugins = [...(discovered.root.config.plugins ?? [])]
     .sort((left, right) => compareCodeUnits(left.id, right.id))
     .map(({ id, version, configSchemaVersion, options }) => ({
@@ -649,7 +824,7 @@ function buildIndex(
       ...(options === undefined ? {} : { options }),
     }));
   return createWorkspaceContractIndex({
-    schemaVersion: '0.1.0',
+    schemaVersion: '0.2.0',
     workspaceConfigSchemaVersion: discovered.inventory.schemaVersion,
     rootConfigPath: discovered.inventory.rootConfigPath,
     configurationHash: computeWorkspaceConfigurationHash({
@@ -676,12 +851,14 @@ function buildIndex(
       effectCyclePolicy:
         discovered.root.config.effects?.cyclePolicy ?? 'error',
       plugins: configurationPlugins,
+      runtimeProvenance,
       projects: indexedProjects.map((project) => ({
         configPath: project.configPath,
         projectId: project.projectId,
         configurationHash: project.configurationHash,
       })),
     }),
+    runtimeProvenance,
     plugins,
     projects: indexedProjects,
     forms,
@@ -888,6 +1065,15 @@ async function planWorkspaceRun(
     );
   }
   const projects = resolveProjects(discovered, options.cliOverrides);
+  const runtimeProvenance =
+    options.runtimeProvenance === undefined
+      ? await createInProcessRuntimeProvenance(
+          workspaceRoot,
+          discovered.root.config.tsconfigPath === undefined
+            ? 'disabled'
+            : 'configured',
+        )
+      : parseRuntimeProvenance(options.runtimeProvenance);
   const inventoried = await inventoryForms(projects);
   const extracted = extractContracts(workspaceRoot, inventoried);
   const aggregateOutputDirectory = canonicalOutputDirectory(
@@ -920,6 +1106,7 @@ async function planWorkspaceRun(
     projects,
     extracted.forms,
     aggregateOutputDirectory,
+    runtimeProvenance,
   );
   return {
     workspaceRoot,

@@ -157,13 +157,31 @@ console.log(result.indexPath);
 console.log(result.artifactPaths);
 ```
 
+Generation and checking select `pnpm-lock.yaml` at the canonical
+`workspaceRoot`, hash its exact bytes, and record that relative path/digest as
+declared dependency provenance. A missing root lock fails with
+`DEPENDENCY_SNAPSHOT_UNAVAILABLE`; the runner does not search parent or sibling
+directories. A trusted runtime-host parent may instead pass a validated
+`runtimeProvenance` DTO through the programmatic API. Root/project config data
+and the generic CLI cannot supply that override.
+
 Artifacts use content-addressed project/form paths beneath the resolved output
 directories. The aggregate `workspace-index.json` contains workspace-relative
 paths, contract hashes, source/project IDs, declared evidence, diagnostic
-provenance, and configuration, plugin, and profile-registry identities. Plugin
-options participate in configuration hashes but are not emitted. Model values,
-form state, callbacks, timestamps, absolute paths, and full profile registries
-are also excluded from the index.
+provenance, configuration/plugin/profile-registry identities, and strict
+runtime provenance for the parent and each project. Runtime provenance schema
+`1.0.0` includes exact worker/adapter/tool/Jiti/Node/execution-profile/package
+identities, canonical loader options, platform/architecture, and the selected
+lock digest. Plugin options participate in configuration hashes but are not
+emitted. Model values, form state, callbacks, timestamps, absolute paths,
+module URLs, PIDs, timings, environment values, temporary directories, and full
+profile registries are excluded from the index.
+
+This is an intentional compatibility break for derived workspace output:
+workspace configuration and index schemas are `0.2.0`, and readers reject
+`0.1.0` indexes. Regenerate the index rather than editing or upgrading it in
+place. The Form Contract schema remains `0.4.0`; form artifact bytes and
+content-addressed paths remain unchanged by this migration.
 
 The runner performs discovery, source inventory, extraction, diagnostic-policy
 checks, and output-path preflight before publishing. Form artifacts are written

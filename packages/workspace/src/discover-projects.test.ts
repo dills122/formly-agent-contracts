@@ -99,7 +99,7 @@ describe('workspace project discovery', () => {
     });
 
     expect(discovered.inventory).toEqual({
-      schemaVersion: '0.1.0',
+      schemaVersion: '0.2.0',
       rootConfigPath: 'formly-contracts.config.ts',
       plugins: [
         {

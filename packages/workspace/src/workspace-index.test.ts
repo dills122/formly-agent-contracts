@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
+import type { RuntimeProvenance } from '@formly-contract/schema';
+
 import {
   WORKSPACE_INDEX_SCHEMA_VERSION,
   canonicalizeWorkspaceContractIndex,
@@ -16,12 +18,61 @@ const HASH_A = `sha256:${'a'.repeat(64)}`;
 const HASH_B = `sha256:${'b'.repeat(64)}`;
 const HASH_C = `sha256:${'c'.repeat(64)}`;
 
+function runtimeProvenance(): RuntimeProvenance {
+  return {
+    schemaVersion: '1.0.0',
+    worker: {
+      id: '@formly-contract/workspace/in-process',
+      version: '0.1.0',
+      protocolVersion: '1',
+    },
+    adapter: {
+      id: '@formly-contract/compiler/declared',
+      version: '0.4.0',
+      mode: 'declared',
+    },
+    tools: [
+      { name: '@formly-contract/compiler', version: '0.4.0' },
+      { name: '@formly-contract/schema', version: '0.4.0' },
+      { name: '@formly-contract/workspace', version: '0.1.0' },
+    ],
+    loader: {
+      id: 'jiti',
+      version: '2.7.0',
+      options: {
+        fsCache: false,
+        interopDefault: false,
+        moduleCache: false,
+        tsconfigPaths: 'configured',
+        nativeModules: [],
+      },
+    },
+    node: {
+      version: '22.22.1',
+      platform: 'linux',
+      architecture: 'x64',
+    },
+    executionProfile: {
+      id: 'trusted-local-v1',
+      version: '1',
+      network: 'not-enforced',
+    },
+    dependencySnapshot: {
+      kind: 'pnpm-lock',
+      workspaceRelativePath: 'pnpm-lock.yaml',
+      sha256: HASH_A,
+    },
+    runtimePackages: [],
+  };
+}
+
 function createDraft(): WorkspaceContractIndexDraft {
   return {
     schemaVersion: WORKSPACE_INDEX_SCHEMA_VERSION,
-    workspaceConfigSchemaVersion: '0.1.0',
+    workspaceConfigSchemaVersion: '0.2.0',
     rootConfigPath: 'formly-contract.config.ts',
     configurationHash: HASH_A,
+    runtimeProvenance: runtimeProvenance(),
     plugins: [
       { id: 'z-plugin', version: '2.0.0', configSchemaVersion: '2' },
       { id: 'a-plugin', version: '1.0.0', configSchemaVersion: '1' },
@@ -33,6 +84,7 @@ function createDraft(): WorkspaceContractIndexDraft {
         sourceIds: ['registry/z', 'registry/a'],
         outputDirectory: 'dist/formly-contracts/forms',
         configurationHash: HASH_B,
+        runtimeProvenance: runtimeProvenance(),
         fieldTypeProfileRegistry: {
           schemaVersion: '0.4.0',
           id: 'profiles/shared',
@@ -46,6 +98,7 @@ function createDraft(): WorkspaceContractIndexDraft {
         sourceIds: ['pages'],
         outputDirectory: 'dist/formly-contracts/admin',
         configurationHash: HASH_C,
+        runtimeProvenance: runtimeProvenance(),
       },
     ],
     forms: [
@@ -182,6 +235,20 @@ describe('workspace contract index', () => {
     expect(() =>
       parseWorkspaceContractIndex({ ...index, rootConfigPath: 'other.ts' }),
     ).toThrow(/contentHash: does not match/u);
+  });
+
+  it('rejects prior workspace index/configuration versions explicitly', () => {
+    const index = createWorkspaceContractIndex(createDraft());
+
+    expect(() =>
+      parseWorkspaceContractIndex({ ...index, schemaVersion: '0.1.0' }),
+    ).toThrow(/schemaVersion.*must be 0\.2\.0/u);
+    expect(() =>
+      parseWorkspaceContractIndex({
+        ...index,
+        workspaceConfigSchemaVersion: '0.1.0',
+      }),
+    ).toThrow(/workspaceConfigSchemaVersion.*must be 0\.2\.0/u);
   });
 
   it('rejects accessors without evaluating them', () => {
