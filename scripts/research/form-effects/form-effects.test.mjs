@@ -1,16 +1,56 @@
+import { readFileSync } from 'node:fs';
+import { createRequire } from 'node:module';
+import { dirname, join } from 'node:path';
+import { pathToFileURL, URL } from 'node:url';
+import { Script } from 'node:vm';
+
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
+const requireFromFormlyApp = createRequire(
+  new URL('../../../apps/formly-test-app/package.json', import.meta.url),
+);
+const formlyPackagePath = requireFromFormlyApp.resolve(
+  '@ngx-formly/core/package.json',
+);
+const formlyPackage = JSON.parse(readFileSync(formlyPackagePath, 'utf8'));
+const formlyPackageRoot = dirname(formlyPackagePath);
+const { evalStringExpression: evaluatePinnedFormlyString } = await import(
+  pathToFileURL(
+    join(
+      formlyPackageRoot,
+      'esm2020/lib/extensions/field-expression/utils.mjs',
+    ),
+  ).href
+);
+
+const CALLBACK_CONTEXT_UNKNOWNS = [
+  'feedback-semantics-unknown',
+  'invocation-wiring-unknown',
+  'stable-node-resolution-required',
+  'timing-readiness-unknown',
+];
+
 function parseExpression(expression) {
+  const sourceText = `const candidate = ${expression};`;
+  try {
+    new Script(sourceText);
+  } catch {
+    return { expression: undefined, reason: 'callback-not-javascript' };
+  }
+
   const sourceFile = ts.createSourceFile(
     'form-effect.js',
-    `const candidate = ${expression};`,
+    sourceText,
     ts.ScriptTarget.Latest,
     true,
     ts.ScriptKind.JS,
   );
+  if (sourceFile.parseDiagnostics.length > 0) {
+    return { expression: undefined, reason: 'callback-parse-error' };
+  }
   const declaration = sourceFile.statements[0]?.declarationList?.declarations[0];
-  return { sourceFile, expression: declaration?.initializer };
+  return { expression: declaration?.initializer };
 }
 
 function propertyName(node) {
@@ -27,6 +67,19 @@ function propertyName(node) {
   return undefined;
 }
 
+function isPropertyPath(node, expected) {
+  const segments = [];
+  let current = node;
+  while (ts.isPropertyAccessExpression(current)) {
+    segments.unshift(current.name.text);
+    current = current.expression;
+  }
+  if (ts.isIdentifier(current)) {
+    segments.unshift(current.text);
+  }
+  return JSON.stringify(segments) === JSON.stringify(expected);
+}
+
 function literalGetTarget(call) {
   if (!ts.isPropertyAccessExpression(call.expression)) {
     return undefined;
@@ -34,34 +87,71 @@ function literalGetTarget(call) {
   if (call.expression.name.text !== 'get') {
     return undefined;
   }
+  if (
+    !isPropertyPath(call.expression.expression, [
+      'field',
+      'parent',
+      'formControl',
+    ])
+  ) {
+    return undefined;
+  }
   const argument = call.arguments[0];
-  return ts.isStringLiteral(argument) ? argument.text : undefined;
+  return argument !== undefined && ts.isStringLiteral(argument)
+    ? argument.text
+    : undefined;
 }
 
 function analyzeCallback(expression) {
   const parsed = parseExpression(expression);
   const root = parsed.expression;
   if (root === undefined) {
-    return { classification: 'parse-error', candidates: [], unknowns: [] };
+    return {
+      classification: 'parse-error',
+      sources: [],
+      candidates: [],
+      localUnknowns: [parsed.reason ?? 'callback-parse-error'],
+      contextUnknowns: [],
+    };
   }
   if (ts.isIdentifier(root) || ts.isPropertyAccessExpression(root)) {
     return {
       classification: 'external-reference',
+      sources: [],
       candidates: [],
-      unknowns: ['implementation-outside-declaration'],
+      localUnknowns: ['implementation-outside-declaration'],
+      contextUnknowns: [],
     };
   }
   if (!ts.isArrowFunction(root) && !ts.isFunctionExpression(root)) {
     return {
       classification: 'unsupported-value',
+      sources: [],
       candidates: [],
-      unknowns: ['callback-shape-unsupported'],
+      localUnknowns: ['callback-shape-unsupported'],
+      contextUnknowns: [],
     };
   }
 
+  const sources = new Map();
   const candidates = [];
   const unknowns = new Set();
   const visit = (node) => {
+    if (
+      ts.isPropertyAccessExpression(node) &&
+      node.name.text === 'valueChanges'
+    ) {
+      if (ts.isCallExpression(node.expression)) {
+        const controlKey = literalGetTarget(node.expression);
+        if (controlKey === undefined) {
+          unknowns.add('source-resolution-required');
+        } else {
+          sources.set(controlKey, { controlKey, stream: 'valueChanges' });
+        }
+      } else {
+        unknowns.add('source-resolution-required');
+      }
+    }
     if (ts.isCallExpression(node)) {
       if (ts.isIdentifier(node.expression)) {
         unknowns.add('helper-call-indirection');
@@ -95,8 +185,177 @@ function analyzeCallback(expression) {
   visit(root.body);
   return {
     classification: 'inline-callback',
+    sources: [...sources.values()],
     candidates,
-    unknowns: [...unknowns].sort(),
+    localUnknowns: [...unknowns].sort(),
+    contextUnknowns: CALLBACK_CONTEXT_UNKNOWNS,
+  };
+}
+
+function modelPath(node) {
+  const segments = [];
+  let current = node;
+  while (ts.isPropertyAccessExpression(current)) {
+    segments.unshift(current.name.text);
+    current = current.expression;
+  }
+  return ts.isIdentifier(current) && current.text === 'model'
+    ? segments
+    : undefined;
+}
+
+function jsonLiteral(node) {
+  if (ts.isStringLiteral(node)) {
+    return { recognized: true, value: node.text };
+  }
+  if (ts.isNumericLiteral(node)) {
+    return { recognized: true, value: Number(node.text) };
+  }
+  if (node.kind === ts.SyntaxKind.TrueKeyword) {
+    return { recognized: true, value: true };
+  }
+  if (node.kind === ts.SyntaxKind.FalseKeyword) {
+    return { recognized: true, value: false };
+  }
+  if (node.kind === ts.SyntaxKind.NullKeyword) {
+    return { recognized: true, value: null };
+  }
+  return { recognized: false };
+}
+
+function normalizeCondition(expression) {
+  const parsed = parseExpression(expression);
+  const root = parsed.expression;
+  if (root === undefined || !ts.isBinaryExpression(root)) {
+    return undefined;
+  }
+  const operator =
+    root.operatorToken.kind === ts.SyntaxKind.EqualsEqualsEqualsToken
+      ? 'equals'
+      : root.operatorToken.kind === ts.SyntaxKind.ExclamationEqualsEqualsToken
+        ? 'not-equals'
+        : undefined;
+  const sourcePath = modelPath(root.left);
+  const literal = jsonLiteral(root.right);
+  if (operator === undefined || sourcePath === undefined || !literal.recognized) {
+    return undefined;
+  }
+  return { kind: 'comparison', operator, sourcePath, value: literal.value };
+}
+
+function evaluateNormalizedCondition(condition, model) {
+  let actual = model;
+  for (const segment of condition.sourcePath) {
+    actual = actual?.[segment];
+  }
+  return condition.operator === 'equals'
+    ? actual === condition.value
+    : actual !== condition.value;
+}
+
+function deriveBranchWitnesses(
+  condition,
+  contractHash,
+  sourceNodeId,
+  operation,
+  domain,
+) {
+  return domain.map((value, valueIndex) => ({
+    outcome: evaluateNormalizedCondition(
+      condition,
+      condition.sourcePath.reduceRight(
+        (child, segment) => ({ [segment]: child }),
+        value,
+      ),
+    ),
+    source: { nodeId: sourceNodeId, operation, value },
+    evidence: {
+      kind: 'domain',
+      contractHash,
+      nodeId: sourceNodeId,
+      valueIndex,
+    },
+  }));
+}
+
+function replayScenarioCase(axis, evidence) {
+  if (
+    axis.identity.id !== evidence.axis.id ||
+    axis.identity.version !== evidence.axis.version
+  ) {
+    return undefined;
+  }
+  const scenarioCase = axis.cases.find(
+    ({ identity }) =>
+      identity.id === evidence.scenarioCase.id &&
+      identity.version === evidence.scenarioCase.version,
+  );
+  return scenarioCase?.replay.kind === 'e2e-replayable'
+    ? scenarioCase.replay.inputs
+    : undefined;
+}
+
+function repeaterAccessPrerequisite({
+  arrayNodeId,
+  targetTemplateNodeId,
+  profile,
+  existingItemWitness,
+}) {
+  if (profile.interaction.kind !== 'repeater') {
+    return undefined;
+  }
+  const preferredOperation = profile.interaction.operation;
+  if (!profile.driver.capabilities.includes(preferredOperation)) {
+    return undefined;
+  }
+  const executor =
+    profile.driver.kind === 'application'
+      ? {
+          kind: 'application-driver',
+          driverId: profile.driver.id,
+          driverVersion: profile.driver.version,
+        }
+      : {
+          kind: 'generic-parts',
+          operationPart:
+            preferredOperation === 'add-item'
+              ? profile.interaction.addPart
+              : profile.interaction.expandPart,
+          itemPart: profile.interaction.itemPart,
+        };
+  if (
+    executor.kind === 'generic-parts' &&
+    (executor.operationPart === undefined || executor.itemPart === undefined)
+  ) {
+    return undefined;
+  }
+  const instanceBinding =
+    preferredOperation === 'add-item'
+      ? { kind: 'operation-result' }
+      : existingItemWitness === undefined
+        ? undefined
+        : { kind: 'existing-item', witness: existingItemWitness };
+  if (instanceBinding === undefined) {
+    return undefined;
+  }
+  return {
+    recordKind: 'access-prerequisite',
+    ownerNodeId: arrayNodeId,
+    target: {
+      kind: 'array-template',
+      arrayNodeId,
+      templateNodeId: targetTemplateNodeId,
+    },
+    preferredOperation,
+    eligibleOperations: profile.driver.capabilities.filter(
+      (operation) => operation === 'add-item' || operation === 'expand-item',
+    ),
+    step: { operation: preferredOperation, executor, instanceBinding },
+    output: {
+      kind: 'transient-instance-handle',
+      templateNodeId: targetTemplateNodeId,
+      readyWhen: 'driver-result',
+    },
   };
 }
 
@@ -131,24 +390,318 @@ class SubjectProbe {
   }
 }
 
-function otherScenario(reason) {
-  const isOther = reason === 'Other';
-  return {
-    reason,
-    details: {
-      visible: isOther,
-      required: isOther,
-    },
-  };
-}
-
 describe('RH-04 bounded form-effects experiments', () => {
-  it('resolves the Other branch only for the controlled scenarios that were run', () => {
-    const standard = otherScenario('Transfer');
-    const other = otherScenario('Other');
+  it('rejects malformed and TypeScript-only callback syntax before AST analysis', () => {
+    for (const source of ['(field) => {', '(field: any) => field']) {
+      expect(analyzeCallback(source)).toEqual({
+        classification: 'parse-error',
+        sources: [],
+        candidates: [],
+        localUnknowns: ['callback-not-javascript'],
+        contextUnknowns: [],
+      });
+    }
+  });
 
-    expect(standard.details).toEqual({ visible: false, required: false });
-    expect(other.details).toEqual({ visible: true, required: true });
+  it('normalizes the Other rule and derives only domain-backed branch witnesses', () => {
+    expect(formlyPackage.version).toBe('6.1.8');
+    const expression = `model.reason === 'Other'`;
+    const condition = normalizeCondition(expression);
+    expect(condition).toEqual({
+      kind: 'comparison',
+      operator: 'equals',
+      sourcePath: ['reason'],
+      value: 'Other',
+    });
+    expect(normalizeCondition(`model.reason == 'Other'`)).toBeUndefined();
+    expect(normalizeCondition(`isOther(model.reason)`)).toBeUndefined();
+
+    const evaluateWithFormly = evaluatePinnedFormlyString(expression, [
+      'model',
+      'formState',
+      'field',
+    ]);
+    for (const reason of ['Transfer', 'Other']) {
+      expect(evaluateNormalizedCondition(condition, { reason })).toBe(
+        evaluateWithFormly({ reason }, {}, {}),
+      );
+    }
+
+    expect(
+      deriveBranchWitnesses(
+        condition,
+        'sha256:research-form-v1',
+        'claims.reason',
+        'select-option',
+        ['Transfer', 'Other'],
+      ),
+    ).toEqual([
+      {
+        outcome: false,
+        source: {
+          nodeId: 'claims.reason',
+          operation: 'select-option',
+          value: 'Transfer',
+        },
+        evidence: {
+          kind: 'domain',
+          contractHash: 'sha256:research-form-v1',
+          nodeId: 'claims.reason',
+          valueIndex: 0,
+        },
+      },
+      {
+        outcome: true,
+        source: {
+          nodeId: 'claims.reason',
+          operation: 'select-option',
+          value: 'Other',
+        },
+        evidence: {
+          kind: 'domain',
+          contractHash: 'sha256:research-form-v1',
+          nodeId: 'claims.reason',
+          valueIndex: 1,
+        },
+      },
+    ]);
+    expect(
+      deriveBranchWitnesses(
+        condition,
+        'sha256:research-form-v1',
+        'claims.reason',
+        'select-option',
+        ['Other'],
+      ).map(({ outcome, source }) => ({ outcome, source })),
+    ).toEqual([
+      {
+        outcome: true,
+        source: {
+          nodeId: 'claims.reason',
+          operation: 'select-option',
+          value: 'Other',
+        },
+      },
+    ]);
+  });
+
+  it('replays scenario state only from a versioned case with explicit E2E inputs', () => {
+    const axis = {
+      identity: { id: 'reason-branches', version: 1 },
+      coverage: 'declared-complete',
+      cases: [
+        {
+          identity: { id: 'other', version: 1 },
+          compilationScenario: { id: 'other', version: 1 },
+          artifactHash: 'sha256:other',
+          replay: {
+            kind: 'e2e-replayable',
+            inputs: [
+              {
+                nodeId: 'claims.reason',
+                operation: 'select-option',
+                value: 'Other',
+                evidence: {
+                  kind: 'domain',
+                  contractHash: 'sha256:research-form-v1',
+                  nodeId: 'claims.reason',
+                  valueIndex: 1,
+                },
+              },
+            ],
+          },
+        },
+        {
+          identity: { id: 'service-seeded', version: 1 },
+          compilationScenario: { id: 'service-seeded', version: 1 },
+          artifactHash: 'sha256:service-seeded',
+          replay: {
+            kind: 'compile-only',
+            reason: 'Provider state has no declared UI operation.',
+          },
+        },
+      ],
+    };
+
+    expect(
+      replayScenarioCase(axis, {
+        axis: { id: 'reason-branches', version: 1 },
+        scenarioCase: { id: 'other', version: 1 },
+      }),
+    ).toEqual([
+      {
+        nodeId: 'claims.reason',
+        operation: 'select-option',
+        value: 'Other',
+        evidence: {
+          kind: 'domain',
+          contractHash: 'sha256:research-form-v1',
+          nodeId: 'claims.reason',
+          valueIndex: 1,
+        },
+      },
+    ]);
+    expect(
+      replayScenarioCase(axis, {
+        axis: { id: 'reason-branches', version: 1 },
+        scenarioCase: { id: 'service-seeded', version: 1 },
+      }),
+    ).toBeUndefined();
+    expect(
+      replayScenarioCase(axis, {
+        axis: { id: 'reason-branches', version: 2 },
+        scenarioCase: { id: 'other', version: 1 },
+      }),
+    ).toBeUndefined();
+    expect(
+      replayScenarioCase(axis, {
+        axis: { id: 'reason-branches', version: 1 },
+        scenarioCase: { id: 'other', version: 2 },
+      }),
+    ).toBeUndefined();
+  });
+
+  it('derives repeater access only from the preferred validated capability', () => {
+    const expandProfile = {
+      interaction: {
+        kind: 'repeater',
+        operation: 'expand-item',
+        addPart: 'add',
+        itemPart: 'item',
+        expandPart: 'expand',
+      },
+      driver: {
+        kind: 'generic',
+        id: 'generic.repeater',
+        version: 1,
+        capabilities: ['expand-item'],
+      },
+    };
+    const existingItemWitness = {
+      kind: 'scenario-item',
+      axis: { id: 'existing-rows', version: 1 },
+      scenarioCase: { id: 'one-row', version: 1 },
+      itemIndex: 0,
+    };
+
+    expect(
+      repeaterAccessPrerequisite({
+        arrayNodeId: 'claims::path:s_items',
+        targetTemplateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        profile: expandProfile,
+      }),
+    ).toBeUndefined();
+
+    const mismatchedCapabilityProfile = {
+      ...expandProfile,
+      driver: { ...expandProfile.driver, capabilities: ['add-item'] },
+    };
+    expect(
+      repeaterAccessPrerequisite({
+        arrayNodeId: 'claims::path:s_items',
+        targetTemplateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        profile: mismatchedCapabilityProfile,
+        existingItemWitness,
+      }),
+    ).toBeUndefined();
+    expect(
+      repeaterAccessPrerequisite({
+        arrayNodeId: 'claims::path:s_items',
+        targetTemplateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        profile: expandProfile,
+        existingItemWitness,
+      }),
+    ).toEqual({
+      recordKind: 'access-prerequisite',
+      ownerNodeId: 'claims::path:s_items',
+      target: {
+        kind: 'array-template',
+        arrayNodeId: 'claims::path:s_items',
+        templateNodeId: 'claims::path:s_items.s_%2A.s_name',
+      },
+      preferredOperation: 'expand-item',
+      eligibleOperations: ['expand-item'],
+      step: {
+        operation: 'expand-item',
+        executor: {
+          kind: 'generic-parts',
+          operationPart: 'expand',
+          itemPart: 'item',
+        },
+        instanceBinding: {
+          kind: 'existing-item',
+          witness: existingItemWitness,
+        },
+      },
+      output: {
+        kind: 'transient-instance-handle',
+        templateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        readyWhen: 'driver-result',
+      },
+    });
+
+    const addProfile = {
+      interaction: { ...expandProfile.interaction, operation: 'add-item' },
+      driver: {
+        ...expandProfile.driver,
+        capabilities: ['add-item', 'expand-item'],
+      },
+    };
+    expect(
+      repeaterAccessPrerequisite({
+        arrayNodeId: 'claims::path:s_items',
+        targetTemplateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        profile: addProfile,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        preferredOperation: 'add-item',
+        eligibleOperations: ['add-item', 'expand-item'],
+        step: {
+          operation: 'add-item',
+          executor: {
+            kind: 'generic-parts',
+            operationPart: 'add',
+            itemPart: 'item',
+          },
+          instanceBinding: { kind: 'operation-result' },
+        },
+      }),
+    );
+
+    const applicationProfile = {
+      ...expandProfile,
+      driver: {
+        kind: 'application',
+        id: 'claims.repeater',
+        version: 3,
+        capabilities: ['expand-item'],
+      },
+    };
+    expect(
+      repeaterAccessPrerequisite({
+        arrayNodeId: 'claims::path:s_items',
+        targetTemplateNodeId: 'claims::path:s_items.s_%2A.s_name',
+        profile: applicationProfile,
+        existingItemWitness,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        preferredOperation: 'expand-item',
+        step: {
+          operation: 'expand-item',
+          executor: {
+            kind: 'application-driver',
+            driverId: 'claims.repeater',
+            driverVersion: 3,
+          },
+          instanceBinding: {
+            kind: 'existing-item',
+            witness: existingItemWitness,
+          },
+        },
+      }),
+    );
   });
 
   it('finds a direct revalidation target and confirms the callback mutation', () => {
@@ -156,10 +709,12 @@ describe('RH-04 bounded form-effects experiments', () => {
       field.parent.formControl.get('dependent').updateValueAndValidity()`;
     expect(analyzeCallback(source)).toEqual({
       classification: 'inline-callback',
+      sources: [],
       candidates: [
         { target: 'dependent', mutation: 'updateValueAndValidity' },
       ],
-      unknowns: [],
+      localUnknowns: [],
+      contextUnknowns: CALLBACK_CONTEXT_UNKNOWNS,
     });
 
     const dependent = new ControlProbe();
@@ -174,8 +729,10 @@ describe('RH-04 bounded form-effects experiments', () => {
   it('refuses to infer an indirect update callback even when a scenario observes options', () => {
     expect(analyzeCallback('externalCallbacks.updateCaseTypes')).toEqual({
       classification: 'external-reference',
+      sources: [],
       candidates: [],
-      unknowns: ['implementation-outside-declaration'],
+      localUnknowns: ['implementation-outside-declaration'],
+      contextUnknowns: [],
     });
 
     const state = { options: ['basic'] };
@@ -198,14 +755,16 @@ describe('RH-04 bounded form-effects experiments', () => {
         })`;
     expect(analyzeCallback(onInitSource)).toEqual({
       classification: 'inline-callback',
+      sources: [{ controlKey: 'source', stream: 'valueChanges' }],
       candidates: [
         { target: 'dependent', mutation: 'markAsTouched' },
         { target: 'dependent', mutation: 'updateValueAndValidity' },
       ],
-      unknowns: [
+      localUnknowns: [
         'helper-call-indirection',
         'subscription-lifecycle-and-pipeline-semantics',
       ],
+      contextUnknowns: CALLBACK_CONTEXT_UNKNOWNS,
     });
 
     const valueChanges = new SubjectProbe();
@@ -232,8 +791,10 @@ describe('RH-04 bounded form-effects experiments', () => {
   it('keeps helpers and aliases as review scaffolds instead of source interpretation', () => {
     expect(analyzeCallback('(field) => revalidateDependent(field)')).toEqual({
       classification: 'inline-callback',
+      sources: [],
       candidates: [],
-      unknowns: ['helper-call-indirection'],
+      localUnknowns: ['helper-call-indirection'],
+      contextUnknowns: CALLBACK_CONTEXT_UNKNOWNS,
     });
     expect(
       analyzeCallback(`(field) => {
@@ -242,8 +803,44 @@ describe('RH-04 bounded form-effects experiments', () => {
       }`),
     ).toEqual({
       classification: 'inline-callback',
+      sources: [],
       candidates: [],
-      unknowns: ['alias-resolution-required'],
+      localUnknowns: ['alias-resolution-required'],
+      contextUnknowns: CALLBACK_CONTEXT_UNKNOWNS,
+    });
+    expect(
+      analyzeCallback(`() =>
+        logger.get('dependent').updateValueAndValidity()`),
+    ).toEqual({
+      classification: 'inline-callback',
+      sources: [],
+      candidates: [],
+      localUnknowns: ['target-resolution-required'],
+      contextUnknowns: CALLBACK_CONTEXT_UNKNOWNS,
+    });
+    expect(
+      analyzeCallback(`(field) =>
+        field.parent.formControl.get().updateValueAndValidity()`),
+    ).toEqual({
+      classification: 'inline-callback',
+      sources: [],
+      candidates: [],
+      localUnknowns: ['target-resolution-required'],
+      contextUnknowns: CALLBACK_CONTEXT_UNKNOWNS,
+    });
+    expect(
+      analyzeCallback(`(field) =>
+        field.parent.formControl.get(field.props.source).valueChanges
+          .subscribe(() => undefined)`),
+    ).toEqual({
+      classification: 'inline-callback',
+      sources: [],
+      candidates: [],
+      localUnknowns: [
+        'source-resolution-required',
+        'subscription-lifecycle-and-pipeline-semantics',
+      ],
+      contextUnknowns: CALLBACK_CONTEXT_UNKNOWNS,
     });
   });
 });
