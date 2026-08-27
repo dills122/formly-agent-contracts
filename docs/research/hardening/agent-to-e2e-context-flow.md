@@ -108,9 +108,12 @@ inventing selectors or application semantics.
    by the agent.
 5. Validation proves the node, value, operation, commit ownership,
    post-commit assertion, ordering, readiness, wrapper/repeater access,
-   validation surface, and usage action are supported.
-6. Compilation resolves only pre-registered driver IDs/versions and locator
-   targets. A missing fact is a diagnostic, never a fallback guess.
+   state/validation assertion surface, and exact usage action/transition are
+   supported.
+6. Compilation treats the plan hash as content identity, reruns complete pure
+   semantic plan validation, and only then resolves pre-registered driver
+   IDs/versions and locator targets. A missing or modified fact is a diagnostic,
+   never a fallback guess.
 7. Runtime execution uses Playwright actionability and web-first assertions and
    reports parity/staleness failures against the pinned context.
 
@@ -358,6 +361,16 @@ interface UsageOutcomeProjection {
   readonly evidenceRefs: readonly string[];
 }
 
+interface UsageTransitionProjection {
+  readonly id: string;
+  readonly version: number;
+  readonly fromStepId: string;
+  readonly actionId: string;
+  readonly outcomeId: string;
+  readonly toStepId: string;
+  readonly evidenceRefs: readonly string[];
+}
+
 interface UsageStepProjection {
   readonly id: string;
   readonly ordinal: number;
@@ -371,6 +384,7 @@ interface UsageJourneyProjection {
   readonly steps: readonly UsageStepProjection[];
   readonly actions: readonly UsageActionProjection[];
   readonly outcomes: readonly UsageOutcomeProjection[];
+  readonly transitions: readonly UsageTransitionProjection[];
 }
 
 interface ValueDomainProjection {
@@ -447,6 +461,8 @@ interface CreatedItemCaptureProjection {
   readonly id: string;
   readonly version: number;
   readonly repeaterNodeId: string;
+  readonly profile: { readonly id: string; readonly version: number };
+  readonly capability: 'add-item';
   readonly guarantee: 'exactly-one-created-item';
   readonly captureMode: 'driver-returned-item-scope';
   readonly driver: NodeInteractionProjection['driver'];
@@ -486,6 +502,24 @@ interface ValueAssertionProjection {
   readonly evidenceRefs: readonly string[];
 }
 
+type AssertableNodeState =
+  | 'visible'
+  | 'hidden'
+  | 'enabled'
+  | 'disabled'
+  | 'valid'
+  | 'invalid';
+
+interface StateAssertionProjection {
+  readonly id: string;
+  readonly version: number;
+  readonly states: readonly [AssertableNodeState, ...AssertableNodeState[]];
+  readonly driver: NodeInteractionProjection['driver'];
+  readonly partRef: string;
+  readonly locatorTargetRef: string;
+  readonly evidenceRefs: readonly string[];
+}
+
 interface E2eNodeProjection {
   readonly nodeId: string;
   readonly modelPath: readonly (string | number | '*')[];
@@ -499,6 +533,7 @@ interface E2eNodeProjection {
     readonly captureProfiles: readonly CreatedItemCaptureProjection[];
   };
   readonly validationSurfaces: readonly ValidationSurfaceProjection[];
+  readonly stateAssertions: readonly StateAssertionProjection[];
   readonly valueAssertions: readonly ValueAssertionProjection[];
   readonly unknowns: readonly {
     readonly aspect:
@@ -509,6 +544,7 @@ interface E2eNodeProjection {
       | 'interaction-sequence'
       | 'value-commit'
       | 'validation-surface'
+      | 'state-assertion'
       | 'value-assertion'
       | 'usage'
       | 'freshness';
@@ -877,6 +913,7 @@ type GetE2eSliceResult =
             readonly code:
               | 'STEP_SCOPE_MISMATCH'
               | 'CROSS_STEP_PREREQUISITE_REQUIRED'
+              | 'CROSS_STEP_TRANSITION_AMBIGUOUS'
               | 'CROSS_STEP_TRANSITION_UNAVAILABLE'
               | 'PREREQUISITE_CYCLE'
               | 'ATOMIC_VIEW_TOO_LARGE'
@@ -889,6 +926,7 @@ type GetE2eSliceResult =
             readonly code:
               | 'STEP_SCOPE_MISMATCH'
               | 'CROSS_STEP_PREREQUISITE_REQUIRED'
+              | 'CROSS_STEP_TRANSITION_AMBIGUOUS'
               | 'CROSS_STEP_TRANSITION_UNAVAILABLE'
               | 'PREREQUISITE_CYCLE'
               | 'ATOMIC_VIEW_TOO_LARGE'
@@ -905,10 +943,14 @@ cross-step focus request returns `STEP_SCOPE_MISMATCH`; the server never chooses
 a step from array order. Starting from the focus set, the server follows every
 executable ordering, visibility, wrapper, item, and readiness prerequisite to a
 fixed point. All included source/target nodes and edges must belong to
-`withinStepId`. A cross-step prerequisite with a declared journey transition
-returns `CROSS_STEP_PREREQUISITE_REQUIRED` and the exact source step/action; if
-no transition is declared it returns `CROSS_STEP_TRANSITION_UNAVAILABLE`. A
-cycle returns `PREREQUISITE_CYCLE`; none of these cases returns a partial slice.
+`withinStepId`. A cross-step prerequisite with exactly one matching
+`UsageTransitionProjection` returns `CROSS_STEP_PREREQUISITE_REQUIRED` and the
+exact transition, source step, action, outcome, and destination step. Zero
+matching transitions returns `CROSS_STEP_TRANSITION_UNAVAILABLE`; more than one
+returns `CROSS_STEP_TRANSITION_AMBIGUOUS` with their stable transition IDs. The
+server never infers the destination from action order, `outcomeIds`, step
+ordinal, or route behavior. A cycle returns `PREREQUISITE_CYCLE`; none of these
+cases returns a partial slice.
 
 The full transitive prerequisite/effect closure is atomic because truncating it
 could omit an execution-safety edge. A server cap therefore returns
@@ -923,8 +965,10 @@ membership; it is not part of the minimum journey.
 fully resolved execution plan or structured blockers. Compilation is stateless:
 the caller resubmits the validated plan, its hash, and the exact same context
 reference. The compiler canonicalizes the submitted plan, recomputes its hash,
-and rejects any hash or context mismatch before resolving trusted drivers. It
-never accepts raw selectors, arbitrary driver imports, or expressions.
+rejects any hash or context mismatch, and then reruns complete semantic plan
+validation before resolving trusted drivers. The hash identifies bytes; it
+does not authenticate validator approval. Compilation never accepts raw
+selectors, arbitrary driver imports, or expressions.
 
 ```ts
 interface ValidateTestIntentInput {
@@ -958,6 +1002,26 @@ interface ApprovedNodeBinding {
     ...NodeInteractionTargetProjection[],
   ];
   readonly itemContext?: ApprovedItemContext;
+}
+
+interface ApprovedCaptureBinding {
+  readonly repeaterNodeId: string;
+  readonly captureRef: {
+    readonly id: string;
+    readonly version: number;
+  };
+}
+
+interface ApprovedStateAssertionBinding {
+  readonly nodeId: string;
+  readonly assertionRef: {
+    readonly id: string;
+    readonly version: number;
+  };
+  readonly state: AssertableNodeState;
+  readonly driver: NodeInteractionProjection['driver'];
+  readonly partRef: string;
+  readonly locatorTargetRef: string;
 }
 
 type ResolvedPlanValue =
@@ -1067,28 +1131,13 @@ type ValidatedExecutionStep = ValidatedPlanStepBase &
       }
     | {
         readonly op: 'add-item';
-        readonly binding: Omit<ApprovedNodeBinding, 'itemContext'> & {
-          readonly itemContext?: never;
-        };
+        readonly captureBinding: ApprovedCaptureBinding;
         readonly physicalOperationId: string;
-        readonly captureRef: {
-          readonly id: string;
-          readonly version: number;
-        };
-        readonly addTarget: {
-          readonly partRef: string;
-          readonly locatorTargetRef: string;
-        };
         readonly establishesItemContext: {
           readonly kind: 'created-item';
           readonly itemContextId: string;
           readonly repeaterNodeId: string;
-          readonly captureId: string;
           readonly establishedByPlanStepId: string;
-          readonly itemTarget: {
-            readonly partRef: string;
-            readonly locatorTargetRef: string;
-          };
         };
       }
     | {
@@ -1108,15 +1157,7 @@ type ValidatedExecutionStep = ValidatedPlanStepBase &
       }
     | {
         readonly op: 'expect-state';
-        readonly binding: ApprovedNodeBinding;
-        readonly state:
-          | 'visible'
-          | 'hidden'
-          | 'enabled'
-          | 'disabled'
-          | 'valid'
-          | 'invalid';
-        readonly assertionTargetRef: string;
+        readonly assertion: ApprovedStateAssertionBinding;
       }
     | {
         readonly op: 'expect-value';
@@ -1153,6 +1194,7 @@ type ValidatedExecutionStep = ValidatedPlanStepBase &
 
 interface ValidatedExecutionPlan {
   readonly schemaVersion: '0.1.0';
+  readonly semanticPolicyVersion: '0.1.0';
   readonly contextRef: ContractContextRef;
   readonly caseId: string;
   readonly steps: readonly ValidatedExecutionStep[];
@@ -1184,6 +1226,24 @@ interface CompileTestIntentInput {
   readonly planHash: `sha256:${string}`;
   readonly output: 'driver-calls' | 'playwright-test';
 }
+
+interface RevalidateExecutionPlanInput {
+  readonly contextRef: ContractContextRef;
+  readonly plan: ValidatedExecutionPlan;
+}
+
+type RevalidateExecutionPlanResult =
+  | {
+      readonly status: 'valid';
+      readonly canonicalPlanHash: `sha256:${string}`;
+    }
+  | {
+      readonly status: 'invalid';
+      readonly diagnostics: readonly [
+        IntentBlockingDiagnostic,
+        ...IntentBlockingDiagnostic[],
+      ];
+    };
 
 interface CompiledDriverCall {
   readonly planStepId: string;
@@ -1228,16 +1288,29 @@ type CompileTestIntentResult =
 it would add storage, expiry, authorization, and replay semantics that the
 smallest flow does not need. Resubmission keeps the boundary explicit and
 reversible. `compile_test_intent` should be idempotent for the same canonical
-plan, context, and tool version. `planHash` covers the canonical serialized
-`ValidatedExecutionPlan`, including its embedded `contextRef`; compilation
-requires the separately submitted `contextRef` to equal the embedded one. In
-the first slice it should return driver calls for review, not write files.
+plan, context, and tool version. `planHash` is content identity and corruption
+detection only; it is not proof that a validator approved the bytes because a
+caller can modify a plan and recompute an ordinary SHA-256 hash. It covers the
+canonical serialized `ValidatedExecutionPlan`, including its embedded
+`contextRef`, and compilation requires the separately submitted `contextRef`
+to equal the embedded one. Before any driver or implementation lookup,
+compilation must invoke the same pure, complete, version-pinned semantic plan
+validator through `RevalidateExecutionPlanInput`. That pass verifies the closed
+schema and semantic-policy version, pinned context, ordering, exact record
+existence and equality, plan-local links, and
+all losslessness invariants below. It may reject or confirm serialized choices;
+it may not select, repair, expand, or reorder them. A hash mismatch returns
+`PLAN_HASH_MISMATCH`; a schema-valid plan that reproduces a caller-supplied hash
+but fails semantic revalidation returns `PLAN_SEMANTIC_INVALID`. In the first
+slice compilation should return driver calls for review, not write files.
 
-**Inference:** The validator, not the compiler, chooses every binding, target,
+**Inference:** Intent validation, not compilation, chooses every binding, target,
 canonical value/policy resolution, usage action, outcome, validation surface,
 wrapper expansion, and readiness step serialized above. Compilation may look
 up the referenced implementation in the hash-pinned trusted registries, but it
 may not select a different semantic reference or add an unplanned operation.
+Its mandatory semantic revalidation is an authorization check over already
+serialized choices, not a second planner.
 The driver-call review output pairs the selected trusted driver with the exact
 closed `ValidatedExecutionStep`; it has no secondary free-form argument bag
 that could reintroduce selectors, code, or unvalidated driver options.
@@ -1268,14 +1341,16 @@ must additionally prove all of the following before returning `status: valid`:
 - every binding for a wildcard descendant carries an exact `itemContext` whose
   establishing plan step precedes the descendant operation. No descendant
   driver may receive a default index; and
-- `add-item` has no input item context, serializes its exact add-control target,
-  selects one versioned `captureRef`, and establishes one plan-local
-  `created-item` context through a driver capability whose source contract
-  guarantees exactly one new item and returns its separately serialized scoped
-  item target. The add binding node, capture profile `repeaterNodeId`, context
-  `repeaterNodeId`, `captureId`, and `establishedByPlanStepId` must agree
-  bidirectionally; later created-item references must resolve to that exact
-  earlier step and capture. `expand-item` is a separate variant and
+- `add-item` has no general `ApprovedNodeBinding` and no duplicate target or
+  driver fields. Its sole execution authority is one `ApprovedCaptureBinding`
+  naming an immutable `CreatedItemCaptureProjection`. That source record owns
+  the profile, `add-item` capability, driver, exact add/item targets, readiness,
+  and exactly-one-created-item guarantee. The capture binding and established
+  context `repeaterNodeId` must equal the source record; the establishing plan
+  step must equal itself; and later created-item references must resolve to that
+  exact earlier step. Hash-pinned lookup may rehydrate the selected capture
+  record but cannot combine it with a general interaction binding or override
+  any capture fact. `expand-item` is a separate variant and
   always carries an `existing-index` or `created-item` context plus exact
   item/expand targets; a many-cardinality expand part is never passed to the
   compiler unscoped; and
@@ -1283,11 +1358,20 @@ must additionally prove all of the following before returning `status: valid`:
   action plan step and that action's `commitIds` contains the selected commit.
 - every validation activation is assigned to exactly one serialized physical
   operation: the approving set, a node operation, or an explicit usage action.
-  Usage-action activations name both node and validation ID on that action.
+  Usage-action activations name both node and validation ID on that action;
+- every `expect-state.assertion` resolves one source
+  `StateAssertionProjection`; node, state, driver, part, locator target, ID, and
+  version must agree exactly, and the requested state must be in its declared
+  non-empty state set; and
+- every cross-step recovery resolves exactly one `UsageTransitionProjection`
+  whose source step, action, outcome, and destination step agree with the
+  returned diagnostic. Action `outcomeIds` and step ordinals are supporting
+  consistency checks, never substitutes for the transition record.
 
 Hash-pinned lookup is compression, not decision-making: it may retrieve an
 immutable record named by the plan, but it may not choose a commit, mechanic,
-row, activation, action, or assertion record that the plan omitted.
+row, activation, action, transition, capture, or assertion record that the plan
+omitted. Compilation repeats these checks even when the submitted hash matches.
 
 ## Progressive disclosure
 
@@ -1397,13 +1481,7 @@ type TestIntentStep =
     }
   | (TestIntentNodeTarget & {
       readonly op: 'expectState';
-      readonly state:
-        | 'visible'
-        | 'hidden'
-        | 'enabled'
-        | 'disabled'
-        | 'valid'
-        | 'invalid';
+      readonly state: AssertableNodeState;
     })
   | (TestIntentNodeTarget & {
       readonly op: 'expectValue';
@@ -1462,7 +1540,12 @@ not add a fixed sleep.
 **Inference:** Wrapper activation preconditions are mechanical and may be
 expanded only by validation after mechanic/part/locator-target approval; the
 compiler consumes the serialized expansion. Hidden fields require an explicit
-reachable trigger path and an `expectState` before interaction. Repeater
+reachable trigger path and an `expectState` before interaction. `expectState`
+is executable only when validation selects one versioned
+`StateAssertionProjection` for the node and requested state. The resulting
+plan carries its exact source ID/version, driver, part, and locator target;
+generic interaction metadata or a visible outcome cannot stand in for that
+assertion authority. Repeater
 descendants require a serialized item context plus explicit `addItem` or
 `expandItem` when the profile says activation is needed. An array wildcard is
 never converted to row zero by convention.
@@ -1470,9 +1553,11 @@ never converted to row zero by convention.
 **Inference:** `addItem.captureAs` is a plan-local alias, not a DOM locator. The
 validator resolves it to an `itemContextId` and may approve add only when one
 compatible `CreatedItemCaptureProjection` is selected from the pinned registry.
-The plan serializes that versioned selection; the approved add driver must
-conform to its `exactly-one-created-item` guarantee and return the item under
-the exact serialized item target, separately from the add-control target.
+The plan serializes only one `ApprovedCaptureBinding` for that versioned
+selection. The selected source capture record—not a competing general node
+binding—owns the profile, add capability, driver, readiness, add-control target,
+item target, and `exactly-one-created-item` guarantee. The approved add driver
+must return the item under that exact source-owned item target.
 Capture aliases are unique within a case and a created-item reference must point
 to an earlier add step. Zero supported profiles returns
 `REPEATER_ITEM_CAPTURE_UNSUPPORTED`; more than one compatible profile returns
@@ -1489,9 +1574,10 @@ inserts one to make a later assertion pass.
 
 **Inference:** Value commit is a third, separate authority. A profile may
 declare that `set` includes an immediate/node-local commit, or it may require
-A distinct explicit `commitValue` is legal only for a declared blur record that
-itself names the exact mechanic, part, and locator target; explicit immediate
-commit is unrepresentable. Included-in-set and explicit variants are disjoint.
+a distinct explicit `commitValue`. The latter is legal only for a declared
+blur record that itself names the exact mechanic, part, and locator target;
+explicit immediate commit is unrepresentable. Included-in-set and explicit
+variants are disjoint.
 A usage-action commit (for example Angular `updateOn: 'submit'`) cannot compile
 from `commitValue`; it requires `invokeUsageAction`. The validator rejects a
 duplicate explicit commit when `set` already owns it, preventing accidental
@@ -1589,6 +1675,11 @@ interface IntentDiagnosticPolicyByCode {
     readonly at: PlanDiagnosticLocation;
     readonly remediation: readonly [{ readonly kind: 'revalidate-intent' }];
   };
+  readonly PLAN_SEMANTIC_INVALID: {
+    readonly phase: 'compile'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: PlanDiagnosticLocation;
+    readonly remediation: readonly [{ readonly kind: 'revalidate-intent' }];
+  };
   readonly USAGE_ENTRY_UNSUPPORTED: {
     readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
     readonly at: ContextDiagnosticLocation & { readonly entryId: string };
@@ -1653,6 +1744,21 @@ interface IntentDiagnosticPolicyByCode {
     readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
     readonly at: IntentStepDiagnosticLocation & { readonly assertionId: string };
     readonly remediation: readonly [{ readonly kind: 'declare-value-assertion-driver'; readonly assertionId: string }];
+  };
+  readonly STATE_ASSERTION_NOT_FOUND: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string; readonly state: AssertableNodeState };
+    readonly remediation: readonly [{ readonly kind: 'declare-state-assertion'; readonly nodeId: string; readonly state: AssertableNodeState }];
+  };
+  readonly STATE_ASSERTION_UNSUPPORTED: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly assertionId: string; readonly state: AssertableNodeState };
+    readonly remediation: readonly [{ readonly kind: 'declare-state-assertion-driver'; readonly assertionId: string }];
+  };
+  readonly STATE_ASSERTION_AMBIGUOUS: {
+    readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: IntentStepDiagnosticLocation & { readonly nodeId: string; readonly state: AssertableNodeState };
+    readonly remediation: readonly [{ readonly kind: 'choose-state-assertion'; readonly assertionIds: readonly string[] }];
   };
   readonly SCENARIO_REQUIRED: {
     readonly phase: 'validation'; readonly severity: 'error'; readonly blocking: true;
@@ -1734,7 +1840,19 @@ interface IntentDiagnosticPolicyByCode {
     };
     readonly remediation: readonly [{
       readonly kind: 'request-prerequisite-step'; readonly withinStepId: string;
-      readonly thenActionId: string;
+      readonly transitionId: string; readonly thenActionId: string;
+      readonly outcomeId: string; readonly toStepId: string;
+    }];
+  };
+  readonly CROSS_STEP_TRANSITION_AMBIGUOUS: {
+    readonly phase: 'context'; readonly severity: 'error'; readonly blocking: true;
+    readonly at: ContextDiagnosticLocation & {
+      readonly requestedStepId: string; readonly sourceStepId: string;
+      readonly sourceNodeId: string; readonly targetNodeId: string;
+    };
+    readonly remediation: readonly [{
+      readonly kind: 'choose-declared-transition';
+      readonly transitionIds: readonly [string, string, ...string[]];
     }];
   };
   readonly CROSS_STEP_TRANSITION_UNAVAILABLE: {
@@ -1826,8 +1944,10 @@ shape requires a breaking version. Machine consumers must reject an unsupported
 diagnostic schema version rather than treating arbitrary strings as executable
 guidance. `USAGE_ENTRY_UNSUPPORTED` and `OUTCOME_ASSERTION_UNSUPPORTED` cover
 existing records whose trusted drivers are absent; missing, unsupported, and
-ambiguous commit/value-assertion cases have distinct codes rather than one
-catch-all refusal.
+ambiguous commit, value-assertion, state-assertion, and transition cases have
+distinct codes rather than one catch-all refusal. `PLAN_HASH_MISMATCH` covers
+content mismatch only; `PLAN_SEMANTIC_INVALID` covers a hash-reproducing plan
+that fails the mandatory compile-time semantic pass.
 
 **Inference — form-contract diagnostic boundary:** Raw
 `ContractDiagnosticCodeProjection` values are not executable diagnostics in
@@ -1858,7 +1978,7 @@ mapping in both directions, and fail closed on a missing structured projection.
 | Usage exists but entry cannot execute | Block before authoring an intent. | `USAGE_ENTRY_UNSUPPORTED: entry ... has no trusted open-usage driver.` | Inference |
 | Outcome exists but cannot be asserted | Block the outcome assertion. | `OUTCOME_ASSERTION_UNSUPPORTED: outcome ... has no trusted assertion driver.` | Inference |
 | Focus nodes cross the requested step | Refuse the whole slice; return exact step candidates. | `STEP_SCOPE_MISMATCH: all focus nodes must belong to step ...` | Inference |
-| A transitive prerequisite belongs to another step | Refuse the slice. Return the exact source step and only a declared transition action, or the fixed transition-unavailable diagnostic. | `CROSS_STEP_PREREQUISITE_REQUIRED` or `CROSS_STEP_TRANSITION_UNAVAILABLE`. | Inference |
+| A transitive prerequisite belongs to another step | Refuse the slice. Return one exact declared transition record, stable IDs when several records match, or a fixed unavailable diagnostic. | `CROSS_STEP_PREREQUISITE_REQUIRED`, `CROSS_STEP_TRANSITION_AMBIGUOUS`, or `CROSS_STEP_TRANSITION_UNAVAILABLE`. | Inference |
 | The prerequisite graph cycles | Refuse the complete slice with bounded cycle evidence. | `PREREQUISITE_CYCLE: executable prerequisite closure is cyclic.` | Inference |
 | Atomic journey/slice exceeds its safe cap | Refuse without partial data and suggest a narrower focus. | `ATOMIC_VIEW_TOO_LARGE: requested closure exceeds ... items.` | Inference |
 | One primary or secondary atomic record exceeds its cap | Refuse without partial data; return either a public node-query retry or an explicit maintainer projection fix. | `ATOMIC_RECORD_TOO_LARGE: node ... exceeds the safe projection cap.` | Inference |
@@ -1866,6 +1986,7 @@ mapping in both directions, and fail closed on a missing structured projection.
 | Source/artifact drift | Block compile; search may still return stale candidates. | `STALE_CONTEXT: form contract was generated from a different input digest.` | Inference |
 | Submitted context differs from validated plan | Block before driver resolution. | `CONTEXT_MISMATCH: compile context does not equal the plan's pinned context.` | Inference |
 | Submitted plan does not reproduce its hash | Block before driver resolution. | `PLAN_HASH_MISMATCH: canonical submitted plan does not match planHash.` | Inference |
+| Submitted plan reproduces its caller-supplied hash but fails semantic revalidation | Block before registry/driver resolution; a plain hash is not approval. | `PLAN_SEMANTIC_INVALID: submitted plan is not valid under its pinned context.` | Inference |
 | Scenario absent for a dynamic node | Block concrete set. | `SCENARIO_REQUIRED: node ... has a dynamic domain and no resolved scenario artifact.` | Repository observation + inference |
 | Value outside selected domain | Block before browser execution. | `VALUE_OUT_OF_DOMAIN: canonical value is absent from scenario ...` | Inference |
 | Literal cannot be classified | Block; do not downgrade to warning. | `VALUE_CLASSIFICATION_UNKNOWN: opaque validator or codec prevents classification.` | Inference |
@@ -1880,6 +2001,7 @@ mapping in both directions, and fail closed on a missing structured projection.
 | More than one capture profile could authorize add | Block before plan creation and return only the pinned capture IDs. | `REPEATER_ITEM_CAPTURE_AMBIGUOUS: choose one declared capture profile.` | Inference |
 | Value commit ID absent, driver unsupported, or authority ambiguous | Block post-set execution with the distinct fixed policy. | `COMMIT_NOT_FOUND`, `COMMIT_UNSUPPORTED`, or `COMMIT_AUTHORITY_AMBIGUOUS`. | Repository observation + inference |
 | Committed-value assertion ID absent or driver unsupported | Block the assertion with the distinct fixed policy. | `VALUE_ASSERTION_NOT_FOUND` or `VALUE_ASSERTION_UNSUPPORTED`. | Inference |
+| State assertion surface absent, unsupported, or ambiguous | Block `expectState`; never fall back to a generic control target or outcome. | `STATE_ASSERTION_NOT_FOUND`, `STATE_ASSERTION_UNSUPPORTED`, or `STATE_ASSERTION_AMBIGUOUS`. | Inference |
 | Validation record absent | Block activation/assertion. | `VALIDATION_NOT_FOUND: validation ID ... is absent from the pinned context.` | Repository observation + inference |
 | Validation activation unsupported | Block activation. | `VALIDATION_ACTIVATION_UNSUPPORTED: validation ... has no supported node-local activation.` | Inference |
 | Validation assertion target unsupported | Block assertion. | `VALIDATION_ASSERTION_UNSUPPORTED: required is known but its assertion surface is not executable.` | Repository observation + inference |
@@ -2195,8 +2317,9 @@ case-specific inputs; these are prerequisites, not optional enrichment:
 - executable profiles and supported drivers for the native product control,
   custom `dependent-select`, and native other-details control, including value
   codecs and strict node/part-scoped locator targets;
-- the two already declared sync ordering/effect edges and an explicit
-  visibility outcome for the scenario/effect; and
+- the two already declared sync ordering/effect edges plus a versioned
+  `StateAssertionProjection` such as `otherDetails.visible`, supporting
+  `visible` through an exact assertion driver, part, and locator target; and
 - a validation record `otherDetails.required.on-blur` with a bounded,
   node-local blur activation and an observable error target/state for the
   other-details `required` rule.
@@ -2299,11 +2422,15 @@ a claim that no other effect can interfere.
 **Inference:** Validation proves product precedes case type, inserts no sleep
 for the declared sync effect, checks `"other"` against the selected resolved
 scenario domain, compiles the custom overlay operation through the pinned
-profile/driver, waits for visible other-details through a web-first assertion,
+profile/driver, resolves `otherDetails.visible` to its exact versioned state
+assertion driver/part/target and waits through that web-first assertion,
 clears/omits its value through the required-violation capability, verifies that
 `otherDetails.required.on-blur` is node-local and non-navigating, and asserts
-the declared error surface. Compilation emits trusted calls conceptually
-equivalent to:
+the declared error surface. The `expect-state` plan step serializes
+`assertionRef: {id: "otherDetails.visible", version: 1}`, the node ID,
+`state: "visible"`, and the exact selected driver/part/locator target; it does
+not reuse the control interaction target implicitly. Compilation emits trusted
+calls conceptually equivalent to:
 
 ```ts
 await formDriver.openUsage(contextRef);
@@ -2342,7 +2469,8 @@ plan. A journey-changing action compiles only from an explicit
 **Inference — important refusal:** If the agent reverses product and case type,
 validation returns `ORDERING_PRECONDITION_MISSING`. If it uses the current
 declared artifact, validation returns `SCENARIO_REQUIRED` and
-`UNSUPPORTED_INTERACTION`. If the validation surface is absent, it returns
+`UNSUPPORTED_INTERACTION`. If the visibility assertion is absent it returns
+`STATE_ASSERTION_NOT_FOUND`; if the validation surface is absent, it returns
 `VALIDATION_ASSERTION_UNSUPPORTED`. None is recoverable by reading the dynamic
 function body, selecting by visible text, or writing a CSS locator.
 
@@ -2353,9 +2481,9 @@ guarantee their success. This table states what this flow actually consumes.
 
 | Proposed lane metadata | Required for this flow | Optional / useful later | Not useful as execution authority | Evidence class |
 | --- | --- | --- | --- | --- |
-| Stable form/source-lineage index | **Required:** form ID; project/source ID; form definition symbol/path/span; consuming page/component usage; stable usage ID; route/entry when present; ordered step ID/membership; source-input digest. | Owners, tags, full import graph, blame/history, human descriptions. | Raw AST dumps, arbitrary source snippets in every response, heuristic “looks like a form root” findings without registration authority. | Inference based on current missing join |
+| Stable form/source-lineage index | **Required:** form ID; project/source ID; form definition symbol/path/span; consuming page/component usage; stable usage ID; route/entry when present; ordered step ID/membership; exact source/action/outcome/destination transition records; source-input digest. | Owners, tags, full import graph, blame/history, human descriptions. | Raw AST dumps, arbitrary source snippets in every response, heuristic “looks like a form root” findings without registration authority, destinations inferred from step order. | Inference based on current missing join |
 | Declared/resolved scenario artifacts | **Required for dynamic/conditional tests:** scenario ID/version; safe synthetic-input provenance; declared basis hash; resolved artifact hash; scenario diagnostics; resolved node state/domain/profile; effect/readiness outcome. | Automatically generated witnesses, large scenario matrices, human scenario prose. | Executable scenario callbacks in MCP, customer-derived inputs, a model sample treated as a domain, one scenario claimed globally complete. | Documented fact + repository observation |
-| Custom field interaction profiles | **Required for every non-native/custom operation:** semantic/value shape; operation; named parts/cardinality/roles; codec/value projection; driver ID/version; wrapper preconditions; locator scope/targets; readiness; disjoint included/explicit value-commit ownership with exact explicit mechanic/part/target; versioned exact-created-item capture guarantee/targets/result scope for repeater add; blocking unknowns. | Angular component symbol/template evidence, authoring scaffolds, component-harness references, observed conformance history. | Inferring behavior from a Formly type name, assuming `fill` commits every control, discovering a new row by count/order, serializing Angular component classes, agent-selected driver packages. | Documented fact + repository observation + inference |
+| Custom field interaction profiles | **Required for every non-native/custom operation:** semantic/value shape; operation; named parts/cardinality/roles; codec/value projection; driver ID/version; wrapper preconditions; locator scope/targets; readiness; disjoint included/explicit value-commit ownership with exact explicit mechanic/part/target; versioned exact state-assertion surface; one source-owned exact-created-item capture profile/driver/capability/guarantee/targets/readiness/result scope for repeater add; blocking unknowns. | Angular component symbol/template evidence, authoring scaffolds, component-harness references, observed conformance history. | Inferring behavior from a Formly type name, assuming `fill` commits every control, reusing a generic control target for state, discovering a new row by count/order, combining general and capture bindings, serializing Angular component classes, agent-selected driver packages. | Documented fact + repository observation + inference |
 | Static/dynamic/mixed values | **Required:** domain kind, canonical values when known, label mapping for choice drivers, evidence, completeness, disabled state, runtime-enumeration capability, privacy classification. | Boundary-value candidates, locale-specific display samples, generator explanations. | Defaults/current model as domain, raw remote option payloads, labels alone as model values. | Documented fact |
 | Explicit/derived effects | **Required for dependent paths:** validated declared ordering, timing/readiness, endpoints/properties, condition reference, coverage completeness, unknowns. Derived/observed evidence may corroborate but not authorize. | Witness generation, change-impact graph, observed parity history. | Operational verbs inferred from callbacks, handler names, source proximity, one scenario delta, or missing edges under incomplete analysis. | Documented fact |
 | Explicit unknowns | **Required:** machine-readable blocker scope and aspect on nodes, scenarios, effects, profiles, usage, validation, and freshness. | Aggregate coverage dashboards and ownership routing. | Free-form warnings with no stable code/evidence/remediation. | Inference |
@@ -2434,7 +2562,7 @@ reachable.
 | Runtime selection privacy | A runtime policy returns only success/selected candidate ID when permitted; logs and model context do not receive the full option collection by default. | Inference |
 | Test artifact privacy | Screenshots, video, and traces can capture rendered values and network activity; retention/redaction must be configured per project, with failure artifacts treated as sensitive. | Documented fact + inference |
 | Bounded read surface | Cap result size, node/value counts, recursive depth, and query complexity; paginate deterministically. | Inference |
-| Hash and schema pinning | Validate schema versions and all referenced hashes before intent validation and again before compilation/runtime. | Inference |
+| Hash, schema, and semantic pinning | Validate schema versions and all referenced hashes before intent validation and again before compilation/runtime. Treat SHA-256 as content identity, not approval; rerun complete pure semantic plan validation before any driver lookup. | Inference |
 
 **Documented fact:** Playwright can record screenshots, video, and traces as
 test artifacts. Its Trace Viewer documentation says traces can contain action
@@ -2479,9 +2607,12 @@ failure-prone last mile.
 
 | Finding | Credible options considered | Selected correction and constraint fit | Failure modes / reversibility | Confidence and evidence that would change it |
 | --- | --- | --- | --- | --- |
+| Plain hash cannot prove validator approval | Trust hash equality; issue a signed/MAC token; retain a server-side handle; rerun pure semantic plan validation. | Keep SHA-256 for deterministic content identity and rerun the complete plan validator before registry lookup. This preserves statelessness and avoids key management/storage while making a caller-rehashed mutation fail closed. | Revalidation costs CPU and validator-version pinning; fully reversible to an authenticated handle if measurements justify state or keys. | 0.98. Profiling that shows material compile latency, plus an established authenticated plan-token service, could favor a signed token or handle. |
+| `expectState` has no source assertion authority | Reuse the interaction target; infer from outcome/effect state; declare a node-owned state assertion surface. | Add a versioned `StateAssertionProjection` and serialize the exact selected ID/version/state/driver/part/target. This mirrors value and validation assertions and prohibits fallback to generic control targets. | More metadata per assertable custom state; unsupported states remain blocked. Additive/reversible before production schema publication. | 0.97. A proven repository invariant that all state assertions share one immutable semantic target could permit a narrower reference, but none exists. |
+| Cross-step recovery cannot name an exact transition | Infer destination from step order/action outcomes; return a multi-step graph; declare exact transition records. | Add `UsageTransitionProjection(fromStepId, actionId, outcomeId, toStepId)` and refuse missing/ambiguous matches. This keeps the minimum slice single-step and makes recovery executable without guessing. | Usage authors must declare transitions; complex branching can refuse. A later multi-step tool remains additive. | 0.96. If workplace journeys routinely require branching graphs in one request, revisit with a separately versioned multi-step contract. |
 | Lossy validated plan | Re-derive from pinned metadata; duplicate every record; serialize stable selections and rehydrate exact IDs. | Serialize commit linkage, physical-operation authority, wrapper mechanic, and item context; split add/capture from exact-item expand; allow lookup only by selected immutable ID. Preserves stateless compilation without copying locator recipes. | More plan bytes and referential-integrity checks; fully versionable and reversible before production schemas exist. | 0.94. A proof that every omitted choice is globally unique and immutable across registry versions could justify less serialization. |
 | Missing source-side blur authority | Let the validator infer a target from interaction parts; bind commit to a generic control purpose; make the commit record select the exact physical operation. | Use disjoint included-in-set versus explicit-blur source variants; explicit blur owns mechanic/part/target and must equal the plan operation. | Adds one physical-operation record and equality checks; reversible before schema publication. | 0.97. A repository invariant proving every supported custom field has exactly one immutable blur target could justify a purpose reference instead, but no such invariant exists. |
-| Repeater capture scheduled too late | Treat add as click-only; discover the new row in the browser; declare a versioned exact capture contract before validation. | Slice 0 owns the capture declaration, Slice 2 validates/serializes it, and Slice 5 proves DOM conformance. This separates authority from observation. | Profile authors must guarantee a stable returned item scope; unsupported repeaters remain blocked. Additive/reversible per profile. | 0.94. If representative repeater frameworks cannot return one stable scope, defer add/capture rather than add heuristics. |
+| Repeater capture scheduled too late or duplicated by a general binding | Treat add as click-only; discover the new row in the browser; combine general interaction and capture fields; make one capture-specific record/binding authoritative before validation. | Slice 0 owns the complete capture declaration; the plan carries only its exact capture-specific binding; Slice 2 checks it, and Slice 5 proves DOM conformance. No general add binding or duplicate driver/target may compete. | Profile authors must guarantee a stable returned item scope; unsupported repeaters remain blocked. Additive/reversible per profile. | 0.97. If representative repeater frameworks cannot return one stable scope, defer add/capture rather than add heuristics. |
 | Incomplete prerequisite closure | Return one hop; return a multi-step graph; compute a same-step fixed point and refuse cross-step/ cycles. | Compute the transitive executable closure within one exact step; return only declared transition evidence on refusal. | Large/cyclic graphs may refuse atomically; a later multi-step tool remains additive. | 0.96. Workplace tests that commonly require cross-step prerequisites would justify a separately reviewed multi-step API. |
 | Non-exhaustive diagnostics | Generic envelope plus prose table; forward raw form diagnostics; schema-owned agent policy with raw diagnostics retained only as evidence. | Use the exhaustive agent policy map as the normative source for code, phase, severity, blocking, location, and remediation; raw contract codes never enter executable diagnostic collections. | Policy changes become versioned contract changes; aspect projection adds modest tooling. Reversible by versioning, not silent mutation. | 0.93. If structured node/effect unknowns cannot conservatively project a raw contract issue, keep the operation blocked rather than restoring a generic tuple. |
 | Free-form diagnostic messages | Trust producers; add a template ID field; use the code as template identity and omit wire messages. | Render stable text only from code-owned templates and bounded typed policy fields; presentation/source text stays evidence. | Clients must carry versioned renderers; localization becomes a consumer concern. Reversible through a future versioned template catalog. | 0.95. A need for server-localized text could justify a signed template ID plus locale, not arbitrary strings. |
@@ -2499,7 +2630,7 @@ failure-prone last mile.
 | Custom widget is structurally known but not operable | Missing/blocked profile, driver, codec, or part locator | Name the exact missing aspect and source owner. | Use type-name or DOM heuristics. | Documented fact |
 | Filled value has not committed to the form model | Missing/ambiguous commit ownership or a blur/submit strategy | Require the declared commit/action and a post-commit assertion surface. | Treat DOM `toHaveValue` or an absent error as proof of acceptance. | Repository observation + inference |
 | Conditional target remains hidden | Wrong scenario, missing trigger, or opaque behavior | Return prerequisite edge/witness when declared; otherwise mark unreachable unknown. | Force click/fill hidden control. | Inference |
-| A prerequisite is in another step | The requested single-step slice cannot contain a complete executable closure | Return the exact source step and declared transition action, or say the transition metadata is unavailable. | Invent a next/submit action or omit the upstream node. | Inference |
+| A prerequisite is in another step | The requested single-step slice cannot contain a complete executable closure | Return one exact source/action/outcome/destination transition record; report stable IDs if ambiguous, or say none is declared. | Infer destination from step order/action outcomes, invent next/submit, or omit the upstream node. | Inference |
 | Test times out after source change | Locator/role/readiness parity drift | Report expected target and redacted observed count/state; point to source/profile. | Increase timeout or force action. | Documented fact + inference |
 | Negative test cannot assert error | Constraint known but activation/surface missing | Offer source inspection and metadata addition; do not generate partial assertion. | Assert any nearby text or CSS class. | Repository observation + inference |
 | Repeater child resolves ambiguously | Missing item identity/index/activation | Require explicit item context and add/expand step. | Assume row zero or call `.nth(0)`. | Inference |
@@ -2513,18 +2644,23 @@ failure-prone last mile.
 
 **Inference:** Add versioned usage records, route/component/source/step joins,
 journey entry/action IDs, build/repository/input digests, scenario references,
-and driver-registry identity to an index extension. Define shared, versioned
+exact from/action/outcome/to transition records, and driver-registry identity
+to an index extension. Define shared, versioned
 node-owned physical-operation records for explicit value commits and
 created-item capture profiles before any validator consumes them. The capture
-record names its exact add/item targets, driver, readiness, plan-local result
-mode, and `exactly-one-created-item` guarantee. Do not add other node fields
-unless a node-owned fact is required.
+record is the sole authority for its profile, add capability, exact add/item
+targets, driver, readiness, plan-local result mode, and
+`exactly-one-created-item` guarantee. Add versioned state-assertion surfaces
+with supported states and exact assertion driver/part/target. Do not add other
+node fields unless a node-owned fact is required.
 
 **Gate:** From a source path, component symbol, form ID, catalog/route, and step
 query, a fixture returns the correct usage or an explicit ambiguity diagnostic.
 An explicit blur commit supplies exact mechanic/part/target authority, and a
 repeater add profile either supplies one exact capture contract or is
-non-executable; operation names alone are insufficient.
+non-executable; an `expectState` surface and a cross-step transition likewise
+supply exact source records rather than being inferred from interaction or
+action arrays. Operation names alone are insufficient.
 If representative workplace forms cannot be joined without per-field manual
 metadata, revisit the source-lineage design before proceeding.
 
@@ -2555,9 +2691,10 @@ never a nonexistent projection control.
 Request nodes from two steps and assert `STEP_SCOPE_MISMATCH`; a same-step
 request must return the exact requested `withinStepId`. Focus only the claims
 `otherDetails` node and require the fixed-point closure to contain `caseType`,
-`product`, and both ordered edges. Refuse a cross-step closure with the exact
-declared source/action or `CROSS_STEP_TRANSITION_UNAVAILABLE`; reject cycles
-with `PREREQUISITE_CYCLE` and no partial slice.
+`product`, and both ordered edges. Refuse a cross-step closure with one exact
+`UsageTransitionProjection` naming source/action/outcome/destination; exercise
+distinct missing, ambiguous, and wrong-destination refusals. Reject cycles with
+`PREREQUISITE_CYCLE` and no partial slice.
 
 ### Slice 2 — Pure typed-intent schema and validator
 
@@ -2574,7 +2711,9 @@ scenarios, unknown values, missing part locators, hidden/repeater ambiguity,
 unknown usage/node/action/outcome/validation/commit/assertion references,
 unsupported usage entry/action/outcome assertion/commit/value assertion,
 ambiguous commit authority, and unsupported validation activation/assertion
-produce no plan and fail with their exact discriminated policies. Assert that
+produce no plan and fail with their exact discriminated policies. For
+`expectState`, separately test absent, unsupported, ambiguous, and exact
+state-assertion surfaces. Assert that
 the runtime diagnostic policy and schema have identical exhaustive code sets
 and reject every wrong code/phase/severity/blocking/location/remediation pair.
 Reject any producer-supplied wire `message`; render the template identified by
@@ -2585,10 +2724,12 @@ agent-context diagnostic and reject generic raw projections. Split `addItem`
 from `expandItem`: reject expand without exact item context and exact scoped
 targets, round-trip both an existing-index expand and add-created capture, and
 reject add when a Slice-0 capture record is absent, ambiguous, mismatched to the
-binding/repeater/establishing step, or cannot guarantee exactly one returned
-item scope. Reject explicit commits whose source record omits or disagrees on
-mechanic, part, or locator target; explicit immediate commit is not a legal
-variant.
+capture binding/repeater/establishing step, or cannot guarantee exactly one
+returned item scope. Reject any add plan carrying a general node binding,
+duplicate driver/target authority, or a capture source with the wrong profile,
+capability, target, or readiness. Reject explicit commits whose source record
+omits or disagrees on mechanic, part, or locator target; explicit immediate
+commit is not a legal variant.
 Assert that every valid plan step is one member of the closed discriminated
 union and contains all approved binding, target, value, commit, wrapper
 mechanic, item context, precondition, readiness, activation, action, and
@@ -2600,9 +2741,10 @@ value proposition.
 **Inference:** Add one usage-entry driver and built-in fill/select/check
 profiles plus validation surfaces for native controls. Compile only validated
 plans to stable driver calls, then Playwright tests. The caller resubmits the
-plan, hash, and context; compilation recomputes the canonical hash and rejects
-context drift or tampering before driver resolution. Retain strict uniqueness,
-actionability, and web-first assertions.
+plan, hash, and context; compilation recomputes the canonical hash, treats it
+only as content identity, and reruns the complete pure semantic plan validator
+before any registry/driver lookup. Retain strict uniqueness, actionability, and
+web-first assertions.
 
 **Gate:** One positive and one negative native fixture test pass repeatedly
 without raw selectors in intent or generated source. Cover immediate,
@@ -2610,8 +2752,10 @@ explicit-blur, and usage-action commit modes; reject missing and duplicate
 commit authority; and prove post-commit rather than DOM-only value state.
 Round-trip representative plans through canonical JSON, then compile them with
 a registry API instrumented to fail if it performs selection instead of exact
-ID lookup. Prove wrapper click/check preservation, repeater descendant item
-binding at schema/compile-call level, bidirectional usage-action commit linkage,
+ID lookup. Mutate a plan, recompute a syntactically valid SHA-256 hash, and
+prove `PLAN_SEMANTIC_INVALID` before any registry call. Prove wrapper
+click/check preservation, repeater descendant item binding at schema/compile-
+call level, bidirectional usage-action commit linkage,
 and that a shared blur-commit/validation activation emits exactly one browser
 event. Browser-level add/capture/expand proof remains in Slice 5.
 Compare author/review time and first-run rate against an ordinary hand-written
@@ -2621,7 +2765,7 @@ Playwright test.
 
 **Inference:** Generate/index trusted resolved scenarios, part-scoped locators,
 runtime value/readiness capabilities, custom profile drivers, wrapper
-preconditions, and the claims conditional path.
+preconditions, state-assertion surfaces, and the claims conditional path.
 
 **Gate:** Walkthrough 2 passes and each deliberately removed metadata item
 causes the expected blocker. If safe scenario materialization cannot settle the
@@ -2676,8 +2820,8 @@ the first workplace sample.
 
 | Acceptance criterion | Evidence in this artifact | Result |
 | --- | --- | --- |
-| 1. Two end-to-end walkthroughs cover positive and negative tests, including a custom/dynamic field and conditional branch. | “Walkthrough 1” covers a positive order-entry flow with async runtime choice, custom currency control, an explicit blur commit whose source record owns the exact physical target, a separately approved validation activation coalesced into one serialized event, and post-commit assertions. “Walkthrough 2” focuses only the negative conditional target and requires the fixed-point closure to recover both upstream nodes/effects before typed intent. Both enumerate complete execution prerequisites and include query, intent, validation, and conceptual driver calls/refusals. | Met as paper walkthrough; current artifacts are explicitly shown insufficient. |
-| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Closed query results; collection-named request/response cursors with atomic secondary metadata and tool-valid oversized-record recovery; fixed-point same-step closure with explicit cross-step/cycle refusal; progressive disclosure; typed intent with a pre-validator capture contract, exact add/capture/expand authority, and distinct commit/validation/action authority; a lossless discriminated stateless plan/compile handoff; raw form diagnostics retained only as evidence behind an exhaustive fixed agent policy whose code owns rendering and whose wire shape has no message escape hatch; security/privacy; and alternatives/remediation-decision sections. | Met as a proposed contract, pending production-schema tests in Slices 0–2. |
+| 1. Two end-to-end walkthroughs cover positive and negative tests, including a custom/dynamic field and conditional branch. | “Walkthrough 1” covers a positive order-entry flow with async runtime choice, custom currency control, an explicit blur commit whose source record owns the exact physical target, a separately approved validation activation coalesced into one serialized event, and post-commit assertions. “Walkthrough 2” focuses only the negative conditional target, requires the fixed-point closure to recover both upstream nodes/effects, and selects an exact versioned state-assertion surface before asserting visibility. Both enumerate complete execution prerequisites and include query, intent, validation, and conceptual driver calls/refusals. | Met as paper walkthrough; current artifacts are explicitly shown insufficient. |
+| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Closed query results; collection-named request/response cursors with atomic secondary metadata and tool-valid oversized-record recovery; fixed-point same-step closure with exact transition records and missing/ambiguous/cycle refusal; progressive disclosure; typed intent with one source-owned capture binding, exact add/capture/expand and state-assertion authority, and distinct commit/validation/action authority; a lossless discriminated stateless plan/compile handoff whose plain hash is content identity and whose compiler reruns complete semantic validation; raw form diagnostics retained only as evidence behind an exhaustive fixed agent policy whose code owns rendering and whose wire shape has no message escape hatch; security/privacy; and alternatives/remediation-decision sections. | Met as a proposed contract, pending production-schema tests in Slices 0–2. |
 | 3. Explicit required/optional/not-useful RH-01–RH-04 metadata list. | “RH-01–RH-04 metadata dependency audit.” | Met without assuming lane success. |
 | 4. Feasibility/value recommendation, confidence, UX failure modes, ordered implementation slices. | Executive decision, alternatives, UX table, slices/stop gates, and feasibility/value section. | Met. |
 
@@ -2964,6 +3108,67 @@ $ git diff --name-only
 docs/research/hardening/agent-to-e2e-context-flow.md
 Exit 0.
 ```
+
+### Post-review-cycle closure pass
+
+**Repository observation:** The newly authorized independent-review cycle
+reached its configured limit at instance 3 of 3 on commit
+`9ab7f2da1a1ce9203c6e8f94304c4b589880e2df`. That review's four findings were
+accepted. At the maintainer's request, this bounded author-side closure pass
+addresses them in this artifact only. It is not represented as a fourth
+independent review.
+
+| Accepted finding | Retained correction | Final adversarial self-check |
+| --- | --- | --- |
+| A caller can mutate a plan and recompute its plain hash | Defined SHA-256 as content identity only, pinned a semantic-policy version, and required compilation to rerun the complete pure plan validator before any registry/driver lookup. Added fixed `PLAN_SEMANTIC_INVALID`. | Slice 3 requires a semantically modified plan with a recomputed valid hash to fail before the registry is touched. The contract audit confirms the policy pin/code; a future production test must exercise the behavioral gate. |
+| `expectState` lacks source-side assertion authority | Added `StateAssertionProjection` with exact supported states, driver, part, target, version, and evidence. The plan uses only `ApprovedStateAssertionBinding`; generic interaction targets cannot substitute. | Contract compilation is clean; structural audit confirms both source and plan bindings. Walkthrough 2 now names `otherDetails.visible`, and Slice 2 covers absent/unsupported/ambiguous/exact cases. |
+| Cross-step recovery lacks an exact transition | Added versioned `UsageTransitionProjection(fromStepId, actionId, outcomeId, toStepId)` to each journey and exact missing/ambiguous/wrong-destination refusal rules. | The slice result includes the fixed ambiguous diagnostic. Slice 1 requires exact referential matching and prohibits inference from step/action/outcome order. |
+| Repeater add has competing capture and general-binding authority | Made the source capture record own profile, capability, driver, targets, readiness, and guarantee. `add-item` now carries only `ApprovedCaptureBinding` plus plan-local result identity; duplicate general binding/driver/target fields are unrepresentable. | Structural audit rejects competing add fields and confirms the source record's complete authority. Slice 2 rejects every capture/source equality mismatch; Slice 5 remains browser conformance only. |
+
+```text
+$ pnpm check:docs
+Documentation checks passed for 57 files.
+Exit 0.
+
+$ pnpm exec vitest run fixtures/angular-monorepo/workspace-fixture.test.ts
+Test Files  1 passed (1)
+Tests       7 passed (7)
+Duration    14.94s
+Exit        0.
+
+$ node /private/tmp/rh05-final-closure-audit.cjs docs/research/hardening/agent-to-e2e-context-flow.md
+Total TypeScript fences       11
+Contract fences                9
+Contract TypeScript lines   1404
+Unexpected diagnostics         0
+Policy codes                   46
+Required closure codes       all present
+Exact state assertion source/plan binding confirmed
+Exact usage transition source confirmed
+Capture-specific add authority confirmed
+Semantic plan policy pin confirmed
+Exit 0.
+
+$ pnpm check
+First sandboxed run: lint, 34 test files / 450 tests, and all builds passed;
+the workspace-consumer check then failed because pnpm could not write its
+external store (`ERR_PNPM_EPERM`). This was an environment limitation, not a
+test failure.
+Approved rerun: lint passed; 34 test files / 450 tests passed; all demo/app/
+fixture builds passed; workspace consumers, release manifest, package checks,
+demo smoke, and 57-file documentation checks passed. Exit 0.
+
+$ git diff --check
+No output; exit 0.
+
+$ git diff --name-only
+docs/research/hardening/agent-to-e2e-context-flow.md
+Exit 0.
+```
+
+The audit script was temporary and outside the repository; it was removed
+after the recorded final verification. No production, canonical plan/spec, or
+generated file was retained.
 
 ## Primary sources
 
