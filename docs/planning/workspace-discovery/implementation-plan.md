@@ -3,8 +3,8 @@
 Status: in progress; Tasks 1–4, including project-owned field-type profile
 registries, the deep Task 6B consumer fixture, a real Nx integration anchor,
 and Tasks 5.0–5.2 artifact/source contracts, profile-aware extraction, runner,
-and workspace index are implemented; Task 5A cross-field effect resolution is
-the next contract-first vertical slice
+workspace index, and the Task 6A pilot `generate` command are implemented;
+Tasks 3C and 5A cross-field effects are the next contract-first vertical slice
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)
@@ -23,7 +23,7 @@ must turn one root config and several project configs into deterministic
 contract artifacts without Angular or Nx coupling. The project configuration
 also becomes the ownership boundary for application field-type profile
 registries, while versioned profile DTOs remain in the schema package and
-profile resolution remains in the Formly adapter. Angular and Nx integrations
+profile resolution remains in the compiler. Angular and Nx integrations
 then add distributed providers, trusted scenario compilation, adapter
 scaffolding, inferred tasks, and affected execution. Runtime capture remains an
 optional migration phase.
@@ -40,17 +40,17 @@ roots, serialize model values, or invent selectors.
 - Use root config for workspace policy and project config for local ownership.
 - Keep global profile policy in root config, but keep application-specific
   field-type profiles and Angular authoring inputs in project config.
-- Put framework-neutral profile DTOs/validation in `contract-schema`, Formly
-  registration/profile resolution in `formly-adapter`, and Angular inventory
-  and scaffold generation in the optional `angular` package.
+- Put framework-neutral profile DTOs/validation in `@formly-contract/schema`,
+  Formly registration/profile resolution in `@formly-contract/compiler`, and
+  Angular inventory and scaffold generation in the optional `angular` package.
 - Store only serializable profiles and stable driver IDs/versions in contracts;
   executable Playwright drivers remain outside this increment.
 - Treat source catalogs as the unit of integration so one adapter can expose
   many forms.
 - Use Jiti as the leading TypeScript config-loader candidate, subject to an
   executable compatibility gate.
-- Keep Angular and Nx optional; neither enters `contract-schema` or the runtime
-  dependency surface of `formly-adapter`.
+- Keep Angular and Nx optional; neither enters `@formly-contract/schema` or the
+  runtime dependency surface of `@formly-contract/compiler`.
 - Treat capture as incomplete migration evidence, never authoritative declared
   inventory.
 
@@ -61,11 +61,10 @@ Task 1 -> Task 2 -> Task 3
 Task 3 -> Task 4: root/project discovery
 Task 3 -> Task 3A -> Task 3B: project profile registry integration
 Tasks 3B + 4 -> Task 5: first artifact-generation vertical slice
+Task 5 -> Task 6A: generic CLI (`generate` pilot first)
 Task 3B -> Task 3C: explicit cross-field effect contract
 Tasks 3C + 5 -> Task 5A: resolve effects against generated nodes
-Task 5A -> Task 6A: generic CLI
-       |
-Task 6B: multi-package consumer fixture
+Tasks 5A + 6A + 6B
        |
 Checkpoint A: generic pilot
        |
@@ -118,7 +117,7 @@ contains explicit effects only.
 
 | Requirement | Decision | Tasks | Verification | Status |
 | --- | --- | --- | --- | --- |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery/runner/index tests plus real Angular consumer generation; CLI fixture assertions remain | Tasks 1–5.2 and Task 6B fixture shell implemented; Task 6A and remaining packed-consumer assertions planned |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery/runner/index tests plus real Angular consumer generation; CLI fixture assertions remain | Tasks 1–5.2, the Task 6A `generate` pilot, and the Task 6B fixture shell are implemented; `list`, `check`, golden artifacts, and linked/packed consumer assertions remain |
 | `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Tasks 5.0–5.1 implemented, including safe node projection and realistic Angular/Nx fixture coverage; executable drivers remain separate |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | Inventory and scaffolds are build-time evidence only | Tasks 7A–8B | Angular inventory, negative inference, and scenario tests | Planned; prototype complete |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Planned; architecture researched |
@@ -465,18 +464,23 @@ and the linked/packed consumer smoke tests remain before Task 6A is complete.
 
 **Acceptance criteria:**
 
-- [ ] `generate` writes artifacts, `list` reports the inventory without running
-      factories, and `check` validates committed/current artifacts.
-- [ ] CLI failures have stable exit codes and concise project/form provenance.
-- [ ] Command help and failures identify config, project, and form provenance
-      without stack traces by default.
+- [x] `generate` writes the deterministic artifact set through the workspace
+      runner.
+- [ ] `list` reports the inventory without running factories.
+- [ ] `check` validates committed/current artifacts.
+- [x] Pilot `generate` usage and generation failures have stable exit codes and
+      concise project/source/form/output provenance.
+- [x] Pilot command help and failures omit stack traces and underlying callback
+      details by default.
 
 **Verification:**
 
-- [ ] CLI unit tests cover parsing and exit behavior.
+- [x] CLI unit tests cover pilot `generate` parsing, forwarding, output, and exit
+      behavior, including a real temporary workspace.
 - [ ] Focused CLI tests execute all three commands against temporary fixtures.
 
-**Dependencies:** Task 5A
+**Dependencies:** Task 5 for the `generate` pilot; Task 5A before Task 6A is
+complete
 
 **Files likely touched:**
 
@@ -506,7 +510,7 @@ Node-oriented discovery descriptors.
 - [x] Angular production compilation proves Node-only discovery dependencies do
       not leak into the browser graph.
 - [x] At least six forms are exposed through two bulk source patterns.
-- [ ] At least one project config registers one field profile reused by
+- [x] At least one project config registers one field profile reused by
       multiple form instances without per-form profile declarations.
 - [ ] At least one form declares an explicit effect whose endpoints resolve to
       generated stable node IDs and profile capabilities.
@@ -518,7 +522,8 @@ Node-oriented discovery descriptors.
 - [ ] A packed-tarball smoke test executes `generate` outside this workspace.
 - [ ] `pnpm check` passes at Checkpoint A.
 
-**Dependencies:** Task 6A
+**Dependencies:** the Task 6A `generate` pilot for the implemented fixture
+boundary; all Task 6A commands for the remaining linked smoke test
 
 **Files likely touched:**
 
@@ -534,14 +539,14 @@ fixture exports rather than duplicate files
 
 ## Checkpoint A: Generic workspace pilot
 
-- [ ] One root config discovers at least three project configs.
-- [ ] Bulk sources generate deterministic declared contracts and a safe index.
-- [ ] Project-owned profile registries resolve deterministically and contribute
+- [x] One root config discovers at least three project configs.
+- [x] Bulk sources generate deterministic declared contracts and a safe index.
+- [x] Project-owned profile registries resolve deterministically and contribute
       their identity to the workspace index.
 - [ ] Explicit effects resolve against generated nodes and contribute their
       validated identity to form and workspace hashes.
 - [ ] Linked or packed packages work from the consumer fixture.
-- [ ] Full lint, tests, builds, demo, and documentation checks pass.
+- [x] Full lint, tests, builds, demo, and documentation checks pass.
 - [ ] Maintainer reviews the actual config and artifact UX before Angular/Nx API
       work begins.
 
@@ -555,13 +560,13 @@ provider or compiler behavior yet.
 
 **Acceptance criteria:**
 
-- [ ] `@formly-agent-contracts/angular` builds as ESM with declarations.
+- [ ] `@formly-contract/angular` builds as ESM with declarations.
 - [ ] Angular core/forms and Formly are peers, not workspace runtime dependencies.
-- [ ] Neither schema, adapter, nor workspace gains an Angular dependency.
+- [ ] Neither schema, compiler, nor workspace gains an Angular dependency.
 
 **Verification:**
 
-- [ ] `pnpm --filter @formly-agent-contracts/angular build`
+- [ ] `pnpm --filter @formly-contract/angular build`
 - [ ] Dependency audit confirms the intended package direction.
 
 **Dependencies:** Checkpoint A
@@ -729,14 +734,14 @@ implementing inference.
 
 **Acceptance criteria:**
 
-- [ ] `@formly-agent-contracts/nx` builds against the approved Nx major.
+- [ ] `@formly-contract/nx` builds against the approved Nx major.
 - [ ] Nx remains a peer/optional integration dependency and does not enter
       workspace runtime dependencies.
 - [ ] Package exports reserve the plugin entry point without executor behavior.
 
 **Verification:**
 
-- [ ] `pnpm --filter @formly-agent-contracts/nx build`
+- [ ] `pnpm --filter @formly-contract/nx build`
 - [ ] Package metadata validation passes.
 
 **Dependencies:** Task 9
@@ -1015,6 +1020,11 @@ project sources.
 **Description:** Finalize the workspace package README, root adoption guide, and
 architecture overview for generic config discovery and bulk source adapters.
 
+**Current status:** the root README, workspace configuration reference, and
+workplace pilot guide now cover the implemented `generate` path. A standalone
+workspace package README, an empty-directory consumer walkthrough, and linked
+example-command smoke tests remain before this release task is complete.
+
 **Acceptance criteria:**
 
 - [ ] A generic guide starts with an empty consumer directory and ends with
@@ -1075,7 +1085,7 @@ consumer smoke tests for the five intended public packages.
 
 **Acceptance criteria:**
 
-- [ ] The release manifest contains only schema, adapter, workspace, Angular,
+- [ ] The release manifest contains only schema, compiler, workspace, Angular,
       and Nx packages for this increment.
 - [ ] Peer dependencies and optional integration dependencies install without
       pulling Angular or Nx into generic consumers.
@@ -1150,12 +1160,12 @@ maintainer review, remediate validated findings, and record final evidence.
 6. Is runtime capture needed for the first workplace pilot, or can it remain a
    later migration tool?
 
-## Plan approval gate
+## Remaining approval and workplace-evidence gates
 
-Implementation starts only after the maintainer:
-
-- [ ] accepts or revises ADR 0007;
-- [ ] approves Checkpoint A as the first shipping target;
-- [ ] confirms whether the first pilot must include Angular resolved scenarios;
-      and
-- [ ] supplies the workplace Nx version before Phase 3 begins.
+- [ ] Formally accept or revise ADR 0007, which remains `Proposed` even though
+      its generic configuration boundary is implemented.
+- [x] Use Checkpoint A as the first shipping target.
+- [x] Keep Angular resolved scenarios in Checkpoint B rather than requiring them
+      for the first generic workplace pilot.
+- [ ] Supply the workplace Nx version before Phase 3 compatibility claims or
+      implementation begin.

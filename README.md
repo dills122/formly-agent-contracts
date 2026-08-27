@@ -48,6 +48,11 @@ generation, browser observation, Angular-assisted application-source
 discovery, and the remaining generic CLI commands are future layers and are not
 shipped by this MVP.
 
+Evaluating the current product in a private application repository? Start with
+the [workplace pilot guide](docs/workplace-pilot.md). It provides one complete
+setup, configuration, generation, troubleshooting, privacy, and feedback path
+for a fresh coding agent or maintainer.
+
 ## Use it in your own Angular/Formly codebase
 
 The package runs as build/test tooling beside your Angular application. It does
@@ -126,8 +131,10 @@ Each factory should return a fresh field tree. If a factory needs application
 inputs, wrap it in a closure with synthetic values that are safe to use in
 local development and CI.
 
-For a repository-aware pilot, define the root/project/source descriptors in
-[the workspace configuration guide](docs/workspace-configuration.md), then run:
+For a repository-aware pilot, follow the
+[workplace pilot guide](docs/workplace-pilot.md), using the
+[workspace configuration reference](docs/workspace-configuration.md) when you
+need the full configuration semantics, then run:
 
 ```sh
 pnpm exec formly-contracts generate
@@ -456,9 +463,10 @@ Schema v0.4 can represent:
 - The supported usage target is Angular 20 or newer with Formly 6.x, but
   compatibility testing is concentrated on Angular `20.3.29` with Formly
   `6.1.8`. Mileage may vary across other major, minor, and patch combinations.
-- The packages are not on npm yet. Their final public names and one-time npm
-  bootstrap release still need maintainer approval; the automated release path
-  is ready and documented in [Releasing](docs/releasing.md).
+- The packages are not on npm yet. Their `@formly-contract/*` names are settled,
+  but the one-time npm bootstrap release still needs maintainer approval; the
+  automated release path is ready and documented in
+  [Releasing](docs/releasing.md).
 
 ## Synthetic test application
 
@@ -483,6 +491,7 @@ rules into this public project.
 packages/
   schema/            Versioned DTOs, validation, canonical JSON, and hashing
   compiler/          Declared extraction and trusted Formly scenario builds
+  workspace/         Config loading, discovery, artifact runner, index, and CLI
 fixtures/
   synthetic-form/    Public golden form and real-builder compatibility fixture
   angular-monorepo/  Deep six-form Angular CLI discovery/interaction corpus
@@ -515,12 +524,16 @@ agent requests.
 
 ## Documentation
 
+- [Workplace pilot guide](docs/workplace-pilot.md)
+- [Workspace configuration reference](docs/workspace-configuration.md)
 - [Architecture overview](docs/architecture-overview.md)
 - [MVP specification](docs/mvp-spec.md)
 - [v0.2 real-world semantics specification](docs/v0.2-real-world-semantics-spec.md)
 - [v0.3 test locator specification](docs/v0.3-test-locators-spec.md)
 - [Formly test application specification](docs/formly-test-app-spec.md)
-- [Implementation plan](docs/implementation-plan.md)
+- [Parser MVP implementation plan](docs/implementation-plan.md)
+- [Workspace discovery implementation
+  plan](docs/planning/workspace-discovery/implementation-plan.md)
 - [Architecture decisions](docs/decisions/)
 
 ## Contributing and security
