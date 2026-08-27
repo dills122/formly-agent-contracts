@@ -1,9 +1,9 @@
 # Workspace Configuration
 
 Status: experimental; deterministic project discovery, project-owned field-type
-profile and cross-field effect registries, programmatic workspace artifact
-generation, and the pilot `generate` CLI are implemented. Effect resolution
-against generated nodes and the `list` and `check` commands remain planned.
+profile and cross-field effect registries, resolved effect projection,
+programmatic workspace artifact generation, and the generic `list`, `generate`,
+and non-mutating `check` CLI commands are implemented.
 
 `@formly-contract/workspace` is the framework-neutral configuration
 layer for repository-aware Formly Contract tooling. It provides trusted config
@@ -179,27 +179,36 @@ workspace index. When discovery wraps a configuration import failure, the CLI
 prints a generic hint to check `tsconfigPath` and Node-safe contract entry
 points without exposing private paths, package names, or stack traces.
 
-### Generate from the pilot CLI
+### Use the generic pilot CLI
 
 After building or linking the workspace package, run the same boundary through
 the `formly-contracts` binary:
 
 ```sh
+pnpm exec formly-contracts list
 pnpm exec formly-contracts generate
 pnpm exec formly-contracts generate \
   --workspace-root ../claims-workspace \
   --config formly-contracts.config.ts \
   --output dist/formly-contracts-pilot
+pnpm exec formly-contracts check \
+  --workspace-root ../claims-workspace \
+  --config formly-contracts.config.ts \
+  --output dist/formly-contracts-pilot
 ```
 
-Successful generation prints the contract count and workspace-relative index
-path. Usage failures exit with status `2`; generation failures exit with status
-`1` and print stable phase/project/source/form provenance without a stack trace
-or underlying callback error. `--fail-on warning` and `--fail-on error` may be
-repeated to override diagnostic policy.
+`list` prints the deterministic configured project/source inventory without
+executing source lists or form factories. Successful generation prints the
+contract count and workspace-relative index path. `check` executes the same
+trusted source inventory, factories, extraction, and hashing as generation,
+but only reads and exact-compares the expected artifact/index bytes; it never
+repairs or rewrites output. Missing or stale output returns status `1`.
 
-This is intentionally the first pilot slice of the generic CLI. `list` and
-`check` remain part of Task 6A and are not accepted commands yet.
+Usage failures exit with status `2`; discovery, generation, and check failures
+exit with status `1` and omit stack traces and underlying callback errors.
+`--fail-on warning` and `--fail-on error` may be repeated for `generate` or
+`check` to override diagnostic policy. `list` does not accept output or
+diagnostic overrides because it never generates contracts.
 
 ## Project-owned custom-field profiles
 
@@ -471,14 +480,13 @@ configuration.
 
 ## Current boundary
 
-The programmatic runner and pilot `generate` command execute trusted source
-catalogs and declared form factories, resolve project field-type profile
-registries, and write the deterministic artifact set. Application driver
-identities remain data and do not execute code. Cross-field effect registries
-are strict configuration data, but endpoint/profile/readiness/cycle resolution
-and artifact projection remain the next vertical slice. The CLI `list`/`check`
-commands, Angular-assisted inventory, and observed runtime capture remain later
-increments on the same configuration bedrock.
+The programmatic runner and `generate`/`check` commands execute trusted source
+catalogs and declared form factories, resolve project field-type profiles and
+explicit cross-field effects, and derive the deterministic artifact set.
+`generate` publishes it; `check` compares it without writes. Application driver
+identities remain data and do not execute code. Angular-assisted inventory and
+observed runtime capture remain later increments on the same configuration
+bedrock.
 
 The [workplace pilot guide](workplace-pilot.md) turns this reference into a
 single operational checklist and includes the expected artifact layout,

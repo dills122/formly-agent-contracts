@@ -1,6 +1,6 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { cp, mkdtemp, readFile, readdir, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { relative, resolve } from 'node:path';
+import { relative, resolve, sep } from 'node:path';
 
 import {
   loadWorkspaceConfigModule,
@@ -19,6 +19,34 @@ import { describe, expect, it } from 'vitest';
 
 const fixtureRoot = fileURLToPath(new URL('./', import.meta.url));
 const fixtureTsconfig = resolve(fixtureRoot, 'tsconfig.json');
+const goldenRoot = resolve(fixtureRoot, 'goldens');
+const generatedOutputPrefix = 'dist/formly-contracts/';
+
+function goldenRelativePath(generatedPath: string): string {
+  if (!generatedPath.startsWith(generatedOutputPrefix)) {
+    throw new Error(`Unexpected generated fixture path: ${generatedPath}`);
+  }
+  return generatedPath
+    .slice(generatedOutputPrefix.length)
+    .replace(/\.json$/u, '.golden.json');
+}
+
+async function listRelativeFiles(
+  directory: string,
+  currentDirectory = directory,
+): Promise<readonly string[]> {
+  const entries = await readdir(currentDirectory, { withFileTypes: true });
+  const paths = await Promise.all(
+    entries.map(async (entry) => {
+      const absolutePath = resolve(currentDirectory, entry.name);
+      if (entry.isDirectory()) {
+        return listRelativeFiles(directory, absolutePath);
+      }
+      return [relative(directory, absolutePath).replaceAll('\\', '/')];
+    }),
+  );
+  return paths.flat().sort();
+}
 
 async function loadProject(
   relativePath: string,
@@ -585,4 +613,149 @@ describe('Angular monorepo workspace fixture', () => {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
   }, 20_000);
+
+  it('matches committed canonical goldens with fully resolved effects', async () => {
+    const temporaryWorkspace = await mkdtemp(
+      resolve(fixtureRoot, '../.angular-monorepo-golden-'),
+    );
+
+    try {
+      await cp(fixtureRoot, temporaryWorkspace, {
+        recursive: true,
+        filter: (source) =>
+          ![
+            goldenRoot,
+            resolve(fixtureRoot, 'dist'),
+            resolve(fixtureRoot, '.angular'),
+          ].some(
+            (excluded) =>
+              source === excluded || source.startsWith(`${excluded}${sep}`),
+          ),
+      });
+
+      const generated = await runWorkspace({
+        workspaceRoot: temporaryWorkspace,
+        rootConfigPath: 'formly-contracts.config.ts',
+        rootLoaderOptions: {
+          tsconfigPath: resolve(temporaryWorkspace, 'tsconfig.json'),
+        },
+      });
+      const generatedPaths = [
+        generated.indexPath,
+        ...generated.artifactPaths,
+      ].sort();
+      const expectedGoldenPaths = generatedPaths.map(goldenRelativePath);
+
+      expect(await listRelativeFiles(goldenRoot)).toEqual(expectedGoldenPaths);
+      await Promise.all(
+        generatedPaths.map(async (generatedPath) => {
+          const [actual, expected] = await Promise.all([
+            readFile(resolve(temporaryWorkspace, generatedPath)),
+            readFile(resolve(goldenRoot, goldenRelativePath(generatedPath))),
+          ]);
+          expect(actual).toEqual(expected);
+        }),
+      );
+
+      const claimsForm = generated.index.forms.find(
+        ({ formId }) => formId === 'claims.intake',
+      );
+      expect(claimsForm).toBeDefined();
+      const expectedEffects = [
+        {
+          identity: {
+            id: 'fixture.case-type-controls-other-details',
+            version: 1,
+          },
+          trigger: {
+            nodeId: 'claims.intake::path:s_claimDetails.s_caseType',
+            event: 'selectionChanged',
+          },
+          target: {
+            nodeId: 'claims.intake::path:s_claimDetails.s_otherDetails',
+            property: 'visibility',
+          },
+          kind: 'controls-state',
+          timing: { mode: 'sync' },
+          ordering: 'source-before-target',
+          evidence: 'declared',
+          opacity: 'transparent',
+        },
+        {
+          identity: {
+            id: 'fixture.product-filters-case-type',
+            version: 1,
+          },
+          trigger: {
+            nodeId: 'claims.intake::path:s_claimDetails.s_product',
+            event: 'selectionChanged',
+          },
+          target: {
+            nodeId: 'claims.intake::path:s_claimDetails.s_caseType',
+            property: 'options',
+          },
+          kind: 'filters',
+          timing: { mode: 'sync' },
+          ordering: 'source-before-target',
+          evidence: 'declared',
+          opacity: 'transparent',
+        },
+      ];
+      const claimsArtifact = JSON.parse(
+        await readFile(
+          resolve(
+            goldenRoot,
+            goldenRelativePath(claimsForm!.artifactPath),
+          ),
+          'utf8',
+        ),
+      ) as {
+        readonly declaredEffects?: readonly unknown[];
+        readonly effectAnalysis?: {
+          readonly completeness: string;
+          readonly reasons: readonly string[];
+        };
+        readonly nodes: readonly {
+          readonly id: string;
+          readonly dynamicRules: readonly unknown[];
+        }[];
+      };
+      const goldenIndex = JSON.parse(
+        await readFile(
+          resolve(goldenRoot, goldenRelativePath(generated.indexPath)),
+          'utf8',
+        ),
+      ) as {
+        readonly forms: readonly {
+          readonly formId: string;
+          readonly declaredEffects?: readonly unknown[];
+        }[];
+      };
+
+      expect(claimsArtifact.declaredEffects).toEqual(expectedEffects);
+      expect(claimsArtifact.effectAnalysis).toEqual({
+        completeness: 'incomplete',
+        reasons: ['opaque-dynamic-rule'],
+      });
+      expect(
+        claimsArtifact.nodes.find(
+          ({ id }) =>
+            id === 'claims.intake::path:s_claimDetails.s_caseType',
+        )?.dynamicRules,
+      ).toEqual([
+        {
+          evidence: 'declared',
+          id: 'claims.intake::path:s_claimDetails.s_caseType::rule:expressions:props.options',
+          property: 'props.options',
+          source: 'function',
+        },
+      ]);
+      expect(
+        goldenIndex.forms.find(({ formId }) => formId === 'claims.intake')
+          ?.declaredEffects,
+      ).toEqual(expectedEffects);
+    } finally {
+      await rm(temporaryWorkspace, { recursive: true, force: true });
+    }
+  }, 30_000);
 });

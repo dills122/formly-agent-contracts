@@ -135,6 +135,17 @@ export interface WorkspaceRunResult {
   readonly index: WorkspaceContractIndex;
 }
 
+export interface WorkspaceCheckDifference {
+  readonly path: string;
+  readonly status: 'missing' | 'stale';
+}
+
+export interface WorkspaceCheckResult {
+  readonly indexPath: string;
+  readonly artifactPaths: readonly string[];
+  readonly differences: readonly WorkspaceCheckDifference[];
+}
+
 interface ResolvedProject {
   readonly discovered: DiscoveredWorkspaceProject;
   readonly resolved: ResolvedWorkspaceProjectConfig;
@@ -154,6 +165,11 @@ interface PendingArtifact {
 interface ExtractionOutput {
   readonly artifacts: readonly PendingArtifact[];
   readonly forms: WorkspaceContractIndexDraft['forms'];
+}
+
+interface PlannedWorkspaceRun extends WorkspaceRunResult {
+  readonly workspaceRoot: string;
+  readonly artifacts: readonly PendingArtifact[];
 }
 
 function compareCodeUnits(left: string, right: string): number {
@@ -730,8 +746,8 @@ async function atomicWrite(
 
   if (!replace) {
     try {
-      const existing = await readFile(absolutePath, 'utf8');
-      if (existing === bytes) {
+      const existing = await readFile(absolutePath);
+      if (existing.equals(Buffer.from(bytes))) {
         return;
       }
       throw new WorkspaceGenerationError('OUTPUT_WRITE_FAILED', 'output', {
@@ -821,9 +837,9 @@ async function publishOutputs(
   );
 }
 
-export async function runWorkspace(
+async function planWorkspaceRun(
   options: RunWorkspaceOptions,
-): Promise<WorkspaceRunResult> {
+): Promise<PlannedWorkspaceRun> {
   let workspaceRoot: string;
   try {
     workspaceRoot = await realpath(resolve(options.workspaceRoot));
@@ -891,10 +907,78 @@ export async function runWorkspace(
     extracted.forms,
     aggregateOutputDirectory,
   );
-  await publishOutputs(workspaceRoot, extracted.artifacts, indexPath, index);
   return {
+    workspaceRoot,
     indexPath,
     artifactPaths: extracted.artifacts.map(({ relativePath }) => relativePath),
     index,
+    artifacts: extracted.artifacts,
+  };
+}
+
+async function comparePlannedOutput(
+  workspaceRoot: string,
+  output: PendingArtifact,
+): Promise<WorkspaceCheckDifference | undefined> {
+  await inspectOutputPath(workspaceRoot, output.relativePath);
+  let actualBytes: Buffer;
+  try {
+    actualBytes = await readFile(resolve(workspaceRoot, output.relativePath));
+  } catch (error) {
+    if (errnoCode(error) === 'ENOENT') {
+      return { path: output.relativePath, status: 'missing' };
+    }
+    throw new WorkspaceGenerationError(
+      'OUTPUT_WRITE_FAILED',
+      'output',
+      { outputPath: output.relativePath },
+      error,
+    );
+  }
+  return actualBytes.equals(Buffer.from(output.bytes))
+    ? undefined
+    : { path: output.relativePath, status: 'stale' };
+}
+
+export async function checkWorkspace(
+  options: RunWorkspaceOptions,
+): Promise<WorkspaceCheckResult> {
+  const planned = await planWorkspaceRun(options);
+  const expectedOutputs = [
+    ...planned.artifacts,
+    {
+      relativePath: planned.indexPath,
+      bytes: `${canonicalizeWorkspaceContractIndex(planned.index)}\n`,
+    },
+  ];
+  const compared = await Promise.all(
+    expectedOutputs.map((output) =>
+      comparePlannedOutput(planned.workspaceRoot, output),
+    ),
+  );
+  return {
+    indexPath: planned.indexPath,
+    artifactPaths: planned.artifactPaths,
+    differences: compared.filter(
+      (difference): difference is WorkspaceCheckDifference =>
+        difference !== undefined,
+    ),
+  };
+}
+
+export async function runWorkspace(
+  options: RunWorkspaceOptions,
+): Promise<WorkspaceRunResult> {
+  const planned = await planWorkspaceRun(options);
+  await publishOutputs(
+    planned.workspaceRoot,
+    planned.artifacts,
+    planned.indexPath,
+    planned.index,
+  );
+  return {
+    indexPath: planned.indexPath,
+    artifactPaths: planned.artifactPaths,
+    index: planned.index,
   };
 }

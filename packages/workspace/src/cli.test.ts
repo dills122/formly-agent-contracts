@@ -1,4 +1,11 @@
-import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import {
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -39,6 +46,23 @@ function captureIo() {
   };
 }
 
+async function pathExists(path: string): Promise<boolean> {
+  try {
+    await lstat(path);
+    return true;
+  } catch (error) {
+    if (
+      typeof error === 'object' &&
+      error !== null &&
+      'code' in error &&
+      error.code === 'ENOENT'
+    ) {
+      return false;
+    }
+    throw error;
+  }
+}
+
 afterEach(async () => {
   await Promise.all(
     temporaryDirectories
@@ -51,16 +75,116 @@ describe('workspace CLI', () => {
   it('prints help without invoking generation', async () => {
     const captured = captureIo();
     const generate = vi.fn();
+    const list = vi.fn();
+    const check = vi.fn();
 
     await expect(
-      runWorkspaceCli(['--help'], { ...captured.io, generate }),
+      runWorkspaceCli(['--help'], {
+        ...captured.io,
+        generate,
+        list,
+        check,
+      }),
     ).resolves.toBe(0);
 
     expect(generate).not.toHaveBeenCalled();
-    expect(captured.stdout.join('')).toContain(
-      'formly-contracts generate [options]',
+    expect(list).not.toHaveBeenCalled();
+    expect(check).not.toHaveBeenCalled();
+    expect(captured.stdout.join('')).toContain('formly-contracts <command>');
+    expect(captured.stdout.join('')).toContain('generate');
+    expect(captured.stdout.join('')).toContain('list');
+    expect(captured.stdout.join('')).toContain('check');
+    expect(captured.stderr).toEqual([]);
+  });
+
+  it('lists deterministic project and source inventory', async () => {
+    const captured = captureIo();
+    const list = vi.fn().mockResolvedValue({
+      inventory: {
+        schemaVersion: '0.1.0',
+        rootConfigPath: 'config/formly.ts',
+        plugins: [],
+        projects: [
+          {
+            configPath: 'apps/claims/formly-contracts.project.ts',
+            projectId: 'claims',
+            sourceIds: ['claims/core', 'claims/shared'],
+          },
+        ],
+      },
+    });
+
+    await expect(
+      runWorkspaceCli(
+        [
+          'list',
+          '--workspace-root',
+          '/workspace',
+          '--config',
+          'config/formly.ts',
+        ],
+        { ...captured.io, list },
+      ),
+    ).resolves.toBe(0);
+
+    expect(list).toHaveBeenCalledWith({
+      workspaceRoot: '/workspace',
+      rootConfigPath: 'config/formly.ts',
+    });
+    expect(captured.stdout.join('')).toBe(
+      'Discovered 1 project and 2 sources.\n' +
+        'Project: claims config="apps/claims/formly-contracts.project.ts" sources=claims/core,claims/shared\n',
     );
     expect(captured.stderr).toEqual([]);
+  });
+
+  it('reports a current artifact set from check', async () => {
+    const captured = captureIo();
+    const check = vi.fn().mockResolvedValue({
+      indexPath: 'dist/contracts/workspace-index.json',
+      artifactPaths: ['dist/contracts/claims.json'],
+      differences: [],
+    });
+
+    await expect(
+      runWorkspaceCli(['check'], {
+        ...captured.io,
+        cwd: () => '/workspace',
+        check,
+      }),
+    ).resolves.toBe(0);
+
+    expect(check).toHaveBeenCalledWith({
+      workspaceRoot: '/workspace',
+      rootConfigPath: 'formly-contracts.config.ts',
+    });
+    expect(captured.stdout.join('')).toBe(
+      '1 contract is current.\nIndex: dist/contracts/workspace-index.json\n',
+    );
+    expect(captured.stderr).toEqual([]);
+  });
+
+  it('reports missing and stale artifact paths from check', async () => {
+    const captured = captureIo();
+    const check = vi.fn().mockResolvedValue({
+      indexPath: 'dist/contracts/workspace-index.json',
+      artifactPaths: ['dist/contracts/claims.json'],
+      differences: [
+        { path: 'dist/contracts/claims.json', status: 'stale' },
+        { path: 'dist/contracts/workspace-index.json', status: 'missing' },
+      ],
+    });
+
+    await expect(
+      runWorkspaceCli(['check'], { ...captured.io, check }),
+    ).resolves.toBe(1);
+
+    expect(captured.stdout).toEqual([]);
+    expect(captured.stderr.join('')).toBe(
+      'Contract artifacts are not current.\n' +
+        'Stale: "dist/contracts/claims.json"\n' +
+        'Missing: "dist/contracts/workspace-index.json"\n',
+    );
   });
 
   it('forwards explicit generate options and prints a concise result', async () => {
@@ -227,6 +351,131 @@ describe('workspace CLI', () => {
     ]);
     expect(captured.stdout.join('')).toContain('Generated 1 contract.');
     expect(captured.stderr).toEqual([]);
+  });
+
+  it('executes list, generate, and check against one real workspace without listing factories', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    const factoryMarker = join(workspaceRoot, 'factory-ran.txt');
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.mjs',
+      `export default { projectConfigs: ['projects/*.project.mjs'] };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `import { writeFileSync } from 'node:fs';
+       export default {
+        projectId: 'forms',
+        sources: [{ sourceId: 'forms', list: () => [{
+          id: 'claims.create',
+          create: () => {
+            writeFileSync(${JSON.stringify(factoryMarker)}, 'ran');
+            return { fields: [{ key: 'name', type: 'input' }] };
+          }
+        }] }]
+      };`,
+    );
+    const listIo = captureIo();
+
+    await expect(
+      runWorkspaceCli(
+        [
+          'list',
+          '--workspace-root',
+          workspaceRoot,
+          '--config',
+          'formly-contracts.config.mjs',
+        ],
+        listIo.io,
+      ),
+    ).resolves.toBe(0);
+
+    expect(await pathExists(factoryMarker)).toBe(false);
+    expect(listIo.stdout.join('')).toContain(
+      'Discovered 1 project and 1 source.',
+    );
+    const generateIo = captureIo();
+    await expect(
+      runWorkspaceCli(
+        [
+          'generate',
+          '--workspace-root',
+          workspaceRoot,
+          '--config',
+          'formly-contracts.config.mjs',
+        ],
+        generateIo.io,
+      ),
+    ).resolves.toBe(0);
+    expect(await pathExists(factoryMarker)).toBe(true);
+    await rm(factoryMarker);
+    const checkIo = captureIo();
+    await expect(
+      runWorkspaceCli(
+        [
+          'check',
+          '--workspace-root',
+          workspaceRoot,
+          '--config',
+          'formly-contracts.config.mjs',
+        ],
+        checkIo.io,
+      ),
+    ).resolves.toBe(0);
+    expect(await pathExists(factoryMarker)).toBe(true);
+    expect(checkIo.stdout.join('')).toContain('1 contract is current.');
+  });
+
+  it('detects missing and stale files through real check commands without repairing them', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.mjs',
+      `export default { projectConfigs: ['projects/*.project.mjs'] };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `export default {
+        projectId: 'forms',
+        sources: [{ sourceId: 'forms', list: () => [{
+          id: 'claims.create',
+          create: () => ({ fields: [{ key: 'name', type: 'input' }] })
+        }] }]
+      };`,
+    );
+    const args = [
+      '--workspace-root',
+      workspaceRoot,
+      '--config',
+      'formly-contracts.config.mjs',
+    ];
+    await expect(
+      runWorkspaceCli(['generate', ...args], captureIo().io),
+    ).resolves.toBe(0);
+    const outputDirectory = join(workspaceRoot, 'dist/formly-contracts');
+    const indexPath = join(outputDirectory, 'workspace-index.json');
+    const index = JSON.parse(await readFile(indexPath, 'utf8')) as {
+      readonly forms: readonly { readonly artifactPath: string }[];
+    };
+    const artifactPath = join(workspaceRoot, index.forms[0]!.artifactPath);
+    await writeFile(artifactPath, 'stale bytes\n');
+    const staleIo = captureIo();
+
+    await expect(
+      runWorkspaceCli(['check', ...args], staleIo.io),
+    ).resolves.toBe(1);
+
+    expect(staleIo.stderr.join('')).toContain('Stale:');
+    expect(await readFile(artifactPath, 'utf8')).toBe('stale bytes\n');
+    await rm(indexPath);
+    const missingIo = captureIo();
+    await expect(
+      runWorkspaceCli(['check', ...args], missingIo.io),
+    ).resolves.toBe(1);
+    expect(missingIo.stderr.join('')).toContain('Missing:');
+    expect(await pathExists(indexPath)).toBe(false);
   });
 
   it('generates from a consumer project loaded through an exact scoped tsconfig alias', async () => {
