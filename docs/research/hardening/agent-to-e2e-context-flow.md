@@ -106,8 +106,9 @@ inventing selectors or application semantics.
 4. Test intent names semantic IDs and typed values/policies only. It has no CSS,
    XPath, Playwright locator, callback source, or driver package name supplied
    by the agent.
-5. Validation proves the node, value, operation, ordering, readiness,
-   wrapper/repeater access, validation surface, and usage action are supported.
+5. Validation proves the node, value, operation, commit ownership,
+   post-commit assertion, ordering, readiness, wrapper/repeater access,
+   validation surface, and usage action are supported.
 6. Compilation resolves only pre-registered driver IDs/versions and locator
    targets. A missing fact is a diagnostic, never a fallback guess.
 7. Runtime execution uses Playwright actionability and web-first assertions and
@@ -142,6 +143,7 @@ and
 | Generated scenario inventory and resolved artifact references. | Repository observation | Dynamic options and conditional state remain declared/unknown even though scenario definitions exist in source. | Emit scenario IDs, safe input provenance, basis hash, resolved artifact hash, and diagnostics during trusted generation. |
 | Versioned native-field and application-driver bindings. | Repository observation | Many current native nodes have no `interactionProfile`; a strict compiler cannot decide whether to fill, check, or select. | Resolve built-in profiles into artifacts or a hash-pinned driver capability registry. |
 | Locator scope/target coverage for every profile part and wrapper precondition. | Repository observation | `wrapper-expand` or overlay option parts cannot be located from `target: control`. | Validate that each required part has an exact node-local locator or an explicitly defined driver-owned scoped-role recipe. |
+| Value-commit ownership and post-commit assertion surfaces. | Repository observation | `fill` can change a DOM value without committing a control configured for blur/submit, producing a false-positive assertion. | Project `updateOn`/equivalent semantics into a profile-owned immediate/explicit node-local commit or a usage action, and name a committed-value assertion surface. |
 | Validation activation and assertion surface. | Repository observation | “Required” says what is invalid, but not whether validation appears on blur, submit/next, or change, nor how to assert the correct message. | Usage/node metadata must name the trigger, constraint/rule ID, and observable error target/state. |
 | Freshness envelope tying source inputs, usage index, scenarios, contract, and driver registry together. | Repository observation | Matching hashes can still describe an older checkout, and independently generated indexes can be mixed. | Add build ID, repository revision, input digest, registry hashes, and current/stale/unknown comparison. |
 | Journey action/outcome metadata where a test must advance or submit. | Documented fact | A field contract alone cannot prove the action or expected application outcome. | Keep actions/outcomes in the usage journey contract, not in field nodes. |
@@ -149,8 +151,9 @@ and
 **Inference:** These are minimum execution inputs, not an argument to place all
 of them in the core `FormContract`. Usage/navigation/step/action data belongs
 in a usage/journey index; scenario identity belongs in an artifact envelope;
-field interaction and validation surfaces belong with nodes/profiles; driver
-implementations remain in the trusted Playwright package.
+field interaction, commit, value-assertion, and validation surfaces belong with
+nodes/profiles; driver implementations remain in the trusted Playwright
+package.
 
 ## Smallest reliable journey
 
@@ -215,6 +218,270 @@ to a newer declared form with coincidentally stable node IDs.
 The shapes below are proposals for strict read-only MCP tools. They are not a
 production schema change.
 
+### Shared query projections
+
+**Inference:** Every query result is a closed, versioned DTO. Projection IDs
+refer back to the immutable `contextRef`; they do not embed executable locator
+recipes, callbacks, or driver modules in model-facing responses.
+Runtime schemas reject unknown properties, unsupported schema versions, and
+unordered duplicate identities at every input, result, plan, and compile
+envelope.
+
+```ts
+type E2eCapability =
+  | 'open-usage'
+  | 'fill'
+  | 'check'
+  | 'select-option'
+  | 'select-from-overlay'
+  | 'type-and-pick'
+  | 'select-row'
+  | 'add-item'
+  | 'expand-item'
+  | 'activate-wrapper'
+  | 'wait-readiness'
+  | 'commit-value'
+  | 'activate-validation'
+  | 'assert-state'
+  | 'assert-value'
+  | 'assert-validation'
+  | 'invoke-usage-action'
+  | 'assert-outcome';
+
+interface PageProjection {
+  readonly truncated: boolean;
+  readonly nextCursor?: string;
+}
+
+type ContractDiagnosticCodeProjection =
+  | 'OPAQUE_FUNCTION'
+  | 'ASYNC_VALUE'
+  | 'UNKNOWN_FIELD_SHAPE'
+  | 'UNSUPPORTED_RULE'
+  | 'LOCATOR_DERIVATION_FAILED'
+  | 'UNRELIABLE_DOM_ID'
+  | 'UNMAPPED_FIELD_TYPE'
+  | 'UNMAPPED_PROFILE_VARIANT'
+  | 'UNMAPPED_WRAPPER_PROFILE'
+  | 'DUPLICATE_WRAPPER_REQUEST'
+  | 'PROFILE_PART_CONFLICT'
+  | 'WRAPPER_BLOCKS_GENERIC_DRIVER'
+  | 'VALUE_DOMAIN_PROJECTION_FAILED'
+  | 'AMBIGUOUS_VALUE_MAPPING'
+  | 'UNKNOWN_EFFECT_SOURCE'
+  | 'UNKNOWN_EFFECT_TARGET'
+  | 'UNSUPPORTED_EFFECT_TARGET'
+  | 'UNKNOWN_EFFECT_READINESS'
+  | 'UNKNOWN_EFFECT_CONDITION'
+  | 'EFFECT_CYCLE';
+
+type DiagnosticIdentityProjection =
+  | {
+      readonly source: 'form-contract';
+      readonly schemaVersion: '0.4.0';
+      readonly code: ContractDiagnosticCodeProjection;
+    }
+  | {
+      readonly source: 'agent-context';
+      readonly schemaVersion: '0.1.0';
+      readonly code: IntentDiagnosticCode;
+    };
+
+interface DiagnosticSummary {
+  readonly identity: DiagnosticIdentityProjection;
+  readonly severity: 'warning' | 'error';
+  readonly phase: 'discovery' | 'context' | 'validation' | 'compile' | 'runtime';
+  readonly count: number;
+  readonly blocking: boolean;
+  readonly evidenceRefs: readonly string[];
+}
+
+interface QueryDiagnosticProjection {
+  readonly identity: DiagnosticIdentityProjection;
+  readonly severity: 'warning' | 'error';
+  readonly phase: 'discovery' | 'context';
+  readonly message: string;
+  readonly blocking: boolean;
+  readonly evidenceRefs: readonly string[];
+}
+
+interface UsageDriverProjection {
+  readonly kind: 'application';
+  readonly id: string;
+  readonly version: number;
+}
+
+interface UsageEntryProjection {
+  readonly id: string;
+  readonly capability: 'open-usage';
+  readonly driver: UsageDriverProjection;
+  readonly evidenceRefs: readonly string[];
+}
+
+interface UsageActionProjection {
+  readonly id: string;
+  readonly kind: 'next' | 'submit' | 'cancel' | 'other';
+  readonly driver: UsageDriverProjection;
+  readonly outcomeIds: readonly string[];
+  readonly evidenceRefs: readonly string[];
+}
+
+interface UsageOutcomeProjection {
+  readonly id: string;
+  readonly kind: 'remains-on-step' | 'step-changed' | 'navigation' | 'message';
+  readonly assertionTargetRef: string;
+  readonly evidenceRefs: readonly string[];
+}
+
+interface UsageStepProjection {
+  readonly id: string;
+  readonly ordinal: number;
+  readonly label?: string;
+  readonly nodeIds: readonly string[];
+  readonly actionIds: readonly string[];
+}
+
+interface UsageJourneyProjection {
+  readonly entry: UsageEntryProjection;
+  readonly steps: readonly UsageStepProjection[];
+  readonly actions: readonly UsageActionProjection[];
+  readonly outcomes: readonly UsageOutcomeProjection[];
+}
+
+interface ValueDomainProjection {
+  readonly kind: 'enumerated' | 'dynamic' | 'mixed' | 'unknown';
+  readonly completeness: 'complete' | 'partial' | 'unknown';
+  readonly values?: readonly JsonValue[];
+  readonly runtimeEnumerationId?: string;
+  readonly evidenceRefs: readonly string[];
+}
+
+type ValueCommitProjection =
+  | {
+      readonly id: string;
+      readonly kind: 'node-local';
+      readonly mode: 'immediate' | 'blur';
+      readonly execution: 'included-in-set' | 'explicit-intent';
+      readonly driverCapability: 'commit-value';
+      readonly evidenceRefs: readonly string[];
+    }
+  | {
+      readonly id: string;
+      readonly kind: 'usage-action';
+      readonly actionId: string;
+      readonly evidenceRefs: readonly string[];
+    };
+
+interface NodeInteractionProjection {
+  readonly profile: { readonly id: string; readonly version: number };
+  readonly driver: {
+    readonly kind: 'generic' | 'application';
+    readonly id: string;
+    readonly version: number;
+  };
+  readonly operation: E2eCapability;
+  readonly partRefs: readonly string[];
+  readonly locatorTargetRefs: readonly string[];
+  readonly readinessIds: readonly string[];
+  readonly commit?: ValueCommitProjection;
+}
+
+interface ValidationSurfaceProjection {
+  readonly id: string;
+  readonly constraint: string;
+  readonly activation:
+    | { readonly kind: 'none' }
+    | { readonly kind: 'node-local'; readonly activationId: string }
+    | { readonly kind: 'usage-action'; readonly actionId: string };
+  readonly assertionTargetRef: string;
+  readonly evidenceRefs: readonly string[];
+}
+
+interface ValueAssertionProjection {
+  readonly id: string;
+  readonly kind: 'committed-model-value' | 'control-value';
+  readonly assertionTargetRef: string;
+  readonly evidenceRefs: readonly string[];
+}
+
+interface E2eNodeProjection {
+  readonly nodeId: string;
+  readonly modelPath: readonly (string | number | '*')[];
+  readonly label?: string;
+  readonly semanticType?: string;
+  readonly capabilities: readonly E2eCapability[];
+  readonly constraintIds: readonly string[];
+  readonly domain?: ValueDomainProjection;
+  readonly interaction?: NodeInteractionProjection;
+  readonly validationSurfaces: readonly ValidationSurfaceProjection[];
+  readonly valueAssertions: readonly ValueAssertionProjection[];
+  readonly unknowns: readonly {
+    readonly aspect:
+      | 'semantic-role'
+      | 'model-codec'
+      | 'runtime-states'
+      | 'locator-scope'
+      | 'interaction-sequence'
+      | 'value-commit'
+      | 'validation-surface'
+      | 'value-assertion'
+      | 'usage'
+      | 'freshness';
+    readonly blocking: boolean;
+    readonly evidenceRef: string;
+  }[];
+}
+
+type E2ePrerequisite =
+  | {
+      readonly kind: 'set-before';
+      readonly effectId: string;
+      readonly sourceNodeId: string;
+      readonly targetNodeId: string;
+    }
+  | {
+      readonly kind: 'wrapper-activation';
+      readonly nodeId: string;
+      readonly partRef: string;
+      readonly operation: 'click' | 'check';
+    }
+  | {
+      readonly kind: 'readiness';
+      readonly nodeId: string;
+      readonly readinessId: string;
+    }
+  | {
+      readonly kind: 'visible-before-interaction';
+      readonly nodeId: string;
+      readonly witnessEffectId: string;
+    }
+  | {
+      readonly kind: 'item-context';
+      readonly nodeId: string;
+      readonly itemMode: 'index';
+    };
+
+interface DeclaredEffectProjection {
+  readonly id: string;
+  readonly version: number;
+  readonly sourceNodeId: string;
+  readonly targetNodeId: string;
+  readonly targetProperty:
+    | 'enabled'
+    | 'options'
+    | 'required'
+    | 'value'
+    | 'visibility';
+  readonly ordering: 'none' | 'source-before-target';
+  readonly timing:
+    | { readonly mode: 'sync' }
+    | { readonly mode: 'async'; readonly readinessId: string }
+    | { readonly mode: 'unknown' };
+  readonly conditionRuleId?: string;
+  readonly evidenceRefs: readonly string[];
+}
+```
+
 ### 1. `search_form_usages`
 
 **Inference — purpose:** Map repository or bug evidence to candidate form
@@ -243,16 +510,7 @@ interface SearchFormUsagesInput {
   readonly modelPath?: readonly (string | number | '*')[];
   readonly label?: string;
   readonly scenarioId?: string;
-  readonly capabilities?: readonly (
-    | 'fill'
-    | 'check'
-    | 'select-option'
-    | 'select-from-overlay'
-    | 'type-and-pick'
-    | 'select-row'
-    | 'add-item'
-    | 'expand-item'
-  )[];
+  readonly capabilities?: readonly E2eCapability[];
   readonly limit?: number; // server-capped
   readonly cursor?: string;
 }
@@ -282,6 +540,13 @@ interface FormUsageCandidate {
   readonly blockers: readonly DiagnosticSummary[];
   readonly contextRef: ContractContextRef;
 }
+
+interface SearchFormUsagesResult {
+  readonly schemaVersion: '0.1.0';
+  readonly candidates: readonly FormUsageCandidate[];
+  readonly page: PageProjection;
+  readonly diagnostics: readonly QueryDiagnosticProjection[];
+}
 ```
 
 **Inference — ambiguity policy:** A unique exact structured match may be
@@ -304,7 +569,7 @@ interface FormContextSummary {
   readonly contextRef: ContractContextRef;
   readonly freshness: 'current' | 'stale' | 'unknown';
   readonly usage: {
-    readonly entryCapability: string;
+    readonly entryCapability: 'open-usage';
     readonly steps: readonly {
       readonly id: string;
       readonly ordinal: number;
@@ -314,13 +579,37 @@ interface FormContextSummary {
   };
   readonly form: {
     readonly nodeCount: number;
-    readonly diagnosticCounts: Readonly<Record<string, number>>;
-    readonly executableCapabilities: readonly string[];
+    readonly diagnosticCounts: readonly {
+      readonly identity: DiagnosticIdentityProjection;
+      readonly count: number;
+    }[];
+    readonly executableCapabilities: readonly E2eCapability[];
     readonly scenarioIds: readonly string[];
     readonly effectAnalysis: 'complete' | 'incomplete' | 'absent';
   };
   readonly blockers: readonly DiagnosticSummary[];
 }
+
+type GetFormContextResult =
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly view: 'summary';
+      readonly summary: FormContextSummary;
+    }
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly view: 'diagnostics';
+      readonly contextRef: ContractContextRef;
+      readonly diagnostics: readonly QueryDiagnosticProjection[];
+      readonly page: PageProjection;
+    }
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly view: 'journey';
+      readonly contextRef: ContractContextRef;
+      readonly journey: UsageJourneyProjection;
+      readonly diagnostics: readonly QueryDiagnosticProjection[];
+    };
 ```
 
 ### 3. `find_form_nodes`
@@ -336,7 +625,7 @@ interface FindFormNodesInput {
   readonly modelPath?: readonly (string | number | '*')[];
   readonly label?: string;
   readonly semanticType?: string;
-  readonly capability?: string;
+  readonly capability?: E2eCapability;
   readonly scenarioId?: string;
   readonly include?: readonly (
     | 'constraints'
@@ -349,6 +638,14 @@ interface FindFormNodesInput {
   readonly limit?: number;
   readonly cursor?: string;
 }
+
+interface FindFormNodesResult {
+  readonly schemaVersion: '0.1.0';
+  readonly contextRef: ContractContextRef;
+  readonly nodes: readonly E2eNodeProjection[];
+  readonly page: PageProjection;
+  readonly diagnostics: readonly QueryDiagnosticProjection[];
+}
 ```
 
 **Inference:** Exact `nodeId` and typed `modelPath` matches outrank labels.
@@ -359,8 +656,8 @@ Labels are useful discovery text, not identity. Duplicate labels return
 
 **Inference — purpose:** Return only the closure needed to author one test
 case: focused nodes, their step/usage entry, incoming ordering/effect edges,
-wrapper/repeater preconditions, values, validation surface, readiness, and
-blocking unknowns.
+wrapper/repeater preconditions, values, validation and value-commit/assertion
+surfaces, readiness, and blocking unknowns.
 
 ```ts
 interface GetE2eSliceInput {
@@ -371,6 +668,7 @@ interface GetE2eSliceInput {
 }
 
 interface E2eSlice {
+  readonly schemaVersion: '0.1.0';
   readonly contextRef: ContractContextRef;
   readonly entry: UsageEntryProjection;
   readonly step: UsageStepProjection;
@@ -395,21 +693,150 @@ interface ValidateTestIntentInput {
   readonly intent: TestIntent;
 }
 
+interface ApprovedNodeBinding {
+  readonly nodeId: string;
+  readonly profile: { readonly id: string; readonly version: number };
+  readonly driver: {
+    readonly kind: 'generic' | 'application';
+    readonly id: string;
+    readonly version: number;
+  };
+  readonly operation: E2eCapability;
+  readonly partRefs: readonly string[];
+  readonly locatorTargetRefs: readonly string[];
+}
+
+type ResolvedPlanValue =
+  | { readonly kind: 'canonical'; readonly value: JsonValue }
+  | {
+      readonly kind: 'runtime-policy';
+      readonly policy: 'first-enabled';
+      readonly runtimeEnumerationId: string;
+      readonly readinessId: string;
+      readonly codecRef: string;
+    }
+  | {
+      readonly kind: 'constraint-violation';
+      readonly constraintId: string;
+      readonly capabilityRef: string;
+    };
+
+type ValidatedPlanStepOrigin =
+  | { readonly kind: 'intent'; readonly intentStepIndex: number }
+  | {
+      readonly kind: 'declared-expansion';
+      readonly parentIntentStepIndex: number;
+      readonly prerequisiteRef: string;
+    };
+
+interface ValidatedPlanStepBase {
+  readonly planStepId: string;
+  readonly origin: ValidatedPlanStepOrigin;
+  readonly evidenceRefs: readonly string[];
+}
+
+type ValidatedExecutionStep = ValidatedPlanStepBase &
+  (
+    | {
+        readonly op: 'open-usage';
+        readonly entryId: string;
+        readonly driver: UsageDriverProjection;
+      }
+    | {
+        readonly op: 'activate-wrapper';
+        readonly binding: ApprovedNodeBinding;
+        readonly partRef: string;
+      }
+    | {
+        readonly op: 'wait-readiness';
+        readonly binding: ApprovedNodeBinding;
+        readonly readinessId: string;
+      }
+    | {
+        readonly op: 'set-value';
+        readonly binding: ApprovedNodeBinding;
+        readonly value: ResolvedPlanValue;
+      }
+    | {
+        readonly op: 'commit-value';
+        readonly binding: ApprovedNodeBinding;
+        readonly commit: {
+          readonly id: string;
+          readonly kind: 'node-local';
+          readonly mode: 'immediate' | 'blur';
+          readonly execution: 'explicit-intent';
+        };
+      }
+    | {
+        readonly op: 'add-item' | 'expand-item';
+        readonly binding: ApprovedNodeBinding;
+        readonly item?: { readonly index: number };
+      }
+    | {
+        readonly op: 'expect-state';
+        readonly binding: ApprovedNodeBinding;
+        readonly state:
+          | 'visible'
+          | 'hidden'
+          | 'enabled'
+          | 'disabled'
+          | 'valid'
+          | 'invalid';
+        readonly assertionTargetRef: string;
+      }
+    | {
+        readonly op: 'expect-value';
+        readonly binding: ApprovedNodeBinding;
+        readonly assertionId: string;
+        readonly value: ResolvedPlanValue;
+      }
+    | {
+        readonly op: 'invoke-usage-action';
+        readonly actionId: string;
+        readonly driver: UsageDriverProjection;
+        readonly expectedOutcomeIds: readonly string[];
+      }
+    | {
+        readonly op: 'activate-validation';
+        readonly binding: ApprovedNodeBinding;
+        readonly validationId: string;
+        readonly activationId: string;
+      }
+    | {
+        readonly op: 'expect-validation';
+        readonly binding: ApprovedNodeBinding;
+        readonly validationId: string;
+        readonly state: 'present' | 'absent';
+        readonly assertionTargetRef: string;
+      }
+    | {
+        readonly op: 'expect-outcome';
+        readonly outcomeId: string;
+        readonly driver: UsageDriverProjection;
+        readonly assertionTargetRef: string;
+      }
+  );
+
 interface ValidatedExecutionPlan {
   readonly schemaVersion: '0.1.0';
   readonly contextRef: ContractContextRef;
+  readonly caseId: string;
   readonly steps: readonly ValidatedExecutionStep[];
 }
 
 type ValidateTestIntentResult =
   | {
+      readonly schemaVersion: '0.1.0';
       readonly status: 'valid';
+      readonly contextRef: ContractContextRef;
       readonly planHash: `sha256:${string}`;
       readonly plan: ValidatedExecutionPlan;
       readonly warnings: readonly IntentDiagnostic[];
     }
   | {
+      readonly schemaVersion: '0.1.0';
       readonly status: 'invalid';
+      readonly contextRef: ContractContextRef;
       readonly diagnostics: readonly IntentDiagnostic[];
     };
 
@@ -419,6 +846,40 @@ interface CompileTestIntentInput {
   readonly planHash: `sha256:${string}`;
   readonly output: 'driver-calls' | 'playwright-test';
 }
+
+interface CompiledDriverCall {
+  readonly planStepId: string;
+  readonly driver: {
+    readonly scope: 'usage' | 'node';
+    readonly kind: 'generic' | 'application';
+    readonly id: string;
+    readonly version: number;
+  };
+  readonly operation: E2eCapability;
+  readonly approvedStep: ValidatedExecutionStep;
+}
+
+type CompileTestIntentResult =
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly status: 'compiled';
+      readonly contextRef: ContractContextRef;
+      readonly planHash: `sha256:${string}`;
+      readonly artifact:
+        | {
+            readonly kind: 'driver-calls';
+            readonly calls: readonly CompiledDriverCall[];
+          }
+        | { readonly kind: 'playwright-test'; readonly source: string };
+      readonly warnings: readonly IntentDiagnostic[];
+    }
+  | {
+      readonly schemaVersion: '0.1.0';
+      readonly status: 'rejected';
+      readonly contextRef: ContractContextRef;
+      readonly planHash: `sha256:${string}`;
+      readonly diagnostics: readonly IntentDiagnostic[];
+    };
 ```
 
 **Inference:** A server-side plan handle is a credible later optimization, but
@@ -429,6 +890,15 @@ plan, context, and tool version. `planHash` covers the canonical serialized
 `ValidatedExecutionPlan`, including its embedded `contextRef`; compilation
 requires the separately submitted `contextRef` to equal the embedded one. In
 the first slice it should return driver calls for review, not write files.
+
+**Inference:** The validator, not the compiler, chooses every binding, target,
+canonical value/policy resolution, usage action, outcome, validation surface,
+wrapper expansion, and readiness step serialized above. Compilation may look
+up the referenced implementation in the hash-pinned trusted registries, but it
+may not select a different semantic reference or add an unplanned operation.
+The driver-call review output pairs the selected trusted driver with the exact
+closed `ValidatedExecutionStep`; it has no secondary free-form argument bag
+that could reintroduce selectors, code, or unvalidated driver options.
 
 ## Progressive disclosure
 
@@ -497,7 +967,13 @@ type TestIntentStep =
   | {
       readonly op: 'expectValue';
       readonly nodeId: string;
+      readonly assertionId: string;
       readonly value: IntentValue;
+    }
+  | {
+      readonly op: 'commitValue';
+      readonly nodeId: string;
+      readonly commitId: string;
     }
   | {
       readonly op: 'invokeUsageAction';
@@ -511,6 +987,7 @@ type TestIntentStep =
   | {
       readonly op: 'expectValidation';
       readonly nodeId: string;
+      readonly validationId: string;
       readonly constraint: string;
       readonly state: 'present' | 'absent';
     }
@@ -558,15 +1035,32 @@ step and may not navigate, submit, persist data, or invoke a usage action.
 `invokeUsageAction` step naming an allowlisted `actionId`; the compiler never
 inserts one to make a later assertion pass.
 
+**Inference:** Value commit is a third, separate authority. A profile may
+declare that `set` includes an immediate/node-local commit, or it may require
+an explicit `commitValue` naming a declared node-local commit ID such as blur.
+A usage-action commit (for example Angular `updateOn: 'submit'`) cannot compile
+from `commitValue`; it requires `invokeUsageAction`. The validator rejects a
+duplicate explicit commit when `set` already owns it, preventing accidental
+double blur or duplicate side effects.
+
 ## Diagnostic model and failure UX
 
 ```ts
 type IntentDiagnosticCode =
   | 'AMBIGUOUS_FORM_USAGE'
   | 'AMBIGUOUS_NODE'
+  | 'FORM_USAGE_NOT_FOUND'
+  | 'NODE_NOT_FOUND'
   | 'STALE_CONTEXT'
   | 'CONTEXT_MISMATCH'
   | 'PLAN_HASH_MISMATCH'
+  | 'USAGE_ACTION_NOT_FOUND'
+  | 'USAGE_ACTION_UNSUPPORTED'
+  | 'OUTCOME_NOT_FOUND'
+  | 'VALIDATION_NOT_FOUND'
+  | 'VALIDATION_ACTIVATION_UNSUPPORTED'
+  | 'COMMIT_SEMANTICS_UNAVAILABLE'
+  | 'VALUE_ASSERTION_UNSUPPORTED'
   | 'SCENARIO_REQUIRED'
   | 'VALUE_OUT_OF_DOMAIN'
   | 'VALUE_CLASSIFICATION_UNKNOWN'
@@ -592,16 +1086,26 @@ interface IntentDiagnostic {
     readonly usageId?: string;
     readonly nodeId?: string;
     readonly actionId?: string;
+    readonly outcomeId?: string;
+    readonly validationId?: string;
+    readonly commitId?: string;
   };
   readonly evidenceRefs: readonly string[];
   readonly remediation: readonly (
     | { readonly kind: 'choose-candidate'; readonly usageIds: readonly string[] }
+    | { readonly kind: 'register-usage'; readonly usageId: string }
+    | { readonly kind: 'choose-node'; readonly nodeIds: readonly string[] }
     | { readonly kind: 'regenerate-artifacts' }
     | { readonly kind: 'choose-scenario'; readonly scenarioIds: readonly string[] }
     | { readonly kind: 'set-before'; readonly nodeId: string }
     | { readonly kind: 'wait-for'; readonly readinessId: string }
     | { readonly kind: 'declare-profile'; readonly formlyType: string }
     | { readonly kind: 'declare-locator-target'; readonly target: string }
+    | { readonly kind: 'declare-action'; readonly actionId: string }
+    | { readonly kind: 'declare-outcome'; readonly outcomeId: string }
+    | { readonly kind: 'declare-validation'; readonly validationId: string }
+    | { readonly kind: 'declare-commit'; readonly commitId: string }
+    | { readonly kind: 'declare-value-assertion'; readonly assertionId: string }
     | { readonly kind: 'inspect-source'; readonly sourceRefs: readonly string[] }
   )[];
 }
@@ -614,9 +1118,26 @@ Machine consumers may exhaustively handle known codes and must reject an
 unsupported diagnostic schema version rather than treating arbitrary strings
 as executable guidance.
 
+**Inference:** A schema-owned code policy fixes phase and severity per code;
+producers do not choose them independently. The semantic-reference refusals
+exposed by `TestIntent` have these mandatory mappings:
+
+| Reference failure | Code | Fixed phase / severity | Required remediation |
+| --- | --- | --- | --- |
+| Exact usage is absent | `FORM_USAGE_NOT_FOUND` | `context` / `error` | `register-usage` with the requested ID, plus source evidence when available |
+| Exact node is absent | `NODE_NOT_FOUND` | `validation` / `error` | `choose-node` with bounded same-step candidates |
+| Usage action ID is absent | `USAGE_ACTION_NOT_FOUND` | `validation` / `error` | `declare-action` with the requested ID |
+| Usage action exists but has no supported driver/capability | `USAGE_ACTION_UNSUPPORTED` | `validation` / `error` | `declare-action` for the affected binding |
+| Outcome ID is absent | `OUTCOME_NOT_FOUND` | `validation` / `error` | `declare-outcome` with the requested ID |
+| Validation record is absent | `VALIDATION_NOT_FOUND` | `validation` / `error` | `declare-validation` with the requested ID |
+| Requested validation activation is not supported | `VALIDATION_ACTIVATION_UNSUPPORTED` | `validation` / `error` | `declare-validation` for the affected activation |
+| Required value commit is absent or ambiguous | `COMMIT_SEMANTICS_UNAVAILABLE` | `validation` / `error` | `declare-commit` with the requested ID |
+| Committed-value assertion surface is absent | `VALUE_ASSERTION_UNSUPPORTED` | `validation` / `error` | `declare-value-assertion` with the requested ID |
+
 | Failure | Required diagnostic behavior | Example stable message | Evidence class |
 | --- | --- | --- | --- |
 | Multiple usage matches | Block and return match reasons, not a winner. | `AMBIGUOUS_FORM_USAGE: 2 usages match; choose an exact usageId.` | Inference |
+| Exact semantic reference is absent/unsupported | Block according to the schema-owned semantic-reference policy above. | `NODE_NOT_FOUND: node ... is absent from the pinned context.` | Inference |
 | Source/artifact drift | Block compile; search may still return stale candidates. | `STALE_CONTEXT: form contract was generated from a different input digest.` | Inference |
 | Submitted context differs from validated plan | Block before driver resolution. | `CONTEXT_MISMATCH: compile context does not equal the plan's pinned context.` | Inference |
 | Submitted plan does not reproduce its hash | Block before driver resolution. | `PLAN_HASH_MISMATCH: canonical submitted plan does not match planHash.` | Inference |
@@ -630,7 +1151,11 @@ as executable guidance.
 | Async target lacks readiness | Block; no sleep suggestion. | `READINESS_UNAVAILABLE: effect requires an undeclared or unsupported readiness capability.` | Inference |
 | Hidden branch lacks witness | Block interaction, allow explicit source inspection. | `HIDDEN_NODE_UNREACHABLE: selected context does not prove a visible path.` | Inference |
 | Repeater wildcard lacks row context | Block. | `REPEATER_CONTEXT_REQUIRED: choose/add an item before addressing wildcard descendant.` | Inference |
-| Validation trigger/surface absent | Block negative assertion. | `VALIDATION_ASSERTION_UNSUPPORTED: required is known but its activation/assertion surface is not.` | Repository observation + inference |
+| Value commit absent or ambiguous | Block post-set execution. | `COMMIT_SEMANTICS_UNAVAILABLE: total requires a declared commit owner.` | Repository observation + inference |
+| Committed-value assertion absent | Block the assertion. | `VALUE_ASSERTION_UNSUPPORTED: no committed-value surface exists for total.` | Inference |
+| Validation record absent | Block activation/assertion. | `VALIDATION_NOT_FOUND: validation ID ... is absent from the pinned context.` | Repository observation + inference |
+| Validation activation unsupported | Block activation. | `VALIDATION_ACTIVATION_UNSUPPORTED: validation ... has no supported node-local activation.` | Inference |
+| Validation assertion target unsupported | Block assertion. | `VALIDATION_ASSERTION_UNSUPPORTED: required is known but its assertion surface is not executable.` | Repository observation + inference |
 | Effect analysis incomplete | Permit explicitly declared path; warn against claims based on absent edges. | `EFFECT_COVERAGE_INCOMPLETE: do not infer independence or unreachability from missing effects.` | Documented fact |
 | Browser differs from contract | Fail with redacted observed facts. | `RUNTIME_PARITY_MISMATCH: declared role/target/state did not match the visited page.` | Inference |
 
@@ -651,8 +1176,9 @@ Therefore runtime diagnostics should preserve strictness rather than defeat it.
 `operations.purchase-order` in
 [`apps/formly-test-app/src/app/forms/operations/operations-forms.ts`](../../../apps/formly-test-app/src/app/forms/operations/operations-forms.ts).
 It has an async/Observable supplier select, a static currency select, and a
-custom currency-like total field with `min: 0`. The fixture application reaches
-forms through a catalog in
+custom currency-like total field with `min: 0` and
+`modelOptions.updateOn: 'blur'`. The fixture application reaches forms through
+a catalog in
 [`apps/formly-test-app/src/app/app.component.ts`](../../../apps/formly-test-app/src/app/app.component.ts),
 not a route/step journey contract.
 
@@ -660,7 +1186,18 @@ not a route/step journey contract.
 workspace golden index, no current usage metadata connects “order entry step
 one” to its symbol or catalog entry, the supplier value source is async, and
 the custom `currency` type has no production interaction profile in the
-workspace artifact set. Current artifacts cannot compile this test reliably.
+workspace artifact set. The current contract also does not project
+`modelOptions.updateOn` into versioned value-commit metadata. Current artifacts
+cannot compile this test reliably.
+
+**Documented fact:** Angular documents `updateOn` as the event on which a form
+control updates itself and explicitly states that `updateOn: 'blur'` updates on
+blur. Playwright documents `locator.fill()` as focusing, filling, and emitting
+an `input` event; it does not claim that `fill()` blurs the control.
+
+**Inference:** A generic fill operation therefore cannot prove that this
+fixture's Formly model and validation state committed. Commit behavior and a
+post-commit assertion surface must be declared independently.
 
 ### Complete paper prerequisites
 
@@ -680,8 +1217,12 @@ case-specific inputs; these are prerequisites, not optional enrichment:
   with “supplier options ready,” stable runtime enumeration, and privacy-safe
   candidate identity; and
 - a reviewed scalar decimal codec and `fill` operation for `total`, plus a
-  declared locator/assertion surface capable of observing its canonical value
-  and the absence of the `min` validation state.
+  declared node-local commit record
+  `operations.purchase-order.total.commit-on-blur` whose execution is
+  `explicit-intent`;
+- post-commit assertion records for the committed canonical value and the
+  absence of the `min` validation state. A DOM input value alone is not the
+  committed-value surface.
 
 **Inference:** The supplier can use `first-enabled` because the positive test
 does not assert supplier-specific business behavior. The total cannot use an
@@ -692,7 +1233,7 @@ valid.
 ### Query storyboard
 
 ```json
-{"query":"order entry step one","step":{"ordinal":1},"capabilities":["fill"]}
+{"query":"order entry step one","step":{"ordinal":1},"capabilities":["fill","commit-value","assert-value"]}
 ```
 
 **Inference — expected candidate:** `search_form_usages` returns the one usage
@@ -740,13 +1281,20 @@ asks for an E2E slice with goal `positive`.
       "value": {"kind": "literal", "value": 125, "expectedClassification": "valid"}
     },
     {
+      "op": "commitValue",
+      "nodeId": "operations.purchase-order::path:s_total",
+      "commitId": "operations.purchase-order.total.commit-on-blur"
+    },
+    {
       "op": "expectValue",
       "nodeId": "operations.purchase-order::path:s_total",
+      "assertionId": "operations.purchase-order.total.committed-value",
       "value": {"kind": "literal", "value": 125, "expectedClassification": "valid"}
     },
     {
       "op": "expectValidation",
       "nodeId": "operations.purchase-order::path:s_total",
+      "validationId": "operations.purchase-order.total.min",
       "constraint": "min",
       "state": "absent"
     }
@@ -760,21 +1308,38 @@ asks for an E2E slice with goal `positive`.
 the exact usage and scenario hashes, waits through the declared supplier
 readiness capability, lets the driver select the first enabled runtime option,
 validates `CAD` against its enumerated domain, classifies `125` through the
-reviewed decimal codec plus `min: 0`, and verifies the validation assertion
-surface. Compilation emits trusted calls conceptually equivalent to:
+reviewed decimal codec plus `min: 0`, proves that the selected profile requires
+the explicit node-local blur commit, and verifies post-commit value and
+validation assertion surfaces. Compilation emits trusted calls conceptually
+equivalent to:
 
 ```ts
 await formDriver.openUsage(contextRef);
 await formDriver.setRuntimeChoice(supplierNode, 'first-enabled');
 await formDriver.set(currencyNode, 'CAD');
 await formDriver.set(totalNode, 125);
-await formDriver.expectValue(totalNode, 125);
-await formDriver.expectValidation(totalNode, 'min', 'absent');
+await formDriver.commitValue(
+  totalNode,
+  'operations.purchase-order.total.commit-on-blur',
+);
+await formDriver.expectValue(
+  totalNode,
+  'operations.purchase-order.total.committed-value',
+  125,
+);
+await formDriver.expectValidation(
+  totalNode,
+  'operations.purchase-order.total.min',
+  'absent',
+);
 ```
 
 **Inference:** No selector, option label, widget event sequence, or sleep comes
 from the agent. If runtime option order is not declared stable, validation must
 reject `first-enabled` and require a resolved exact domain value instead.
+Generic `fill` does not imply blur: if commit metadata or the post-commit
+assertion surface is absent, validation blocks rather than accepting a DOM-only
+value assertion or a vacuously absent error.
 
 ## Walkthrough 2 — negative conditional/custom-field test
 
@@ -836,7 +1401,12 @@ compiler may not substitute it for `activateValidation`.
   "formId": "claims.intake",
   "step": {"ordinal": 1},
   "scenarioId": "auto-other",
-  "capabilities": ["select-from-overlay", "fill"]
+  "capabilities": [
+    "select-from-overlay",
+    "fill",
+    "activate-validation",
+    "assert-validation"
+  ]
 }
 ```
 
@@ -901,6 +1471,7 @@ claim that no other effect can interfere.
     {
       "op": "expectValidation",
       "nodeId": "claims.intake::path:s_claimDetails.s_otherDetails",
+      "validationId": "otherDetails.required.on-blur",
       "constraint": "required",
       "state": "present"
     }
@@ -929,7 +1500,11 @@ await formDriver.activateValidation(
   otherDetailsNode,
   'otherDetails.required.on-blur',
 );
-await formDriver.expectValidation(otherDetailsNode, 'required', 'present');
+await formDriver.expectValidation(
+  otherDetailsNode,
+  'otherDetails.required.on-blur',
+  'present',
+);
 ```
 
 **Inference:** `expectValidation` is assertion-only. Compilation cannot add a
@@ -953,7 +1528,7 @@ guarantee their success. This table states what this flow actually consumes.
 | --- | --- | --- | --- | --- |
 | Stable form/source-lineage index | **Required:** form ID; project/source ID; form definition symbol/path/span; consuming page/component usage; stable usage ID; route/entry when present; ordered step ID/membership; source-input digest. | Owners, tags, full import graph, blame/history, human descriptions. | Raw AST dumps, arbitrary source snippets in every response, heuristic “looks like a form root” findings without registration authority. | Inference based on current missing join |
 | Declared/resolved scenario artifacts | **Required for dynamic/conditional tests:** scenario ID/version; safe synthetic-input provenance; declared basis hash; resolved artifact hash; scenario diagnostics; resolved node state/domain/profile; effect/readiness outcome. | Automatically generated witnesses, large scenario matrices, human scenario prose. | Executable scenario callbacks in MCP, customer-derived inputs, a model sample treated as a domain, one scenario claimed globally complete. | Documented fact + repository observation |
-| Custom field interaction profiles | **Required for every non-native/custom operation:** semantic/value shape; operation; named parts/cardinality/roles; codec/value projection; driver ID/version; wrapper preconditions; locator scope/targets; readiness; blocking unknowns. | Angular component symbol/template evidence, authoring scaffolds, component-harness references, observed conformance history. | Inferring behavior from a Formly type name, serializing Angular component classes, agent-selected driver packages. | Documented fact |
+| Custom field interaction profiles | **Required for every non-native/custom operation:** semantic/value shape; operation; named parts/cardinality/roles; codec/value projection; driver ID/version; wrapper preconditions; locator scope/targets; readiness; value-commit mode/ownership; blocking unknowns. | Angular component symbol/template evidence, authoring scaffolds, component-harness references, observed conformance history. | Inferring behavior from a Formly type name, assuming `fill` commits every control, serializing Angular component classes, agent-selected driver packages. | Documented fact + repository observation + inference |
 | Static/dynamic/mixed values | **Required:** domain kind, canonical values when known, label mapping for choice drivers, evidence, completeness, disabled state, runtime-enumeration capability, privacy classification. | Boundary-value candidates, locale-specific display samples, generator explanations. | Defaults/current model as domain, raw remote option payloads, labels alone as model values. | Documented fact |
 | Explicit/derived effects | **Required for dependent paths:** validated declared ordering, timing/readiness, endpoints/properties, condition reference, coverage completeness, unknowns. Derived/observed evidence may corroborate but not authorize. | Witness generation, change-impact graph, observed parity history. | Operational verbs inferred from callbacks, handler names, source proximity, one scenario delta, or missing edges under incomplete analysis. | Documented fact |
 | Explicit unknowns | **Required:** machine-readable blocker scope and aspect on nodes, scenarios, effects, profiles, usage, validation, and freshness. | Aggregate coverage dashboards and ownership routing. | Free-form warnings with no stable code/evidence/remediation. | Inference |
@@ -1082,6 +1657,7 @@ failure-prone last mile.
 | Contract exists but compile says stale | Checkout changed since generation | Offer exact regeneration/check command and preserve the drafted intent. | Compile against stale selectors. | Inference |
 | Dynamic field has no value | Scenario not generated or runtime provider unsafe | Explain required scenario/provider/readiness capability. | Use first visible text or model default. | Repository observation + inference |
 | Custom widget is structurally known but not operable | Missing/blocked profile, driver, codec, or part locator | Name the exact missing aspect and source owner. | Use type-name or DOM heuristics. | Documented fact |
+| Filled value has not committed to the form model | Missing/ambiguous commit ownership or a blur/submit strategy | Require the declared commit/action and a post-commit assertion surface. | Treat DOM `toHaveValue` or an absent error as proof of acceptance. | Repository observation + inference |
 | Conditional target remains hidden | Wrong scenario, missing trigger, or opaque behavior | Return prerequisite edge/witness when declared; otherwise mark unreachable unknown. | Force click/fill hidden control. | Inference |
 | Test times out after source change | Locator/role/readiness parity drift | Report expected target and redacted observed count/state; point to source/profile. | Increase timeout or force action. | Documented fact + inference |
 | Negative test cannot assert error | Constraint known but activation/surface missing | Offer source inspection and metadata addition; do not generate partial assertion. | Assert any nearby text or CSS class. | Repository observation + inference |
@@ -1111,7 +1687,8 @@ presentation data, and no trusted-code loading.
 
 **Gate:** The two paper journeys can obtain all relevant nodes/prerequisites
 without reading a full contract. Measure result size and ambiguity on at least
-one large form.
+one large form. Validate every closed result variant, including summary,
+diagnostics, journey, node-search pagination, and the complete E2E slice.
 
 ### Slice 2 — Pure typed-intent schema and validator
 
@@ -1125,8 +1702,13 @@ a plan. Return no Playwright code.
 **Gate:** Separately assert that valid fixture intents produce canonical plans
 whose hashes reproduce, while reversed ordering, stale hashes, missing
 scenarios, unknown values, missing part locators, hidden/repeater ambiguity,
-and unsupported validation produce no plan and fail with stable diagnostics.
-This slice alone tests the central value proposition.
+unknown usage/node/action/outcome/validation/commit/assertion references, and
+unsupported validation activation produce no plan and fail with their fixed
+code/phase/severity/remediation policies. Assert that every valid plan step is
+one member of the closed discriminated union and contains all approved binding,
+target, value, precondition, readiness, activation, action, and outcome
+references required by compilation. This slice alone tests the central value
+proposition.
 
 ### Slice 3 — One native positive/negative driver vertical
 
@@ -1138,8 +1720,11 @@ context drift or tampering before driver resolution. Retain strict uniqueness,
 actionability, and web-first assertions.
 
 **Gate:** One positive and one negative native fixture test pass repeatedly
-without raw selectors in intent or generated source. Compare author/review time
-and first-run rate against an ordinary hand-written Playwright test.
+without raw selectors in intent or generated source. Cover immediate,
+explicit-blur, and usage-action commit modes; reject missing and duplicate
+commit authority; and prove post-commit rather than DOM-only value state.
+Compare author/review time and first-run rate against an ordinary hand-written
+Playwright test.
 
 ### Slice 4 — Resolved scenario and custom/dynamic vertical
 
@@ -1196,8 +1781,8 @@ the first workplace sample.
 
 | Acceptance criterion | Evidence in this artifact | Result |
 | --- | --- | --- |
-| 1. Two end-to-end walkthroughs cover positive and negative tests, including a custom/dynamic field and conditional branch. | “Walkthrough 1” covers a positive order-entry flow with async runtime choice and custom currency control; “Walkthrough 2” covers a negative custom dependent-select and conditional required field. Both enumerate complete execution prerequisites and include query, intent, validation, and conceptual driver calls/refusals. | Met as paper walkthrough; current artifacts are explicitly shown insufficient. |
-| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Query/API, progressive disclosure, typed intent with explicit validation/action authority, stateless plan handoff, versioned diagnostic/failure UX, security/privacy, and alternatives sections. | Met. |
+| 1. Two end-to-end walkthroughs cover positive and negative tests, including a custom/dynamic field and conditional branch. | “Walkthrough 1” covers a positive order-entry flow with async runtime choice, custom currency control, explicit blur commit, and post-commit assertions; “Walkthrough 2” covers a negative custom dependent-select and conditional required field. Both enumerate complete execution prerequisites and include query, intent, validation, and conceptual driver calls/refusals. | Met as paper walkthrough; current artifacts are explicitly shown insufficient. |
+| 2. Minimal query/intent contract and diagnostic model with alternatives and security constraints. | Closed query results, progressive disclosure, typed intent with distinct commit/validation/action authority, a discriminated stateless plan/compile handoff, fixed semantic-refusal policies, security/privacy, and alternatives sections. | Met. |
 | 3. Explicit required/optional/not-useful RH-01–RH-04 metadata list. | “RH-01–RH-04 metadata dependency audit.” | Met without assuming lane success. |
 | 4. Feasibility/value recommendation, confidence, UX failure modes, ordered implementation slices. | Executive decision, alternatives, UX table, slices/stop gates, and feasibility/value section. | Met. |
 
@@ -1261,6 +1846,43 @@ request contents. W3C WCAG 2.2 SC 3.3.1 and technique ARIA21 were checked to
 separate the normative text-error requirement from the optional programmatic
 association technique.
 
+### Review-instance-2 correction verification
+
+**Repository observation:** On 2026-08-27, the three findings from independent
+review instance 2 of 3 were addressed in this artifact only. The correction
+worktree was based on commit
+`cc522ff6784f6ee54a6fa5175c5224afcc354d6a` on branch
+`codex/rh-05-agent-e2e-context-flow` with the environment recorded above.
+
+```text
+$ pnpm check:docs
+Documentation checks passed for 57 files.
+Exit 0.
+
+$ pnpm exec vitest run fixtures/angular-monorepo/workspace-fixture.test.ts
+Test Files  1 passed (1)
+Tests       7 passed (7)
+Duration    15.38s
+Exit        0
+
+$ git diff --check
+No output; exit 0.
+
+$ git diff --name-only
+docs/research/hardening/agent-to-e2e-context-flow.md
+Exit 0.
+```
+
+**Repository observation — contract self-check:** An in-memory TypeScript
+compiler-API audit extracted all 11 `ts` fences from this artifact. It parsed
+796 TypeScript lines with zero syntax diagnostics and found no unresolved
+custom type references; `JsonValue` is intentionally supplied by the existing
+repository schema.
+
+**Documented fact — source readback:** Official Angular `FormControl.updateOn`
+and Playwright `Locator.fill` documentation were checked to distinguish blur
+commit semantics from Playwright's documented focus/fill/input behavior.
+
 ## Primary sources
 
 ### Repository sources
@@ -1286,6 +1908,8 @@ association technique.
 - Playwright, [Assertions](https://playwright.dev/docs/test-assertions)
 - Playwright, [Test configuration and artifacts](https://playwright.dev/docs/test-configuration)
 - Playwright, [Trace Viewer](https://playwright.dev/docs/trace-viewer)
+- Playwright, [`Locator.fill`](https://playwright.dev/docs/api/class-locator#locator-fill)
+- Angular, [`FormControl.updateOn`](https://angular.dev/api/forms/FormControl#updateOn)
 - W3C WAI, [Providing Accessible Names and Descriptions](https://www.w3.org/WAI/ARIA/apg/practices/names-and-descriptions/)
 - W3C WAI, [Understanding SC 3.3.1: Error Identification](https://www.w3.org/WAI/WCAG22/Understanding/error-identification.html)
 - W3C WAI, [Understanding SC 4.1.3: Status Messages](https://www.w3.org/WAI/WCAG22/Understanding/status-messages)
