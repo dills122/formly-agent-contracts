@@ -1,7 +1,12 @@
 # v0.4 E2E Authoring Research Plan
 
-**Status:** In progress — field-type adapter and field-effects spikes complete;
-choice-domain spike pending
+**Status:** Complete and reconciled — the standalone choice-domain spike was
+superseded by the approved v0.4 metadata contract and its implemented
+schema/compiler evidence; field-type, field-effects, and agent-context research
+are complete
+
+**Delivery handoff:**
+[Agent Context and Deterministic E2E Delivery Plan](agent-context-delivery-plan.md)
 
 ## Executive recommendation
 
@@ -77,6 +82,16 @@ service is used.
 Stop when the matrix has deterministic tests and every row has a recommended
 contract state. Retain `docs/research/v0.4-choice-resolution.md` and a minimal
 synthetic experiment. Expected size: one focused session.
+
+**Execution status:** The decision was settled through the approved
+[v0.4 E2E authoring metadata specification](../../v0.4-e2e-authoring-metadata-spec.md)
+and implemented v0.4 schema, compiler, workspace, and fixture coverage rather
+than through a separate retained spike artifact. The shipped contract
+distinguishes complete static domains, scenario-complete resolved domains,
+dynamic domains, unknown domains, deliberately empty collections, disabled
+options, and canonical duplicate handling. No
+`docs/research/v0.4-choice-resolution.md` was retained; this is an explicit
+deviation from the original research plan, not an outstanding decision gate.
 
 ## Spike 2: Field-type adapter and interaction profile
 
@@ -191,34 +206,45 @@ The following items do not need separate research:
 They still require contract review, failing tests first, and full repository
 verification.
 
-## Proposed delivery sequence
+## Original delivery sequence and disposition
 
-1. Complete the choice-domain decision gate and review all spike artifacts
-   together.
-2. Complete workspace Tasks 1–3 so typed root/project configuration exists as
-   the trusted ownership boundary.
-3. Approve the normalized v0.4 DTOs, profile precedence, and migration policy.
-4. Complete workspace Tasks 3A–3B so project-owned field profiles are strict,
-   deterministic configuration inputs.
-5. Ship value-domain completeness plus static/resolved/dynamic coverage.
-6. Ship interaction profiles, adapter provenance, repeater access, and ID
-   provenance.
-7. Ship only strict application-declared cross-field effects in the first
-   slice. Keep direct-string scaffolds, opaque signals, scenario deltas, and
-   browser traces as separate non-authoritative follow-on producers.
-8. Add Angular-assisted inventory/scaffolding through workspace Task 8B and
-   automated rendered conformance as a later acceptance slice.
-9. Add the future typed test-intent policy after the contract can distinguish
-   enumerated values from runtime-only choices.
+The original sequence below is retained for traceability. Its metadata
+decisions are implemented or reconciled; the remaining Angular authoring and
+rendered-conformance work stays in the workspace plan. Future
+agent-context/test-intent delivery is governed by the
+[agent-context delivery plan](agent-context-delivery-plan.md), which keeps the
+query/validator pilot ahead of MCP transport and Playwright execution.
+
+1. **Reconciled:** settle choice-domain behavior. The approved specification
+   and implemented contract evidence superseded the separate spike artifact.
+2. **Complete:** establish typed root/project configuration as the trusted
+   ownership boundary through workspace Tasks 1–3.
+3. **Complete:** approve the v0.4 DTOs, profile precedence, and migration
+   policy.
+4. **Complete:** integrate strict deterministic project-owned field profiles
+   through workspace Tasks 3A–3B.
+5. **Complete for the current artifact boundary:** ship value-domain
+   completeness and static/dynamic/unknown coverage. Broader resolved scenario
+   generation belongs to the agent-context plan.
+6. **Complete for the current artifact boundary:** ship interaction profiles,
+   adapter provenance, repeater access, and ID provenance. Browser conformance
+   remains a later delivery slice.
+7. **Complete:** ship strict application-declared cross-field effects while
+   keeping derived evidence non-authoritative.
+8. **Planned separately:** add Angular-assisted inventory/scaffolding through
+   workspace Task 8B and rendered conformance when its checkpoint is approved.
+9. **Ready for bounded pilot:** add typed test intent only after Slices 0–1 of
+   the agent-context plan establish the remaining execution authority and pure
+   query boundary.
 
 `first-available` should be modeled as a test-intent selection policy rather
 than a claim about the form itself. The contract should expose that choices are
 runtime-enumerable while their concrete values are unknown; a consumer may
 then deliberately choose `first-available` for an appropriate test.
 
-## Gate to implementation
+## Research-gate disposition
 
-Implementation begins only after the maintainer approves:
+The research gate required maintainer approval of:
 
 - the spike conclusions;
 - additive versus normalized v0.4 migration;
@@ -226,3 +252,9 @@ Implementation begins only after the maintainer approves:
 - the explicit-effect DTO, endpoint/capability/readiness validation, cycle
   policy, and separation from non-authoritative evidence; and
 - the placement of selection policy outside the semantic contract.
+
+Those choices are now represented in the approved v0.4 metadata specification,
+the implemented schema/compiler/workspace contracts, and the reconciled
+research artifacts. This closes the research gate; it does not bypass the
+separate Slices 0–2 pilot approval in the
+[agent-context delivery plan](agent-context-delivery-plan.md).

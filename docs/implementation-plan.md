@@ -19,6 +19,11 @@ Its contract and execution boundaries are specified in
 [the real-world semantics specification](v0.2-real-world-semantics-spec.md) and
 tracked in [the v0.2 task plan](planning/v0.2-real-world/task_plan.md).
 
+The future agent-to-contract-to-Playwright flow is summarized in the
+[agent context and deterministic E2E delivery plan](planning/v0.4-e2e-authoring/agent-context-delivery-plan.md).
+It authorizes no implementation task yet: Slices 0–2 remain a bounded pilot
+that must be approved and measured before MCP transport or Playwright drivers.
+
 ## Dependency Order
 
 ```text
