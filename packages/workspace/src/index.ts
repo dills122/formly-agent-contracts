@@ -31,10 +31,12 @@ export {
 export type {
   FormContractProjectConfig,
   ResolvedFieldTypeProfileRegistry,
+  ResolvedCrossFieldEffectRegistry,
   ResolvedWorkspacePluginIdentity,
   ResolvedWorkspaceProjectConfig,
   WorkspaceCliOverrides,
   WorkspaceDiagnosticConfig,
+  WorkspaceEffectConfig,
   WorkspaceLocatorConfig,
   WorkspaceOutputConfig,
   WorkspacePlugin,

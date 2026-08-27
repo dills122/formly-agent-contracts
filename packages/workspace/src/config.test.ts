@@ -1,7 +1,10 @@
 import {
+  CROSS_FIELD_EFFECT_SCHEMA_VERSION,
   FIELD_TYPE_PROFILE_SCHEMA_VERSION,
   canonicalStringify,
+  computeCrossFieldEffectRegistryHash,
   computeFieldTypeProfileRegistryHash,
+  type CrossFieldEffectRegistry,
   type FieldTypeProfileRegistry,
 } from '@formly-contract/schema';
 import { describe, expect, it } from 'vitest';
@@ -27,6 +30,58 @@ function createPlugin(id: string): WorkspacePlugin {
 
 function createSource(sourceId: string) {
   return defineFormContractSource({ sourceId, list: () => [] });
+}
+
+function createEffectRegistry(reversed = false): CrossFieldEffectRegistry {
+  const effects: CrossFieldEffectRegistry['forms'][number]['effects'] = [
+    {
+      identity: { id: 'claims.product-filters-case-type', version: 1 },
+      trigger: {
+        nodeId: 'claims.intake::path:s_product',
+        event: 'selectionChanged',
+      },
+      target: {
+        nodeId: 'claims.intake::path:s_caseType',
+        property: 'options',
+      },
+      kind: 'filters',
+      timing: {
+        mode: 'async',
+        readinessId: 'claims.case-type-options-ready',
+      },
+      ordering: 'source-before-target',
+      evidence: 'declared',
+      opacity: 'transparent',
+    },
+    {
+      identity: { id: 'claims.product-clears-case', version: 1 },
+      trigger: {
+        nodeId: 'claims.intake::path:s_product',
+        event: 'valueChanged',
+      },
+      target: {
+        nodeId: 'claims.intake::path:s_case',
+        property: 'value',
+      },
+      kind: 'clears',
+      timing: { mode: 'sync' },
+      ordering: 'source-before-target',
+      evidence: 'declared',
+      opacity: 'transparent',
+    },
+  ];
+
+  return {
+    schemaVersion: CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+    id: 'claims.cross-field-effects',
+    version: 1,
+    forms: [
+      {
+        formId: 'claims.intake',
+        effects: reversed ? [...effects].reverse() : effects,
+      },
+    ],
+  };
 }
 
 function createProfileRegistry(
@@ -145,16 +200,127 @@ describe('workspace configuration', () => {
       output: { directory: 'dist/contracts' },
       locators: { testIdAttributes: ['data-testid', 'data-cy'] },
       diagnostics: { failOn: ['error', 'warning'] },
+      effects: { cyclePolicy: 'warning' },
       plugins: [createPlugin('workspace/angular')],
     });
     const project = defineFormContractProject({
       projectId: 'claims/forms',
       sources: [createSource('claims')],
+      crossFieldEffects: createEffectRegistry(),
       output: { directory: 'dist/claims-contracts' },
     });
 
     expect(parseRootConfig(root)).toBe(root);
     expect(parseProjectConfig(project)).toBe(project);
+  });
+
+  it('resolves canonical cross-field effects and root cycle policy', () => {
+    const root = defineConfig({
+      projectConfigs: ['apps/**/config.ts'],
+      effects: { cyclePolicy: 'warning' },
+    });
+    const registry = createEffectRegistry(true);
+    const project = defineFormContractProject({
+      projectId: 'claims',
+      crossFieldEffects: registry,
+    });
+
+    const resolved = resolveWorkspaceProjectConfig(root, project);
+
+    expect(resolved.effectCyclePolicy).toBe('warning');
+    expect(resolved.crossFieldEffects?.schemaVersion).toBe(
+      CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+    );
+    expect(resolved.crossFieldEffects?.id).toBe(registry.id);
+    expect(resolved.crossFieldEffects?.version).toBe(registry.version);
+    expect(resolved.crossFieldEffects?.contentHash).toBe(
+      computeCrossFieldEffectRegistryHash(registry),
+    );
+    expect(
+      resolved.crossFieldEffects?.registry.forms[0]?.effects.map(
+        (effect) => effect.identity.id,
+      ),
+    ).toEqual([
+      'claims.product-clears-case',
+      'claims.product-filters-case-type',
+    ]);
+    expect(registry.forms[0]!.effects[0]!.identity.id).toBe(
+      'claims.product-clears-case',
+    );
+  });
+
+  it('defaults effect-cycle policy to error', () => {
+    const resolved = resolveWorkspaceProjectConfig(
+      defineConfig({ projectConfigs: ['apps/**/config.ts'] }),
+      defineFormContractProject({ projectId: 'claims' }),
+    );
+
+    expect(resolved.effectCyclePolicy).toBe('error');
+  });
+
+  it('rejects accessor-backed effect policy without invoking it', () => {
+    let invoked = false;
+    const effects: Record<string, unknown> = {};
+    Object.defineProperty(effects, 'cyclePolicy', {
+      enumerable: true,
+      get: () => {
+        invoked = true;
+        return 'error';
+      },
+    });
+
+    expect(() =>
+      parseRootConfig({
+        projectConfigs: ['apps/**/config.ts'],
+        effects: effects as { readonly cyclePolicy: 'error' },
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'CONFIG_INVALID',
+        path: 'root.effects.cyclePolicy',
+      }),
+    );
+    expect(invoked).toBe(false);
+  });
+
+  it('rejects accessor-backed root and project effect registries without invoking them', () => {
+    let rootInvoked = false;
+    const root: Record<string, unknown> = {
+      projectConfigs: ['apps/**/config.ts'],
+    };
+    Object.defineProperty(root, 'effects', {
+      enumerable: true,
+      get: () => {
+        rootInvoked = true;
+        return { cyclePolicy: 'error' };
+      },
+    });
+
+    expect(() => parseRootConfig(root)).toThrow(
+      expect.objectContaining({
+        code: 'CONFIG_INVALID',
+        path: 'root.effects',
+      }),
+    );
+    expect(rootInvoked).toBe(false);
+
+    let projectInvoked = false;
+    const project: Record<string, unknown> = { projectId: 'claims' };
+    Object.defineProperty(project, 'crossFieldEffects', {
+      enumerable: true,
+      get: () => {
+        projectInvoked = true;
+        return createEffectRegistry();
+      },
+    });
+
+    expect(() => parseProjectConfig(project)).toThrow(
+      expect.objectContaining({
+        code: 'CONFIG_INVALID',
+        path: 'project.crossFieldEffects',
+      }),
+    );
+    expect(projectInvoked).toBe(false);
   });
 
   it('accepts a configuration-only project with no form sources', () => {
@@ -223,6 +389,13 @@ describe('workspace configuration', () => {
     [
       {
         projectConfigs: ['apps/**/config.ts'],
+        effects: { cyclePolicy: 'allow' },
+      },
+      'root.effects.cyclePolicy',
+    ],
+    [
+      {
+        projectConfigs: ['apps/**/config.ts'],
         plugins: [createPlugin('duplicate'), createPlugin('duplicate')],
       },
       'root.plugins[1].id',
@@ -259,6 +432,26 @@ describe('workspace configuration', () => {
         sources: [createSource('duplicate'), createSource('duplicate')],
       },
       'project.sources[1].sourceId',
+    ],
+    [
+      {
+        projectId: 'claims',
+        crossFieldEffects: {
+          ...createEffectRegistry(),
+          forms: [
+            {
+              formId: 'claims.intake',
+              effects: [
+                {
+                  ...createEffectRegistry().forms[0]!.effects[0]!,
+                  authority: 'candidate',
+                },
+              ],
+            },
+          ],
+        },
+      },
+      'project.crossFieldEffects',
     ],
     [{ projectId: 'Claims With Spaces', sources: [] }, 'project.projectId'],
   ])('rejects invalid project configuration at %s', (project, expectedPath) => {
@@ -305,6 +498,7 @@ describe('workspace configuration', () => {
       outputDirectory: 'dist/cli',
       testIdAttributes: ['data-cli'],
       failOn: ['error', 'warning'],
+      effectCyclePolicy: 'error',
       plugins: [
         {
           id: 'workspace/angular',

@@ -1,14 +1,15 @@
 # Workspace Configuration
 
 Status: experimental; deterministic project discovery, project-owned field-type
-profile registries, programmatic workspace artifact generation, and the pilot
-`generate` CLI are implemented, while `list` and `check` remain planned
+profile and cross-field effect registries, programmatic workspace artifact
+generation, and the pilot `generate` CLI are implemented. Effect resolution
+against generated nodes and the `list` and `check` commands remain planned.
 
 `@formly-contract/workspace` is the framework-neutral configuration
 layer for repository-aware Formly Contract tooling. It provides trusted config
 loading, strict root/project descriptors, source catalogs, deterministic policy
 resolution, stable plugin identities, and serializable custom-field interaction
-profiles.
+profiles and form relationships.
 
 For a copyable private-repository evaluation path, start with the
 [workplace pilot guide](workplace-pilot.md). This document is the detailed API
@@ -65,6 +66,7 @@ export default defineConfig({
   output: { directory: 'dist/formly-contracts' },
   locators: { testIdAttributes: ['data-testid', 'data-cy'] },
   diagnostics: { failOn: ['error'] },
+  effects: { cyclePolicy: 'error' },
 });
 ```
 
@@ -305,6 +307,85 @@ mappings cannot authorize a generic driver. Declared function, string, async,
 or expression-backed collections remain dynamic without being executed; a
 trusted resolved collection is enumerated with scenario completeness.
 
+## Project-owned cross-field effects
+
+A project may declare one versioned `crossFieldEffects` registry beside its
+source and field-profile registries. The registry owns explicit relationships
+for stable form and node IDs. It never accepts callbacks, services, readiness
+executors, observed deltas, or candidate authority.
+
+```ts
+import {
+  CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+  type CrossFieldEffectRegistry,
+} from '@formly-contract/schema';
+import { defineFormContractProject } from '@formly-contract/workspace';
+
+const crossFieldEffects: CrossFieldEffectRegistry = {
+  schemaVersion: CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+  id: 'claims.cross-field-effects',
+  version: 1,
+  forms: [
+    {
+      formId: 'claims.intake',
+      effects: [
+        {
+          identity: {
+            id: 'claims.product-filters-case-type',
+            version: 1,
+          },
+          trigger: {
+            nodeId: 'claims.intake::path:s_product',
+            event: 'selectionChanged',
+          },
+          target: {
+            nodeId: 'claims.intake::path:s_caseType',
+            property: 'options',
+          },
+          kind: 'filters',
+          timing: {
+            mode: 'async',
+            readinessId: 'claims.case-type-options-ready',
+          },
+          ordering: 'source-before-target',
+          evidence: 'declared',
+          opacity: 'transparent',
+        },
+      ],
+    },
+  ],
+};
+
+export default defineFormContractProject({
+  projectId: 'claims/forms',
+  sources: [claimsSource],
+  crossFieldEffects,
+});
+```
+
+Registry and effect identities are versioned. Form and effect arrays are
+canonicalized by stable identity before hashing, so declaration order does not
+change the resolved registry hash. Effect IDs are logical identities scoped to
+one form registration; only one version of an effect ID may be active in that
+form, while another form may use the same logical ID without colliding. Async
+effects require a serializable
+`readinessId`; sync and explicitly unknown timing reject readiness metadata.
+Semantic kinds are checked against their target property: `loads` and
+`filters` target options, `clears` targets value, and `toggles` or
+`controls-state` target visibility, enabled, or required state.
+
+Root configuration owns `effects.cyclePolicy`, which is `error` by default and
+may be reduced to `warning`. The current slice validates and resolves the
+registry as configuration only. Task 5A will resolve endpoint existence,
+condition rules, target/readiness capabilities, and strongly connected
+components before effects are allowed into form artifacts or the workspace
+index. Until then, configuring an effect does not make it actionable output.
+
+Dependency strings, opaque handlers, controlled scenario deltas, and future
+browser observations remain separate non-authoritative evidence. They cannot
+be parsed as `CrossFieldEffectRegistry` and are never promoted to `loads`,
+`filters`, `clears`, or `toggles` automatically.
+
 ### Keep discovery entry points out of browser barrels
 
 Angular libraries should expose browser runtime code and trusted discovery code
@@ -346,6 +427,7 @@ The initial defaults are:
 - locator attributes: `data-testid`, `data-test-id`, `data-test`, `data-cy`,
   and `data-pw`; and
 - diagnostic failure threshold: `error`.
+- effect-cycle diagnostic severity: `error`.
 
 Runtime validation rejects unknown keys, duplicate plugin/source IDs, invalid
 globs and attribute names, absolute, globbed, or parent-traversing literal
@@ -359,9 +441,11 @@ configuration.
 The programmatic runner and pilot `generate` command execute trusted source
 catalogs and declared form factories, resolve project field-type profile
 registries, and write the deterministic artifact set. Application driver
-identities remain data and do not execute code. Cross-field effects, the CLI
-`list`/`check` commands, Angular-assisted inventory, and observed runtime
-capture remain later increments on the same configuration bedrock.
+identities remain data and do not execute code. Cross-field effect registries
+are strict configuration data, but endpoint/profile/readiness/cycle resolution
+and artifact projection remain the next vertical slice. The CLI `list`/`check`
+commands, Angular-assisted inventory, and observed runtime capture remain later
+increments on the same configuration bedrock.
 
 The [workplace pilot guide](workplace-pilot.md) turns this reference into a
 single operational checklist and includes the expected artifact layout,

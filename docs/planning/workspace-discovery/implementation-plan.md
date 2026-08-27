@@ -3,8 +3,9 @@
 Status: in progress; Tasks 1–4, including project-owned field-type profile
 registries, the deep Task 6B consumer fixture, a real Nx integration anchor,
 and Tasks 5.0–5.2 artifact/source contracts, profile-aware extraction, runner,
-workspace index, and the Task 6A pilot `generate` command are implemented;
-Tasks 3C and 5A cross-field effects are the next contract-first vertical slice
+workspace index, the Task 6A pilot `generate` command, and Task 3C's strict
+project-owned cross-field effect registries are implemented; Task 5A effect
+resolution is the next contract-first vertical slice
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)
@@ -120,7 +121,7 @@ contains explicit effects only.
 | `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery/runner/index tests plus real Angular consumer generation; CLI fixture assertions remain | Tasks 1–5.2, the Task 6A `generate` pilot, and the Task 6B fixture shell are implemented; `list`, `check`, golden artifacts, and linked/packed consumer assertions remain |
 | `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Tasks 5.0–5.1 implemented, including safe node projection and realistic Angular/Nx fixture coverage; executable drivers remain separate |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | Inventory and scaffolds are build-time evidence only | Tasks 7A–8B | Angular inventory, negative inference, and scenario tests | Planned; prototype complete |
-| `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Planned; architecture researched |
+| `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Task 3C implemented with schema/config/fixture evidence; Task 5A resolution planned |
 
 ## Phase 0: Fail-fast feasibility and contracts
 
@@ -304,22 +305,24 @@ separate evidence records and are not part of this first actionable slice.
 
 **Acceptance criteria:**
 
-- [ ] Runtime validation rejects unknown keys, malformed identities, missing
+- [x] Runtime validation rejects unknown keys, malformed identities, missing
       timing/readiness data, contradictory ordering, and non-declared authority.
-- [ ] Project/form configuration carries serializable effect data only and
+- [x] Project/form configuration carries serializable effect data only and
       cannot embed callbacks, services, or executable readiness behavior.
-- [ ] Canonical serialization and hashing include effect identity/version and
+- [x] Canonical serialization and hashing include effect identity/version and
       are stable under equivalent input ordering.
 
 **Verification:**
 
-- [ ] Focused schema/config tests cover sync, async, conditional, invalid,
+- [x] Focused schema/config tests cover sync, async, conditional, invalid,
       duplicate, and unknown-field branches.
-- [ ] Tests prove derived dependency candidates and scenario deltas cannot be
+- [x] Tests prove derived dependency candidates and scenario deltas cannot be
       accepted as actionable effects.
 
-**Dependencies:** Task 3B; maintainer approval of the explicit-effect DTO,
-cycle policy, readiness vocabulary, and condition-rule linkage
+**Dependencies:** Task 3B; the explicit-effect DTO, cycle-severity policy,
+serializable readiness reference, and condition-rule linkage are approved for
+the Task 3C authoring boundary. Task 5A still owns capability and endpoint
+resolution semantics.
 
 **Files likely touched:**
 

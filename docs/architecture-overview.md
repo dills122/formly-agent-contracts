@@ -5,15 +5,16 @@
 The implemented generic pilot now includes schema v0.4, declared and trusted
 scenario compilation, project-owned custom-field profiles, repository-aware
 root/project/source configuration, deterministic multi-project discovery and
-artifact generation, a workspace index, and the pilot
-`formly-contracts generate` command.
+artifact generation, a workspace index, the pilot `formly-contracts generate`
+command, and strict project-owned cross-field effect registries.
 
-The long-term architecture below remains the intended direction. Cross-field
-effects, the remaining `list`/`check` CLI commands, Angular-assisted profile
-inventory, optional Nx task integration, production MCP delivery, typed
-Playwright execution, browser observation, runtime parity, and change analysis
-remain later layers. They must consume or extend the same contracts rather than
-move trusted application execution into routine agent requests.
+The long-term architecture below remains the intended direction. Resolving
+declared effects against generated nodes and readiness capabilities, the
+remaining `list`/`check` CLI commands, Angular-assisted profile inventory,
+optional Nx task integration, production MCP delivery, typed Playwright
+execution, browser observation, runtime parity, and change analysis remain
+later layers. They must consume or extend the same contracts rather than move
+trusted application execution into routine agent requests.
 
 See [the parser MVP specification](mvp-spec.md) for the original foundation,
 [the workspace implementation plan](planning/workspace-discovery/implementation-plan.md)

@@ -400,7 +400,7 @@ sanitized conclusions with this public project.
 
 ## Diagnostics and gaps
 - Unexpected diagnostics:
-- Cross-field effects the contract could not express:
+- Cross-field effects the contract could not configure or resolve:
 - Runtime-only behavior:
 - Information that would have helped Playwright authoring:
 
