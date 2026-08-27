@@ -6,6 +6,7 @@ import {
   FIELD_TYPE_PROFILE_SCHEMA_VERSION,
   FORM_CONTRACT_SCHEMA_VERSION,
   canonicalStringify,
+  canonicalizeRuntimeProvenance,
   contractEffectCycleComponents,
   parseCrossFieldEffectRegistry,
   type ContractDiagnosticCode,
@@ -14,11 +15,12 @@ import {
   type ContractEffectAnalysis,
   type DeclaredCrossFieldEffect,
   type ModelPathSegment,
+  type RuntimeProvenance,
 } from '@formly-contract/schema';
 
 import { WORKSPACE_CONFIG_SCHEMA_VERSION } from './config.js';
 
-export const WORKSPACE_INDEX_SCHEMA_VERSION = '0.1.0' as const;
+export const WORKSPACE_INDEX_SCHEMA_VERSION = '0.2.0' as const;
 
 const HASH_PATTERN = /^sha256:[a-f0-9]{64}$/u;
 const VERSION_PATTERN = /^[A-Za-z0-9](?:[A-Za-z0-9._+-]*[A-Za-z0-9])?$/u;
@@ -50,6 +52,7 @@ export interface WorkspaceIndexProject {
   readonly sourceIds: readonly string[];
   readonly outputDirectory: string;
   readonly configurationHash: string;
+  readonly runtimeProvenance: RuntimeProvenance;
   readonly fieldTypeProfileRegistry?: WorkspaceIndexFieldTypeProfileRegistryIdentity;
   readonly crossFieldEffectRegistry?: WorkspaceIndexCrossFieldEffectRegistryIdentity;
 }
@@ -82,6 +85,7 @@ export interface WorkspaceContractIndexDraft {
   readonly workspaceConfigSchemaVersion: typeof WORKSPACE_CONFIG_SCHEMA_VERSION;
   readonly rootConfigPath: string;
   readonly configurationHash: string;
+  readonly runtimeProvenance: RuntimeProvenance;
   readonly plugins: readonly WorkspaceIndexPluginIdentity[];
   readonly projects: readonly WorkspaceIndexProject[];
   readonly forms: readonly WorkspaceIndexForm[];
@@ -98,6 +102,7 @@ const INDEX_KEYS = new Set([
   'workspaceConfigSchemaVersion',
   'rootConfigPath',
   'configurationHash',
+  'runtimeProvenance',
   'plugins',
   'projects',
   'forms',
@@ -113,6 +118,7 @@ const PROJECT_KEYS = new Set([
   'sourceIds',
   'outputDirectory',
   'configurationHash',
+  'runtimeProvenance',
   'fieldTypeProfileRegistry',
   'crossFieldEffectRegistry',
 ]);
@@ -444,6 +450,11 @@ function parseProject(input: unknown, path: string): WorkspaceIndexProject {
       required(record, 'configurationHash', path),
       `${path}.configurationHash`,
     ),
+    runtimeProvenance: JSON.parse(
+      canonicalizeRuntimeProvenance(
+        required(record, 'runtimeProvenance', path),
+      ),
+    ) as RuntimeProvenance,
     ...(fieldTypeProfileRegistry === undefined
       ? {}
       : { fieldTypeProfileRegistry }),
@@ -863,6 +874,11 @@ function parseIndexDraft(
       required(record, 'configurationHash', path),
       `${path}.configurationHash`,
     ),
+    runtimeProvenance: JSON.parse(
+      canonicalizeRuntimeProvenance(
+        required(record, 'runtimeProvenance', path),
+      ),
+    ) as RuntimeProvenance,
     plugins,
     projects,
     forms,
