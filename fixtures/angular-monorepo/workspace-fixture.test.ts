@@ -457,6 +457,7 @@ describe('Angular monorepo workspace fixture', () => {
       const options = {
         workspaceRoot: fixtureRoot,
         rootConfigPath: 'formly-contracts.config.ts',
+        rootLoaderOptions: { tsconfigPath: fixtureTsconfig },
         cliOverrides: { outputDirectory },
       } as const;
       const first = await runWorkspace(options);
