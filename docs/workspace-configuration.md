@@ -26,8 +26,12 @@ identity rules described here.
 Configuration files are trusted local or CI build code. The workspace package
 uses Jiti's asynchronous import API to support ESM, CommonJS, and TypeScript.
 TypeScript path aliases are disabled unless the caller supplies an explicit
-`tsconfigPath`. MCP requests and other untrusted runtime inputs must never load
-configuration or select executable plugins.
+`tsconfigPath`. Jiti is anchored to the configuration file being evaluated so
+bare packages resolve from the consuming workspace. The loader also converts
+exact, non-wildcard `paths` entries into Jiti aliases because Jiti 2.7 does not
+resolve that shape consistently; wildcard and fallback resolution remains with
+Jiti's native `tsconfigPaths` support. MCP requests and other untrusted runtime
+inputs must never load configuration or select executable plugins.
 
 The loader returns stable error codes:
 
@@ -171,7 +175,9 @@ silently overwrite a hash-addressed contract with different content.
 Failures are reported as `WorkspaceGenerationError` with a stable `code`,
 `phase`, and safe project/source/form/output provenance. The original error is
 retained as `cause` for trusted build tooling but is not serialized into the
-workspace index.
+workspace index. When discovery wraps a configuration import failure, the CLI
+prints a generic hint to check `tsconfigPath` and Node-safe contract entry
+points without exposing private paths, package names, or stack traces.
 
 ### Generate from the pilot CLI
 

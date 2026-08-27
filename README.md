@@ -407,7 +407,10 @@ these common attributes from `props.attributes`:
 
 It can also retain explicit role, accessible name, placeholder, and Formly
 field-ID candidates. An empty array means no reliable locator was found; the
-adapter never invents CSS or XPath.
+adapter never invents CSS or XPath. Field IDs are derived hints because a
+custom type may render the ID on a wrapper. IDs declared inside `fieldArray`
+templates are omitted with an `UNRELIABLE_DOM_ID` diagnostic because runtime
+rows may omit or index them.
 
 Applications with their own naming convention can set `testIdAttributes` and
 provide a deterministic `deriveLocators` callback. The callback receives only

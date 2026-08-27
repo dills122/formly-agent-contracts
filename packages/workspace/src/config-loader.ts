@@ -1,6 +1,7 @@
 import { stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
+import { createPathsMatcher, parseTsconfig } from 'get-tsconfig';
 import { createJiti } from 'jiti';
 
 export type WorkspaceConfigLoadErrorCode =
@@ -33,6 +34,32 @@ function isConfigObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
+function readExactTsconfigAliases(
+  tsconfigPath: string,
+): Readonly<Record<string, string>> | undefined {
+  const config = parseTsconfig(tsconfigPath);
+  const paths = config.compilerOptions?.paths;
+  if (paths === undefined) {
+    return undefined;
+  }
+  const matchPaths = createPathsMatcher({ path: tsconfigPath, config });
+  if (matchPaths === null) {
+    return undefined;
+  }
+
+  const aliases: Record<string, string> = {};
+  for (const alias of Object.keys(paths).sort()) {
+    if (alias.includes('*')) {
+      continue;
+    }
+    const target = matchPaths(alias)[0];
+    if (target !== undefined) {
+      aliases[alias] = target;
+    }
+  }
+  return Object.keys(aliases).length === 0 ? undefined : aliases;
+}
+
 export async function loadWorkspaceConfigModule(
   configPath: string,
   options: WorkspaceConfigLoaderOptions = {},
@@ -53,17 +80,27 @@ export async function loadWorkspaceConfigModule(
     );
   }
 
-  const jiti = createJiti(import.meta.url, {
-    fsCache: false,
-    interopDefault: false,
-    moduleCache: false,
-    tsconfigPaths: options.tsconfigPath
-      ? resolve(options.tsconfigPath)
-      : false,
-  });
-
   let loaded: unknown;
   try {
+    const tsconfigPath =
+      options.tsconfigPath === undefined
+        ? undefined
+        : resolve(options.tsconfigPath);
+    const alias =
+      tsconfigPath === undefined
+        ? undefined
+        : readExactTsconfigAliases(tsconfigPath);
+    const jiti = createJiti(absoluteConfigPath, {
+      fsCache: false,
+      interopDefault: false,
+      moduleCache: false,
+      ...(tsconfigPath === undefined
+        ? { tsconfigPaths: false }
+        : {
+            ...(alias === undefined ? {} : { alias }),
+            tsconfigPaths: tsconfigPath,
+          }),
+    });
     const imported = await jiti.import<unknown>(absoluteConfigPath);
     loaded =
       isConfigObject(imported) && 'default' in imported

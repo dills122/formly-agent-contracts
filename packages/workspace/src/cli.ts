@@ -1,5 +1,6 @@
 import { parseArgs } from 'node:util';
 
+import { WorkspaceConfigLoadError } from './config-loader.js';
 import {
   runWorkspace,
   WorkspaceGenerationError,
@@ -119,7 +120,22 @@ function formatGenerationError(error: WorkspaceGenerationError): string {
       ? []
       : [`output=${JSON.stringify(error.outputPath)}`]),
   ].join(' ');
-  return `Generation failed [${error.code}] ${provenance}\n${error.message}\n`;
+  const hint = configLoadHint(error);
+  return `Generation failed [${error.code}] ${provenance}\n${error.message}\n${hint}`;
+}
+
+function configLoadHint(error: WorkspaceGenerationError): string {
+  if (
+    error.code !== 'WORKSPACE_DISCOVERY_FAILED' ||
+    !(error.cause instanceof WorkspaceConfigLoadError) ||
+    error.cause.code !== 'CONFIG_LOAD_FAILED'
+  ) {
+    return '';
+  }
+  return (
+    'Hint: verify tsconfigPath and import a Node-safe contracts entry point; ' +
+    'Angular browser barrels may require a dedicated contracts shim.\n'
+  );
 }
 
 export async function runWorkspaceCli(
