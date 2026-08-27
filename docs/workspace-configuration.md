@@ -1,8 +1,8 @@
 # Workspace Configuration
 
-Status: experimental configuration bedrock; deterministic project discovery and
-project-owned field-type profile registries are implemented, while artifact
-generation remains planned
+Status: experimental; deterministic project discovery, project-owned field-type
+profile registries, and programmatic workspace artifact generation are
+implemented, while the generic CLI remains planned
 
 `@formly-contract/workspace` is the framework-neutral configuration
 layer for repository-aware Formly Contract tooling. It provides trusted config
@@ -139,6 +139,44 @@ The source interface is intentionally framework-neutral. Angular and Formly
 integrations can produce source descriptors around application-specific
 factories while the workspace runner continues to operate on stable source and
 form identities.
+
+## Generate a workspace artifact set
+
+The trusted build-time runner discovers every configured project, inventories
+all source definitions, validates globally unique form IDs, extracts each form,
+and writes a deterministic workspace index after its form artifacts succeed:
+
+```ts
+import { runWorkspace } from '@formly-contract/workspace';
+
+const result = await runWorkspace({
+  workspaceRoot: process.cwd(),
+  rootConfigPath: 'formly-contracts.config.ts',
+});
+
+console.log(result.indexPath);
+console.log(result.artifactPaths);
+```
+
+Artifacts use content-addressed project/form paths beneath the resolved output
+directories. The aggregate `workspace-index.json` contains workspace-relative
+paths, contract hashes, source/project IDs, declared evidence, diagnostic
+provenance, and configuration, plugin, and profile-registry identities. Plugin
+options participate in configuration hashes but are not emitted. Model values,
+form state, callbacks, timestamps, absolute paths, and full profile registries
+are also excluded from the index.
+
+The runner performs discovery, source inventory, extraction, diagnostic-policy
+checks, and output-path preflight before publishing. Form artifacts are written
+atomically and the aggregate index is written last, so a failed run never
+advertises a partially generated artifact set. Existing content-addressed
+artifacts must already contain identical canonical bytes; the runner does not
+silently overwrite a hash-addressed contract with different content.
+
+Failures are reported as `WorkspaceGenerationError` with a stable `code`,
+`phase`, and safe project/source/form/output provenance. The original error is
+retained as `cause` for trusted build tooling but is not serialized into the
+workspace index.
 
 ## Project-owned custom-field profiles
 
@@ -303,13 +341,9 @@ configuration.
 
 ## Current boundary
 
-Discovery loads and inventories project descriptors but does not yet execute
-source catalogs or write contract artifacts. Direct declared and trusted
-scenario extraction can consume a resolved project field-type profile registry
-and project its identity, interaction metadata, safe value domains, and stable
-diagnostics onto Form Contract nodes. The Task 5.2 workspace runner still needs
-to connect discovered project configuration to that extraction boundary and
-write the deterministic artifact set. Application driver identities remain
-data and do not execute code. Cross-field effects, CLI execution,
-Angular-assisted inventory, and observed runtime capture remain later
-increments on the same configuration bedrock.
+The programmatic runner executes trusted source catalogs and declared form
+factories, resolves project field-type profile registries, and writes the
+deterministic artifact set. Application driver identities remain data and do
+not execute code. Cross-field effects, CLI execution, Angular-assisted
+inventory, and observed runtime capture remain later increments on the same
+configuration bedrock.

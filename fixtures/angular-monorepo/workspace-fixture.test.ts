@@ -1,11 +1,13 @@
+import { mkdtemp, readFile, rm } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { resolve } from 'node:path';
+import { relative, resolve } from 'node:path';
 
 import {
   loadWorkspaceConfigModule,
   parseProjectConfig,
   parseRootConfig,
   resolveWorkspaceProjectConfig,
+  runWorkspace,
   type FormContractProjectConfig,
 } from '@formly-contract/workspace';
 import {
@@ -140,7 +142,7 @@ describe('Angular monorepo workspace fixture', () => {
         sourceIds: ['fixture/claims-feature'],
       },
     ]);
-  });
+  }, 20_000);
 
   it('shares one canonical custom-field registry across source-owning projects', async () => {
     const root = parseRootConfig(
@@ -444,4 +446,79 @@ describe('Angular monorepo workspace fixture', () => {
       { id: 'adjuster-2', label: 'Sam Rivera' },
     ]);
   });
+
+  it('generates a deterministic six-form workspace artifact set', async () => {
+    const temporaryDirectory = await mkdtemp(
+      resolve(fixtureRoot, '.workspace-runner-'),
+    );
+    const outputDirectory = relative(fixtureRoot, temporaryDirectory);
+
+    try {
+      const options = {
+        workspaceRoot: fixtureRoot,
+        rootConfigPath: 'formly-contracts.config.ts',
+        cliOverrides: { outputDirectory },
+      } as const;
+      const first = await runWorkspace(options);
+      const firstIndexBytes = await readFile(
+        resolve(fixtureRoot, first.indexPath),
+        'utf8',
+      );
+      const firstArtifactBytes = await Promise.all(
+        first.artifactPaths.map((path) =>
+          readFile(resolve(fixtureRoot, path), 'utf8'),
+        ),
+      );
+      const second = await runWorkspace(options);
+      const secondIndexBytes = await readFile(
+        resolve(fixtureRoot, second.indexPath),
+        'utf8',
+      );
+      const secondArtifactBytes = await Promise.all(
+        second.artifactPaths.map((path) =>
+          readFile(resolve(fixtureRoot, path), 'utf8'),
+        ),
+      );
+
+      expect(first.index.forms.map(({ formId }) => formId)).toEqual([
+        'claims.assignment',
+        'claims.intake',
+        'customers.onboarding',
+        'operations.incident',
+        'shared.contact-preferences',
+        'shared.customer-lookup',
+      ]);
+      expect(first.artifactPaths).toHaveLength(6);
+      expect(first.index.projects).toHaveLength(4);
+      expect(first.index.plugins).toEqual([
+        {
+          id: 'fixture/angular',
+          version: '1.0.0',
+          configSchemaVersion: '1',
+        },
+      ]);
+      expect(first.index.forms).toEqual(
+        expect.arrayContaining([
+          expect.objectContaining({
+            formId: 'customers.onboarding',
+            diagnostics: [
+              expect.objectContaining({
+                code: 'UNMAPPED_FIELD_TYPE',
+                formlyType: 'date-range',
+              }),
+            ],
+          }),
+        ]),
+      );
+      expect(first.index).toEqual(second.index);
+      expect(first.indexPath).toBe(second.indexPath);
+      expect(first.artifactPaths).toEqual(second.artifactPaths);
+      expect(firstIndexBytes).toBe(secondIndexBytes);
+      expect(firstArtifactBytes).toEqual(secondArtifactBytes);
+      expect(firstIndexBytes).not.toContain('projectLayout');
+      expect(firstIndexBytes).not.toContain('apps-and-libs');
+    } finally {
+      await rm(temporaryDirectory, { recursive: true, force: true });
+    }
+  }, 20_000);
 });

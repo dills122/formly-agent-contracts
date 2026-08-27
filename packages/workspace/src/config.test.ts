@@ -202,6 +202,27 @@ describe('workspace configuration', () => {
     [
       {
         projectConfigs: ['apps/**/config.ts'],
+        output: { directory: './' },
+      },
+      'root.output.directory',
+    ],
+    [
+      {
+        projectConfigs: ['apps/**/config.ts'],
+        output: { directory: '././' },
+      },
+      'root.output.directory',
+    ],
+    [
+      {
+        projectConfigs: ['apps/**/config.ts'],
+        output: { directory: '.\\' },
+      },
+      'root.output.directory',
+    ],
+    [
+      {
+        projectConfigs: ['apps/**/config.ts'],
         plugins: [createPlugin('duplicate'), createPlugin('duplicate')],
       },
       'root.plugins[1].id',
