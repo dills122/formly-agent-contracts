@@ -130,7 +130,10 @@ export default defineConfig({
 
 Use the repository's real root TypeScript config. Angular CLI workspaces often
 use `tsconfig.json`; Nx workspaces commonly use `tsconfig.base.json`. The config
-loader resolves TypeScript aliases only when `tsconfigPath` is explicit.
+loader resolves TypeScript aliases only when `tsconfigPath` is explicit. Exact
+scoped mappings such as `@work/forms-kit` and wildcard mappings such as
+`@work/*` are both supported. The loader evaluates each config relative to the
+consuming workspace rather than the linked Formly Contract checkout.
 
 Project patterns and output paths are relative to the workplace root. Keep the
 output directory inside the repository and do not point it through a symlink.
@@ -203,6 +206,56 @@ the browser bundle. The maintained
 [Angular fixture](../fixtures/angular-monorepo/formly-contracts.config.ts) and
 [Nx fixture](../fixtures/nx-workspace/formly-contracts.config.ts) demonstrate
 the complete project layout.
+
+Jiti evaluates imported modules; it does not tree-shake a browser barrel before
+running it. If a barrel re-exports partially compiled Angular modules or
+dependencies such as NgRx or Apollo Angular, plain Node may request the Angular
+JIT compiler before the form factories are reached. The durable fix is a
+secondary entry point that exports only Node-safe source descriptors, form
+factories, types, constants, and pure utilities.
+
+When a secondary entry point cannot be published during the pilot, use a
+tool-only shim and a dedicated TypeScript config. The shim must import safe
+implementation files directly rather than re-exporting the Angular barrel:
+
+```ts
+// tools/formly-contract/forms-kit-shim.ts
+export { createClaimFields } from '../../libs/forms-kit/src/forms/claim.js';
+export type { ClaimFormModel } from '../../libs/forms-kit/src/models/claim.js';
+```
+
+```json
+{
+  "extends": "./tsconfig.base.json",
+  "compilerOptions": {
+    "paths": {
+      "@work/forms-kit": ["tools/formly-contract/forms-kit-shim.ts"]
+    }
+  }
+}
+```
+
+Point `tsconfigPath` at that tool-only config and keep it out of application
+builds. Preserve every other alias the pilot imports because `paths` overrides
+from an extended config are not merged entry by entry.
+
+### Dynamic options require named synthetic scenarios
+
+Declared extraction intentionally reports a function- or async-backed option
+source as dynamic and leaves `options` empty. Do not guess a visible label or
+model value from another field, a semantic type, or a test recording.
+
+For a meaningful branch, run `compileFormContractScenario` in an
+application-controlled Angular build with a synthetic model that selects the
+upstream value. For example, retain one base artifact for structure and compile
+one synthetic product-selected scenario for each option branch an E2E author
+must use. Resolved values are scenario-complete, not globally complete. The
+[scenario compiler example](../README.md#resolve-a-synthetic-scenario) shows
+the API and trust boundary.
+
+The pilot workspace CLI currently generates declared artifacts only; it does
+not yet execute named Angular scenarios. Record required scenario artifacts as
+a follow-up rather than adding private runtime values to a declared source.
 
 ## 5. Describe custom field types once per project
 
@@ -335,6 +388,18 @@ Then inspect one representative artifact for each custom field family. Check
 `formlyType`, `semanticType`, `options`, `valueDomain`, `interactionProfile`,
 `locators`, `dynamicRules`, and `diagnostics`.
 
+Treat `domId` entries as lower-confidence hints. Formly field types may render
+the configured ID on a wrapper rather than the interactive control. IDs inside
+`fieldArray` templates are omitted and reported as `UNRELIABLE_DOM_ID` because
+runtime rows may omit them or rewrite them with indices. Prefer exact test IDs,
+roles, and accessible names when they are declared.
+
+Formly Contract cannot manufacture application-level test IDs. Legacy template
+buttons, section containers, and controls without `props.attributes` remain
+outside declared field metadata. Add stable attributes in the consumer when
+possible; for Formly controls, declare them under
+`props.attributes['data-testid']` so the contract can emit an exact locator.
+
 Run the command twice without changing inputs. The second run should retain the
 same index bytes, artifact paths, and content hashes.
 
@@ -350,7 +415,8 @@ use the more specific `CONFIG_*` classifications named below.
 | An existing checkout tries to load `@formly-agent-contracts/workspace` | A pre-rename pnpm bin shim is stale. From the Formly Contract root, run `pnpm install --force --frozen-lockfile` once, then rebuild the three packages. Fresh clones do not need this recovery step. |
 | `WORKSPACE_DISCOVERY_FAILED` | Confirm `--workspace-root`, `--config`, filename casing, project globs, exclusions, duplicate project/source IDs, and project-config symlinks. The config path is relative to the supplied workspace root. |
 | Underlying `CONFIG_NOT_FOUND` | Confirm the root/project config exists and its casing matches. |
-| Underlying `CONFIG_LOAD_FAILED` | Check imported aliases, Node-safe entry points, and `tsconfigPath`. Avoid importing an Angular browser barrel from a project config. |
+| Underlying `CONFIG_LOAD_FAILED` | Check imported aliases, Node-safe entry points, and `tsconfigPath`. The CLI prints the same safe guidance without exposing private import details. If an Angular browser barrel triggers JIT compilation, use a secondary contracts entry point or the tool-only shim pattern above. |
+| `UNRELIABLE_DOM_ID` | A field inside `fieldArray` declares an ID that may be omitted or rewritten for runtime rows. Add an exact test ID or accessible locator convention instead of treating the configured ID as a selector. |
 | Underlying `CONFIG_EXPORT_INVALID` or `CONFIG_INVALID` | Export one default object created by `defineConfig` or `defineFormContractProject`; remove unknown keys and non-JSON plugin options. |
 | `FORM_FACTORY_FAILED` | Run the named factory with the same synthetic inputs in isolation. Remove network, service, or environment dependencies from the pilot source. |
 | `UNMAPPED_FIELD_TYPE` | Add a reviewed field profile for that exact Formly type, or accept that it remains visible but non-operable. |

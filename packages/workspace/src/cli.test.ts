@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { runWorkspaceCli } from './cli.js';
+import { WorkspaceConfigLoadError } from './config-loader.js';
 import { WorkspaceGenerationError } from './run-workspace.js';
 
 const temporaryDirectories: string[] = [];
@@ -146,6 +147,41 @@ describe('workspace CLI', () => {
     expect(captured.stderr.join('')).not.toContain(' at ');
   });
 
+  it('suggests Node-safe contract imports for config-load failures without exposing the cause', async () => {
+    const captured = captureIo();
+    const privateConfigPath = '/private/workspace/apps/claims/project.ts';
+    const privateCause = new WorkspaceConfigLoadError(
+      'CONFIG_LOAD_FAILED',
+      privateConfigPath,
+      `Unable to load workspace config: ${privateConfigPath}`,
+      new Error('Cannot import private Angular package @company/forms'),
+    );
+    const generate = vi.fn().mockRejectedValue(
+      new WorkspaceGenerationError(
+        'WORKSPACE_DISCOVERY_FAILED',
+        'inventory',
+        {},
+        privateCause,
+      ),
+    );
+
+    await expect(
+      runWorkspaceCli(['generate'], {
+        ...captured.io,
+        cwd: () => '/workspace',
+        generate,
+      }),
+    ).resolves.toBe(1);
+
+    expect(captured.stderr.join('')).toBe(
+      'Generation failed [WORKSPACE_DISCOVERY_FAILED] phase=inventory\n' +
+        'Workspace discovery failed.\n' +
+        'Hint: verify tsconfigPath and import a Node-safe contracts entry point; Angular browser barrels may require a dedicated contracts shim.\n',
+    );
+    expect(captured.stderr.join('')).not.toContain(privateConfigPath);
+    expect(captured.stderr.join('')).not.toContain('@company/forms');
+  });
+
   it('executes generate against a real temporary workspace', async () => {
     const workspaceRoot = await createTemporaryWorkspace();
     await writeModule(
@@ -189,6 +225,68 @@ describe('workspace CLI', () => {
     expect(index.forms).toEqual([
       expect.objectContaining({ formId: 'claims.create' }),
     ]);
+    expect(captured.stdout.join('')).toContain('Generated 1 contract.');
+    expect(captured.stderr).toEqual([]);
+  });
+
+  it('generates from a consumer project loaded through an exact scoped tsconfig alias', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'tsconfig.base.json',
+      JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          module: 'esnext',
+          moduleResolution: 'node',
+          paths: {
+            '@consumer/forms-ui-kit': [
+              'libs/forms-ui-kit/src/contracts-shim.ts',
+            ],
+          },
+        },
+      }),
+    );
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.ts',
+      `export default {
+        projectConfigs: ['apps/**/formly-contracts.project.ts'],
+        tsconfigPath: 'tsconfig.base.json'
+      };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'libs/forms-ui-kit/src/contracts-shim.ts',
+      `export const FORMS_SOURCE = {
+        sourceId: 'consumer/forms',
+        list: () => [{
+          id: 'consumer.claim',
+          create: () => ({ fields: [{ key: 'name', type: 'input' }] })
+        }]
+      };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'apps/claims/formly-contracts.project.ts',
+      `import { FORMS_SOURCE } from '@consumer/forms-ui-kit';
+       export default { projectId: 'consumer/claims', sources: [FORMS_SOURCE] };`,
+    );
+    const captured = captureIo();
+
+    await expect(
+      runWorkspaceCli(
+        [
+          'generate',
+          '--workspace-root',
+          workspaceRoot,
+          '--config',
+          'formly-contracts.config.ts',
+        ],
+        captured.io,
+      ),
+    ).resolves.toBe(0);
+
     expect(captured.stdout.join('')).toContain('Generated 1 contract.');
     expect(captured.stderr).toEqual([]);
   });
