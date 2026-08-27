@@ -28,7 +28,7 @@ This repository currently provides schema v0.4 and three packages:
 | --- | --- |
 | `@formly-contract/schema` | Contract DTOs, runtime validation, canonical JSON, and SHA-256 content hashing |
 | `@formly-contract/compiler` | Safe declared extraction and trusted scenario compilation for Formly 6.x |
-| `@formly-contract/workspace` | Experimental trusted config loading, strict root/project/source descriptors, and deterministic policy resolution |
+| `@formly-contract/workspace` | Experimental trusted config loading, strict root/project/source descriptors, policy resolution, and deterministic multi-project artifact generation |
 
 It also includes:
 
@@ -42,11 +42,10 @@ It also includes:
 - deep compatibility coverage for the pinned Angular `20.3.29` and Formly
   `6.1.8` reference combination.
 
-The parser and contract are the current product. A production MCP server,
-automatic Playwright generation, browser observation, application-source
-discovery, and artifact generation are future layers and are not shipped by
-this MVP. The workspace package currently provides their configuration bedrock,
-not a discovery runner or CLI.
+The parser, contract, and programmatic workspace runner are the current product.
+A production MCP server, automatic Playwright generation, browser observation,
+Angular-assisted application-source discovery, and a generic CLI are future
+layers and are not shipped by this MVP.
 
 ## Use it in your own Angular/Formly codebase
 

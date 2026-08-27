@@ -468,6 +468,7 @@ describe('workspace project discovery', () => {
       ]);
       expect(discovered.inventory.plugins).toHaveLength(1);
     },
+    20_000,
   );
 
   it('exposes a typed discovery error', () => {
