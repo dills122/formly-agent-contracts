@@ -142,6 +142,7 @@ interface NodeLocation {
   readonly parentModelPath: readonly ModelPathSegment[];
   readonly position: readonly number[];
   readonly sourcePath: readonly ModelPathSegment[];
+  readonly insideArrayTemplate: boolean;
 }
 
 function isRecord(value: unknown): value is Readonly<Record<string, unknown>> {
@@ -1377,13 +1378,23 @@ function readLocators(
   }
 
   if (typeof field.id === 'string' && field.id.length > 0) {
-    domIds.push({
-      target: 'control',
-      strategy: 'domId',
-      value: field.id,
-      evidence: context.evidence,
-      confidence: 'derived',
-    });
+    if (location.insideArrayTemplate) {
+      addDiagnostic(
+        context,
+        'UNRELIABLE_DOM_ID',
+        'Declared field IDs inside array templates may be omitted or rewritten with runtime indices and were not emitted as stable locators.',
+        [...location.sourcePath, 'id'],
+        nodeId,
+      );
+    } else {
+      domIds.push({
+        target: 'control',
+        strategy: 'domId',
+        value: field.id,
+        evidence: context.evidence,
+        confidence: 'derived',
+      });
+    }
   }
 
   return deduplicateLocators([
@@ -1600,6 +1611,7 @@ function extractNode(
         parentModelPath: modelPath,
         position: [...location.position, index],
         sourcePath: [...location.sourcePath, 'fieldGroup', index],
+        insideArrayTemplate: location.insideArrayTemplate,
       },
       context,
     ),
@@ -1622,6 +1634,7 @@ function extractNode(
           parentModelPath: [...modelPath, '*'],
           position: [...location.position, 0],
           sourcePath: [...location.sourcePath, 'fieldArray'],
+          insideArrayTemplate: true,
         },
         context,
       );
@@ -1737,6 +1750,7 @@ function projectFormContract(
         parentModelPath: [],
         position: [index],
         sourcePath: ['fields', index],
+        insideArrayTemplate: false,
       },
       context,
     ),

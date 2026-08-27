@@ -713,6 +713,38 @@ describe('extractFormContract arrays, conditions, and unknowns', () => {
     expect(result.diagnostics).toEqual([]);
   });
 
+  it('does not advertise declared DOM IDs from an array template as stable locators', () => {
+    const result = extractFormContract({
+      formId: 'array.locator',
+      fields: [
+        {
+          key: 'cases',
+          type: 'repeat-section',
+          fieldArray: {
+            fieldGroup: [
+              {
+                key: 'caseType',
+                id: 'case-type-select',
+                type: 'select',
+                props: { label: 'Select Case Type' },
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    expect(result.contract.nodes[0]?.arrayTemplate?.children[0]?.locators).toEqual(
+      [],
+    );
+    expect(result.diagnostics).toContainEqual(
+      expect.objectContaining({
+        code: 'UNRELIABLE_DOM_ID',
+        sourcePath: ['fields', 0, 'fieldArray', 'fieldGroup', 0, 'id'],
+      }),
+    );
+  });
+
   it('preserves string conditions and diagnoses every opaque behavior class without evaluating it', () => {
     let functionWasCalled = false;
     const opaqueFunction = (): boolean => {
