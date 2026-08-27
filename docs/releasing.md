@@ -40,11 +40,12 @@ Commit the generated `.changeset/*.md` file with the rest of the PR. See
 
 ## From merged changesets to a release
 
-1. Merging a PR with one or more `.changeset/*.md` files to `main` runs
-   [.github/workflows/changesets.yml](../.github/workflows/changesets.yml),
-   which opens or updates a bot-authored "Version Packages" pull request. That
-   PR bumps every affected package's `package.json` and writes its
-   `CHANGELOG.md` entries. The bot never publishes anything.
+1. When preparing a release, a maintainer manually runs
+   [.github/workflows/changesets.yml](../.github/workflows/changesets.yml).
+   The workflow opens or updates a bot-authored "Version Packages" pull
+   request, which bumps every affected package's `package.json` and writes its
+   `CHANGELOG.md` entries. It does not run automatically on pushes to `main`,
+   and the bot never publishes anything.
 2. A maintainer reviews and merges the Version Packages PR like any other
    change (full `pnpm check` gate applies).
 3. A maintainer pushes a release tag to trigger
