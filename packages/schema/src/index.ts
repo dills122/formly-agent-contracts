@@ -5,6 +5,22 @@ export {
   verifyContentHash,
 } from './canonical-json.js';
 export {
+  CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+  canonicalizeCrossFieldEffectRegistry,
+  computeCrossFieldEffectRegistryHash,
+  parseCrossFieldEffectRegistry,
+} from './cross-field-effect.js';
+export type {
+  CrossFieldEffectIdentity,
+  CrossFieldEffectKind,
+  CrossFieldEffectRegistry,
+  CrossFieldEffectTargetProperty,
+  CrossFieldEffectTiming,
+  CrossFieldEffectTriggerEvent,
+  DeclaredCrossFieldEffect,
+  FormCrossFieldEffects,
+} from './cross-field-effect.js';
+export {
   CONTRACT_DIAGNOSTIC_CODES,
   FIELD_TYPE_PROFILE_RESOLUTION_DIAGNOSTIC_CODES,
   FORM_CONTRACT_SCHEMA_VERSION,

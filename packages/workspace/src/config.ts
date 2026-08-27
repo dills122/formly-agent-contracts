@@ -1,9 +1,13 @@
 import {
   canonicalStringify,
+  canonicalizeCrossFieldEffectRegistry,
   canonicalizeFieldTypeProfileRegistry,
+  computeCrossFieldEffectRegistryHash,
   computeFieldTypeProfileRegistryHash,
+  parseCrossFieldEffectRegistry,
   parseFieldTypeProfileRegistry,
   type ContractDiagnosticSeverity,
+  type CrossFieldEffectRegistry,
   type FieldTypeProfileRegistry,
   type JsonValue,
 } from '@formly-contract/schema';
@@ -27,6 +31,7 @@ const DEFAULT_TEST_ID_ATTRIBUTES = [
   'data-pw',
 ] as const;
 const DEFAULT_FAIL_ON = ['error'] as const;
+const DEFAULT_EFFECT_CYCLE_POLICY = 'error' as const;
 
 export interface WorkspacePlugin {
   readonly id: string;
@@ -47,6 +52,10 @@ export interface WorkspaceDiagnosticConfig {
   readonly failOn: readonly ContractDiagnosticSeverity[];
 }
 
+export interface WorkspaceEffectConfig {
+  readonly cyclePolicy: ContractDiagnosticSeverity;
+}
+
 export interface WorkspaceRootConfig {
   readonly projectConfigs: readonly string[];
   readonly excludeProjectConfigs?: readonly string[];
@@ -54,6 +63,7 @@ export interface WorkspaceRootConfig {
   readonly output?: WorkspaceOutputConfig;
   readonly locators?: WorkspaceLocatorConfig;
   readonly diagnostics?: WorkspaceDiagnosticConfig;
+  readonly effects?: WorkspaceEffectConfig;
   readonly plugins?: readonly WorkspacePlugin[];
 }
 
@@ -61,6 +71,7 @@ export interface FormContractProjectConfig {
   readonly projectId: string;
   readonly sources?: readonly FormContractSource[];
   readonly fieldTypeProfiles?: FieldTypeProfileRegistry;
+  readonly crossFieldEffects?: CrossFieldEffectRegistry;
   readonly output?: WorkspaceOutputConfig;
   readonly locators?: WorkspaceLocatorConfig;
   readonly diagnostics?: WorkspaceDiagnosticConfig;
@@ -87,6 +98,14 @@ export interface ResolvedFieldTypeProfileRegistry {
   readonly registry: FieldTypeProfileRegistry;
 }
 
+export interface ResolvedCrossFieldEffectRegistry {
+  readonly schemaVersion: CrossFieldEffectRegistry['schemaVersion'];
+  readonly id: string;
+  readonly version: number;
+  readonly contentHash: string;
+  readonly registry: CrossFieldEffectRegistry;
+}
+
 export interface ResolvedWorkspaceProjectConfig {
   readonly schemaVersion: typeof WORKSPACE_CONFIG_SCHEMA_VERSION;
   readonly projectId: string;
@@ -95,9 +114,11 @@ export interface ResolvedWorkspaceProjectConfig {
   readonly outputDirectory: string;
   readonly testIdAttributes: readonly string[];
   readonly failOn: readonly ContractDiagnosticSeverity[];
+  readonly effectCyclePolicy: ContractDiagnosticSeverity;
   readonly plugins: readonly ResolvedWorkspacePluginIdentity[];
   readonly sourceIds: readonly string[];
   readonly fieldTypeProfiles?: ResolvedFieldTypeProfileRegistry;
+  readonly crossFieldEffects?: ResolvedCrossFieldEffectRegistry;
   readonly tsconfigPath?: string;
 }
 
@@ -120,12 +141,14 @@ const ROOT_KEYS = new Set([
   'output',
   'locators',
   'diagnostics',
+  'effects',
   'plugins',
 ]);
 const PROJECT_KEYS = new Set([
   'projectId',
   'sources',
   'fieldTypeProfiles',
+  'crossFieldEffects',
   'output',
   'locators',
   'diagnostics',
@@ -133,6 +156,7 @@ const PROJECT_KEYS = new Set([
 const OUTPUT_KEYS = new Set(['directory']);
 const LOCATOR_KEYS = new Set(['testIdAttributes']);
 const DIAGNOSTIC_KEYS = new Set(['failOn']);
+const EFFECT_KEYS = new Set(['cyclePolicy']);
 const PLUGIN_KEYS = new Set([
   'id',
   'version',
@@ -146,6 +170,21 @@ function requireArray(value: unknown, path: string): readonly unknown[] {
     invalid(path, 'must be an array.');
   }
   return value;
+}
+
+function readOptionalOwnDataProperty(
+  value: Readonly<Record<string, unknown>>,
+  key: string,
+  path: string,
+): unknown {
+  const descriptor = Object.getOwnPropertyDescriptor(value, key);
+  if (descriptor === undefined) {
+    return undefined;
+  }
+  if (!('value' in descriptor)) {
+    invalid(path, 'must be an own data property.');
+  }
+  return descriptor.value;
 }
 
 function isUnsafeRelativePath(value: string): boolean {
@@ -254,6 +293,19 @@ function validateDiagnostics(value: unknown, path: string): void {
   );
 }
 
+function validateEffects(value: unknown, path: string): void {
+  const effects = requireRecord(value, path);
+  rejectUnknownKeys(effects, EFFECT_KEYS, path);
+  const descriptor = Object.getOwnPropertyDescriptor(effects, 'cyclePolicy');
+  if (descriptor === undefined) {
+    invalid(`${path}.cyclePolicy`, 'is required.');
+  }
+  if (!('value' in descriptor)) {
+    invalid(`${path}.cyclePolicy`, 'must be an own data property.');
+  }
+  requireSeverity(descriptor.value, `${path}.cyclePolicy`);
+}
+
 function requireVersion(value: unknown, path: string): string {
   if (
     typeof value !== 'string' ||
@@ -320,6 +372,10 @@ export function parseRootConfig(value: unknown): WorkspaceRootConfig {
   if (root.diagnostics !== undefined) {
     validateDiagnostics(root.diagnostics, 'root.diagnostics');
   }
+  const effects = readOptionalOwnDataProperty(root, 'effects', 'root.effects');
+  if (effects !== undefined) {
+    validateEffects(effects, 'root.effects');
+  }
   if (root.plugins !== undefined) {
     validatePlugins(root.plugins, 'root.plugins');
   }
@@ -364,6 +420,20 @@ export function parseProjectConfig(value: unknown): FormContractProjectConfig {
       invalid('project.fieldTypeProfiles', `is invalid: ${message}`);
     }
   }
+  const crossFieldEffects = readOptionalOwnDataProperty(
+    project,
+    'crossFieldEffects',
+    'project.crossFieldEffects',
+  );
+  if (crossFieldEffects !== undefined) {
+    try {
+      parseCrossFieldEffectRegistry(crossFieldEffects);
+    } catch (error) {
+      const message =
+        error instanceof Error ? error.message : 'unknown validation failure';
+      invalid('project.crossFieldEffects', `is invalid: ${message}`);
+    }
+  }
   return value as FormContractProjectConfig;
 }
 
@@ -377,6 +447,20 @@ function resolveFieldTypeProfiles(
     id: normalized.id,
     version: normalized.version,
     contentHash: computeFieldTypeProfileRegistryHash(normalized),
+    registry: normalized,
+  };
+}
+
+function resolveCrossFieldEffects(
+  registry: CrossFieldEffectRegistry,
+): ResolvedCrossFieldEffectRegistry {
+  const canonical = canonicalizeCrossFieldEffectRegistry(registry);
+  const normalized = JSON.parse(canonical) as CrossFieldEffectRegistry;
+  return {
+    schemaVersion: normalized.schemaVersion,
+    id: normalized.id,
+    version: normalized.version,
+    contentHash: computeCrossFieldEffectRegistryHash(normalized),
     registry: normalized,
   };
 }
@@ -426,6 +510,16 @@ export function resolveWorkspaceProjectConfig(
   const root = parseRootConfig(rootInput);
   const project = parseProjectConfig(projectInput);
   validateCliOverrides(cliOverrides);
+  const rootEffects = readOptionalOwnDataProperty(
+    root as unknown as Readonly<Record<string, unknown>>,
+    'effects',
+    'root.effects',
+  ) as WorkspaceEffectConfig | undefined;
+  const crossFieldEffects = readOptionalOwnDataProperty(
+    project as unknown as Readonly<Record<string, unknown>>,
+    'crossFieldEffects',
+    'project.crossFieldEffects',
+  ) as CrossFieldEffectRegistry | undefined;
 
   const outputDirectory =
     cliOverrides.outputDirectory ??
@@ -442,6 +536,8 @@ export function resolveWorkspaceProjectConfig(
     project.diagnostics?.failOn ??
     root.diagnostics?.failOn ??
     DEFAULT_FAIL_ON;
+  const effectCyclePolicy =
+    rootEffects?.cyclePolicy ?? DEFAULT_EFFECT_CYCLE_POLICY;
 
   return {
     schemaVersion: WORKSPACE_CONFIG_SCHEMA_VERSION,
@@ -451,6 +547,7 @@ export function resolveWorkspaceProjectConfig(
     outputDirectory,
     testIdAttributes: [...testIdAttributes],
     failOn: [...failOn],
+    effectCyclePolicy,
     plugins: [...(root.plugins ?? [])].sort(compareIds).map((plugin) => ({
       id: plugin.id,
       version: plugin.version,
@@ -466,6 +563,11 @@ export function resolveWorkspaceProjectConfig(
           fieldTypeProfiles: resolveFieldTypeProfiles(
             project.fieldTypeProfiles,
           ),
+        }),
+    ...(crossFieldEffects === undefined
+      ? {}
+      : {
+          crossFieldEffects: resolveCrossFieldEffects(crossFieldEffects),
         }),
     ...(root.tsconfigPath === undefined
       ? {}

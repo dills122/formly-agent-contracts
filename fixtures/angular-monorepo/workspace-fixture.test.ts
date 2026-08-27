@@ -162,6 +162,18 @@ describe('Angular monorepo workspace fixture', () => {
 
     expect(formsKit.fieldTypeProfiles).toBeDefined();
     expect(feature.fieldTypeProfiles).toEqual(formsKit.fieldTypeProfiles);
+    expect(formsKit.crossFieldEffects).toBeUndefined();
+    expect(feature.crossFieldEffects?.id).toBe(
+      'fixture.angular-cross-field-effects',
+    );
+    expect(
+      feature.crossFieldEffects?.registry.forms.flatMap(({ effects }) =>
+        effects.map(({ identity }) => identity.id),
+      ),
+    ).toEqual([
+      'fixture.case-type-controls-other-details',
+      'fixture.product-filters-case-type',
+    ]);
     expect(
       formsKit.fieldTypeProfiles?.registry.registrations.map(
         ({ formlyType }) => formlyType,
