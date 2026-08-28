@@ -26,8 +26,15 @@ export default defineConfig({
 });
 ```
 
-`projectConfigs` is required. Other settings have validated defaults. Paths
-must stay inside the workspace and output must not resolve through a symlink.
+`projectConfigs` is required. Other settings have validated defaults:
+
+- `output.directory` defaults to `dist/formly-contracts`
+- `locators.testIdAttributes` defaults to `['data-testid', 'data-test-id', 'data-test', 'data-cy', 'data-pw']`
+- `diagnostics.failOn` defaults to `['error']`
+- `effects.cyclePolicy` defaults to `'error'`
+
+Paths must stay inside the workspace and output must not resolve through a
+symlink.
 
 ## Project configuration
 

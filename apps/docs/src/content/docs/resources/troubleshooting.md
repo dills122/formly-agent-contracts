@@ -28,6 +28,44 @@ exclude every directory named `dist`.
 
 Project-config symlinks are rejected. Keep real configs inside the workspace.
 
+Discovery failures carry one of these stable codes:
+
+- `CONFIG_PATH_OUTSIDE_WORKSPACE` — a matched project config resolves
+  outside the workspace root.
+- `DUPLICATE_PROJECT_ID` — two discovered project configs declare the same
+  `projectId`.
+- `DUPLICATE_SOURCE_ID` — two sources within a project declare the same
+  `sourceId`.
+- `PROJECT_CONFIG_SYMLINK_UNSUPPORTED` — a matched project config path is a
+  symlink.
+
+## `generate` or `check` fails
+
+`runWorkspace`/`checkWorkspace` throw a `WorkspaceGenerationError` with one
+of these codes:
+
+- `WORKSPACE_DISCOVERY_FAILED` — workspace discovery failed.
+- `PROJECT_CONFIG_RESOLUTION_FAILED` — a project's configuration failed to
+  resolve.
+- `SOURCE_LIST_FAILED` — a form contract source could not be listed.
+- `SOURCE_LIST_INVALID` — a form contract source returned an invalid list.
+- `FORM_DEFINITION_INVALID` — a form contract definition is invalid.
+- `DUPLICATE_FORM_ID` — a form ID is declared more than once.
+- `FORM_FACTORY_FAILED` — a form contract factory failed.
+- `FORM_INSTANCE_INVALID` — a form contract factory returned an invalid
+  instance.
+- `CONTRACT_EXTRACTION_FAILED` — form contract extraction failed.
+- `DIAGNOSTIC_POLICY_FAILED` — a generated contract violates diagnostic
+  policy (`diagnostics.failOn`).
+- `DEPENDENCY_SNAPSHOT_UNAVAILABLE` — a pnpm dependency snapshot could not
+  be selected.
+- `RUNTIME_PROVENANCE_UNAVAILABLE` — runtime toolchain provenance could not
+  be determined.
+- `OUTPUT_PATH_OUTSIDE_WORKSPACE` — an output path is outside the
+  workspace.
+- `OUTPUT_SYMLINK_UNSUPPORTED` — symlinked output paths are not supported.
+- `OUTPUT_WRITE_FAILED` — workspace contract output could not be written.
+
 ## A custom field is unmapped
 
 `UNMAPPED_FIELD_TYPE` means extraction preserved the field but had no reviewed
