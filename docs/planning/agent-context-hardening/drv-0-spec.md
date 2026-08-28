@@ -1,6 +1,6 @@
 # DRV-0A/B Driver-Registry Manifest Contract
 
-- Status: approved schema foundation
+- Status: DRV-0A/B complete; aggregate DRV-0 incomplete
 - Owner: `@formly-contract/schema`
 - Schema identity: `agent-context.driver-registry@0.1.0`
 - Dependency: `CTX-0C`
@@ -222,13 +222,11 @@ manifest. A hash is content identity, not execution approval.
 - Focused schema tests, schema typecheck, scoped lint, and `git diff --check`
   pass with no new dependency.
 
-## Later runtime-owned gap
+## Remaining runtime-owned gap
 
-The future `@formly-contract/playwright` owner must separately add and verify an
-implementation registry keyed by the same exact triples and bind the five
-CTX-2-reserved capabilities once validated plans contain exact authority. That
-runtime inventory and exact-resolution follow-up should be tracked as DRV-0C
-(or an equivalent runtime-owned child item) without browser execution. Browser
-conformance remains evidence for the later `PW-1` and `PW-2` lanes. Until
-DRV-0C lands, `DRV-0` remains in progress even when this schema packet is
-complete.
+`DRV-0C1` has added and verified the private
+`@formly-contract/playwright` implementation inventory keyed by these exact
+triples, including exact whole-inventory binding and resolution without browser
+execution. Aggregate `DRV-0` remains incomplete until `DRV-0C2` binds the five
+CTX-2-reserved capabilities to validated plans containing exact authority.
+Browser conformance remains evidence for the later `PW-1` and `PW-2` lanes.

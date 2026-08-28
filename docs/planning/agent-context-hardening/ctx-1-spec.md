@@ -282,6 +282,18 @@ against the exact named owners. Structurally valid but owner-drifted entry or
 driver records, partial projections with omitted dependencies, and projections
 inflated with unrelated authority records fail this validation.
 
+Overflow-result authentication follows the information retained by each DTO.
+The boundary exactly recomputes overflow for the atomic E2E slice, whose result
+echoes its complete request, and for the fixed unpaginated journey projection,
+which is recoverable from its selection and view. Pageable overflow refusals
+do not echo filters, included node aspects, page/cursor state, or the pagination
+runtime, so this two-argument boundary validates only their structure and exact
+scope/selection owners. `executeAgentContextQuery` is the authoritative
+classifier for those pageable operations. A future transport that requires
+query/result authenticity must add an explicit query-bound validator accepting
+the dataset, query, result, and pagination runtime; it must not claim that this
+result-only boundary replayed an unavailable query.
+
 The source module exposes internal parsed-dataset validation seams for scope,
 selection, and result validation. The executor parses and detaches the dataset
 once, then uses those seams while enumerating handoffs and validating its final
@@ -457,9 +469,12 @@ enforced before an output is returned. The echoed slice request and a semantic
 refusal reason are individual records. Semantic refusals are classified before
 return, so a large transition-ambiguity reason is replaced by the exact
 record-before-view overflow reason. Dataset-aware validation recomputes the
-would-be complete or semantic-refusal result and accepts an overflow reason
-only when that same classification produces it. Numeric inputs must be finite safe
-integers; negative zero is normalized only where zero is legal.
+would-be complete or semantic-refusal result for the request-recoverable atomic
+E2E slice and fixed journey projection, and accepts an overflow reason only
+when that same classification produces it. Pageable overflow refusals receive
+the structural and owner validation described above because their originating
+query and pagination runtime are not present. Numeric inputs must be finite
+safe integers; negative zero is normalized only where zero is legal.
 
 ## Non-goals
 

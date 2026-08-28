@@ -465,6 +465,9 @@ describe('public agent-context query API', () => {
       'classifyAgentContextE2eSliceOverflow',
     );
     expect(publicApi).not.toHaveProperty(
+      'classifyAgentContextJourneyOverflow',
+    );
+    expect(publicApi).not.toHaveProperty(
       'AGENT_CONTEXT_QUERY_MAX_ATOMIC_RECORD_GRAPH_NODES',
     );
     expect(publicApi).not.toHaveProperty(

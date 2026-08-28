@@ -2708,9 +2708,6 @@ function parseUsageCandidate(
   const form = optional(value, 'form');
   const parsedForm =
     form === undefined ? undefined : parseFormReference(form, `${path}.form`);
-  if (parsedForm !== undefined && parsedForm.projectId !== projectId) {
-    fail(`${path}.form.projectId`, 'must equal the candidate projectId.');
-  }
   const sourceUsageCatalog = parseTypedArtifactReference(
     required(value, 'sourceUsageCatalog', path),
     `${path}.sourceUsageCatalog`,
@@ -3496,6 +3493,12 @@ function parseSearchResult(input: unknown, path: string): SearchFormUsagesResult
   );
   const page = parsePageResult(required(value, 'page', path), `${path}.page`, 'candidates');
   if (status === 'complete') {
+    if (candidates.length !== 1) {
+      fail(`${path}.candidates`, 'must contain exactly one complete match.');
+    }
+    if (page.truncated) {
+      fail(`${path}.page.truncated`, 'must be false for a complete result.');
+    }
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation: 'search-form-usages',
@@ -4368,6 +4371,12 @@ function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
     }
   }
   if (status === 'complete') {
+    if (candidates.length !== 1) {
+      fail(`${path}.candidates`, 'must contain exactly one complete match.');
+    }
+    if (page.truncated) {
+      fail(`${path}.page.truncated`, 'must be false for a complete result.');
+    }
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation: 'find-form-nodes',
@@ -5614,6 +5623,57 @@ function dataGraphExceeds(input: unknown, maximum: number): boolean {
 }
 
 /** @internal CTX-1 source-module seam; package publication remains CTX-1D. */
+export function classifyAgentContextJourneyOverflow(
+  result: Extract<
+    GetFormContextResult,
+    { readonly status: 'complete'; readonly view: 'journey' }
+  >,
+):
+  | Extract<
+      AgentContextQueryReason,
+      { readonly kind: 'atomic-record-too-large' | 'atomic-view-too-large' }
+    >
+  | undefined {
+  const authority = result.journey.authority;
+  const collections = [
+    authority.steps.items,
+    authority.actions.items,
+    authority.outcomes.items,
+    authority.transitions.items,
+    authority.physicalOperations.items,
+    authority.readiness.items,
+    authority.interactions.items,
+    authority.commits.items,
+    authority.validationSurfaces.items,
+    authority.valueAssertions.items,
+    authority.stateAssertions.items,
+    authority.repeaterCaptures.items,
+  ];
+  if (
+    collections.some(
+      (items) => items.length > AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE,
+    ) ||
+    [authority.entry, ...collections.flat()].some((record) =>
+      dataGraphExceeds(
+        record,
+        AGENT_CONTEXT_QUERY_MAX_ATOMIC_RECORD_GRAPH_NODES,
+      ),
+    )
+  ) {
+    return { kind: 'atomic-record-too-large' };
+  }
+  if (
+    dataGraphExceeds(
+      result,
+      AGENT_CONTEXT_QUERY_MAX_ATOMIC_VIEW_GRAPH_NODES,
+    )
+  ) {
+    return { kind: 'atomic-view-too-large' };
+  }
+  return undefined;
+}
+
+/** @internal CTX-1 source-module seam; package publication remains CTX-1D. */
 export function classifyAgentContextE2eSliceOverflow(
   result: GetE2eSliceResult,
 ):
@@ -5743,16 +5803,42 @@ export function validateAgentContextQueryResultAgainstParsedDataset(
     assertSame(result.slice, resolution.slice, `${path}.slice`);
     return result;
   }
-  if (result.status === 'refused') return result;
-  const scenarioContract = findOwner(
-    dataset.formContracts,
-    selection.owners.scenarioArtifact,
-    `${path}.selection.owners.scenarioArtifact`,
-  ).artifact;
   const authority = findOwner(
     dataset.executionAuthorities,
     selection.owners.executionAuthority,
     `${path}.selection.owners.executionAuthority`,
+  ).artifact;
+  if (result.status === 'refused') {
+    if (result.operation === 'get-form-context' && result.view === 'journey') {
+      const semanticResult = {
+        schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+        operation: 'get-form-context',
+        status: 'complete',
+        view: 'journey',
+        selection,
+        freshness: result.freshness,
+        journey: {
+          identity: selection.journey,
+          authority: projectExecutionAuthority(
+            selection,
+            authority,
+            authority.usage.steps.flatMap(({ nodeIds }) => nodeIds),
+            'complete-usage',
+          ),
+        },
+      } as const;
+      const overflow = classifyAgentContextJourneyOverflow(semanticResult);
+      if (overflow === undefined) {
+        fail(`${path}.reason`, 'does not match the recomputed journey outcome.');
+      }
+      assertSame(result.reason, overflow, `${path}.reason`);
+    }
+    return result;
+  }
+  const scenarioContract = findOwner(
+    dataset.formContracts,
+    selection.owners.scenarioArtifact,
+    `${path}.selection.owners.scenarioArtifact`,
   ).artifact;
   const contractNodeById = new Map(
     collectFormContractNodes(scenarioContract.nodes).map(

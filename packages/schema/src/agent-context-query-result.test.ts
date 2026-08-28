@@ -938,7 +938,7 @@ describe('agent-context query result contract', () => {
         ...searchBase,
         status: 'complete',
         candidates: [candidate],
-        page: { collection: 'candidates', truncated: true, nextCursor: 'acq1.x.y' },
+        page: { collection: 'candidates', truncated: false },
       },
       {
         ...searchBase,
@@ -1175,6 +1175,87 @@ describe('agent-context query result contract', () => {
     ]) {
       expect(() => parseAgentContextQueryResult(result)).toThrow(
         /ambiguous|totalMatches|usages|nodeIds|candidate/u,
+      );
+    }
+  });
+
+  it('requires complete search and node results to prove one untruncated match', () => {
+    const { value, candidate, node, searchBase, nodeBase } = baseResults();
+    const secondUsageCandidate = {
+      ...candidate,
+      usage: {
+        kind: 'declared' as const,
+        usageId: 'synthetic.second-usage',
+        version: 1,
+      },
+      selectionHandoffs: complete([]),
+    };
+    const usageCandidates = [candidate, secondUsageCandidate].sort((left, right) =>
+      canonicalStringify({
+        sourceUsageCatalog: left.sourceUsageCatalog,
+        usage: left.usage,
+      }).localeCompare(
+        canonicalStringify({
+          sourceUsageCatalog: right.sourceUsageCatalog,
+          usage: right.usage,
+        }),
+      ),
+    );
+
+    const authorityNodeIds = allAuthorityNodeIds(value.walkthrough.executionAuthority);
+    const secondNodeSource = value.nodes.find(
+      ({ id }) => id !== node.nodeId && authorityNodeIds.includes(id),
+    );
+    if (secondNodeSource === undefined) {
+      throw new Error('fixture needs a second authority node');
+    }
+    const secondNode = nodeProjection(value, secondNodeSource);
+    const nodeCandidates = [node, secondNode].sort((left, right) =>
+      left.nodeId.localeCompare(right.nodeId),
+    );
+    const nodeAuthority = authorityProjection(
+      value,
+      nodeCandidates.map(({ nodeId }) => nodeId),
+    );
+
+    for (const result of [
+      {
+        ...searchBase,
+        status: 'complete',
+        candidates: usageCandidates,
+        page: { collection: 'candidates', truncated: false },
+      },
+      {
+        ...searchBase,
+        status: 'complete',
+        candidates: [candidate],
+        page: {
+          collection: 'candidates',
+          truncated: true,
+          nextCursor: 'acq1.x.y',
+        },
+      },
+      {
+        ...nodeBase,
+        status: 'complete',
+        authority: nodeAuthority,
+        candidates: nodeCandidates,
+        page: { collection: 'nodes', truncated: false },
+      },
+      {
+        ...nodeBase,
+        status: 'complete',
+        authority: authorityProjection(value, [node.nodeId]),
+        candidates: [node],
+        page: {
+          collection: 'nodes',
+          truncated: true,
+          nextCursor: 'acq1.x.y',
+        },
+      },
+    ]) {
+      expect(() => parseAgentContextQueryResult(result)).toThrow(
+        /complete|candidate|truncated/u,
       );
     }
   });
@@ -1617,6 +1698,27 @@ describe('agent-context query result contract', () => {
           reason: { kind },
         }),
       ).toThrow(/reason|recomputed|outcome|projection/u);
+    }
+  });
+
+  it('recomputes journey overflow refusals against the selected authority', () => {
+    const { value, contextBase } = baseResults();
+    for (const kind of [
+      'atomic-record-too-large',
+      'atomic-view-too-large',
+    ] as const) {
+      const forgedRefusal = {
+        ...contextBase,
+        status: 'refused',
+        view: 'journey',
+        reason: { kind },
+      } as const;
+      expect(parseAgentContextQueryResult(forgedRefusal)).toEqual(
+        forgedRefusal,
+      );
+      expect(() =>
+        validateAgentContextQueryResult(value.dataset, forgedRefusal),
+      ).toThrow(/journey|reason|overflow|recomputed/u);
     }
   });
 

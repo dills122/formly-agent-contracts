@@ -13,6 +13,7 @@ import {
   AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE,
   AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
   classifyAgentContextE2eSliceOverflow,
+  classifyAgentContextJourneyOverflow,
   evaluateAgentContextQueryFreshness,
   parseAgentContextLiveOwnerState,
   parseAgentContextQuery,
@@ -1326,17 +1327,6 @@ function executeContextQuery(
     authority.usage.steps.flatMap(({ nodeIds }) => nodeIds),
     'complete-usage',
   );
-  if (authorityProjectionHasOversizedRecord(projection)) {
-    return {
-      schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
-      operation: 'get-form-context',
-      status: 'refused',
-      view: 'journey',
-      selection,
-      freshness,
-      reason: { kind: 'atomic-record-too-large' },
-    };
-  }
   const result: GetFormContextResult = {
     schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
     operation: 'get-form-context',
@@ -1346,7 +1336,8 @@ function executeContextQuery(
     freshness,
     journey: { identity: selection.journey, authority: projection },
   };
-  if (graphExceeds(result, AGENT_CONTEXT_QUERY_MAX_ATOMIC_VIEW_GRAPH_NODES)) {
+  const overflow = classifyAgentContextJourneyOverflow(result);
+  if (overflow !== undefined) {
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation: 'get-form-context',
@@ -1354,7 +1345,7 @@ function executeContextQuery(
       view: 'journey',
       selection,
       freshness,
-      reason: { kind: 'atomic-view-too-large' },
+      reason: overflow,
     };
   }
   return result;

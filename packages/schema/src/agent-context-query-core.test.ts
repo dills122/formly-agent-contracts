@@ -996,6 +996,69 @@ describe('agent-context pure query core', () => {
     ).toBe(true);
   });
 
+  it('supports consuming-project usages resolved to forms owned by another project', () => {
+    const value = boundary();
+    const primary = value.dataset.sourceUsageCatalogs[0]!.artifact;
+    const source = primary.usages[0]!;
+    if (source.resolution.status !== 'exact') {
+      throw new Error('fixture usage must resolve exactly');
+    }
+    const consumingProjectId = `${source.projectId}.consumer`;
+    const catalog = createAgentContextSourceUsageCatalog({
+      schemaVersion: primary.schemaVersion,
+      workspaceIndex: primary.workspaceIndex,
+      coverage: {
+        ...primary.coverage,
+        scope: {
+          ...primary.coverage.scope,
+          projectIds: [
+            ...new Set([
+              ...primary.coverage.scope.projectIds,
+              consumingProjectId,
+            ]),
+          ].sort(),
+        },
+      },
+      usages: primary.usages.map((usage) =>
+        canonicalStringify(usage.identity) === canonicalStringify(source.identity)
+          ? { ...usage, projectId: consumingProjectId }
+          : usage,
+      ),
+    });
+    const dataset = replacePrimarySourceCatalog(value.dataset, catalog);
+    const scope = scopeFor(dataset);
+    const usageId =
+      source.identity.kind === 'declared' ? source.identity.usageId : undefined;
+    if (usageId === undefined) throw new Error('fixture usage must be declared');
+
+    const result = executeAgentContextQuery(
+      dataset,
+      searchQuery(scope, { usageId }),
+      searchLive(scope),
+      PAGINATION,
+    );
+
+    expect(result).toMatchObject({
+      operation: 'search-form-usages',
+      status: 'complete',
+      candidates: [
+        {
+          projectId: consumingProjectId,
+          form: source.resolution.candidate.form,
+        },
+      ],
+    });
+    if (
+      result.operation !== 'search-form-usages' ||
+      result.status !== 'complete'
+    ) {
+      throw new Error('expected one cross-project usage match');
+    }
+    expect(result.candidates[0]!.projectId).not.toBe(
+      result.candidates[0]!.form?.projectId,
+    );
+  });
+
   it('surfaces exact forms with empty handoffs and preserves absence authority', () => {
     const value = boundary();
     const primary = value.dataset.sourceUsageCatalogs[0]!.artifact;
