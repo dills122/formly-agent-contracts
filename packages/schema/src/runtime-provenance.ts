@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import { canonicalStringify } from './canonical-json.js';
+import { canonicalStringify, compareText } from './canonical-json.js';
 
 export const RUNTIME_PROVENANCE_SCHEMA_VERSION = '1.0.0' as const;
 
@@ -460,10 +460,6 @@ export function parseRuntimeProvenance(input: unknown): RuntimeProvenance {
     ),
     runtimePackages,
   };
-}
-
-function compareText(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function canonicalRuntimeProvenance(

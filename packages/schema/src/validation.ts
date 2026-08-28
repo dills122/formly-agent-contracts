@@ -21,7 +21,11 @@ import {
   type JsonValue,
   type ModelPathSegment,
 } from './contract.js';
-import { canonicalStringify, verifyContentHash } from './canonical-json.js';
+import {
+  canonicalStringify,
+  isNamespacedId,
+  verifyContentHash,
+} from './canonical-json.js';
 import {
   collectContractConditionIds,
   collectContractNodes,
@@ -140,10 +144,7 @@ function assertPositiveVersion(value: unknown, path: string): void {
 }
 
 function assertNamespacedIdentifier(value: unknown, path: string): void {
-  if (
-    typeof value !== 'string' ||
-    !/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$/u.test(value)
-  ) {
+  if (typeof value !== 'string' || !isNamespacedId(value)) {
     throw new TypeError(`${path} must be a stable namespaced identifier`);
   }
 }
@@ -873,17 +874,29 @@ function assertInteractionProfile(
   }
 }
 
-function assertFieldTypeProfileRegistryIdentity(
+/**
+ * Shared shape check for the two `{schemaVersion, id, version, contentHash}`
+ * registry identity DTOs; `expectedSchemaVersion` pins the accepted literal.
+ */
+function assertRegistryIdentity<
+  T extends {
+    readonly schemaVersion: string;
+    readonly id: string;
+    readonly version: number;
+    readonly contentHash: string;
+  },
+>(
   value: unknown,
   path: string,
-): asserts value is ContractFieldTypeProfileRegistryIdentity {
+  expectedSchemaVersion: string,
+): asserts value is T {
   assertRecord(value, path);
   assertExactProperties(
     value,
     new Set(['schemaVersion', 'id', 'version', 'contentHash']),
     path,
   );
-  if (value.schemaVersion !== FIELD_TYPE_PROFILE_SCHEMA_VERSION) {
+  if (value.schemaVersion !== expectedSchemaVersion) {
     throw new TypeError(`${path}.schemaVersion is unsupported`);
   }
   assertNamespacedIdentifier(value.id, `${path}.id`);
@@ -896,27 +909,26 @@ function assertFieldTypeProfileRegistryIdentity(
   }
 }
 
+function assertFieldTypeProfileRegistryIdentity(
+  value: unknown,
+  path: string,
+): asserts value is ContractFieldTypeProfileRegistryIdentity {
+  assertRegistryIdentity<ContractFieldTypeProfileRegistryIdentity>(
+    value,
+    path,
+    FIELD_TYPE_PROFILE_SCHEMA_VERSION,
+  );
+}
+
 function assertCrossFieldEffectRegistryIdentity(
   value: unknown,
   path: string,
 ): asserts value is ContractCrossFieldEffectRegistryIdentity {
-  assertRecord(value, path);
-  assertExactProperties(
+  assertRegistryIdentity<ContractCrossFieldEffectRegistryIdentity>(
     value,
-    new Set(['schemaVersion', 'id', 'version', 'contentHash']),
     path,
+    CROSS_FIELD_EFFECT_SCHEMA_VERSION,
   );
-  if (value.schemaVersion !== CROSS_FIELD_EFFECT_SCHEMA_VERSION) {
-    throw new TypeError(`${path}.schemaVersion is unsupported`);
-  }
-  assertNamespacedIdentifier(value.id, `${path}.id`);
-  assertPositiveVersion(value.version, `${path}.version`);
-  if (
-    typeof value.contentHash !== 'string' ||
-    !CONTENT_HASH_PATTERN.test(value.contentHash)
-  ) {
-    throw new TypeError(`${path}.contentHash must be a sha256 digest`);
-  }
 }
 
 function assertDeclaredEffects(
@@ -936,7 +948,7 @@ function assertDeclaredEffects(
     });
   } catch (error) {
     const message = error instanceof Error ? error.message : 'is invalid';
-    throw new TypeError(`${path} ${message.replace(/^registry\.forms\[0\]\.effects/u, '')}`);
+    throw new TypeError(`${path}${message.replace(/^registry\.forms\[0\]\.effects/u, '')}`);
   }
 }
 
@@ -1067,7 +1079,8 @@ function assertNode(
   value: unknown,
   path: string,
   nodeIds: Set<string>,
-  ruleIds: Set<string>,
+  conditionIds: Set<string>,
+  dynamicRuleIds: Set<string>,
 ): asserts value is ContractNode {
   assertRecord(value, path);
   assertExactProperties(
@@ -1140,6 +1153,8 @@ function assertNode(
       assertion(item, `${path}.${property}[${index}]`),
     );
     if (property === 'conditions' || property === 'dynamicRules') {
+      const ruleIds =
+        property === 'conditions' ? conditionIds : dynamicRuleIds;
       items.forEach((item, index) => {
         const ruleId = (item as ContractCondition | ContractDynamicRule).id;
         if (ruleIds.has(ruleId)) {
@@ -1193,10 +1208,22 @@ function assertNode(
     throw new TypeError(`${path}.children must be an array`);
   }
   value.children.forEach((child, index) =>
-    assertNode(child, `${path}.children[${index}]`, nodeIds, ruleIds),
+    assertNode(
+      child,
+      `${path}.children[${index}]`,
+      nodeIds,
+      conditionIds,
+      dynamicRuleIds,
+    ),
   );
   if (value.arrayTemplate !== undefined) {
-    assertNode(value.arrayTemplate, `${path}.arrayTemplate`, nodeIds, ruleIds);
+    assertNode(
+      value.arrayTemplate,
+      `${path}.arrayTemplate`,
+      nodeIds,
+      conditionIds,
+      dynamicRuleIds,
+    );
   }
 }
 
@@ -1305,9 +1332,16 @@ export function parseFormContract(input: unknown): FormContract {
   }
 
   const nodeIds = new Set<string>();
-  const ruleIds = new Set<string>();
+  const seenConditionIds = new Set<string>();
+  const seenDynamicRuleIds = new Set<string>();
   input.nodes.forEach((node, index) =>
-    assertNode(node, `nodes[${index}]`, nodeIds, ruleIds),
+    assertNode(
+      node,
+      `nodes[${index}]`,
+      nodeIds,
+      seenConditionIds,
+      seenDynamicRuleIds,
+    ),
   );
   const contractNodes = collectContractNodes(input.nodes as readonly ContractNode[]);
   const conditionIds = collectContractConditionIds(

@@ -23,6 +23,134 @@ export function parseArrayIndexProperty(
   return index;
 }
 
+/**
+ * @internal Shared by `cross-field-effect.ts` and `field-type-profile.ts` to
+ * validate untrusted registry input is a canonical JSON value (no cycles,
+ * no accessor/symbol-keyed/sparse-array properties, no non-plain
+ * prototypes) before further structural parsing. Not part of the package
+ * barrel.
+ */
+export function assertCanonicalJsonShape(
+  value: unknown,
+  path: string,
+  ancestors = new Set<object>(),
+): void {
+  if (
+    value === null ||
+    typeof value === 'string' ||
+    typeof value === 'boolean'
+  ) {
+    return;
+  }
+  if (typeof value === 'number') {
+    if (!Number.isFinite(value)) {
+      throw new TypeError(`${path} must be a finite JSON number`);
+    }
+    return;
+  }
+  if (typeof value !== 'object') {
+    throw new TypeError(`${path} must be a JSON value`);
+  }
+  if (ancestors.has(value)) {
+    throw new TypeError(`${path} must not contain a cycle`);
+  }
+
+  const prototype = Object.getPrototypeOf(value) as unknown;
+  if (
+    !Array.isArray(value) &&
+    prototype !== Object.prototype &&
+    prototype !== null
+  ) {
+    throw new TypeError(`${path} must be a plain or null-prototype object`);
+  }
+  if (Object.getOwnPropertySymbols(value).length > 0) {
+    throw new TypeError(`${path} must not contain symbol-keyed properties`);
+  }
+
+  ancestors.add(value);
+  try {
+    const descriptors = Object.getOwnPropertyDescriptors(value);
+    if (Array.isArray(value)) {
+      const indexedDescriptors: [number, PropertyDescriptor][] = [];
+      for (const [key, descriptor] of Object.entries(descriptors)) {
+        if (key === 'length') {
+          continue;
+        }
+        const index = parseArrayIndexProperty(key, value.length);
+        if (index === undefined) {
+          throw new TypeError(
+            `${path}.${key} must not be an additional array property`,
+          );
+        }
+        const itemPath = `${path}[${index}]`;
+        if (!('value' in descriptor)) {
+          throw new TypeError(`${itemPath} must not be an accessor property`);
+        }
+        indexedDescriptors.push([index, descriptor]);
+      }
+
+      indexedDescriptors.sort(([left], [right]) => left - right);
+      if (indexedDescriptors.length !== value.length) {
+        let missingIndex = 0;
+        for (const [index] of indexedDescriptors) {
+          if (index !== missingIndex) {
+            break;
+          }
+          missingIndex += 1;
+        }
+        throw new TypeError(
+          `${path}[${missingIndex}] must not be a sparse array element`,
+        );
+      }
+      for (const [index, descriptor] of indexedDescriptors) {
+        assertCanonicalJsonShape(
+          descriptor.value,
+          `${path}[${index}]`,
+          ancestors,
+        );
+      }
+      return;
+    }
+
+    for (const [key, descriptor] of Object.entries(descriptors)) {
+      const propertyPath = `${path}.${key}`;
+      if (!descriptor.enumerable) {
+        throw new TypeError(
+          `${propertyPath} must be an enumerable JSON property`,
+        );
+      }
+      if (!('value' in descriptor)) {
+        throw new TypeError(
+          `${propertyPath} must not be an accessor property`,
+        );
+      }
+      assertCanonicalJsonShape(descriptor.value, propertyPath, ancestors);
+    }
+  } finally {
+    ancestors.delete(value);
+  }
+}
+
+/**
+ * @internal Shared string comparator used to sort registry entries into a
+ * stable, deterministic order before hashing. Not part of the package
+ * barrel.
+ */
+export function compareText(left: string, right: string): number {
+  return left < right ? -1 : left > right ? 1 : 0;
+}
+
+const NAMESPACED_ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$/u;
+
+/**
+ * @internal Shared identifier rule for registry/identity ids: lowercase,
+ * `.`/`-` separated segments (e.g. `formly-contract.core`). Not part of the
+ * package barrel.
+ */
+export function isNamespacedId(value: string): boolean {
+  return NAMESPACED_ID_PATTERN.test(value);
+}
+
 function firstMissingArrayIndex(
   sortedIndexes: readonly number[],
 ): number {
