@@ -24,6 +24,17 @@ pnpm check
 For a smaller documentation-only change, run `pnpm check:docs`. Every pull
 request is expected to pass the relevant focused check and the complete gate.
 
+The product documentation site is an Astro Starlight app under `apps/docs/`.
+Start it with `pnpm docs:dev`, inspect the production build with
+`pnpm docs:preview`, and use `pnpm check:docs` to run repository Markdown checks
+plus the static site build. Existing root docs and ADRs remain canonical; site
+pages should link to them and label planned behavior explicitly.
+
+The Pages deployment runs only after relevant changes reach `main`; pull
+requests validate the same build through `pnpm check`. See
+[`apps/docs/README.md`](apps/docs/README.md) for the production URL, subpath
+configuration, manual workflow, and custom-domain overrides.
+
 ## Making a Change
 
 1. Create a focused branch from `main`.

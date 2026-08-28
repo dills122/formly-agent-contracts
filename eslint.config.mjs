@@ -7,6 +7,7 @@ const typeScriptFiles = ['fixtures/**/*.ts', 'packages/**/*.ts', 'apps/**/*.ts']
 export default defineConfig(
   {
     ignores: [
+      '**/.astro/**',
       '**/build/**',
       '**/coverage/**',
       '**/dist/**',
