@@ -1,0 +1,31 @@
+---
+import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+const base = `${import.meta.env.BASE_URL.replace(/\/+$/u, '')}/`;
+---
+
+<StarlightPage
+  frontmatter={{
+    title: 'Page not found',
+    description: 'The requested Formly Contract documentation page does not exist.',
+    template: 'splash',
+    hero: {
+      title: 'No contract for this route.',
+      tagline:
+        'The page may have moved, or the capability may still be planned rather than documented.',
+      actions: [
+        {
+          text: 'Open the documentation index',
+          link: base,
+          icon: 'right-arrow',
+          variant: 'primary',
+        },
+        {
+          text: 'Search current capabilities',
+          link: `${base}start/product-status/`,
+          variant: 'minimal',
+        },
+      ],
+    },
+  }}
+/>
