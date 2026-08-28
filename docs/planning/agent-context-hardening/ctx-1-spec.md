@@ -1,8 +1,8 @@
 # CTX-1 Specification: Pure Progressive Query Core
 
-- Status: frozen for implementation
+- Status: complete
 - Schema version: `0.1.0`
-- Evolution: unreleased `0.1.0` reopened for review reconciliation
+- Evolution: initial public surface at `0.1.0`; incompatible changes require a schema-version bump
 - Owner: `@formly-contract/schema`
 - Research basis: RH-05, reconciled by RH-06
 - Prerequisite: `CTX-0D`
@@ -21,8 +21,10 @@ another package. Production APIs accept the general query dataset below. The
 synthetic RH-05 fixture wrapper is test input from CTX-0D, not a production
 dataset type. CTX-1A establishes the unreleased DTO, validation, freshness, and
 cursor source modules. CTX-1B adds the unreleased pure executor source module.
-The schema barrel export, package Changeset, and package-level consumability
-claim are deliberately deferred to CTX-1D.
+CTX-1D publishes the reviewed query and cursor surface from the schema barrel
+and records the package-level change in a Changeset. Internal parsed-dataset
+validators, E2E-slice resolution/overflow seams, and their private atomic-bound
+constants remain source-module implementation details.
 
 ## Invariants
 
@@ -474,8 +476,8 @@ CTX-1 does not:
 - make repository revision a freshness or mixed-context proof;
 - page atomic journeys, E2E closures, secondary metadata, or nested records;
   and
-- publish the unreleased modules from `packages/schema/src/index.ts` or claim
-  package-level consumability before the CTX-1D barrel export and Changeset.
+- avoid loading the validated dataset into the current in-memory executor or
+  provide the later indexed-provider API.
 
 ## Implementation packets
 
@@ -488,10 +490,10 @@ CTX-1 does not:
    once per execution and fail closed for the still-unimplemented E2E slice.
 3. **CTX-1C — atomic slice:** implement fixed-point same-step prerequisite
    closure, exact transition refusals, cycles, and atomic size caps.
-4. **CTX-1D — walkthrough/scale/publication gate:** prove both CTX-0D
-   walkthroughs and one measured large-form case without loading a whole
-   contract, then deliberately publish the reviewed query/cursor modules from
-   the schema barrel and add the Changeset.
+4. **CTX-1D — walkthrough/scale/publication gate (complete):** prove both
+   CTX-0D walkthroughs and one measured large-form case without delivering a
+   whole contract to the consumer, then deliberately publish the reviewed
+   query/cursor modules from the schema barrel and add the Changeset.
 
 Later packets may add projection fields only through a versioned contract
 change; they must not weaken the selection, freshness, or cursor invariants.
@@ -534,11 +536,26 @@ unknown, and stale freshness; getter/proxy and missing-endpoint fail-closed
 behavior; and exact record, semantic-refusal, collection, and view overflow
 boundaries.
 
+CTX-1D adds a package-barrel-only consumer test. It preserves the existing
+driver-registry export as a compatibility sentinel, executes and validates both
+exact CTX-0D E2E slices, and measures a 512-node resolved Form Contract with at
+least 512 ASCII metadata bytes per node. The canonical full-contract baseline
+is 458,115 bytes. Usage search, context summary, node page one, and node page
+two total 64,626 canonical bytes, or 14.11% of the baseline. Both node pages
+contain two disjoint records, remain truncated with authenticated
+continuations, report all 512 matches, exclude metadata from an unrequested
+node, and reproduce byte-for-byte with fixed inputs.
+
+CTX-1 proves that the consumer never receives or serializes the whole contract
+in this progressive flow. It does not claim that the in-memory executor lazily
+avoids loading the validated dataset. True provider-side lazy loading is a
+later indexed-provider API.
+
 Required commands:
 
 ```sh
-pnpm exec vitest run packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-result.test.ts packages/schema/src/agent-context-query-cursor.test.ts packages/schema/src/agent-context-query-core.test.ts
+pnpm exec vitest run packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-result.test.ts packages/schema/src/agent-context-query-cursor.test.ts packages/schema/src/agent-context-query-core.test.ts packages/schema/src/agent-context-query-public.test.ts
 pnpm --filter @formly-contract/schema typecheck
-pnpm exec eslint packages/schema/src/agent-context-query.ts packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-result.test.ts packages/schema/src/agent-context-query-cursor.ts packages/schema/src/agent-context-query-cursor.test.ts packages/schema/src/agent-context-query-core.ts packages/schema/src/agent-context-query-core.test.ts
+pnpm exec eslint packages/schema/src/agent-context-query.ts packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-result.test.ts packages/schema/src/agent-context-query-cursor.ts packages/schema/src/agent-context-query-cursor.test.ts packages/schema/src/agent-context-query-core.ts packages/schema/src/agent-context-query-core.test.ts packages/schema/src/agent-context-query-public.test.ts packages/schema/src/index.ts
 git diff --check
 ```
