@@ -1,15 +1,21 @@
 # Implementation Plan: Distributed Workspace Form Discovery
 
-Status: in progress; Tasks 1–6B and Checkpoint A are complete. Task 7A.1 code
-and acceptance verification are complete after correcting the exact-loader and
-resolved-package findings from independent review instance 1 plus the
-order-insensitive configuration-hash finding from instance 2. Completed work
-includes
-project-owned field-type profiles and cross-field effects, resolved effect
-projection, deterministic workspace artifacts/indexes, all three generic CLI
-commands, canonical Angular-fixture goldens, linked/packed consumer smokes, and
-the schema-owned portable runtime/dependency provenance foundation. Task 7A.2
-begins only after the independent review loop returns a ready verdict.
+Status: in progress. Tasks 1–6B, Checkpoint A, and Task 7A.1 are implemented
+and verified. Completed work includes project-owned field-type profiles and
+cross-field effects, resolved effect projection, deterministic workspace
+artifacts/indexes, all three generic CLI commands, canonical Angular-fixture
+goldens, linked/packed consumer smokes, and the schema-owned portable
+runtime/dependency provenance foundation.
+
+The RH-01 through RH-05 research packets are approved planning evidence, not
+implemented product behavior. `RH06-DOC` is complete. Under its reconciled
+dependency order, Task 7A.2 (`HOST-1`) and every new producer remain pending
+until the required `CTX-0` predecessor is complete (`CTX-0A` for the
+framework-neutral host protocol; each producer's exact prerequisites are in
+the execution index). Application
+factory execution is separately blocked on `oci-rootless-v1`; neither the
+trusted local worker nor the future `isolated-ci-v1` config worker satisfies
+that gate.
 
 Related research:
 [Scalable Form Discovery and Registration](../../research/form-discovery-dx.md)
@@ -19,6 +25,11 @@ Profile architecture research:
 
 Controlled Angular loader research:
 [Angular JIT/config loading in pnpm and Nx monorepos](../../research/angular-jit-config-loading.md)
+
+Canonical hardening decisions and scheduler:
+[RH-06 Agent Context Hardening Reconciliation](../agent-context-hardening/rh-06-reconciliation.md)
+and
+[Agent Context Hardening Execution Index](../agent-context-hardening/execution-index.md)
 
 Proposed decision:
 [ADR 0007](../../decisions/0007-distributed-workspace-discovery.md)
@@ -32,9 +43,11 @@ contract artifacts without Angular or Nx coupling. The project configuration
 also becomes the ownership boundary for application field-type profile
 registries, while versioned profile DTOs remain in the schema package and
 profile resolution remains in the compiler. Angular and Nx integrations
-then add distributed providers, trusted scenario compilation, adapter
-scaffolding, inferred tasks, and affected execution. Runtime capture remains an
-optional migration phase.
+then add distributed providers, trusted JIT scenario compilation, a separate
+AOT authoring/inventory lane, adapter scaffolding, and affected execution.
+Source lineage, behavior evidence, and factory/value production follow their
+own RH-06 gates and join through pinned sibling artifacts. Runtime capture
+remains an optional migration phase.
 
 The plan preserves the existing schema and extraction boundaries. No task may
 silently execute application code from an MCP request, infer arbitrary form
@@ -42,7 +55,9 @@ roots, serialize model values, or invent selectors.
 
 ## Architecture decisions
 
-- Add only three packages in this increment: `workspace`, `angular`, and `nx`.
+- Add only three integration packages in this workspace increment:
+  `workspace`, `angular`, and `nx`. The later MCP/Playwright consumer packages
+  belong to the separate agent-context delivery plan.
 - Keep configuration, discovery, runner, and CLI together in `workspace` until
   independent consumers justify more packages.
 - Use root config for workspace policy and project config for local ownership.
@@ -55,20 +70,52 @@ roots, serialize model values, or invent selectors.
   executable Playwright drivers remain outside this increment.
 - Treat source catalogs as the unit of integration so one adapter can expose
   many forms.
-- Use Jiti as the leading TypeScript config-loader candidate, subject to an
-  executable compatibility gate.
+- Use Jiti only inside the guarded trusted config/JIT worker after its retained
+  compatibility gate. The AOT authoring browser uses an Angular CLI/Nx
+  application target and is a different execution profile.
 - Keep Angular and Nx optional; neither enters `@formly-contract/schema` or the
   runtime dependency surface of `@formly-contract/compiler`.
 - Preserve one workspace-wide orchestrator and publication boundary. The first
   Nx integration adds exactly one aggregate target to an explicitly selected
   coordinator project; it does not run or publish one contract generation per
   form-owning project.
+- Treat Nx as optional project enumeration, scheduling, caching, and affected
+  execution. Nx never defines form IDs, source-use identity, journey meaning,
+  behavior authority, or artifact freshness.
 - Treat capture as incomplete migration evidence, never authoritative declared
   inventory.
+
+## RH-06 status and authority boundary
+
+Status words in the future sections are normative:
+
+- **Implemented** means the named repository behavior exists and has retained
+  verification evidence.
+- **Approved research** means the design is decision-ready but no production
+  behavior is implied.
+- **Pending** means a predecessor or acceptance gate is not complete.
+- **Blocked** means a named safety or feasibility gate has failed or has not yet
+  been demonstrated; downstream implementation must not begin.
+
+Form Contract `0.4.0` remains the implemented semantic compatibility boundary.
+Source lineage, journeys, normalized behavior/scenario evidence, Angular
+authoring reports, factory execution evidence, and agent-context manifests are
+strict sibling record families until a later schema version explicitly adopts
+any stable subset. The cross-plan authority chain is:
+
+1. [RH-06](../agent-context-hardening/rh-06-reconciliation.md) decides ownership
+   and dependency direction.
+2. This plan owns workspace discovery, guarded execution hosts, producer
+   integration, and optional Nx scheduling.
+3. The [execution index](../agent-context-hardening/execution-index.md) owns the
+   stable cross-plan task IDs and readiness state.
+4. RH-01 through RH-04 retain the detailed research evidence and stop gates;
+   completing research does not advance an implementation status.
 
 ## Dependency graph
 
 ```text
+Implemented historical path:
 Task 1 -> Task 2 -> Task 3
 Task 3 -> Task 4: root/project discovery
 Task 3 -> Task 3A -> Task 3B: project profile registry integration
@@ -81,21 +128,70 @@ Tasks 5A + 6A + 6B
 Checkpoint A: generic pilot
        |
 Task 7A.1: portable provenance
+
+Reconciled pending path:
+RH06-DOC
        |
-Task 7A.2: workspace host protocol
-       |---------------------------|
-Task 7B.1 -> 7B.2        Task 7A.3: Angular package scaffold
-       |---------------------------|
-Task 7B.3                 Task 7D: Angular provider bridge
+       v
+CTX-0A: schema-addressed artifact-set envelope + workspace-index anchor
+       |----------------------|----------------------|
+       v                      v                      v
+CTX-0B: usage/journey    CTX-0C: scenario/      producer contracts only
+records                  execution authority   (no runtime execution)
+       |                      |
+       |----------------------|
+                  v
+CTX-0D: synthetic walkthrough fixtures
        |
-Task 7C.1 -> 7C.2 -> 7C.3: guarded Angular JIT host
-       |---------------------------|
-Task 8: trusted Angular scenario compilation
+       v
+CTX-1: pure queries + live freshness status -> CTX-2: intent/diagnostics
+
+Cross-plan release gate (canonical scheduler is the execution index):
+CTX-2 + LIN-4 + BHV-4 + ANG-5 + DRV-0 -> CTX-GATE -> MCP-1 -> PW-1
+
+Workspace/Angular host branch:
+Task 7A.1 [complete provenance; consumed by HOST-1]
+CTX-0A -> HOST-1 / Task 7A.2: framework-neutral host protocol
+                 |
+                 v
+HOST-2 / Task 7B.1 -> HOST-3 / Task 7B.2
+                              |
+                              v
+                 HOST-4 / Task 7B.3 (+ CTX-0A)
+
+CTX-0A -> ANG-0 -> ANG-1 retained AOT compatibility gate
+HOST-1 + ANG-1 go -> ANG-2 / Task 7A.3: Angular package shell
+ANG-2 + CTX-0A -> ANG-2P / Task 7D: providers + project descriptor
+CTX-0A + ANG-1 go -> ANG-2R / Task 8B.1: report/scaffold contracts
+ANG-2 + HOST-4 -> ANG-3 / Task 7C: guarded JIT host
+ANG-2 + ANG-2P + ANG-2R -> ANG-4 / Task 8B.2: AOT inventory host
+ANG-4 (+ LIN-2 where source joins are required) -> ANG-5 / Task 8B.3
+
+ANG-3 + ANG-2P + BHV-1 + CTX-0C + CTX-0D -> Task 8 / BHV-4
+Task 8 + Tasks 8B.2–8B.4 ----------------> Checkpoint B: Angular producer pilot
+
+Source-lineage branch:
+LIN-0 workplace topology/scale/privacy gate -> LIN-1 -> LIN-2 lineage artifact
+LIN-2 + CTX-1 -> LIN-3 artifact queries
+LIN-2 + journey/Angular refs -> LIN-4 bounded context/annotations
+
+Behavior/scenario branch:
+RH06-DOC -> BHV-0; CTX-0A + BHV-0 -> BHV-1 portable semantics
        |
-Task 8B: Angular field-profile authoring
+       +----> BHV-2 v0.4 projections -> BHV-3 bounded derivation/scaffolds
        |
-Checkpoint B: Angular pilot
+       +----> BHV-4 / Task 8 trusted resolved evidence
+              (also needs CTX-0C, CTX-0D, ANG-3 / Task 7C,
+               and ANG-2P / Task 7D)
+
+Factory branch:
+CTX-0A -> FAC-1 inert DTO/projector -> FAC-2 code-free sidecar/identity
        |
+FAC-3 rootless OCI conformance [BLOCKED until `oci-rootless-v1` passes]
+       |
+FAC-4 opt-in application factory execution
+
+Optional Nx branch after Checkpoint B and stable producer APIs:
 Task 9: Nx version gate
        |
 Task 10A: Nx package scaffold
@@ -112,9 +208,7 @@ Task 12B: Nx fixture projects          |
        |-------------------------------|
 Task 12C: aggregate cache/affected + isolation proof
        |
-Checkpoint C: workplace-ready path
-       |
-Tasks 13-14: optional migration capture
+Checkpoint C: optional Nx/workplace operations path
        |
 Task 15A: generic consumer documentation
        |
@@ -123,7 +217,33 @@ Task 15B: integration consumer documentation
 Task 15C: package/release smoke
        |
 Task 15D: independent review
+
+Optional migration branch after Checkpoint B + CTX-0A:
+Task 13: capture identity/privacy -> Task 14: capture/reconciliation
+       |
+       +----> joins Task 15B only when capture ships in the same release
 ```
+
+`CTX-0A` through `CTX-0D` are the shared contract checkpoint. They land in
+dependency order, while each lineage, Angular, behavior, or factory producer
+waits for the exact checkpoint surfaces listed in the execution index; there is
+no additional blanket publication prerequisite. `CTX-2` exits only when the
+explicitly synthetic walkthroughs validate or refuse exactly; it does not
+authorize transport or browser work.
+The real representative producer/workplace `CTX-GATE` depends on `CTX-2`,
+`LIN-4`, `BHV-4`, `ANG-5`, and `DRV-0`, and blocks both `MCP-1` and `PW-1`.
+`PW-1` is scheduled only after `MCP-1` and a go decision at `CTX-GATE`. The
+[execution index](../agent-context-hardening/execution-index.md) is canonical
+for these cross-plan dependencies and status.
+
+The diagram intentionally keeps three execution profiles separate:
+
+- Task 7B/7C uses a short-lived trusted config/JIT worker and never claims an
+  untrusted-code sandbox;
+- Task 8B uses a pinned Angular application-target AOT build plus fresh browser
+  contexts for trusted authoring/inventory; and
+- FAC-3/FAC-4 uses a future rootless OCI runner for application factory
+  execution. `isolated-ci-v1` is not an alias for `oci-rootless-v1`.
 
 The cross-field effects research item `RS-EFFECTS-01` is complete. It approves
 an explicit application-declared effect graph, conditionally approves derived
@@ -135,10 +255,15 @@ contains explicit effects only.
 
 | Requirement | Decision | Tasks | Verification | Status |
 | --- | --- | --- | --- | --- |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership | Tasks 1–6B | Focused loader/config/source/discovery/runner/index tests, canonical Angular goldens, and linked/packed CLI consumers | Implemented through Task 6B; maintainer UX review remains at Checkpoint A |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3 | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks | Implemented through Task 6B; `HOST-1`–`HOST-4` remain pending |
 | `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Tasks 5.0–5.1 implemented, including safe node projection and realistic Angular/Nx fixture coverage; executable drivers remain separate |
-| `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | Inventory and scaffolds are build-time evidence only | Tasks 7A–8B | Angular inventory, negative inference, and scenario tests | Planned; prototype complete |
+| `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | A schema-owned compatibility result and retained AOT gate precede inventory/scaffolds; reviewed profiles remain sole semantic authority | `ANG-0`, `ANG-1`, `ANG-2`/Task 7A.3, `ANG-2P`/Task 7D, `ANG-2R`/Task 8B.1, `ANG-4`–`ANG-6`/Tasks 8B.2–8C | Angular CLI/Nx application-target gate, strict report/scaffold tests, configured-scope coverage, negative inference, and workplace value pilot | Approved research with retained spike; production gates pending |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Implemented with schema/config/compiler/workspace/anchor-fixture evidence |
+| `REQ-CONTEXT-01` New producer artifacts share exact references, freshness, execution authority, and diagnostics | Land the schema-addressed envelope first, then keep authority, live freshness, and consumer diagnostic ownership in their named slices | `CTX-0A`–`CTX-2` and `CTX-GATE` in the execution index | Strict validators, canonical round trips, referential-integrity and mutation tests, exact synthetic walkthroughs, then one real pinned producer pilot | Approved by RH-06; pending implementation |
+| `REQ-LINEAGE-01` An agent can connect an anchored form root and direct source usage without name guessing | Explicit root authority plus per-leaf TypeScript indexing; ambiguity, coverage, staleness, and privacy fail closed | `LIN-0`–`LIN-4` / RH01-T2–T8 | Representative leaf-tsconfig/project-reference/alias/barrel/lazy/privacy/scale gate, then exact/ambiguous/stale/incomplete query tests | Approved research; `LIN-0` gate pending, no production index |
+| `REQ-SCENARIO-01` Scenario evidence has portable semantics and a distinct trusted producer | RH-04 owns semantics; Task 8 produces JIT-resolved artifacts; RH-05 only queries/validates them | `BHV-0`–`BHV-4`, `ANG-2P`/Task 7D, and `ANG-3`/Task 7C | Exact basis-contract hashes, replayable/compile-only cases, strict deltas, no inferred business verbs | Approved research; pending shared schemas and guarded host |
+| `REQ-FACTORY-01` Factory-derived shape/value evidence cannot be manufactured from synthetic live-looking inputs | Inert DTO/projector first; code-free sidecar and structural identity; execution only in rootless OCI | `FAC-1`–`FAC-4` | Synthetic projector negatives, then retained catch-resistant ledger and `oci-rootless-v1` conformance controls | Pure work pending; runtime execution blocked at FAC-3 |
+| `REQ-NX-01` Nx improves monorepo discovery and execution without becoming authority | One optional aggregate coordinator target; artifact hashes remain correctness | Tasks 9–12C | Supported-version fixture, one-target/cache/affected/isolation tests | Pending Checkpoint B and workplace version evidence |
 
 ## Phase 0: Fail-fast feasibility and contracts
 
@@ -584,14 +709,105 @@ fixture exports rather than duplicate files
       accepted Angular host implementation plan on 2026-08-27. Additional
       workplace UX feedback remains expected after the next pull-down test.
 
+## RH-06 shared foundation and producer gates
+
+This section is the mandatory bridge between the implemented generic workspace
+history and all pending producer work. It does not renumber Tasks 1–7A.1 and it
+does not duplicate the full task contracts in the
+[execution index](../agent-context-hardening/execution-index.md).
+
+### Shared `CTX-0` contract checkpoint
+
+| ID | Observable output | Dependencies | Status | Verification boundary |
+| --- | --- | --- | --- | --- |
+| `CTX-0A` | Schema-addressed artifact-set envelope with open content references, one structured workspace-index anchor, and its own `contentHash` identity | `RH06-DOC` | Ready | Strict schema, canonical round-trip, version/unknown-key/hash mutation tests, package Changeset |
+| `CTX-0B` | Source-usage and journey record schemas with distinct form/root/usage/journey identities | `CTX-0A` | Pending | Identity, ambiguity, coverage, transition, and referential-integrity tests |
+| `CTX-0C` | Scenario references and exact commit/assertion/action/transition/repeater-capture authority | `CTX-0A` | Pending | Every selected ID resolves exactly; unsupported execution authority refuses |
+| `CTX-0D` | Minimal positive and negative synthetic walkthrough records | `CTX-0B`, `CTX-0C` | Pending | Deterministic fixture IDs validate and are visibly marked `synthetic` |
+
+No TypeScript source indexer, Angular host, application factory, MCP adapter, or
+Playwright driver is part of `CTX-0`. New producers may define their internal
+contracts after `CTX-0A`, but they may not publish sibling records until every
+explicit execution-index dependency for that producer is complete. The pure
+query/validator lane may proceed over `CTX-0D` without pretending those fixtures
+are source, runtime, or workplace evidence. `CTX-0A` does not define execution
+authority, compare a set to a live workspace, choose the query module boundary,
+or own an exhaustive consumer diagnostic policy: those responsibilities belong
+to `CTX-0C`, `CTX-1`, and `CTX-2`, respectively.
+
+### RH-01 source-lineage producer mapping
+
+The [RH-01 research packet](../../research/hardening/form-identity-and-source-lineage.md)
+is approved evidence. Production source lineage remains pending and uses the
+execution-index IDs below so RH01's research task numbers remain stable.
+
+| Execution ID | RH-01 mapping | Workspace responsibility | Dependencies | Status |
+| --- | --- | --- | --- | --- |
+| `LIN-0` | RH01-T2 | Retain the representative leaf-tsconfig, project-reference, declaration-output, alias/barrel, lazy-route, privacy, bundle-isolation, and scale gate | `RH06-DOC` | Ready feasibility gate |
+| `LIN-1` | RH01-T3 | Add typed definition/root anchors and creation provenance without serializing functions | `CTX-0A`, `LIN-0` go | Pending; must not begin before gate |
+| `LIN-2` | RH01-T4–T5 | Build per-leaf indexes, canonical cross-program joins, coverage, staleness, disclosure, and deterministic source-lineage artifact | `CTX-0B`, `LIN-1` | Pending |
+| `LIN-3` | RH01-T6 | Add artifact-only exact/ambiguous/unresolved/stale/incomplete queries | `LIN-2`, `CTX-1` | Pending |
+| `LIN-4` | RH01-T7–T8 | Add bounded Angular/route candidates and strict exceptional usage/journey annotations | `LIN-2`, journey schema from `CTX-0B`; Angular evidence when used | Pending |
+
+The form ID, root anchor ID, usage/callsite ID, and journey/step ID remain
+separate identities. Nx may enumerate the leaf programs and cache index targets,
+and Angular may enrich component/route evidence, but neither can manufacture a
+form root, usage selection, or business journey. A missing or incomplete
+program produces `incomplete`, not an authoritative empty usage list.
+
+### Behavior/scenario and factory mappings
+
+| Execution IDs | Ownership in this plan | Status and boundary |
+| --- | --- | --- |
+| `BHV-0` | Approve the portable causal-edge/acausal-state/access-prerequisite topology and authority matrix | Ready after RH-06 documentation completion |
+| `BHV-1` | Schema owns strict normalized conditions, behavior/scenario evidence, facet/scope completeness, and unknowns | Approved research; pending `CTX-0A` and topology approval |
+| `BHV-2` | Compiler/workspace project existing v0.4 effects, wrapper prerequisites, and repeater access losslessly | Pending `BHV-1`; existing v0.4 source records remain implemented authority |
+| `BHV-3` | Compiler/workspace derive only the bounded closed grammar and emit conservative callback/hook scaffolds | Pending `BHV-2`; helpers/imports/pipelines remain refused |
+| `BHV-4` | Angular Task 8 produces exact contract-hash-bound replayable/compile-only scenario evidence | Pending `ANG-3`, `ANG-2P`, `BHV-1`, `CTX-0C`, and `CTX-0D`; these are direct publication dependencies |
+| `BHV-GATE` | A redacted workplace pilot measures construct frequency and scaffold acceptance before AST coverage expands | Pending `BHV-3` and `BHV-4` |
+| `FAC-1`–`FAC-2` | Schema/compiler own inert binding/value DTOs and pure projection; workspace owns the code-free sidecar and structural-identity gate | Approved research; pending pure synthetic implementation only |
+| `FAC-3`–`FAC-4` | An external rootless OCI provider owns conformance; workspace may orchestrate only after it passes | **Blocked** until `oci-rootless-v1`, the catch-resistant runner ledger, structural controls, and retained negative cases pass |
+
+The trusted JIT/config worker and the `isolated-ci-v1` CI provider are not
+factory containment. No future task may extend the current `create()` path with
+application factory execution as a shortcut around FAC-3.
+
 ## Phase 2: Angular integration
+
+The framework-neutral runtime-host mapping is explicit and precedes Angular
+execution. Task 7A.1 is already complete provenance work; it is not a hidden
+pending scheduler dependency.
+
+| Execution ID | Workspace-plan task | Exact dependencies |
+| --- | --- | --- |
+| `HOST-1` | Task 7A.2 framework-neutral runtime-host protocol | `CTX-0A` |
+| `HOST-2` | Task 7B.1 discovery/inventory split | `HOST-1` |
+| `HOST-3` | Task 7B.2 trusted-local worker lifecycle | `HOST-2` |
+| `HOST-4` | Task 7B.3 failure-safe aggregation/publication | `HOST-3`, `CTX-0A` |
+
+The Angular execution-index mapping is likewise explicit:
+
+| Execution ID | Workspace-plan task(s) | Exact dependencies |
+| --- | --- | --- |
+| `ANG-0` | Schema-owned compatibility result in the prerequisite below | `CTX-0A` |
+| `ANG-1` | Retained Angular CLI/Nx application-target compatibility fixture gate | `ANG-0` |
+| `ANG-2` | Task 7A.3 dependency-light Angular package shell | `ANG-1` go, `HOST-1` |
+| `ANG-2P` | Task 7D Angular source providers plus Node-safe authoring/project-source descriptor | `ANG-2`, `CTX-0A` |
+| `ANG-2R` | Task 8B.1 schema-owned authoring report/scaffold contracts | `CTX-0A`, `ANG-1` go |
+| `ANG-3` | Task 7C guarded JIT/config host capability only; no scenario semantics or publication | `ANG-2`, `HOST-4` |
+| `ANG-4` | Task 8B.2 AOT browser host and Formly inventory | `ANG-2`, `ANG-2P`, `ANG-2R` |
+| `ANG-5` | Task 8B.3 source/template joins and review-only scaffolds | `ANG-4`; `LIN-2` where source joins are required |
+| `ANG-GATE` | Task 8B.4 workplace authoring-value pilot | `ANG-5` |
+| `ANG-6` | Optional Task 8C exact registry-bound conformance | `ANG-GATE` go, `BHV-4` |
 
 ### Task 7A: Publish the runtime-host contract and Angular package boundary
 
 **Description:** Establish the versioned framework-neutral host contract first,
-then make the workspace and Angular packages consume it. This parent task is
-complete only after Tasks 7A.1–7A.3 pass; each child is a separate reviewable
-slice and must leave generic consumers working.
+then make the workspace and Angular packages consume it. The completed Task
+7A.1 number is preserved. This parent task is complete only after Tasks
+7A.1–7A.3 plus the separately named `ANG-0`/`ANG-1` compatibility prerequisite
+pass; each child is a separate reviewable slice and must leave generic
+consumers working.
 
 #### Task 7A.1: Version portable runtime and dependency provenance
 
@@ -629,12 +845,15 @@ the provenance migration inside worker changes.
 
 **Estimated scope:** Medium
 
-#### Task 7A.2: Publish the workspace runtime-host protocol
+#### Task 7A.2 (`HOST-1`): Publish the workspace runtime-host protocol
 
 **Description:** Promote `@formly-contract/workspace` from the private prototype
 to the publishable framework-neutral execution host. Add strict IPC and
 parent-selected host-module descriptors plus public composition subpaths and a
 packed private worker entry. No Angular dependency enters this package.
+
+**Current status:** Pending `CTX-0A`. The earlier 7A.1 review completion does not
+by itself authorize this task.
 
 **Acceptance criteria:**
 
@@ -656,7 +875,8 @@ packed private worker entry. No Angular dependency enters this package.
 - [ ] Dependency audit proves workspace depends only on framework-neutral
       compiler/schema surfaces.
 
-**Dependencies:** Task 7A.1
+**Dependencies:** `CTX-0A`. Task 7A.1 is already complete provenance work and
+is consumed by this task; it is not a pending scheduler gate.
 
 **Files likely touched:**
 
@@ -667,20 +887,69 @@ packed private worker entry. No Angular dependency enters this package.
 
 **Estimated scope:** Medium
 
-#### Task 7A.3: Scaffold the dependency-light Angular host package
+#### RH-06 Angular compatibility prerequisite: `ANG-0` and `ANG-1`
 
-**Description:** Add the publishable Angular integration shell and its Node-safe
-`./jit` wrapper. Fix peer ownership with a strict pnpm install matrix before any
-runtime compatibility claim; the guarded compiler import itself belongs to Task
-7C.
+**Description:** Before an Angular package, JIT host, AOT browser host, or
+authoring behavior is implemented, promote the retained RH-03 substrate proof
+into a schema-owned compatibility result and a maintained application-target
+fixture. This prerequisite is intentionally named with execution-index IDs
+rather than retroactively inserting or renumbering Task 7A.1.
+
+**`ANG-0` acceptance criteria:**
+
+- [ ] `AngularHostCompatibilityResult` is a strict, dependency-free schema
+      record with exact pass/fail cases, environment identity, canonical hash,
+      and exhaustive diagnostics.
+- [ ] Unknown keys, duplicate/missing cases, pass records with diagnostics, and
+      fail records without the case-specific diagnostic are rejected.
+- [ ] The result is substrate evidence only and cannot authorize a field
+      profile or driver.
+
+**`ANG-1` acceptance criteria:**
+
+- [ ] Maintained Angular CLI and Nx application-target fixtures prove partial
+      library linking, external resources, NgModule/standalone composition,
+      root/feature scope isolation, opaque/missing-resource refusal, browser
+      HTTP/WebSocket interception, model sink, popup association, and teardown.
+- [ ] The fixture uses public Angular/Formly surfaces and fresh browser
+      contexts; private Ivy inspection and bare-Node partial-library loading
+      are prohibited.
+- [ ] The result validates against `ANG-0`; every case must pass for the pinned
+      tuple before Angular package behavior is supported.
+
+**Verification:**
+
+- [ ] Focused schema canonical/refinement/mutation tests pass.
+- [ ] Retained Angular CLI and Nx application-target commands produce validated,
+      byte-stable compatibility results for the supported tuple.
+- [ ] Browser interception is documented as an I/O determinism guard, not a
+      whole-process or OS sandbox.
+
+**Dependencies:** `ANG-0` depends on `CTX-0A`; `ANG-1` depends on `ANG-0`
+
+**Files likely touched:**
+
+- `packages/schema/src/` Angular compatibility DTO and tests
+- retained Angular CLI/Nx application-target compatibility fixtures
+- exact gate scripts and package/check integration
+
+**Estimated scope:** two Medium slices, landed sequentially
+
+#### Task 7A.3 (`ANG-2`): Scaffold the dependency-light Angular host package
+
+**Description:** After `ANG-1` passes, add the publishable Angular integration
+shell and reserve separate Node-safe `./jit` and `./authoring` entry points. Fix
+peer ownership with a strict pnpm install matrix; the guarded compiler import
+belongs to Task 7C and the AOT browser implementation belongs to Task 8B.
 
 **Acceptance criteria:**
 
 - [ ] `@formly-contract/angular` has a mandatory compatible workspace peer and
       no reverse dependency; Angular/Formly peer optionality is fixed by an
       explicit supported/unsupported install matrix.
-- [ ] Importing `@formly-contract/angular/jit` performs no eager Angular import
-      and returns a host descriptor relative to the installed Angular package.
+- [ ] Importing `@formly-contract/angular/jit` or
+      `@formly-contract/angular/authoring` performs no eager Angular import and
+      returns only a Node-safe descriptor for its distinct execution mode.
 - [ ] The unique future CLI/programmatic entry names are reserved without
       advertising an unimplemented generation path.
 
@@ -691,7 +960,7 @@ runtime compatibility claim; the guarded compiler import itself belongs to Task
       project-only-peer install cases match the documented matrix.
 - [ ] Dependency audit proves `angular -> workspace -> compiler/schema`.
 
-**Dependencies:** Task 7A.2
+**Dependencies:** `HOST-1` (Task 7A.2) and `ANG-1` go
 
 **Files likely touched:**
 
@@ -707,9 +976,11 @@ runtime compatibility claim; the guarded compiler import itself belongs to Task
 **Description:** Replace parent-process project evaluation in three ordered
 slices. The parent evaluates only the Node-safe root config; every project-owned
 config, registry, factory, and framework object stays inside one disposable
-child. Workers never publish final artifacts or the workspace index.
+child. Workers never publish final artifacts or the workspace index. Task 7B
+owns the generic trusted-local lifecycle only; Angular provider contribution and
+Node-safe authoring descriptors belong to Task 7D, not this worker task.
 
-#### Task 7B.1: Split discovery and inventory before project evaluation
+#### Task 7B.1 (`HOST-2`): Split discovery and inventory before project evaluation
 
 **Acceptance criteria:**
 
@@ -728,7 +999,7 @@ child. Workers never publish final artifacts or the workspace index.
       duplicate-before-factory tests pass.
 - [ ] `list` obtains inventory without invoking a form factory.
 
-**Dependencies:** Task 7A.2
+**Dependencies:** `HOST-1` (Task 7A.2)
 
 **Files likely touched:**
 
@@ -739,7 +1010,7 @@ child. Workers never publish final artifacts or the workspace index.
 
 **Estimated scope:** Medium
 
-#### Task 7B.2: Enforce the trusted-local worker lifecycle
+#### Task 7B.2 (`HOST-3`): Enforce the trusted-local worker lifecycle
 
 **Acceptance criteria:**
 
@@ -759,7 +1030,7 @@ child. Workers never publish final artifacts or the workspace index.
       crash, and cleanup tests pass without weakening the trusted-code caveat.
 - [ ] Reversed child completion produces identical validated result ordering.
 
-**Dependencies:** Task 7B.1
+**Dependencies:** `HOST-2` (Task 7B.1)
 
 **Files likely touched:**
 
@@ -770,7 +1041,7 @@ child. Workers never publish final artifacts or the workspace index.
 
 **Estimated scope:** Medium
 
-#### Task 7B.3: Make aggregation and publication failure-safe
+#### Task 7B.3 (`HOST-4`): Make aggregation and publication failure-safe
 
 **Acceptance criteria:**
 
@@ -790,7 +1061,9 @@ child. Workers never publish final artifacts or the workspace index.
 - [ ] Node-safe form-artifact bytes remain unchanged; provenance-versioned
       index/configuration goldens migrate intentionally and remain canonical.
 
-**Dependencies:** Task 7B.2 and Task 7A.3
+**Dependencies:** `HOST-3` (Task 7B.2) and `CTX-0A`. Angular-specific hosts
+compose this generic publication boundary later; they are not a prerequisite
+for proving it.
 
 **Files likely touched:**
 
@@ -801,11 +1074,13 @@ child. Workers never publish final artifacts or the workspace index.
 
 **Estimated scope:** Medium
 
-### Task 7C: Add the guarded Angular JIT runtime host
+### Task 7C (`ANG-3`): Add the guarded Angular JIT runtime host
 
 **Description:** Implement the Angular-owned runtime for conventional
 peer-correct Angular graphs without claiming complete transitive singleton
-enforcement.
+enforcement. This is the guarded trusted config/JIT lane used by Task 8
+scenario compilation. It does not build the AOT authoring application, inspect
+rendered custom fields, or serve as a fallback for a failed `ANG-1` gate.
 
 #### Task 7C.1: Resolve and reserve the Angular runtime safely
 
@@ -826,7 +1101,7 @@ enforcement.
 - [ ] Resolver/realpath/symlink/version/ambient/reservation tests pass against
       strict non-hoisted and centralized-config fixtures.
 
-**Dependencies:** Tasks 7A.3 and 7B.3
+**Dependencies:** `ANG-2` (Task 7A.3) and `HOST-4` (Task 7B.3)
 
 **Files likely touched:**
 
@@ -877,6 +1152,9 @@ enforcement.
       facade or Angular cache enters the parent.
 - [ ] ESM/TS/CJS and supported Node/Angular/Formly/package-manager combinations
       are recorded from maintained fixtures, not inferred broadly.
+- [ ] The compatibility statement is explicitly limited to the trusted JIT
+      config/scenario worker and remains separate from the `ANG-1` AOT
+      application-target compatibility result.
 
 **Verification:**
 
@@ -897,18 +1175,27 @@ enforcement.
 
 **Estimated scope:** Medium
 
-### Task 7D: Productize distributed Angular source providers
+### Task 7D (`ANG-2P`): Productize distributed Angular source providers
 
 **Description:** Add the Angular integration package with a multi token,
 `provideFormContractSource`, and a deterministic catalog. Prove NgModule and
 standalone provider contribution using groups rather than individual root
-registrations.
+registrations. This task also owns the Node-safe `angularAuthoring` project
+descriptor that points to the application-owned target, trusted entry,
+tsconfig, configured scopes, source roots, and exact type dispositions. Generic
+workspace discovery validates those serializable pointers without importing
+Angular; Task 7B does not own or infer them.
 
 **Acceptance criteria:**
 
 - [ ] Separate features contribute source groups through Angular public provider
       APIs.
 - [ ] The catalog sorts IDs, rejects duplicates, and returns fresh instances.
+- [ ] The Node-safe authoring descriptor validates confined workspace-relative
+      target/entry/tsconfig/source-root pointers, explicit feature scopes, and
+      exact type dispositions without importing the trusted Angular entry.
+- [ ] Provider and descriptor inventory states configured scope explicitly;
+      absent lazy features remain incomplete rather than silently absent.
 - [ ] The package declares Angular/Formly peers without adding them to
       `workspace`.
 
@@ -916,114 +1203,249 @@ registrations.
 
 - [ ] Focused Angular provider tests cover NgModule, standalone, optional-empty,
       and duplicate cases.
+- [ ] Generic `list` and config validation prove that authoring pointers are
+      Node-safe and that no Angular module or provider executes.
 - [ ] Angular production compilation succeeds.
 
-**Dependencies:** Task 7A.3
+**Dependencies:** `ANG-2` (Task 7A.3) and `CTX-0A`
 
 **Files likely touched:**
 
 - `packages/angular/src/provider.ts`
 - `packages/angular/src/provider.test.ts`
 - `packages/angular/src/index.ts`
+- `packages/workspace/src/config.ts` and focused Node-safe descriptor tests
 - synthetic feature-provider test modules
 
 **Estimated scope:** Medium
 
-### Task 8: Compile trusted Angular scenarios from a project source
+### Task 8: Produce trusted JIT scenario artifacts from a project source
 
-**Description:** Let an Angular project config declare the controlled imports,
-providers, and synthetic scenarios needed to obtain the application-equivalent
-`FormlyFormBuilder`. Compile each scenario through the existing allowlisted
-adapter without retaining the injector or live field tree.
+**Description:** Let an Angular project source declare the controlled imports,
+providers, trusted compile callbacks, and separately versioned JSON-safe
+scenario axes/cases needed to obtain the application-equivalent
+`FormlyFormBuilder`. Run them only through the guarded Task 7C JIT/config worker
+and project through the existing allowlisted adapter. RH-04 owns the portable
+behavior/scenario semantics; this task is the trusted Angular producer, and the
+agent-context/MCP layers are consumers only.
 
 **Acceptance criteria:**
 
 - [ ] A dynamic form resolves visibility, required/readonly state, and options
-      under two synthetic scenarios.
+      under two named synthetic cases without retaining an injector or live
+      field tree.
+- [ ] Every result pins its exact form-contract hash, scenario axis/case,
+      compiler/host identity, and its own canonical artifact hash.
+- [ ] Replayable cases declare exact JSON-safe node operations and values;
+      callback-only cases are marked compile-only and cannot generate E2E
+      steps.
 - [ ] Lazy-feature providers are included explicitly by the project source; the
       runner does not assume root DI can enumerate unloaded features.
-- [ ] Artifacts record resolved evidence and scenario identity but no model or
-      form-state values beyond explicitly approved JSON-safe metadata.
+- [ ] Scenario state is acausal evidence unless an explicit v0.4 effect or a
+      closed witnessed derived rule establishes the exact edge. Option deltas
+      never infer `loads` or `filters`.
+- [ ] No model/form-state value enters a portable artifact beyond the
+      allowlisted scenario metadata required to witness the exact result.
 
 **Verification:**
 
-- [ ] Focused TestBed tests prove eager, lazy-feature-import, custom type, and
-      factory-failure behavior.
-- [ ] Declared and resolved artifacts remain separate and deterministic.
-- [ ] `pnpm check` passes at Checkpoint B.
+- [ ] Focused guarded-worker/TestBed tests prove eager, lazy-feature-import,
+      custom type, compile-only/replayable, factory-failure, timeout, teardown,
+      and basis-hash mismatch behavior.
+- [ ] Declared, scenario-resolved, and later observed artifacts remain separate
+      and deterministic.
+- [ ] Removing a replay operation/value, changing the basis contract, or
+      relabeling a business verb fails with an exact diagnostic.
 
-**Dependencies:** Tasks 7C.3 and 7D
+**Dependencies:** `ANG-3` (Tasks 7C.1–7C.3), `ANG-2P` (the Task 7D
+project-source integration), approved `BHV-1` portable behavior/scenario
+semantics, `CTX-0C`, and `CTX-0D`. This task is `BHV-4`, the resolved-evidence
+producer; `ANG-3` owns only the guarded host capability and never owns scenario
+semantics or publication.
 
 **Files likely touched:**
 
 - `packages/angular/src/compile-project.ts`
 - `packages/angular/src/compile-project.test.ts`
 - `packages/angular/src/config.ts`
+- schema-owned scenario/behavior records and synthetic integration fixtures
 - `packages/angular/src/index.ts`
-- synthetic Angular integration fixture
 
 **Estimated scope:** Medium
 
-### Task 8B: Generate Angular-assisted field-profile inventory and scaffolds (`REQ-AUTHOR-01`)
+### Task 8B: Build the separate AOT field-profile authoring lane (`REQ-AUTHOR-01`)
 
-**Description:** Use the configured Angular generation host to inventory the
-effective Formly type/component/inheritance/default/wrapper surface and produce
-evidence-tagged, review-required profile scaffolds from public Angular
-reflection and optional source-template analysis. The generator must preserve
-unknowns and never approve inferred interaction semantics.
+**Description:** Use the configured Angular application target and fresh browser
+contexts to inventory effective Formly registrations and produce
+evidence-tagged, review-required field-profile scaffolds. This lane never loads
+through Task 7C, never writes a reviewed registry, and never turns rendered DOM
+or source heuristics into semantic authority.
+
+#### Task 8B.1 (`ANG-2R`): Publish strict authoring report and scaffold contracts
 
 **Acceptance criteria:**
 
-- [ ] Inventory distinguishes raw Formly declarations from effective inherited
-      components, defaults, and wrappers in the configured project injector.
-- [ ] Native-backed candidates are tagged `derived` with explicit unknowns;
-      opaque children, parse failures, dynamic roles, and multi-step widgets do
-      not become actionable profiles automatically.
-- [ ] The report lists registered custom types with missing profiles and lazy
-      feature registrations absent from the configured generation host.
+- [ ] Schema-owned DTOs cover environment/scope identity, raw/effective
+      registrations, inheritance/defaults/wrappers, evidence, unknowns,
+      dispositions, configured-scope coverage, diagnostics, observations, and
+      review-only scaffolds.
+- [ ] Validators enforce exact IDs/references, canonical set ordering,
+      built-in-vs-explicit precedence, closed diagnostic/unknown unions, and no
+      Angular objects, paths outside the disclosure policy, or live values.
+- [ ] Display/assertion-only and unsupported generic-operation gaps remain
+      explicit dispositions/unknowns rather than invented executable profiles;
+      no driver is implied before the schema-owned non-interactive decision.
+
+**Verification:**
+
+- [ ] Canonical round-trip, unknown-key, reference-mutation, coverage, evidence,
+      and precedence tests pass over the retained RH-03 matrix.
+
+**Dependencies:** `CTX-0A` and `ANG-1` go
+
+**Estimated scope:** Medium
+
+#### Task 8B.2 (`ANG-4`): Implement the isolated AOT browser host and Formly inventory
+
+**Acceptance criteria:**
+
+- [ ] The selected Angular CLI/Nx application target consumes the exact
+      authoring entry and tsconfig, links partial libraries, resolves external
+      resources, and emits the confined browser shell.
+- [ ] Each root/feature scope uses a fresh browser context/platform/injector,
+      a one-shot schema-validated bridge, bounded time/output, and mandatory
+      destroy/page/context cleanup.
+- [ ] Inventory distinguishes raw and effective registrations, inherited
+      components/defaults/wrappers, explicit scope provenance, alias conflicts,
+      missing profiles, and absent/unconfigured lazy scopes.
+- [ ] HTTP/WebSocket interception improves determinism but is not described as
+      a process or OS sandbox.
+
+**Verification:**
+
+- [ ] Maintained Angular CLI and Nx AOT fixtures retain partial-library,
+      external-resource, root/feature isolation, model-sink, popup, opaque-child,
+      missing-resource, and teardown cases.
+
+**Dependencies:** `ANG-2` (Task 7A.3), `ANG-2P` (Task 7D), and `ANG-2R`
+(Task 8B.1). Cross-plan release remains gated separately by `CTX-GATE`; it is
+not another `ANG-4` scheduler dependency.
+
+**Estimated scope:** Medium
+
+#### Task 8B.3 (`ANG-5`): Join source/template evidence and emit review scaffolds
+
+**Acceptance criteria:**
+
+- [ ] Registration/component evidence joins deterministically to configured
+      source/template evidence with explicit ambiguity and unknown results.
+- [ ] Native-backed candidates are `derived`; overlays, autocomplete, tables,
+      repeaters, dynamic names, opaque children, parse failures, and multi-step
+      widgets remain non-actionable until a reviewed profile supplies exact
+      semantics.
+- [ ] Reviewed profiles authorize interaction only for interactive custom types.
+      Display/assertion-only fields and components retain an explicit
+      non-interactive disposition and remain non-executable or unknown until a
+      schema-owned no-driver/non-interactive profile branch is approved.
+- [ ] Output is canonical and review-only; no registry file or semantic contract
+      is created or updated automatically.
 
 **Verification:**
 
 - [ ] Focused tests retain the native-backed, overlay, autocomplete, table,
-      repeater, opaque-child, wrapper, variant, and inherited-type matrix from
-      the research spike.
-- [ ] Angular production compilation and `pnpm check` pass.
+      repeater, date-range, text-editor, display-only, wrapper, variant,
+      inherited-type, dynamic-name, and ambiguous-overlay matrix.
+- [ ] Source-derived joins use `LIN-2` identities/coverage when available;
+      incomplete lineage produces a localized unknown, not a guessed join.
 
-**Dependencies:** Tasks 3B and 8
-
-**Files likely touched:**
-
-- `packages/angular/src/field-type-authoring.ts`
-- `packages/angular/src/field-type-authoring.test.ts`
-- `packages/angular/src/index.ts`
-- synthetic Angular integration fixture
+**Dependencies:** `ANG-4` (Task 8B.2); `LIN-2` where source joins are required
 
 **Estimated scope:** Medium
 
-## Checkpoint B: Angular consumer pilot
+#### Task 8B.4: Run the workplace authoring-value pilot (`ANG-GATE`)
 
-- [ ] Root discovery imports no project configs; one fresh worker contains each
-      project's config, sources, factories, and Angular runtime state.
+**Acceptance criteria:**
+
+- [ ] A sanitized workplace slice records configuration effort, configured
+      custom-type coverage, missing/ambiguous joins, scaffold acceptance,
+      review time, and saved mechanical work without retaining workplace source.
+- [ ] Maintainers issue an explicit go/narrow/stop decision before broader
+      control-family or version support is claimed.
+
+**Verification:**
+
+- [ ] Redacted retained metrics and the accepted/narrowed support matrix are
+      reviewable beside the exact environment/fixture identities.
+
+**Dependencies:** Task 8B.3
+
+**Estimated scope:** Small research/pilot gate
+
+### Task 8C: Add optional exact registry-bound conformance (`ANG-6`)
+
+**Description:** After the authoring-value gate passes, optionally compare an
+already reviewed registry against TestBed and AOT browser scenarios. Exact
+registry/profile/driver/model-sink/part bindings and reviewed steps own the
+claim. Observation may corroborate or diagnose drift but never promotes a
+scaffold or rewrites the registry.
+
+**Acceptance criteria:**
+
+- [ ] TestBed and browser lanes are explicit and exact-version; neither is a
+      fallback for a failed application-target gate.
+- [ ] Every operation, part, popup, codec, model sink, and network mock resolves
+      against pinned reviewed IDs and hashes before execution.
+- [ ] Results distinguish pass, drift, unsupported, and incomplete coverage;
+      one observed scenario never proves workspace completeness.
+
+**Verification:**
+
+- [ ] Exact-binding mutation tests and rendered positive/negative scenarios
+      cover the approved workplace matrix without authority promotion.
+
+**Dependencies:** `ANG-GATE` go, Task 8, and the stable behavior/scenario schema
+
+**Estimated scope:** Medium; optional after Checkpoint B
+
+## Checkpoint B: Angular producer pilot
+
+- [ ] `CTX-0` is complete, and `ANG-0` plus the retained Angular CLI/Nx `ANG-1`
+      application-target gate pass for the pinned tuple.
+- [ ] Root discovery imports no project configs; one fresh trusted JIT worker
+      contains each project's config, sources, factories, and JIT runtime state.
 - [ ] Packed, non-hoisted Angular CLI/programmatic consumers resolve the compiler
       from the selected project rather than workspace/root hoisting.
-- [ ] The peer-correct graph limitation, reserved-alias failures, and unsupported
-      private-copy fixture are explicit and tested.
+- [ ] The JIT peer-correct graph limitation, reserved-alias failures, and
+      unsupported private-copy fixture are explicit and tested.
 - [ ] Trusted-local provenance says network is not enforced. Selecting
       `isolated-ci-v1` before its external provider is installed fails closed
       with `WORKER_ISOLATION_UNAVAILABLE`; network denial is a later Task 11C
       gate rather than a Checkpoint B claim.
-- [ ] Multiple Angular feature sources compile through one project config.
-- [ ] Both NgModule and standalone contribution are documented.
-- [ ] Trusted scenario execution is isolated from CLI/MCP query handling.
-- [ ] A work-like synthetic dynamic form demonstrates locator and state results.
+- [ ] Task 8 produces deterministic contract-hash-bound scenario artifacts in
+      the guarded JIT lane, separate from the AOT authoring browser.
+- [ ] Task 8B uses the configured application target and fresh browser contexts;
+      browser interception is documented only as an I/O determinism guard.
+- [ ] Multiple Angular feature sources and both NgModule/standalone provider
+      contributions are represented through Task 7D's Node-safe boundary.
 - [ ] Project configuration supplies a reviewed custom-field profile registry;
-      Angular inventory/scaffolding reports coverage and unmapped types without
-      automatically authorizing derived candidates.
-- [ ] The complex-widget research matrix remains the acceptance fixture for
-      profiles, scenario values, wrappers, and unknowns.
-- [ ] Maintainer approves the Angular host API before Nx packages depend on it.
+      inventory/scaffolding reports coverage and unmapped types without
+      automatically authorizing derived or observed candidates.
+- [ ] The complex-widget matrix and `ANG-GATE` workplace metrics support an
+      explicit go/narrow/stop decision. Optional Task 8C is not required to
+      complete this authoring-value checkpoint.
+- [ ] Maintainer approves the stable producer APIs before the optional Nx layer
+      depends on them. This approval grants no form, usage, journey, or behavior
+      authority to Nx.
 
 ## Phase 3: Nx integration
+
+This phase is optional operational integration. Nx may enumerate project
+boundaries, attach one configured aggregate target, schedule/cache work, and
+compute affected inputs. Generic workspace artifacts and their pinned hashes
+remain the correctness boundary. Nothing in this phase creates a semantic form
+ID, root/usage/journey identity, behavior edge, scenario authority, or field
+profile. Lineage producers may consume Nx project topology only after
+independently proving the `LIN-0` coverage and identity gates.
 
 ### Task 9: Fix the supported Nx version contract
 
@@ -1092,6 +1514,10 @@ The target runs the workspace-wide parent once so inventory, cross-project
 duplicate validation, the generation lock, and index-last publication retain
 one owner. Fine-grained per-project contract caching is outside the first Nx
 contract.
+
+“Infer” in this task means recognizing explicit marker/config files and
+installing a scheduler target. It never means inferring forms, usages, journeys,
+or behavior from the Nx project graph.
 
 **Acceptance criteria:**
 
@@ -1193,7 +1619,9 @@ local project marker without editing a central form list.
 contract and add one maintained CI realization that can enforce network denial.
 The trusted parent selects the provider; project configuration cannot supply an
 executable provider module or command. Node's Permission Model may add local
-guardrails but is never treated as the network boundary.
+guardrails but is never treated as the network boundary. This profile executes
+the trusted config/JIT project protocol. It is not the RH-02 application-factory
+runner and cannot satisfy or weaken the separate `oci-rootless-v1` FAC-3 gate.
 
 **Acceptance criteria:**
 
@@ -1207,6 +1635,8 @@ guardrails but is never treated as the network boundary.
       `trusted-local-v1` continues to report `network: not-enforced`.
 - [ ] The provider returns the same versioned project inventory/result protocol
       and never writes the final workspace index directly.
+- [ ] Selecting `isolated-ci-v1` for an application-factory sidecar is rejected;
+      factory execution remains blocked until FAC-3 passes.
 
 **Verification:**
 
@@ -1337,8 +1767,14 @@ second identical run has been demonstrated as a local Nx cache hit. Aggregate
 contract-target behavior remains pending until the inferred target/executor
 exists.
 
-## Checkpoint C: Workplace-ready discovery path
+## Checkpoint C: Optional Nx/workplace operations path
 
+**Status:** Pending Checkpoint B, workplace Nx version evidence, and Tasks
+9–12C. This checkpoint proves the optional monorepo scheduling path; it is not
+the agent-context `CTX-GATE` and does not authorize MCP or Playwright work.
+
+- [ ] `CTX-0` and Checkpoint B remain valid under the selected Nx execution
+      inputs; no producer record or hash changes merely because Nx scheduled it.
 - [ ] A new form-owning Nx project needs only a local project config.
 - [ ] Existing registries and factory maps can be adapted in bulk.
 - [ ] Generic, Angular, and Nx package boundaries remain acyclic and optional.
@@ -1347,9 +1783,18 @@ exists.
       demonstrated rather than inferred.
 - [ ] `isolated-ci-v1` proves external network denial and fails closed when its
       provider is unavailable; trusted-local output never makes that claim.
+- [ ] `isolated-ci-v1` is demonstrated only for the trusted project/JIT protocol;
+      FAC-3/FAC-4 application factory execution remains blocked until the
+      separate `oci-rootless-v1` conformance gate passes.
+- [ ] If source lineage participates in the pilot, `LIN-0` has independently
+      passed and `LIN-2` records program coverage/staleness/privacy. Nx topology
+      alone is never reported as complete lineage.
 - [ ] Install, configuration, troubleshooting, and migration docs are complete.
-- [ ] A sanitized workplace pilot confirms integration effort before a broader
-      rollout.
+- [ ] A sanitized workplace pilot confirms this integration's setup, scheduling,
+      cache, and affected-execution effort before a broader rollout. The later
+      real producer/agent-context `CTX-GATE` is separate and additionally waits
+      for `CTX-2`, `LIN-4`, `BHV-4`, `ANG-5`, and `DRV-0`; it blocks `MCP-1` and
+      `PW-1` regardless of this optional Nx checkpoint.
 
 ## Phase 4: Optional migration capture
 
@@ -1357,7 +1802,10 @@ exists.
 
 **Description:** Define how an enabled dev/test Formly extension identifies root
 builds, labels evidence, redacts state, deduplicates captures, and reports
-incomplete coverage. Record the decision before implementation.
+incomplete coverage. Record the decision before implementation. Capture is a
+separate observed sibling artifact: it may corroborate a declared/static usage
+or behavior result but cannot create form-root, journey, effect, or completeness
+authority.
 
 **Acceptance criteria:**
 
@@ -1371,7 +1819,9 @@ incomplete coverage. Record the decision before implementation.
 - [ ] A dedicated specification contains examples and threat cases.
 - [ ] Maintainer approves the privacy and evidence rules.
 
-**Dependencies:** Checkpoint C
+**Dependencies:** Checkpoint B, `CTX-0A`, and approval of the RH-01 path/privacy
+and runtime-observation identity rules. Nx Checkpoint C is optional and is not
+an authority prerequisite.
 
 **Files likely touched:**
 
@@ -1541,11 +1991,14 @@ maintainer review, remediate validated findings, and record final evidence.
 | Config loader cannot resolve workplace aliases or Angular imports | High | Run Task 1 before public API work; keep compiled/JS source adapter fallback |
 | Root config becomes a nondeterministic arbitrary-code surface | High | Trusted local/CI boundary, runtime validation, explicit plugin imports, recorded identities, no MCP execution |
 | Nx version API churn expands scope | High | Gate on workplace `nx report`; support one confirmed major first; isolate Nx package |
-| Lazy modules appear registered but are not visible | High | Discover project markers outside Angular; require explicit feature imports or runtime capture |
-| Bulk adapter executes real services/data | High | Fresh synthetic factories, no-network fixtures, structured-clone inputs, immediate allowlist projection |
+| Lazy modules appear registered but are not visible | High | Require explicit configured feature scopes; report configured-scope coverage and absent lazy scopes as incomplete; runtime capture remains later corroboration only |
+| Trusted JIT loading and AOT authoring are conflated | High | Keep Task 7C/8 and Task 8B on separate entry points, hosts, evidence, and compatibility gates; never fall back between them |
+| Source-lineage coverage appears complete when a leaf program or resolution input is missing | High | Run `LIN-0` before public indexing; retain per-program coverage, semantic-resolution closure hashes, hard staleness, and incomplete query results |
+| Application factory execution leaks live data or side effects | High | Limit FAC-1/FAC-2 to inert DTO/projector work; use a code-free sidecar; block all imports/execution until `oci-rootless-v1` and the retained negative controls pass |
 | Workspace index leaks model or environment information | High | Allowlisted index schema, privacy tests, no raw inputs or timestamps |
 | Package ecosystem fragments too early | Medium | Keep config/runner/CLI in `workspace`; add only Angular and Nx integration packages |
-| 100-form runs become slow | Medium | Bounded project workers inside one deterministic generation, aggregate Nx caching for v1, and optional shard design only after global-validation semantics are preserved |
+| Nx topology is mistaken for form, usage, journey, or behavior authority | High | Limit Nx to explicit marker enumeration and scheduling; validate resulting pinned artifacts through the generic workspace layer |
+| 100-form runs or source indexing become slow | Medium | Measure cold/incremental time, memory, and artifact size at `LIN-0`; use bounded workers and aggregate Nx caching only after correctness gates pass |
 | Project/form IDs collide across products | Medium | Global deterministic duplicate gate before artifact success |
 | Migration capture is mistaken for completeness | Medium | Explicit incomplete status and separate evidence/inventory reports |
 
@@ -1560,6 +2013,13 @@ maintainer review, remediate validated findings, and record final evidence.
 5. Which diagnostic codes should fail workplace CI versus remain warnings?
 6. Is runtime capture needed for the first workplace pilot, or can it remain a
    later migration tool?
+7. Which source path/route disclosure mode and cold/incremental lineage budgets
+   are acceptable for local versus remotely exposed consumers?
+8. Which workplace Angular application target and custom-field scopes form the
+   minimum `ANG-1`/`ANG-GATE` matrix?
+9. Is a maintained provider capable of satisfying the exact
+   `oci-rootless-v1`/violation-ledger negative controls available? Until it is,
+   application factory execution remains out of scope.
 
 ## Remaining approval and workplace-evidence gates
 
@@ -1568,5 +2028,13 @@ maintainer review, remediate validated findings, and record final evidence.
 - [x] Use Checkpoint A as the first shipping target.
 - [x] Keep Angular resolved scenarios in Checkpoint B rather than requiring them
       for the first generic workplace pilot.
+- [ ] Complete `RH06-DOC`, then land `CTX-0A` through `CTX-0D` before any new
+      producer publishes a sibling artifact.
+- [ ] Pass `LIN-0` before implementing public source-lineage indexing.
+- [ ] Implement `ANG-0` and pass the retained Angular CLI/Nx `ANG-1` gate before
+      Task 7A.3 or any JIT/AOT Angular host behavior.
+- [ ] Approve `BHV-0`/`BHV-1` before Task 8 publishes scenario evidence.
+- [ ] Keep FAC-3/FAC-4 blocked until `oci-rootless-v1` and the catch-resistant
+      negative controls pass; Task 11C cannot substitute for this gate.
 - [ ] Supply the workplace Nx version before Phase 3 compatibility claims or
       implementation begin.

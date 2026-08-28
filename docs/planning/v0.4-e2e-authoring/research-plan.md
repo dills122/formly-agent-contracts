@@ -3,10 +3,22 @@
 **Status:** Complete and reconciled — the standalone choice-domain spike was
 superseded by the approved v0.4 metadata contract and its implemented
 schema/compiler evidence; field-type, field-effects, and agent-context research
-are complete
+are complete. Form Contract `0.4.0` remains the implemented compatibility
+boundary; successor records and task readiness are governed by RH-06.
 
 **Delivery handoff:**
-[Agent Context and Deterministic E2E Delivery Plan](agent-context-delivery-plan.md)
+[RH-06 reconciliation](../agent-context-hardening/rh-06-reconciliation.md),
+[execution index](../agent-context-hardening/execution-index.md), and
+[Agent Context and Deterministic E2E Delivery Plan](agent-context-delivery-plan.md).
+`RH06-DOC` is verified. `CTX-0A`, `LIN-0`, and `BHV-0` are ready; only
+`CTX-0A` writes product schema code.
+
+`CTX-0A` is deliberately narrow: it owns only an open schema-addressed pinned
+artifact-set envelope, the set's own content hash, and a structured
+workspace-index anchor. Execution authority belongs to `CTX-0C`; live
+freshness status and query module selection belong to `CTX-1`; exhaustive
+consumer diagnostics belong to `CTX-2`. The execution index is normative for
+the producer graph and later gates.
 
 ## Executive recommendation
 
@@ -139,6 +151,12 @@ documented. Retain `docs/research/v0.4-field-type-adapter.md` and, if the result
 changes architecture, a proposed ADR. Expected size: one to two focused
 sessions.
 
+**Execution status:** Reviewed application-owned interaction profiles are the
+implemented authority for interactive custom controls. Display- or
+assertion-only custom components do not inherit an interaction driver by
+analogy; they remain an explicit disposition/unknown until the schema owner
+approves a non-interactive or no-driver representation.
+
 ## Spike 3: Cross-field dependency and effect representation
 
 ### Decision question
@@ -186,10 +204,14 @@ and the ownership split is clear. Retain
 warranted. Expected size: one to two focused sessions.
 
 **Execution status:** `RS-EFFECTS-01` is complete and reconciled after
-single-model and Claude adversarial review. The result is a go for explicit
-application-declared effects, a conditional go for conservative string/scenario
-authoring evidence, and a no-go for automatic semantic-effect inference. See
-`docs/research/v0.4-cross-field-effects.md`.
+single-model and Claude adversarial review. Existing v0.4 explicit
+application-declared effects authorize named business verbs. RH-04 later
+narrowed the derived path: a closed normalized rule with a witness pinned to
+the same evaluation semantics may authorize only its exact state edge in a
+sibling behavior record. Callback, helper, hook, RxJS, and browser-observation
+evidence remains scaffold or corroboration and cannot acquire a business verb.
+See `docs/research/v0.4-cross-field-effects.md` and
+`docs/research/hardening/form-behavior-and-effects.md`.
 
 ## Direct implementation after the spikes
 
@@ -210,10 +232,10 @@ verification.
 
 The original sequence below is retained for traceability. Its metadata
 decisions are implemented or reconciled; the remaining Angular authoring and
-rendered-conformance work stays in the workspace plan. Future
-agent-context/test-intent delivery is governed by the
-[agent-context delivery plan](agent-context-delivery-plan.md), which keeps the
-query/validator pilot ahead of MCP transport and Playwright execution.
+rendered-conformance work stays in the workspace plan. Future agent-context
+delivery is governed by RH-06 and the execution index, which keep the shared
+schema and pure query/validator pilot ahead of MCP transport and Playwright
+execution.
 
 1. **Reconciled:** settle choice-domain behavior. The approved specification
    and implemented contract evidence superseded the separate spike artifact.
@@ -224,23 +246,34 @@ query/validator pilot ahead of MCP transport and Playwright execution.
 4. **Complete:** integrate strict deterministic project-owned field profiles
    through workspace Tasks 3A–3B.
 5. **Complete for the current artifact boundary:** ship value-domain
-   completeness and static/dynamic/unknown coverage. Broader resolved scenario
-   generation belongs to the agent-context plan.
+   completeness and static/dynamic/unknown coverage. Portable scenario
+   semantics belong to RH-04; trusted resolved-scenario production belongs to
+   workspace/Angular Task 8, not the RH-05 consumer flow.
 6. **Complete for the current artifact boundary:** ship interaction profiles,
    adapter provenance, repeater access, and ID provenance. Browser conformance
    remains a later delivery slice.
-7. **Complete:** ship strict application-declared cross-field effects while
-   keeping derived evidence non-authoritative.
-8. **Planned separately:** add Angular-assisted inventory/scaffolding through
-   workspace Task 8B and rendered conformance when its checkpoint is approved.
-9. **Ready for bounded pilot:** add typed test intent only after Slices 0–1 of
-   the agent-context plan establish the remaining execution authority and pure
-   query boundary.
+7. **Complete for v0.4:** ship strict application-declared cross-field effects
+   as business-verb authority. RH-04 exact witnessed state edges are narrower
+   successor sibling records; opaque and observed evidence remains
+   non-executable.
+8. **Planned separately:** `BHV-4` (workspace/Angular Task 8) is the trusted
+   resolved-scenario producer and depends on guarded JIT-host capability
+   `ANG-3`, the `ANG-2P` provider/project descriptor, portable behavior schema
+   `BHV-1`, and publication of `CTX-0C` plus `CTX-0D`. `ANG-3` is host capability
+   only. Angular-assisted
+   inventory/scaffolding and rendered conformance remain under their separate
+   execution-index tasks.
+9. **Ready after RH-06 documentation verification:** dispatch `CTX-0A`, then
+   follow the execution-index order through `CTX-0D`, `CTX-1`, and `CTX-2`.
+   `CTX-0D` fixtures are explicitly synthetic, and `CTX-2` owns their
+   positive/negative proof. The real representative producer/workplace
+   `CTX-GATE` waits for `CTX-2`, `LIN-4`, `BHV-4`, `ANG-5`, and `DRV-0`; MCP and
+   Playwright wait for that gate.
 
-`first-available` should be modeled as a test-intent selection policy rather
+`first-enabled` should be modeled as a test-intent selection policy rather
 than a claim about the form itself. The contract should expose that choices are
 runtime-enumerable while their concrete values are unknown; a consumer may
-then deliberately choose `first-available` for an appropriate test.
+then deliberately choose `first-enabled` for an appropriate test.
 
 ## Research-gate disposition
 
@@ -255,6 +288,7 @@ The research gate required maintainer approval of:
 
 Those choices are now represented in the approved v0.4 metadata specification,
 the implemented schema/compiler/workspace contracts, and the reconciled
-research artifacts. This closes the research gate; it does not bypass the
-separate Slices 0–2 pilot approval in the
-[agent-context delivery plan](agent-context-delivery-plan.md).
+research artifacts. This closes the research gate. RH-06 is the current
+planning baseline: after `RH06-DOC` passes review and checks, dispatch only
+`CTX-0A`; every later producer or consumer waits for the dependencies in the
+execution index.

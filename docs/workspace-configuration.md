@@ -5,6 +5,14 @@ profile and cross-field effect registries, resolved effect projection,
 programmatic workspace artifact generation, and the generic `list`, `generate`,
 and non-mutating `check` CLI commands are implemented.
 
+Form Contract `0.4.0` and workspace index `0.2.0` remain the implemented output
+boundary. Source lineage, journeys, behavior/scenario evidence, Angular
+authoring reports, driver registries, and agent-context manifests described
+below are planned sibling artifacts, not current output fields. Their canonical
+ownership and dependency order are defined by the
+[RH-06 reconciliation](planning/agent-context-hardening/rh-06-reconciliation.md)
+and [execution index](planning/agent-context-hardening/execution-index.md).
+
 `@formly-contract/workspace` is the framework-neutral configuration
 layer for repository-aware Formly Contract tooling. It provides trusted config
 loading, strict root/project descriptors, source catalogs, deterministic policy
@@ -20,6 +28,12 @@ convenience helpers and presets on these contracts. They must not create
 parallel configuration systems. A convenience helper may hide routine wiring,
 but its result must still resolve through the same validation, provenance, and
 identity rules described here.
+
+Workspace configuration is the project-aware discovery and policy bedrock. It
+does not make one registry own every kind of truth: semantic form definitions,
+source usages, business journeys, portable behavior, Angular observations, and
+driver execution each retain distinct authority and join through pinned IDs and
+hashes.
 
 ## Trust boundary
 
@@ -52,6 +66,20 @@ and the root config's artifact output directory (or `dist/formly-contracts` when
 no output is configured) before matching files or checking for config symlinks.
 Other directories named `dist` are not implicitly excluded because they may
 contain project-owned source; exclude them explicitly when appropriate.
+
+Trusted execution is split by purpose:
+
+| Mode | Workspace responsibility | Status and limit |
+| --- | --- | --- |
+| Config/JIT worker | Resolve the project runtime base, validate a parent-selected host, and carry JSON-safe results/provenance | Generic trusted config loading exists; Angular scenario compilation remains a separate planned host and is not an untrusted-code sandbox |
+| AOT authoring browser worker | Point a future Angular integration at an application-owned build target and configured authoring scopes | Planned; browser isolation and interception improve determinism but are not OS containment |
+| Rootless OCI factory runner | Stage a code-free registration sidecar and receive only allowlisted, structurally bound output | Blocked until `oci-rootless-v1` conformance, a runner-owned violation ledger, structural identity checks, and retained negative controls pass |
+
+These modes must not be collapsed into “load whatever the project imports.”
+The generic loader evaluates trusted workspace configuration; it does not
+authorize arbitrary application-factory execution. Angular JIT resolution and
+AOT observation produce different evidence, and an ordinary child process is
+not the containment boundary required by the factory runner.
 
 ## Root and project ownership
 
@@ -107,6 +135,14 @@ maps to that shape. Scalar field entries and arbitrary opaque instance return
 types are not part of the source contract; Formly-specific structural handling
 belongs to the compiler during artifact generation.
 
+This implemented no-argument `create` path is a trusted declaration boundary,
+not a general solution for real constructors or functions whose parameters are
+services, streams, callbacks, templates, or business data. Do not make such a
+factory appear compilable by duplicating it elsewhere and supplying plausible
+synthetic objects. Planned factory-input support classifies inert values and
+opaque capability bindings first; executing the application factory is a
+separate, currently blocked OCI mode.
+
 The root and project descriptors can be loaded as one deterministic inventory:
 
 ```ts
@@ -138,6 +174,35 @@ The source interface is intentionally framework-neutral. Angular and Formly
 integrations can produce source descriptors around application-specific
 factories while the workspace runner continues to operate on stable source and
 form identities.
+
+### Form, root, usage, and journey authority
+
+Project-aware configuration provides the discovery path, but it does not merge
+four distinct identities:
+
+| Record | What it identifies | Where authority comes from |
+| --- | --- | --- |
+| Form definition | The semantic form and its Form Contract ID | Current typed project source |
+| Root anchor | The exported function, callable `const`, or class that creates the form | Planned validated symbol anchor, preferably declared beside or re-exported with the form definition |
+| Usage | One direct call or constructor site | Planned TypeScript lineage index; an explicit source annotation is required for durable or ambiguous usages |
+| Journey/step | Page entry, business step, actions, transitions, and outcomes | Planned project-owned journey catalog or validated attached annotation |
+
+Co-location is encouraged without coupling browser code to the tooling loader.
+A form library can keep the application factory and its declarative contract
+descriptor in the same source area and re-export the descriptor from a
+Node-safe `contracts` entry point. The future root anchor refers to the
+canonical TypeScript symbol, so a source index can connect calls such as
+`IndexingFormConfig(...)` or `new OrderEntryStepperForm(...)` to generated
+contracts without executing those application callsites. The exact public DTO
+is deferred to the shared schema checkpoint; the identity and authority split
+is not.
+
+One root may map to several form IDs and one form may have several roots or
+usages. The lineage result must preserve all exact candidates. If an
+unannotated usage has several candidates, generation or context assembly
+reports ambiguity rather than selecting by name, route, label, or source order.
+Journey membership is never inferred merely because a call occurs in a page
+component.
 
 ## Generate a workspace artifact set
 
@@ -204,6 +269,41 @@ workspace index. When discovery wraps a configuration import failure, the CLI
 prints a generic hint to check `tsconfigPath` and Node-safe contract entry
 points without exposing private paths, package names, or stack traces.
 
+### Planned sibling records and pinned assembly
+
+Later workspace contributors publish independent source-lineage, journey,
+behavior/scenario, Angular-authoring, and driver-registry record families. They
+do not mutate Form Contract `0.4.0` or turn the current workspace index into one
+monolithic document. Each family owns its strict schema, canonical
+non-self-referential hash, identity rules, coverage and unknowns, and safe
+path/privacy policy.
+
+The first shared agent-context record is a narrow artifact-set envelope. It has
+one structured workspace-index reference, an open collection of
+schema-addressed content references, and its own `contentHash`. It does not
+define one universal artifact-kind list, artifact ID grammar, build ID, or input
+digest. Each artifact-owning schema validates its own identity and contents.
+Later source-usage, journey, scenario, and driver records pin the exact hashes
+needed for an operation.
+
+Live assembly and freshness comparison belong to the pure query layer, not the
+envelope parser. They fail closed for incompatible sets, stale lineage, a
+scenario based on a different contract, ambiguous usage, incomplete configured
+coverage where an authoritative negative answer is required, or a changed
+driver registry. Exact execution authority is a separate schema record, and
+the pure validator owns exhaustive stable consumer diagnostics.
+
+Scenario responsibilities are explicit: the portable behavior schema owns
+conditions, exact edges, access prerequisites, replay cases, scoped
+completeness, and unknowns; trusted Angular scenario compilation produces a
+resolved artifact tied to one form-contract hash; AOT authoring contributes
+observations; the future context/query layer references and validates those
+artifacts but does not produce them.
+
+The current `runWorkspace`, `generate`, and `check` commands do not yet publish
+or verify this sibling graph. The shared schema/reference checkpoint in the
+execution index must land before producer-specific configuration is added.
+
 ### Use the generic pilot CLI
 
 After building or linking the workspace package, run the same boundary through
@@ -242,6 +342,19 @@ maps an exact Formly type string, such as `cool-radio-btn-grp`, to reviewed
 semantic parts, ARIA roles, an interaction operation, a possible-value domain,
 and a stable driver identity. Named variants and wrapper profiles are explicit;
 there is no fuzzy matching or silent last-write-wins behavior.
+
+This reviewed registry remains the semantic and execution authority for
+interactive custom types. A future Angular authoring contributor may inventory
+configured Formly registrations, effective components and wrappers, public
+component metadata, bounded source/template candidates, rendered roles and
+parts, configured-scope coverage, and drift. That evidence can prefill review
+scaffolds and explain an unknown custom type, but it cannot approve a profile,
+choose a value codec, register a driver, or claim workspace-wide completeness
+from one injector or browser state. Display/assertion-only fields and
+components require an explicit non-interactive disposition and remain
+non-executable or unknown until the schema defines a no-driver/non-interactive
+profile branch. Declared and observed facts remain separate, and a mismatch is
+a diagnostic rather than an automatic registry rewrite.
 
 ```ts
 import {
@@ -360,6 +473,13 @@ mappings cannot authorize a generic driver. Declared function, string, async,
 or expression-backed collections remain dynamic without being executed; a
 trusted resolved collection is enumerated with scenario completeness.
 
+The Angular authoring lane is compatibility-first: schema-owned compatibility
+result, retained application-target gate, Node-safe workspace descriptor,
+isolated AOT browser inventory, source/template joins, and only then
+review-required scaffolds and a workplace value pilot. It is separate from the
+trusted JIT scenario compiler. Exact application-specific drivers remain
+available when a custom field cannot be made safely generic.
+
 ## Project-owned cross-field effects
 
 A project may declare one versioned `crossFieldEffects` registry beside its
@@ -453,6 +573,14 @@ browser observations remain separate non-authoritative evidence. They cannot
 be parsed as `CrossFieldEffectRegistry` and are never promoted to `loads`,
 `filters`, `clears`, or `toggles` automatically.
 
+These explicit v0.4 effects remain authoritative for application/business
+verbs. A future closed normalized rule, witnessed against pinned evaluation
+semantics, may authorize only the exact state edge it proves, such as
+visibility or required state for one condition. Portable behavior records own
+that narrower condition/state evidence, replay cases, access prerequisites, and
+facet/scope-local completeness; they do not reinterpret callbacks, imported
+helpers, lifecycle hooks, or RxJS pipelines as business effects.
+
 ### Keep discovery entry points out of browser barrels
 
 Angular libraries should expose browser runtime code and trusted discovery code
@@ -512,6 +640,21 @@ explicit cross-field effects, and derive the deterministic artifact set.
 identities remain data and do not execute code. Angular-assisted inventory and
 observed runtime capture remain later increments on the same configuration
 bedrock.
+
+The next shared checkpoint is schema and fixture work, not MCP or Playwright: a
+schema-addressed artifact-set envelope with a structured workspace-index
+anchor, source-usage and journey records, scenario and exact
+execution-authority records, and minimal clearly marked synthetic walkthroughs.
+Pure progressive queries then add live freshness status, and the pure
+typed-intent validator owns canonical plans and exhaustive stable diagnostics.
+Passing those synthetic walkthroughs is only the `CTX-2` exit; it does not
+authorize transport or browser execution.
+
+The real representative producer/workplace `CTX-GATE` additionally requires
+current `LIN-4`, `BHV-4`, `ANG-5`, and `DRV-0` artifacts. It blocks MCP and
+Playwright, and the first Playwright vertical schedules only after the MCP
+adapter. Neither layer accepts agent-supplied selectors, callbacks, or module
+paths.
 
 The [workplace pilot guide](workplace-pilot.md) turns this reference into a
 single operational checklist and includes the expected artifact layout,

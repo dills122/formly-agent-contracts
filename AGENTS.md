@@ -15,11 +15,19 @@ Optimize for:
 
 ## Architecture Boundaries
 
-Primary areas:
+Primary areas follow [ADR 0008](docs/decisions/0008-package-rename.md):
 
 - `packages/schema/`: versioned DTOs, runtime schemas, diagnostics, canonical serialization, and hashing
 - `packages/compiler/`: form registry, controlled Angular/Formly compilation, and allowlisted projection
-- `apps/mcp-server/`, `packages/test-intent/`, and `packages/playwright-driver/`: read-only discovery, intent validation, and deterministic browser execution
+- `packages/workspace/`: distributed discovery, generation, source indexing, and artifact assembly
+- future `packages/angular/`: Angular-specific authoring and host integration
+- future `packages/mcp/`: progressive read-only agent transport
+- future `packages/playwright/`: validated-plan compilation, reviewed driver registries, and deterministic browser execution
+
+Intent DTOs and validation policy belong in `packages/schema/`. Do not create
+`apps/mcp-server/`, `packages/test-intent/`, or
+`packages/playwright-driver/`; those historical paths were superseded by ADR
+0008.
 
 When a change spans areas, preserve ownership boundaries and update shared contracts first.
 
