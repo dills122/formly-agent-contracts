@@ -22,9 +22,9 @@ a real unsatisfied gate; “pending” simply means a predecessor is not complet
 | ID | Scope | Primary owner | Depends on | Status | Exit gate |
 | --- | --- | --- | --- | --- | --- |
 | `RH06-DOC` | Reconcile canonical architecture and plans | Documentation/architecture | RH-01 through RH-05 | complete | Canonical docs agree; review instance 3 returned ready with non-blocking follow-ups; final repository checks pass |
-| `CTX-0A` | Schema-addressed artifact-set envelope and structured workspace-index anchor | `packages/schema` | `RH06-DOC` | ready | Strict schema, canonical round-trip, version/unknown-key/hash mutation tests, and package Changeset |
-| `CTX-0B` | Source-usage and journey records | `packages/schema` | `CTX-0A` | pending | Identity, coverage, transition, ambiguity, and referential-integrity tests |
-| `CTX-0C` | Scenario refs and exact execution-authority records | `packages/schema` | `CTX-0A` | pending | Commit/assertion/action/transition/capture IDs validate and mutations refuse |
+| `CTX-0A` | Schema-addressed artifact-set envelope and structured workspace-index anchor | `packages/schema` | `RH06-DOC` | complete | 59 focused tests, schema build/lint, fresh review, package Changeset, and full `pnpm check` pass |
+| `CTX-0B` | Source-usage and journey records | `packages/schema` | `CTX-0A` | ready | Identity, coverage, transition, ambiguity, and referential-integrity tests |
+| `CTX-0C` | Scenario refs and exact execution-authority records | `packages/schema` | `CTX-0A` | ready | Commit/assertion/action/transition/capture IDs validate and mutations refuse |
 | `CTX-0D` | Minimal synthetic positive/negative walkthrough fixtures | Schema test fixtures | `CTX-0B`, `CTX-0C` | pending | Deterministic fixtures validate and are explicitly marked synthetic |
 
 `CTX-0A` through `CTX-0D` are one shared-contract checkpoint and must land in
@@ -47,7 +47,7 @@ that dependency order. They add no runtime execution.
 
 | ID | Scope | Primary owner | Depends on | Status | Exit gate |
 | --- | --- | --- | --- | --- | --- |
-| `LIN-0` | Representative workplace topology, scale, privacy, and convention gate | `packages/workspace` fixtures/research | `RH06-DOC` | ready | Leaf tsconfigs, references, aliases/barrels, lazy features, disclosure and budgets measured |
+| `LIN-0` | Representative workplace topology, scale, privacy, and convention gate | `packages/workspace` fixtures/research | `RH06-DOC` | blocked | [Harness and public rehearsal pass](../../research/hardening/lin-0-workplace-gate.md), but the retained decision is `inconclusive` until the sanitized representative workplace evidence is measured |
 | `LIN-1` | Typed form definition/root anchor | `packages/workspace` | `CTX-0A`, `LIN-0` go | pending | Direct function/class/callable-const anchors and negative grammar fixtures |
 | `LIN-2` | Per-leaf TypeScript index and aggregate source-lineage artifact | `packages/workspace` | `CTX-0B`, `LIN-1` | pending | Exact/ambiguous/unresolved, overlap, coverage, staleness, privacy tests |
 | `LIN-3` | Compact artifact-only lineage queries | pure query layer | `LIN-2`, `CTX-1` | pending | Exact, stale, incomplete, ambiguous, paged outcomes; no source execution at request time |
@@ -62,7 +62,7 @@ the portable provenance foundation consumed by `HOST-1`.
 
 | ID | Workspace-plan mapping | Scope | Primary owner | Depends on | Status | Exit gate |
 | --- | --- | --- | --- | --- | --- | --- |
-| `HOST-1` | Task 7A.2 | Framework-neutral runtime-host protocol and public/private package boundaries | `packages/workspace` | `CTX-0A` | pending | Strict IPC/host DTOs, Angular-free public composition, packed private worker, and non-hoisted consumer checks pass |
+| `HOST-1` | Task 7A.2 | Framework-neutral runtime-host protocol and public/private package boundaries | `packages/workspace` | `CTX-0A` | ready | Strict IPC/host DTOs, Angular-free public composition, packed private worker, and non-hoisted consumer checks pass |
 | `HOST-2` | Task 7B.1 | Discovery and inventory before project evaluation | `packages/workspace` | `HOST-1` | pending | Import-free discovery, parent-selected host requests, duplicate rejection, and list-without-factory tests pass |
 | `HOST-3` | Task 7B.2 | Trusted-local worker lifecycle | `packages/workspace` | `HOST-2` | pending | Scrubbed spawn, validated IPC, bounded teardown, failure controls, and no-publication authority tests pass |
 | `HOST-4` | Task 7B.3 | Failure-safe aggregation and publication | `packages/workspace` | `HOST-3`, `CTX-0A` | pending | Parent revalidation, deterministic aggregation, atomic index-last publication, fault injection, and rerun tests pass |
@@ -71,7 +71,7 @@ the portable provenance foundation consumed by `HOST-1`.
 
 | ID | Scope | Primary owner | Depends on | Status | Exit gate |
 | --- | --- | --- | --- | --- | --- |
-| `ANG-0` | Schema-owned Angular host compatibility result | `packages/schema` | `CTX-0A` | pending | Strict pass/fail result, environment identity, canonical/refinement tests |
+| `ANG-0` | Schema-owned Angular host compatibility result | `packages/schema` | `CTX-0A` | ready | Strict pass/fail result, environment identity, canonical/refinement tests |
 | `ANG-1` | Retained Angular CLI/Nx application-target compatibility gate | fixtures/research | `ANG-0` | pending | Partial library, resources, standalone/NgModule, scopes, popup/model/teardown cases pass |
 | `ANG-2` | Task 7A.3 dependency-light Angular package shell | future `@formly-contract/angular` | `ANG-1` go, `HOST-1` | pending | Node-safe `./jit` and `./authoring` package entry points build; generic discovery stays Angular-free |
 | `ANG-2P` | Task 7D Angular source providers and Node-safe authoring/project-source descriptor | future `@formly-contract/angular`; workspace config | `ANG-2`, `CTX-0A` | pending | Provider catalogs and confined descriptor pointers validate without importing Angular from generic discovery |
@@ -86,7 +86,7 @@ the portable provenance foundation consumed by `HOST-1`.
 
 | ID | Scope | Primary owner | Depends on | Status | Exit gate |
 | --- | --- | --- | --- | --- | --- |
-| `BHV-0` | Approve portable behavior/scenario artifact topology and authority matrix | schema/architecture | `RH06-DOC` | ready | Explicit effects, derived state edges, observations, and completeness have disjoint rules |
+| `BHV-0` | Approve portable behavior/scenario artifact topology and authority matrix | schema/architecture | `RH06-DOC` | ready | [ADR 0010](../../decisions/0010-portable-behavior-scenario-authority.md) is proposed; explicit effects, derived state edges, observations, and completeness have disjoint rules |
 | `BHV-1` | Closed normalized-condition and behavior schemas | `packages/schema` | `CTX-0A`, `BHV-0` | pending | Strict validators, relative path semantics, facet/scope completeness, unknown tests |
 | `BHV-2` | Lossless v0.4 effect/profile/repeater projections | compiler/workspace | `BHV-1` | pending | Current explicit effects retain IDs, parts, ordering, readiness, and wildcard targets |
 | `BHV-3` | Bounded static rule derivation and conservative callback/hook scaffolds | compiler/workspace | `BHV-2` | pending | Differential tests for accepted grammar; helpers/imports/pipelines refuse |
@@ -97,7 +97,7 @@ the portable provenance foundation consumed by `HOST-1`.
 
 | ID | Scope | Primary owner | Depends on | Status | Exit gate |
 | --- | --- | --- | --- | --- | --- |
-| `FAC-1` | Inert binding DTOs, validation, value-domain semantics, and pure projector | schema/compiler | `CTX-0A` | pending | Synthetic fixtures classify values/capabilities without application execution |
+| `FAC-1` | Inert binding DTOs, validation, value-domain semantics, and pure projector | schema/compiler | `CTX-0A` | ready | Synthetic fixtures classify values/capabilities without application execution |
 | `FAC-2` | Code-free sidecar and structural identity gate | workspace/compiler | `FAC-1` | pending | Runner receives no executable config; form identity remains exact |
 | `FAC-3` | Rootless OCI provider conformance and retained negative controls | external execution provider | `FAC-2` | blocked | `oci-rootless-v1`, catch-resistant ledger, isolation and negative controls pass |
 | `FAC-4` | Opt-in application factory execution | workspace provider | `FAC-3` go | pending | Deterministic bounded artifacts; all violations owned and reported by runner |
@@ -112,7 +112,10 @@ topology evidence before a public Nx package is necessary.
 
 ## Immediate dispatch rule
 
-`RH06-DOC` is complete. Dispatch the independent `CTX-0A`, `LIN-0`, and
-`BHV-0` lanes; only `CTX-0A` writes product schema code. Do not start `CTX-0B`,
-`CTX-0C`, producer runtime code, MCP, or Playwright merely because their
-research is complete.
+`CTX-0A` is complete. `CTX-0B` and `CTX-0C` are now the ready shared-contract
+lanes and may proceed independently before `CTX-0D`. `HOST-1`, `ANG-0`, and
+`FAC-1` are also dependency-ready, but they remain separate producer task
+packets and do not publish the unfinished `CTX-0` sibling records. `LIN-0` is
+blocked on its representative workplace run, while `BHV-0` remains ready for
+explicit maintainer approval of ADR 0010. MCP and Playwright remain pending
+their named context and producer gates.

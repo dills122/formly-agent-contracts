@@ -7,8 +7,10 @@ governed by the
 [RH-06 reconciliation](planning/agent-context-hardening/rh-06-reconciliation.md).
 
 **Current status:** Form Contract `0.4.0` is the implemented compatibility
-boundary. `RH06-DOC` is complete; `CTX-0A`, `LIN-0`, and `BHV-0` are the only
-ready lanes, and only `CTX-0A` writes product schema code.
+boundary. `RH06-DOC` and `CTX-0A` are complete. `CTX-0B`, `CTX-0C`, `HOST-1`,
+`ANG-0`, and `FAC-1` are dependency-ready; `BHV-0` awaits explicit approval of
+ADR 0010; and `LIN-0` is blocked on its sanitized representative workplace
+run after the public harness rehearsal returned `inconclusive`.
 
 ## Delivery Target
 
@@ -540,9 +542,9 @@ not add compilation, Angular execution, storage, or mutation to MCP requests.
 The earlier aspirational increment list is superseded by RH-06 and the
 execution index. The current order is:
 
-1. complete and verify `RH06-DOC`;
-2. land `CTX-0A`, then `CTX-0B` and `CTX-0C`, then the explicitly synthetic
-   `CTX-0D` fixtures;
+1. retain the completed `RH06-DOC` and `CTX-0A` foundations;
+2. land the now-ready `CTX-0B` and `CTX-0C` schemas, then the explicitly
+   synthetic `CTX-0D` fixtures;
 3. advance source-lineage, behavior/scenario, Angular, and safe factory
    producers only when their execution-index schema and compatibility
    dependencies are satisfied;

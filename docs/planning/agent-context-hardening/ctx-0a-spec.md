@@ -1,6 +1,6 @@
 # CTX-0A Specification: Pinned Artifact-Set Foundation
 
-- Status: Ready after RH-06 review instance 3
+- Status: Complete
 - Depends on: `RH06-DOC`
 - Implements: `CTX-0A` in the [execution index](execution-index.md)
 - Architecture: [RH-06 reconciliation](rh-06-reconciliation.md)
@@ -294,25 +294,33 @@ Never:
 
 ## Tasks
 
-- [ ] `CTX-0A.1` — Add RED tests for DTO shape, strict parsing, ordering,
+- [x] `CTX-0A.1` — Add RED tests for DTO shape, strict parsing, ordering,
   hashing, and adversarial inputs.
   - Acceptance: focused tests fail because the public API is absent.
   - Verify: focused Vitest command with the failure recorded.
   - Files: test file only.
-- [ ] `CTX-0A.2` — Implement minimal DTO/parser/canonical/hash/create behavior.
+- [x] `CTX-0A.2` — Implement minimal DTO/parser/canonical/hash/create behavior.
   - Acceptance: all focused tests pass without ignored cases.
   - Verify: focused Vitest and schema build.
   - Files: implementation and test files.
-- [ ] `CTX-0A.3` — Export the public API and run refactor/scope checks.
+- [x] `CTX-0A.3` — Export the public API and run refactor/scope checks.
   - Acceptance: ESM exports type-check; the schema package Changeset describes
     the new public API; no unrelated public surface changes.
   - Verify: scoped lint, schema build, and `git diff --check`.
   - Files: package barrel, package Changeset, plus prior files.
-- [ ] `CTX-0A.4` — Run full repository verification and fresh review.
+- [x] `CTX-0A.4` — Run full repository verification and fresh review.
   - Acceptance: `pnpm check` passes and review has no unresolved blocking
     finding.
   - Verify: recorded full-check and review evidence.
   - Files: no new scope unless a finding requires a documented correction.
+
+Completion evidence: commit `bc0b726` retains the RED-to-GREEN implementation
+and package Changeset; 59 focused tests, schema build/type-check, scoped lint,
+and diff safety pass. Fresh review instance 1 found no blocker, and the final
+repository gate passed 40 test files / 569 tests plus every build, packed
+consumer, release, demo, and documentation check. Early rejection of an
+oversized hostile object graph remains a non-blocking hardening follow-up; the
+specified 10,000-reference acceptance boundary is enforced.
 
 ## Success criteria
 
@@ -335,5 +343,7 @@ These do not block CTX-0A and are owned by later slices:
   executable queries;
 - live-checkout freshness comparison, input-manifest closure, mixed-context
   basis validation, and review-only stale behavior;
-- path disclosure modes and source coverage; and
-- whether a future mature subset is folded into a successor Form Contract.
+- path disclosure modes and source coverage;
+- whether a future mature subset is folded into a successor Form Contract; and
+- whether a future parser hardening slice should reject oversized hostile
+  graphs before cloning every nested value.

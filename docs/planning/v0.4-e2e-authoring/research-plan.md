@@ -10,8 +10,10 @@ boundary; successor records and task readiness are governed by RH-06.
 [RH-06 reconciliation](../agent-context-hardening/rh-06-reconciliation.md),
 [execution index](../agent-context-hardening/execution-index.md), and
 [Agent Context and Deterministic E2E Delivery Plan](agent-context-delivery-plan.md).
-`RH06-DOC` is verified. `CTX-0A`, `LIN-0`, and `BHV-0` are ready; only
-`CTX-0A` writes product schema code.
+`RH06-DOC` and `CTX-0A` are verified complete. `CTX-0B` and `CTX-0C` are the
+next ready shared-contract lanes. The `LIN-0` harness is retained but its
+workplace decision is blocked/`inconclusive`; `BHV-0` awaits explicit approval
+of ADR 0010.
 
 `CTX-0A` is deliberately narrow: it owns only an open schema-addressed pinned
 artifact-set envelope, the set's own content hash, and a structured
@@ -263,8 +265,9 @@ execution.
    only. Angular-assisted
    inventory/scaffolding and rendered conformance remain under their separate
    execution-index tasks.
-9. **Ready after RH-06 documentation verification:** dispatch `CTX-0A`, then
-   follow the execution-index order through `CTX-0D`, `CTX-1`, and `CTX-2`.
+9. **In progress after RH-06 documentation verification:** `CTX-0A` is
+   complete; dispatch the now-ready `CTX-0B` and `CTX-0C`, then follow the
+   execution-index order through `CTX-0D`, `CTX-1`, and `CTX-2`.
    `CTX-0D` fixtures are explicitly synthetic, and `CTX-2` owns their
    positive/negative proof. The real representative producer/workplace
    `CTX-GATE` waits for `CTX-2`, `LIN-4`, `BHV-4`, `ANG-5`, and `DRV-0`; MCP and
@@ -289,6 +292,6 @@ The research gate required maintainer approval of:
 Those choices are now represented in the approved v0.4 metadata specification,
 the implemented schema/compiler/workspace contracts, and the reconciled
 research artifacts. This closes the research gate. RH-06 is the current
-planning baseline: after `RH06-DOC` passes review and checks, dispatch only
-`CTX-0A`; every later producer or consumer waits for the dependencies in the
-execution index.
+planning baseline: `CTX-0A` has passed review and checks, so `CTX-0B` and
+`CTX-0C` are ready; every producer or consumer still waits for the remaining
+dependencies in the execution index.

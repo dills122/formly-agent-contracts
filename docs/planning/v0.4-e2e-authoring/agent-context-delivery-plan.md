@@ -1,7 +1,8 @@
 # Agent Context and Deterministic E2E Delivery Plan
 
-**Status:** Reconciled with RH-06; `RH06-DOC` is complete and `CTX-0A` is ready.
-The independent `LIN-0` and `BHV-0` research/decision lanes may run in parallel.
+**Status:** Reconciled with RH-06; `RH06-DOC` and `CTX-0A` are complete.
+`CTX-0B` and `CTX-0C` are ready. `LIN-0` is blocked on representative
+workplace evidence, and `BHV-0` awaits explicit approval of ADR 0010.
 
 **Decision:** Conditional go for a bounded contract/query/validator pilot
 
@@ -452,10 +453,9 @@ contract expansion before `CTX-0A`.
 
 ## Task-dispatch readiness
 
-The approved RH-06 planning baseline makes one task eligible after the
-`RH06-DOC` reconciliation itself passes review and repository checks:
-`CTX-0A`. Do not dispatch the rest of the `CTX-0` checkpoint as one task. Each
-packet must state:
+The approved RH-06 planning baseline first made `CTX-0A` eligible; that slice
+is now complete. `CTX-0B` and `CTX-0C` are independently ready and must not be
+collapsed into one shared implementation task. Each packet must state:
 
 - the exact contract and package owner;
 - dependencies and base commit;
@@ -465,12 +465,13 @@ packet must state:
 - migration and compatibility implications; and
 - evidence required at the next stop/go gate.
 
-The first task packet covers only `CTX-0A`: the open schema-addressed pinned
-artifact-set envelope, its own content hash, the structured workspace-index
-anchor, and a schema package Changeset in `@formly-contract/schema`. Do not
-combine it with authority, live freshness status, diagnostic policy, query
-module selection, `CTX-0B`, `CTX-0C`, fixtures, producer runtime code, MCP,
-Playwright, or workplace integration.
+The completed first task packet covers only `CTX-0A`: the open
+schema-addressed pinned artifact-set envelope, its own content hash, the
+structured workspace-index anchor, and a schema package Changeset in
+`@formly-contract/schema`. The next packets preserve that boundary: `CTX-0B`
+owns source-usage/journey records and `CTX-0C` owns scenario/execution-authority
+records. Neither includes fixtures, producer runtime code, MCP, Playwright, or
+workplace integration.
 
 ## Planning acceptance
 
@@ -484,5 +485,6 @@ High-level planning is reconciled when the maintainer agrees to:
 - the real representative `CTX-GATE`, requiring `CTX-2`, `LIN-4`, `BHV-4`,
   `ANG-5`, and `DRV-0`, before MCP transport or browser-driver expansion.
 
-Those points are now represented in RH-06. After `RH06-DOC` verification,
-dispatch `CTX-0A`; all later tasks remain dependent on the execution index.
+Those points are now represented in RH-06. `CTX-0A` is complete; dispatch
+`CTX-0B` and `CTX-0C` independently, while all other tasks remain governed by
+the execution index.

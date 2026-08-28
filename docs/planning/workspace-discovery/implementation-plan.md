@@ -8,11 +8,10 @@ goldens, linked/packed consumer smokes, and the schema-owned portable
 runtime/dependency provenance foundation.
 
 The RH-01 through RH-05 research packets are approved planning evidence, not
-implemented product behavior. `RH06-DOC` is complete. Under its reconciled
-dependency order, Task 7A.2 (`HOST-1`) and every new producer remain pending
-until the required `CTX-0` predecessor is complete (`CTX-0A` for the
-framework-neutral host protocol; each producer's exact prerequisites are in
-the execution index). Application
+implemented product behavior. `RH06-DOC` and `CTX-0A` are complete. Under the
+reconciled dependency order, Task 7A.2 (`HOST-1`) is now ready; each other
+producer's exact prerequisites and status remain in the execution index.
+Application
 factory execution is separately blocked on `oci-rootless-v1`; neither the
 trusted local worker nor the future `isolated-ci-v1` config worker satisfies
 that gate.
@@ -255,14 +254,14 @@ contains explicit effects only.
 
 | Requirement | Decision | Tasks | Verification | Status |
 | --- | --- | --- | --- | --- |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3 | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks | Implemented through Task 6B; `HOST-1`–`HOST-4` remain pending |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3 | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks | Implemented through Task 6B; `HOST-1` is ready and `HOST-2`–`HOST-4` remain pending |
 | `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Tasks 5.0–5.1 implemented, including safe node projection and realistic Angular/Nx fixture coverage; executable drivers remain separate |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | A schema-owned compatibility result and retained AOT gate precede inventory/scaffolds; reviewed profiles remain sole semantic authority | `ANG-0`, `ANG-1`, `ANG-2`/Task 7A.3, `ANG-2P`/Task 7D, `ANG-2R`/Task 8B.1, `ANG-4`–`ANG-6`/Tasks 8B.2–8C | Angular CLI/Nx application-target gate, strict report/scaffold tests, configured-scope coverage, negative inference, and workplace value pilot | Approved research with retained spike; production gates pending |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Implemented with schema/config/compiler/workspace/anchor-fixture evidence |
-| `REQ-CONTEXT-01` New producer artifacts share exact references, freshness, execution authority, and diagnostics | Land the schema-addressed envelope first, then keep authority, live freshness, and consumer diagnostic ownership in their named slices | `CTX-0A`–`CTX-2` and `CTX-GATE` in the execution index | Strict validators, canonical round trips, referential-integrity and mutation tests, exact synthetic walkthroughs, then one real pinned producer pilot | Approved by RH-06; pending implementation |
-| `REQ-LINEAGE-01` An agent can connect an anchored form root and direct source usage without name guessing | Explicit root authority plus per-leaf TypeScript indexing; ambiguity, coverage, staleness, and privacy fail closed | `LIN-0`–`LIN-4` / RH01-T2–T8 | Representative leaf-tsconfig/project-reference/alias/barrel/lazy/privacy/scale gate, then exact/ambiguous/stale/incomplete query tests | Approved research; `LIN-0` gate pending, no production index |
-| `REQ-SCENARIO-01` Scenario evidence has portable semantics and a distinct trusted producer | RH-04 owns semantics; Task 8 produces JIT-resolved artifacts; RH-05 only queries/validates them | `BHV-0`–`BHV-4`, `ANG-2P`/Task 7D, and `ANG-3`/Task 7C | Exact basis-contract hashes, replayable/compile-only cases, strict deltas, no inferred business verbs | Approved research; pending shared schemas and guarded host |
-| `REQ-FACTORY-01` Factory-derived shape/value evidence cannot be manufactured from synthetic live-looking inputs | Inert DTO/projector first; code-free sidecar and structural identity; execution only in rootless OCI | `FAC-1`–`FAC-4` | Synthetic projector negatives, then retained catch-resistant ledger and `oci-rootless-v1` conformance controls | Pure work pending; runtime execution blocked at FAC-3 |
+| `REQ-CONTEXT-01` New producer artifacts share exact references, freshness, execution authority, and diagnostics | Land the schema-addressed envelope first, then keep authority, live freshness, and consumer diagnostic ownership in their named slices | `CTX-0A`–`CTX-2` and `CTX-GATE` in the execution index | Strict validators, canonical round trips, referential-integrity and mutation tests, exact synthetic walkthroughs, then one real pinned producer pilot | `CTX-0A` complete; `CTX-0B` and `CTX-0C` ready; later slices pending |
+| `REQ-LINEAGE-01` An agent can connect an anchored form root and direct source usage without name guessing | Explicit root authority plus per-leaf TypeScript indexing; ambiguity, coverage, staleness, and privacy fail closed | `LIN-0`–`LIN-4` / RH01-T2–T8 | Representative leaf-tsconfig/project-reference/alias/barrel/lazy/privacy/scale gate, then exact/ambiguous/stale/incomplete query tests | Harness retained; `LIN-0` blocked after an `inconclusive` public rehearsal, no production index |
+| `REQ-SCENARIO-01` Scenario evidence has portable semantics and a distinct trusted producer | RH-04 owns semantics; Task 8 produces JIT-resolved artifacts; RH-05 only queries/validates them | `BHV-0`–`BHV-4`, `ANG-2P`/Task 7D, and `ANG-3`/Task 7C | Exact basis-contract hashes, replayable/compile-only cases, strict deltas, no inferred business verbs | ADR 0010 proposed; explicit `BHV-0` approval and later schemas/host remain pending |
+| `REQ-FACTORY-01` Factory-derived shape/value evidence cannot be manufactured from synthetic live-looking inputs | Inert DTO/projector first; code-free sidecar and structural identity; execution only in rootless OCI | `FAC-1`–`FAC-4` | Synthetic projector negatives, then retained catch-resistant ledger and `oci-rootless-v1` conformance controls | `FAC-1` ready; runtime execution remains blocked at FAC-3 |
 | `REQ-NX-01` Nx improves monorepo discovery and execution without becoming authority | One optional aggregate coordinator target; artifact hashes remain correctness | Tasks 9–12C | Supported-version fixture, one-target/cache/affected/isolation tests | Pending Checkpoint B and workplace version evidence |
 
 ## Phase 0: Fail-fast feasibility and contracts
@@ -720,9 +719,9 @@ does not duplicate the full task contracts in the
 
 | ID | Observable output | Dependencies | Status | Verification boundary |
 | --- | --- | --- | --- | --- |
-| `CTX-0A` | Schema-addressed artifact-set envelope with open content references, one structured workspace-index anchor, and its own `contentHash` identity | `RH06-DOC` | Ready | Strict schema, canonical round-trip, version/unknown-key/hash mutation tests, package Changeset |
-| `CTX-0B` | Source-usage and journey record schemas with distinct form/root/usage/journey identities | `CTX-0A` | Pending | Identity, ambiguity, coverage, transition, and referential-integrity tests |
-| `CTX-0C` | Scenario references and exact commit/assertion/action/transition/repeater-capture authority | `CTX-0A` | Pending | Every selected ID resolves exactly; unsupported execution authority refuses |
+| `CTX-0A` | Schema-addressed artifact-set envelope with open content references, one structured workspace-index anchor, and its own `contentHash` identity | `RH06-DOC` | Complete | 59 focused tests, schema build/lint, fresh review, Changeset, and full repository gate pass |
+| `CTX-0B` | Source-usage and journey record schemas with distinct form/root/usage/journey identities | `CTX-0A` | Ready | Identity, ambiguity, coverage, transition, and referential-integrity tests |
+| `CTX-0C` | Scenario references and exact commit/assertion/action/transition/repeater-capture authority | `CTX-0A` | Ready | Every selected ID resolves exactly; unsupported execution authority refuses |
 | `CTX-0D` | Minimal positive and negative synthetic walkthrough records | `CTX-0B`, `CTX-0C` | Pending | Deterministic fixture IDs validate and are visibly marked `synthetic` |
 
 No TypeScript source indexer, Angular host, application factory, MCP adapter, or
@@ -743,7 +742,7 @@ execution-index IDs below so RH01's research task numbers remain stable.
 
 | Execution ID | RH-01 mapping | Workspace responsibility | Dependencies | Status |
 | --- | --- | --- | --- | --- |
-| `LIN-0` | RH01-T2 | Retain the representative leaf-tsconfig, project-reference, declaration-output, alias/barrel, lazy-route, privacy, bundle-isolation, and scale gate | `RH06-DOC` | Ready feasibility gate |
+| `LIN-0` | RH01-T2 | Retain the representative leaf-tsconfig, project-reference, declaration-output, alias/barrel, lazy-route, privacy, bundle-isolation, and scale gate | `RH06-DOC` | Blocked: harness/public rehearsal complete; representative workplace evidence remains `inconclusive` |
 | `LIN-1` | RH01-T3 | Add typed definition/root anchors and creation provenance without serializing functions | `CTX-0A`, `LIN-0` go | Pending; must not begin before gate |
 | `LIN-2` | RH01-T4–T5 | Build per-leaf indexes, canonical cross-program joins, coverage, staleness, disclosure, and deterministic source-lineage artifact | `CTX-0B`, `LIN-1` | Pending |
 | `LIN-3` | RH01-T6 | Add artifact-only exact/ambiguous/unresolved/stale/incomplete queries | `LIN-2`, `CTX-1` | Pending |
@@ -759,13 +758,13 @@ program produces `incomplete`, not an authoritative empty usage list.
 
 | Execution IDs | Ownership in this plan | Status and boundary |
 | --- | --- | --- |
-| `BHV-0` | Approve the portable causal-edge/acausal-state/access-prerequisite topology and authority matrix | Ready after RH-06 documentation completion |
-| `BHV-1` | Schema owns strict normalized conditions, behavior/scenario evidence, facet/scope completeness, and unknowns | Approved research; pending `CTX-0A` and topology approval |
+| `BHV-0` | Approve the portable causal-edge/acausal-state/access-prerequisite topology and authority matrix | ADR 0010 proposed; ready for explicit maintainer approval |
+| `BHV-1` | Schema owns strict normalized conditions, behavior/scenario evidence, facet/scope completeness, and unknowns | Pending topology approval; `CTX-0A` is complete |
 | `BHV-2` | Compiler/workspace project existing v0.4 effects, wrapper prerequisites, and repeater access losslessly | Pending `BHV-1`; existing v0.4 source records remain implemented authority |
 | `BHV-3` | Compiler/workspace derive only the bounded closed grammar and emit conservative callback/hook scaffolds | Pending `BHV-2`; helpers/imports/pipelines remain refused |
 | `BHV-4` | Angular Task 8 produces exact contract-hash-bound replayable/compile-only scenario evidence | Pending `ANG-3`, `ANG-2P`, `BHV-1`, `CTX-0C`, and `CTX-0D`; these are direct publication dependencies |
 | `BHV-GATE` | A redacted workplace pilot measures construct frequency and scaffold acceptance before AST coverage expands | Pending `BHV-3` and `BHV-4` |
-| `FAC-1`–`FAC-2` | Schema/compiler own inert binding/value DTOs and pure projection; workspace owns the code-free sidecar and structural-identity gate | Approved research; pending pure synthetic implementation only |
+| `FAC-1`–`FAC-2` | Schema/compiler own inert binding/value DTOs and pure projection; workspace owns the code-free sidecar and structural-identity gate | `FAC-1` ready; `FAC-2` pending `FAC-1` |
 | `FAC-3`–`FAC-4` | An external rootless OCI provider owns conformance; workspace may orchestrate only after it passes | **Blocked** until `oci-rootless-v1`, the catch-resistant runner ledger, structural controls, and retained negative cases pass |
 
 The trusted JIT/config worker and the `isolated-ci-v1` CI provider are not
@@ -852,8 +851,8 @@ to the publishable framework-neutral execution host. Add strict IPC and
 parent-selected host-module descriptors plus public composition subpaths and a
 packed private worker entry. No Angular dependency enters this package.
 
-**Current status:** Pending `CTX-0A`. The earlier 7A.1 review completion does not
-by itself authorize this task.
+**Current status:** Ready after `CTX-0A` completion. The earlier 7A.1 review
+completion did not by itself authorize this task; both dependencies now pass.
 
 **Acceptance criteria:**
 
@@ -2028,8 +2027,9 @@ maintainer review, remediate validated findings, and record final evidence.
 - [x] Use Checkpoint A as the first shipping target.
 - [x] Keep Angular resolved scenarios in Checkpoint B rather than requiring them
       for the first generic workplace pilot.
-- [ ] Complete `RH06-DOC`, then land `CTX-0A` through `CTX-0D` before any new
-      producer publishes a sibling artifact.
+- [x] Complete `RH06-DOC` and `CTX-0A`.
+- [ ] Land `CTX-0B` through `CTX-0D` before any new producer publishes one of
+      those sibling artifact families.
 - [ ] Pass `LIN-0` before implementing public source-lineage indexing.
 - [ ] Implement `ANG-0` and pass the retained Angular CLI/Nx `ANG-1` gate before
       Task 7A.3 or any JIT/AOT Angular host behavior.
