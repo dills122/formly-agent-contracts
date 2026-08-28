@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 
-import type { AgentContextArtifactReference } from './agent-context-artifacts.js';
+import {
+  createAgentContextArtifactSet,
+  type AgentContextArtifactReference,
+} from './agent-context-artifacts.js';
 import {
   AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
   canonicalizeAgentContextQueryResult,
   parseAgentContextQueryResult,
+  validateAgentContextQuerySelection,
   validateAgentContextQueryResult,
   type AgentContextQueryDataset,
   type AgentContextQuerySelection,
@@ -13,6 +17,7 @@ import {
 import {
   AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_ID,
   AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_VERSION,
+  createAgentContextExecutionAuthority,
   type AgentContextExecutionAuthority,
 } from './agent-context-execution-authority.js';
 import {
@@ -22,7 +27,7 @@ import {
   AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_VERSION,
 } from './agent-context-usage.js';
 import { createSyntheticRh05AgentContextFixtureSet } from './agent-context-walkthrough-fixtures.js';
-import { canonicalStringify } from './canonical-json.js';
+import { canonicalStringify, createFormContract } from './canonical-json.js';
 import {
   FORM_CONTRACT_SCHEMA_ID,
   FORM_CONTRACT_SCHEMA_VERSION,
@@ -177,7 +182,7 @@ function boundary() {
     workspaceIndex: selection.workspaceIndex,
     sourceUsageCatalogs: [sourceUsageCatalog],
   };
-  const nodes = flattenNodes(walkthrough.declaredContract.nodes);
+  const nodes = flattenNodes(walkthrough.resolvedContract.nodes);
   const step = walkthrough.executionAuthority.usage.steps[0];
   if (step === undefined) throw new Error('positive authority needs a step');
   const focusNode = nodes.find(({ id }) => step.nodeIds.includes(id));
@@ -200,10 +205,10 @@ function nodeProjection(
   node: ContractNode,
   includeAll = false,
 ) {
-  const effects = (value.walkthrough.declaredContract.declaredEffects ?? []).filter(
+  const effects = (value.walkthrough.resolvedContract.declaredEffects ?? []).filter(
     ({ trigger, target }) => trigger.nodeId === node.id || target.nodeId === node.id,
   );
-  const diagnostics = value.walkthrough.declaredContract.diagnostics.filter(
+  const diagnostics = value.walkthrough.resolvedContract.diagnostics.filter(
     ({ nodeId }) => nodeId === node.id,
   );
   return {
@@ -408,7 +413,7 @@ function nodeExecutableCapabilities(
 }
 
 function summaryProjection(value: ReturnType<typeof boundary>) {
-  const contract = value.walkthrough.declaredContract;
+  const contract = value.walkthrough.resolvedContract;
   const nodes = flattenNodes(contract.nodes);
   const diagnostics = contract.diagnostics;
   const interactionUnknowns = nodes.reduce(
@@ -615,7 +620,7 @@ describe('agent-context query result contract', () => {
           { kind: 'readiness', node: readinessNode, readiness },
         ]),
         effects: complete(
-          value.walkthrough.declaredContract.declaredEffects ?? [],
+          value.walkthrough.resolvedContract.declaredEffects ?? [],
         ),
       },
     } as const;
@@ -712,6 +717,89 @@ describe('agent-context query result contract', () => {
     ).toThrow(/diagnostic|evidence|owner|projection/u);
   });
 
+  it('requires the resolved scenario node set to equal the declared and authority node sets', () => {
+    const value = boundary();
+    const {
+      contentHash: originalScenarioHash,
+      ...scenarioDraft
+    } = value.walkthrough.resolvedContract;
+    const driftScenario = createFormContract({
+      ...scenarioDraft,
+      nodes: scenarioDraft.nodes.slice(1),
+    });
+    const {
+      contentHash: originalAuthorityHash,
+      ...authorityDraft
+    } = value.walkthrough.executionAuthority;
+    const driftAuthority = createAgentContextExecutionAuthority({
+      ...authorityDraft,
+      scenario: {
+        ...authorityDraft.scenario,
+        artifactHash:
+          driftScenario.contentHash as AgentContextArtifactReference['contentHash'],
+      },
+    });
+    const scenarioReference: AgentContextArtifactReference = {
+      ...value.selection.owners.scenarioArtifact,
+      contentHash:
+        driftScenario.contentHash as AgentContextArtifactReference['contentHash'],
+    };
+    const authorityReference: AgentContextArtifactReference = {
+      ...value.selection.owners.executionAuthority,
+      contentHash: driftAuthority.contentHash,
+    };
+    const { contentHash: originalArtifactSetHash, ...artifactSetDraft } =
+      value.dataset.artifactSet;
+    const artifactSet = createAgentContextArtifactSet({
+      ...artifactSetDraft,
+      artifacts: artifactSetDraft.artifacts
+        .map((reference) =>
+          reference.contentHash === originalScenarioHash
+            ? scenarioReference
+            : reference.contentHash === originalAuthorityHash
+              ? authorityReference
+              : reference,
+        )
+        .sort(compareReference),
+    });
+    void originalArtifactSetHash;
+    const dataset = {
+      ...value.dataset,
+      artifactSet,
+      formContracts: value.dataset.formContracts
+        .map((owner) =>
+          owner.reference.contentHash === originalScenarioHash
+            ? { reference: scenarioReference, artifact: driftScenario }
+            : owner,
+        )
+        .sort((left, right) => compareReference(left.reference, right.reference)),
+      executionAuthorities: value.dataset.executionAuthorities
+        .map((owner) =>
+          owner.reference.contentHash === originalAuthorityHash
+            ? { reference: authorityReference, artifact: driftAuthority }
+            : owner,
+        )
+        .sort((left, right) => compareReference(left.reference, right.reference)),
+    };
+    const selection = {
+      ...value.selection,
+      artifactSet: {
+        schemaVersion: artifactSet.schemaVersion,
+        contentHash: artifactSet.contentHash,
+      },
+      owners: {
+        ...value.selection.owners,
+        scenarioArtifact: scenarioReference,
+        executionAuthority: authorityReference,
+      },
+      scenario: driftAuthority.scenario,
+    };
+
+    expect(() => validateAgentContextQuerySelection(dataset, selection)).toThrow(
+      /scenarioArtifact\.nodes|node/u,
+    );
+  });
+
   it('preserves valid schema-owned effect-analysis reason order', () => {
     const { value, contextBase } = baseResults();
     const summary = summaryProjection(value);
@@ -791,7 +879,11 @@ describe('agent-context query result contract', () => {
         status: 'ambiguous',
         candidates: usageCandidates,
         page: { collection: 'candidates', truncated: false },
-        reason: { kind: 'usage-ambiguous', usages: usageIdentities },
+        reason: {
+          kind: 'usage-ambiguous',
+          totalMatches: usageCandidates.length,
+          usages: usageIdentities,
+        },
       },
       ...(
         ['usage-absent-authoritative', 'usage-absence-not-authoritative'] as const
@@ -865,7 +957,11 @@ describe('agent-context query result contract', () => {
         authority: authorityProjection(value, nodeIds),
         candidates: nodeCandidates,
         page: { collection: 'nodes', truncated: false },
-        reason: { kind: 'node-ambiguous', nodeIds },
+        reason: {
+          kind: 'node-ambiguous',
+          totalMatches: nodeCandidates.length,
+          nodeIds,
+        },
       },
       {
         ...nodeBase,
@@ -920,6 +1016,72 @@ describe('agent-context query result contract', () => {
 
     for (const result of results) {
       expect(() => parseAgentContextQueryResult(result)).not.toThrow();
+    }
+  });
+
+  it('binds ambiguous reasons to page-local identities and total unpaged matches', () => {
+    const { value, candidate, node, searchBase, nodeBase } = baseResults();
+    const pagedUsageAmbiguity = {
+      ...searchBase,
+      status: 'ambiguous',
+      candidates: [candidate],
+      page: {
+        collection: 'candidates',
+        truncated: true,
+        nextCursor: 'acq1.x.y',
+      },
+      reason: {
+        kind: 'usage-ambiguous',
+        totalMatches: 2,
+        usages: [
+          {
+            sourceUsageCatalog: candidate.sourceUsageCatalog,
+            usage: candidate.usage,
+          },
+        ],
+      },
+    } as const;
+    const pagedNodeAmbiguity = {
+      ...nodeBase,
+      status: 'ambiguous',
+      authority: authorityProjection(value, [node.nodeId]),
+      candidates: [node],
+      page: { collection: 'nodes', truncated: true, nextCursor: 'acq1.x.y' },
+      reason: {
+        kind: 'node-ambiguous',
+        totalMatches: 2,
+        nodeIds: [node.nodeId],
+      },
+    } as const;
+
+    expect(parseAgentContextQueryResult(pagedUsageAmbiguity)).toEqual(
+      pagedUsageAmbiguity,
+    );
+    expect(parseAgentContextQueryResult(pagedNodeAmbiguity)).toEqual(
+      pagedNodeAmbiguity,
+    );
+
+    for (const result of [
+      {
+        ...pagedUsageAmbiguity,
+        reason: { ...pagedUsageAmbiguity.reason, totalMatches: 1 },
+      },
+      {
+        ...pagedUsageAmbiguity,
+        reason: { ...pagedUsageAmbiguity.reason, usages: [] },
+      },
+      {
+        ...pagedNodeAmbiguity,
+        reason: { ...pagedNodeAmbiguity.reason, totalMatches: 1 },
+      },
+      {
+        ...pagedNodeAmbiguity,
+        reason: { ...pagedNodeAmbiguity.reason, nodeIds: [] },
+      },
+    ]) {
+      expect(() => parseAgentContextQueryResult(result)).toThrow(
+        /ambiguous|totalMatches|usages|nodeIds|candidate/u,
+      );
     }
   });
 
@@ -1192,16 +1354,18 @@ describe('agent-context query result contract', () => {
         page: { collection: 'candidates', truncated: false },
       }),
     ).not.toThrow();
-    expect(() =>
-      parseAgentContextQueryResult({
-        ...searchBase,
-        status: 'complete',
-        candidates: [
-          { ...candidate, selectionHandoffs: complete([]) },
-        ],
-        page: { collection: 'candidates', truncated: false },
-      }),
-    ).toThrow(/form|selectionHandoffs|resolved/u);
+    const exactWithoutHandoff = {
+      ...searchBase,
+      status: 'complete',
+      candidates: [{ ...candidate, selectionHandoffs: complete([]) }],
+      page: { collection: 'candidates', truncated: false },
+    } as const;
+    expect(parseAgentContextQueryResult(exactWithoutHandoff)).toEqual(
+      exactWithoutHandoff,
+    );
+    expect(
+      validateAgentContextQueryResult(value.dataset, exactWithoutHandoff),
+    ).toEqual(exactWithoutHandoff);
 
     expect(() =>
       parseAgentContextQueryResult({

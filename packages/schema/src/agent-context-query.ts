@@ -69,6 +69,7 @@ import {
   type DeclaredCrossFieldEffect,
 } from './cross-field-effect.js';
 import type { FieldTypeWrapperPrecondition } from './field-type-interaction.js';
+import { FIELD_TYPE_PROFILE_SCHEMA_VERSION } from './field-type-profile.js';
 import { parseFormContract } from './validation.js';
 
 export const AGENT_CONTEXT_QUERY_SCHEMA_VERSION = '0.1.0' as const;
@@ -1447,10 +1448,18 @@ function validateAgentContextQuerySelectionAgainstParsedDataset(
   const contractNodeIds = [...collectFormContractNodeIds(formContract.nodes)].sort(
     compareText,
   );
+  const scenarioNodeIds = [
+    ...collectFormContractNodeIds(scenarioArtifact.nodes),
+  ].sort(compareText);
   assertSame(
     authorityNodeIds,
     contractNodeIds,
     'agentContextQuerySelection.executionAuthority.usage.steps.nodeIds',
+  );
+  assertSame(
+    scenarioNodeIds,
+    contractNodeIds,
+    'agentContextQuerySelection.scenarioArtifact.nodes',
   );
   const relevantStepIds = new Set(relevantJourneySteps.map(({ id }) => id));
   const relevantActionIds = new Set(
@@ -2089,11 +2098,16 @@ export function createAgentContextQueryCursorBinding(
 export type AgentContextQueryReason =
   | {
       readonly kind: 'usage-ambiguous';
+      readonly totalMatches: number;
       readonly usages: readonly AgentContextUsageCandidateReference[];
     }
   | { readonly kind: 'usage-absent-authoritative' }
   | { readonly kind: 'usage-absence-not-authoritative' }
-  | { readonly kind: 'node-ambiguous'; readonly nodeIds: readonly string[] }
+  | {
+      readonly kind: 'node-ambiguous';
+      readonly totalMatches: number;
+      readonly nodeIds: readonly string[];
+    }
   | { readonly kind: 'node-absent' }
   | { readonly kind: 'step-scope-mismatch'; readonly nodeIds: readonly string[] }
   | {
@@ -2682,16 +2696,6 @@ function parseUsageCandidate(
       'must be empty when the candidate has no exact resolved form.',
     );
   }
-  if (
-    usage.kind === 'declared' &&
-    parsedForm !== undefined &&
-    selectionHandoffs.items.length === 0
-  ) {
-    fail(
-      `${path}.selectionHandoffs`,
-      'must carry at least one exact selection for a resolved declared usage.',
-    );
-  }
   const matchReasons = parseCanonicalCompleteCollection(
     required(value, 'matchReasons', path),
     `${path}.matchReasons`,
@@ -2892,6 +2896,16 @@ function parseNodeCandidate(
         },
       ],
       diagnostics: (unknowns?.items ?? []) as readonly ContractDiagnostic[],
+      ...(interaction?.profile === undefined
+        ? {}
+        : {
+            fieldTypeProfileRegistry: {
+              schemaVersion: FIELD_TYPE_PROFILE_SCHEMA_VERSION,
+              id: 'agent-context.query-node-projection-profiles',
+              version: 1,
+              contentHash: `sha256:${'0'.repeat(64)}`,
+            },
+          }),
     }),
   );
   const parsedNode = contract.nodes[0]!;
@@ -3038,34 +3052,58 @@ function parseReason(input: unknown, path: string): AgentContextQueryReason {
       'transitionId',
       'toStepId',
       'transitionIds',
+      'totalMatches',
     ]),
   );
   const kind = required(union, 'kind', path);
   if (kind === 'usage-ambiguous') {
-    const value = record(input, path, new Set(['kind', 'usages']));
+    const value = record(input, path, new Set(['kind', 'totalMatches', 'usages']));
+    const totalMatches = positiveInteger(
+      required(value, 'totalMatches', path),
+      `${path}.totalMatches`,
+    );
+    if (totalMatches < 2) {
+      fail(`${path}.totalMatches`, 'must be at least two for ambiguity.');
+    }
     const usages = parseCandidateList(
       required(value, 'usages', path),
       `${path}.usages`,
       parseUsageCandidateReference,
       canonicalStringify,
     );
-    if (usages.length < 2) {
-      fail(`${path}.usages`, 'must contain at least two usage identities.');
+    if (usages.length < 1 || usages.length > totalMatches) {
+      fail(
+        `${path}.usages`,
+        'must contain one page-local identity per candidate and no more than totalMatches.',
+      );
     }
     return {
       kind,
+      totalMatches,
       usages,
     };
   }
   if (kind === 'node-ambiguous') {
-    const value = record(input, path, new Set(['kind', 'nodeIds']));
+    const value = record(input, path, new Set(['kind', 'totalMatches', 'nodeIds']));
+    const totalMatches = positiveInteger(
+      required(value, 'totalMatches', path),
+      `${path}.totalMatches`,
+    );
+    if (totalMatches < 2) {
+      fail(`${path}.totalMatches`, 'must be at least two for ambiguity.');
+    }
+    const nodeIds = parseCanonicalStringSet(
+      required(value, 'nodeIds', path),
+      `${path}.nodeIds`,
+      1,
+    );
+    if (nodeIds.length > totalMatches) {
+      fail(`${path}.nodeIds`, 'must not exceed totalMatches.');
+    }
     return {
       kind,
-      nodeIds: parseCanonicalStringSet(
-        required(value, 'nodeIds', path),
-        `${path}.nodeIds`,
-        2,
-      ),
+      totalMatches,
+      nodeIds,
     };
   }
   if (kind === 'step-scope-mismatch' || kind === 'prerequisite-cycle') {
@@ -4819,10 +4857,10 @@ export function validateAgentContextQueryResult(
     result.selection,
   );
   if (result.status === 'refused') return result;
-  const contract = findOwner(
+  const scenarioContract = findOwner(
     dataset.formContracts,
-    selection.owners.formContract,
-    `${path}.selection.owners.formContract`,
+    selection.owners.scenarioArtifact,
+    `${path}.selection.owners.scenarioArtifact`,
   ).artifact;
   const authority = findOwner(
     dataset.executionAuthorities,
@@ -4830,13 +4868,15 @@ export function validateAgentContextQueryResult(
     `${path}.selection.owners.executionAuthority`,
   ).artifact;
   const contractNodeById = new Map(
-    collectFormContractNodes(contract.nodes).map((node) => [node.id, node] as const),
+    collectFormContractNodes(scenarioContract.nodes).map(
+      (node) => [node.id, node] as const,
+    ),
   );
   if (result.operation === 'get-form-context') {
     if (result.view === 'summary') {
       assertSame(
         result.summary,
-        projectContextSummary(selection, contract, authority),
+        projectContextSummary(selection, scenarioContract, authority),
         `${path}.summary`,
       );
       const stepById = new Map(
@@ -4897,7 +4937,7 @@ export function validateAgentContextQueryResult(
     for (const [index, candidate] of result.candidates.entries()) {
       validateNodeProjectionAgainstOwners(
         contractNodeById,
-        contract,
+        scenarioContract,
         authority,
         candidate,
         `${path}.candidates[${index}]`,
@@ -4917,7 +4957,7 @@ export function validateAgentContextQueryResult(
   for (const [index, candidate] of result.slice.closureNodes.items.entries()) {
     validateNodeProjectionAgainstOwners(
       contractNodeById,
-      contract,
+      scenarioContract,
       authority,
       candidate,
       `${path}.slice.closureNodes.items[${index}]`,
@@ -4932,7 +4972,7 @@ export function validateAgentContextQueryResult(
     ),
     `${path}.slice.authority`,
   );
-  const declaredEffects = contract.declaredEffects ?? [];
+  const declaredEffects = scenarioContract.declaredEffects ?? [];
   for (const [index, effect] of result.slice.effects.items.entries()) {
     if (!declaredEffects.some((candidate) => sameJson(candidate, effect))) {
       fail(
