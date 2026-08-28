@@ -107,7 +107,11 @@ export function npmTagForVersion(version) {
   if (!SEMVER_PATTERN.test(version)) {
     throw new Error(`Invalid semantic version: ${version}`);
   }
-  return version.includes('-') ? 'next' : 'latest';
+  // Strip build metadata before checking for a prerelease segment, so a
+  // stable version with a hyphenated build (e.g. "1.0.0+build-5") isn't
+  // misclassified as a prerelease.
+  const [versionCore] = version.split('+');
+  return versionCore.includes('-') ? 'next' : 'latest';
 }
 
 // Packages version independently (Changesets owns version selection; see
@@ -115,6 +119,17 @@ export function npmTagForVersion(version) {
 // "the release tag" here anymore: a release run publishes whichever
 // packages/* have a version not already on npm and skips the rest. See
 // docs/releasing.md and ADR 0009 for the full flow.
+//
+// Returns `{ packages }`, where `packages` is every non-private
+// `packages/*` directory sorted by directory name, each as
+// `{ directory, name, version }`. Throws if the workspace root manifest
+// isn't private, if any non-publishable workspace package (apps/*,
+// fixtures/*, or a private packages/* directory) isn't marked
+// `private: true`, if no publishable packages are found at all, or if any
+// publishable package fails `assertReleasePackageMetadata` (missing
+// name/description/version, missing `files: ["dist"]`, wrong
+// `publishConfig`, wrong `repository`, or — for packages/compiler — a
+// missing/incorrect Formly 6.x peer range).
 export async function loadReleaseManifest({ rootDirectory } = {}) {
   const resolvedRoot = resolve(
     rootDirectory ?? dirname(dirname(fileURLToPath(import.meta.url))),

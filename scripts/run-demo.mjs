@@ -1,9 +1,10 @@
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath, URL } from 'node:url';
 
+import { PNPM_EXECUTABLE } from './tarball.mjs';
+
 const repositoryRoot = fileURLToPath(new URL('..', import.meta.url));
-const pnpmCommand = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-const build = spawnSync(pnpmCommand, ['build:demo'], {
+const build = spawnSync(PNPM_EXECUTABLE, ['build:demo'], {
   cwd: repositoryRoot,
   encoding: 'utf8',
 });
