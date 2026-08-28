@@ -11,6 +11,8 @@ import {
   type FieldTypeWrapperPrecondition,
 } from '@formly-contract/schema';
 
+import { deepFreezeRegistryValue } from './freeze.js';
+
 export { FIELD_TYPE_PROFILE_RESOLUTION_DIAGNOSTIC_CODES };
 
 export type FieldTypeProfileResolutionDiagnosticCode =
@@ -80,16 +82,6 @@ function normalizeRegistry(
   return JSON.parse(
     canonicalizeFieldTypeProfileRegistry(input),
   ) as FieldTypeProfileRegistry;
-}
-
-function deepFreezeRegistryValue<T>(value: T): T {
-  if (typeof value !== 'object' || value === null || Object.isFrozen(value)) {
-    return value;
-  }
-  for (const child of Object.values(value)) {
-    deepFreezeRegistryValue(child);
-  }
-  return Object.freeze(value);
 }
 
 function createPreparedResolver(
