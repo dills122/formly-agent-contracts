@@ -1,5 +1,13 @@
 # RH-03: Angular/Formly Field-Profile Authoring and Conformance Bridge
 
+> **Authoring-model supersession:** the build, inventory, isolation, and render
+> evidence in this report remains valid. Proposed
+> [ADR 0011](../../decisions/0011-named-formly-environments-and-contracted-field-adapters.md)
+> replaces the manual project-registry UX and optional-only conformance
+> recommendation with named environments, compact reviewed adapters,
+> deterministic canonical-registry generation, and required conformance for
+> actionability.
+
 **Status:** candidate production design with retained contract and AOT-browser
 spikes on the pinned tuple; production implementation remains blocked on
 promoting those proofs into schema/package-owned compatibility gates and on the

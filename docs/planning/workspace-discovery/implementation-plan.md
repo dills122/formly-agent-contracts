@@ -8,10 +8,12 @@ goldens, linked/packed consumer smokes, and the schema-owned portable
 runtime/dependency provenance foundation.
 
 The RH-01 through RH-05 research packets are approved planning evidence, not
-implemented product behavior. `RH06-DOC` and `CTX-0A` are complete. Under the
-reconciled dependency order, Task 7A.2 (`HOST-1`) is now ready; each other
-producer's exact prerequisites and status remain in the execution index.
-Application
+implemented product behavior. `RH06-DOC` and `CTX-0A` through `CTX-0D` are
+complete. Under the reconciled dependency order, `CTX-1`, `DRV-0`, and Task
+7A.2 (`HOST-1`) are ready. `AUTH-0` is also ready for explicit maintainer
+approval of proposed ADR 0011; AUTH-dependent implementation remains gated
+until that approval. Each other producer's exact prerequisites and status
+remain in the execution index. Application
 factory execution is separately blocked on `oci-rootless-v1`; neither the
 trusted local worker nor the future `isolated-ci-v1` config worker satisfies
 that gate.
@@ -38,12 +40,15 @@ Proposed decision:
 Build a typed workspace layer that discovers project-local Formly contract
 sources across applications, libraries, and packages. The first vertical slice
 must turn one root config and several project configs into deterministic
-contract artifacts without Angular or Nx coupling. The project configuration
-also becomes the ownership boundary for application field-type profile
-registries, while versioned profile DTOs remain in the schema package and
-profile resolution remains in the compiler. Angular and Nx integrations
+contract artifacts without Angular or Nx coupling. Project-owned raw
+field-type profile registries are the implemented legacy input, while versioned
+profile DTOs remain in the schema package and profile resolution remains in the
+compiler. Proposed ADR 0011 moves normal authoring to workspace-level named
+Formly environments and compact reusable-library adapters that lower
+deterministically to that same canonical registry. Angular and Nx integrations
 then add distributed providers, trusted JIT scenario compilation, a separate
-AOT authoring/inventory lane, adapter scaffolding, and affected execution.
+AOT environment inventory/conformance lane, generated canonical registries,
+optional migration scaffolds, and affected execution.
 Source lineage, behavior evidence, and factory/value production follow their
 own RH-06 gates and join through pinned sibling artifacts. Runtime capture
 remains an optional migration phase.
@@ -60,8 +65,12 @@ roots, serialize model values, or invent selectors.
 - Keep configuration, discovery, runner, and CLI together in `workspace` until
   independent consumers justify more packages.
 - Use root config for workspace policy and project config for local ownership.
-- Keep global profile policy in root config, but keep application-specific
-  field-type profiles and Angular authoring inputs in project config.
+- Pending `AUTH-0`/ADR 0011 approval, put named Formly environments and global
+  authoring inputs in root config, let projects select one exact environment,
+  and require reusable field libraries to contribute compact reviewed adapters
+  through the same catalog/helper used by production registration. Third-party
+  registrations use explicit reviewed binding adapters. Keep project
+  `fieldTypeProfiles` only as a mutually exclusive legacy input.
 - Put framework-neutral profile DTOs/validation in `@formly-contract/schema`,
   Formly registration/profile resolution in `@formly-contract/compiler`, and
   Angular inventory and scaffold generation in the optional `angular` package.
@@ -160,11 +169,14 @@ HOST-2 / Task 7B.1 -> HOST-3 / Task 7B.2
 
 CTX-0A -> ANG-0 -> ANG-1 retained AOT compatibility gate
 HOST-1 + ANG-1 go -> ANG-2 / Task 7A.3: Angular package shell
-ANG-2 + CTX-0A -> ANG-2P / Task 7D: providers + project descriptor
-CTX-0A + ANG-1 go -> ANG-2R / Task 8B.1: report/scaffold contracts
+ANG-2 + CTX-0A + AUTH-0 accepted
+  -> ANG-2P / Task 7D: source providers + named-environment descriptors
+CTX-0A + ANG-1 go + AUTH-0 accepted
+  -> ANG-2R / Task 8B.1: environment/adapter/registry/conformance contracts
 ANG-2 + HOST-4 -> ANG-3 / Task 7C: guarded JIT host
 ANG-2 + ANG-2P + ANG-2R -> ANG-4 / Task 8B.2: AOT inventory host
-ANG-4 (+ LIN-2 where source joins are required) -> ANG-5 / Task 8B.3
+ANG-4 -> ANG-5 / Task 8B.3: adapter lowering + required conformance
+          (+ LIN-2 only for optional source/template joins)
 
 ANG-3 + ANG-2P + BHV-1 + CTX-0C + CTX-0D -> Task 8 / BHV-4
 Task 8 + Tasks 8B.2–8B.4 ----------------> Checkpoint B: Angular producer pilot
@@ -252,17 +264,17 @@ contains explicit effects only.
 
 ## Cross-plan traceability
 
-| Requirement | Decision | Tasks | Verification | Status |
-| --- | --- | --- | --- | --- |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3 | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks | Implemented through Task 6B; `HOST-1` is ready and `HOST-2`–`HOST-4` remain pending |
-| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics | Profiles are application-owned data; executable drivers are separate | Tasks 3A–3B | Strict DTO, resolution, conflict, canonical-hash, and artifact-ingestion semantic safety tests | Tasks 3A–3B and Tasks 5.0–5.1 implemented, including safe node projection and realistic Angular/Nx fixture coverage; executable drivers remain separate |
-| `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority | A schema-owned compatibility result and retained AOT gate precede inventory/scaffolds; reviewed profiles remain sole semantic authority | `ANG-0`, `ANG-1`, `ANG-2`/Task 7A.3, `ANG-2P`/Task 7D, `ANG-2R`/Task 8B.1, `ANG-4`–`ANG-6`/Tasks 8B.2–8C | Angular CLI/Nx application-target gate, strict report/scaffold tests, configured-scope coverage, negative inference, and workplace value pilot | Approved research with retained spike; production gates pending |
-| `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing | Explicit declared graph; derived references/deltas remain non-authoritative evidence | Tasks 3C and 5A | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike | Implemented with schema/config/compiler/workspace/anchor-fixture evidence |
-| `REQ-CONTEXT-01` New producer artifacts share exact references, freshness, execution authority, and diagnostics | Land the schema-addressed envelope first, then keep authority, live freshness, and consumer diagnostic ownership in their named slices | `CTX-0A`–`CTX-2` and `CTX-GATE` in the execution index | Strict validators, canonical round trips, referential-integrity and mutation tests, exact synthetic walkthroughs, then one real pinned producer pilot | `CTX-0A` complete; `CTX-0B` and `CTX-0C` ready; later slices pending |
-| `REQ-LINEAGE-01` An agent can connect an anchored form root and direct source usage without name guessing | Explicit root authority plus per-leaf TypeScript indexing; ambiguity, coverage, staleness, and privacy fail closed | `LIN-0`–`LIN-4` / RH01-T2–T8 | Representative leaf-tsconfig/project-reference/alias/barrel/lazy/privacy/scale gate, then exact/ambiguous/stale/incomplete query tests | Harness retained; `LIN-0` blocked after an `inconclusive` public rehearsal, no production index |
-| `REQ-SCENARIO-01` Scenario evidence has portable semantics and a distinct trusted producer | RH-04 owns semantics; Task 8 produces JIT-resolved artifacts; RH-05 only queries/validates them | `BHV-0`–`BHV-4`, `ANG-2P`/Task 7D, and `ANG-3`/Task 7C | Exact basis-contract hashes, replayable/compile-only cases, strict deltas, no inferred business verbs | ADR 0010 proposed; explicit `BHV-0` approval and later schemas/host remain pending |
-| `REQ-FACTORY-01` Factory-derived shape/value evidence cannot be manufactured from synthetic live-looking inputs | Inert DTO/projector first; code-free sidecar and structural identity; execution only in rootless OCI | `FAC-1`–`FAC-4` | Synthetic projector negatives, then retained catch-resistant ledger and `oci-rootless-v1` conformance controls | `FAC-1` ready; runtime execution remains blocked at FAC-3 |
-| `REQ-NX-01` Nx improves monorepo discovery and execution without becoming authority | One optional aggregate coordinator target; artifact hashes remain correctness | Tasks 9–12C | Supported-version fixture, one-target/cache/affected/isolation tests | Pending Checkpoint B and workplace version evidence |
+| Requirement                                                                                                     | Decision                                                                                                                                                                                     | Tasks                                                                                                              | Verification                                                                                                                                                                                                                   | Status                                                                                                                               |
+| --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery                                                        | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host                                                                                    | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3                                                                   | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks                                                                        | Implemented through Task 6B; `HOST-1` is ready and `HOST-2`–`HOST-4` remain pending                                                  |
+| `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics                               | The implemented canonical registry remains the compiler IR; proposed ADR 0011 makes compact library-owned adapters the normal semantic authoring authority; executable drivers stay separate | Tasks 3A–3B plus `AUTH-0`, adapter lowering, and environment publication                                           | Existing strict DTO/resolution/hash tests plus compact-to-canonical parity, conflict, exact environment binding, and conformance tests                                                                                         | Tasks 3A–3B and Tasks 5.0–5.1 implemented for the canonical/legacy boundary; `AUTH-0` is ready and the new authoring path is pending |
+| `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority                      | A schema-owned compatibility result and retained AOT gate precede named-environment inventory; reviewed adapters remain semantic authority and required conformance gates actionability      | `AUTH-0`, `ANG-0`, `ANG-1`, `ANG-2`/Task 7A.3, `ANG-2P`/Task 7D, `ANG-2R`/Task 8B.1, `ANG-4`–`ANG-6`/Tasks 8B.2–8C | Angular CLI/Nx application-target gate, strict environment/adapter/registry/report schemas, configured-scope coverage, compact-lowering parity, required controlled conformance, negative inference, and workplace value pilot | Proposed ADR 0011 plus approved retained Angular research; production gates pending                                                  |
+| `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing                              | Explicit declared graph; derived references/deltas remain non-authoritative evidence                                                                                                         | Tasks 3C and 5A                                                                                                    | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike                                                                                                                                                    | Implemented with schema/config/compiler/workspace/anchor-fixture evidence                                                            |
+| `REQ-CONTEXT-01` New producer artifacts share exact references, freshness, execution authority, and diagnostics | Land the schema-addressed envelope first, then keep authority, live freshness, and consumer diagnostic ownership in their named slices                                                       | `CTX-0A`–`CTX-2` and `CTX-GATE` in the execution index                                                             | Strict validators, canonical round trips, referential-integrity and mutation tests, exact synthetic walkthroughs, then one real pinned producer pilot                                                                          | `CTX-0A` through `CTX-0D` complete; `CTX-1` ready; later gates pending                                                               |
+| `REQ-LINEAGE-01` An agent can connect an anchored form root and direct source usage without name guessing       | Explicit root authority plus per-leaf TypeScript indexing; ambiguity, coverage, staleness, and privacy fail closed                                                                           | `LIN-0`–`LIN-4` / RH01-T2–T8                                                                                       | Representative leaf-tsconfig/project-reference/alias/barrel/lazy/privacy/scale gate, then exact/ambiguous/stale/incomplete query tests                                                                                         | Harness retained; `LIN-0` blocked after an `inconclusive` public rehearsal, no production index                                      |
+| `REQ-SCENARIO-01` Scenario evidence has portable semantics and a distinct trusted producer                      | RH-04 owns semantics; Task 8 produces JIT-resolved artifacts; RH-05 only queries/validates them                                                                                              | `BHV-0`–`BHV-4`, `ANG-2P`/Task 7D, and `ANG-3`/Task 7C                                                             | Exact basis-contract hashes, replayable/compile-only cases, strict deltas, no inferred business verbs                                                                                                                          | ADR 0010 proposed; explicit `BHV-0` approval and later schemas/host remain pending                                                   |
+| `REQ-FACTORY-01` Factory-derived shape/value evidence cannot be manufactured from synthetic live-looking inputs | Inert DTO/projector first; code-free sidecar and structural identity; execution only in rootless OCI                                                                                         | `FAC-1`–`FAC-4`                                                                                                    | Synthetic projector negatives, then retained catch-resistant ledger and `oci-rootless-v1` conformance controls                                                                                                                 | `FAC-1` ready; runtime execution remains blocked at FAC-3                                                                            |
+| `REQ-NX-01` Nx improves monorepo discovery and execution without becoming authority                             | One optional aggregate coordinator target; artifact hashes remain correctness                                                                                                                | Tasks 9–12C                                                                                                        | Supported-version fixture, one-target/cache/affected/isolation tests                                                                                                                                                           | Pending Checkpoint B and workplace version evidence                                                                                  |
 
 ## Phase 0: Fail-fast feasibility and contracts
 
@@ -399,13 +411,18 @@ precedence/conflict rules
 
 **Estimated scope:** Medium
 
-### Task 3B: Integrate project-owned profile registries (`REQ-PROFILE-01`)
+### Task 3B: Integrate legacy project-owned profile registries (`REQ-PROFILE-01`)
 
 **Description:** Let each project descriptor contribute a serializable
 field-type profile registry, resolve it against Formly types/wrappers/approved
 variants, and carry its canonical identity into resolved workspace
 configuration. Root configuration controls policy and defaults but does not
 become a central list of application field types.
+
+This completed task remains the compatibility implementation. Proposed ADR
+0011 supersedes raw project registries as the intended normal authoring UX but
+retains the DTO, hashes, compiler resolution, and mutually exclusive legacy
+input during migration.
 
 **Acceptance criteria:**
 
@@ -717,12 +734,12 @@ does not duplicate the full task contracts in the
 
 ### Shared `CTX-0` contract checkpoint
 
-| ID | Observable output | Dependencies | Status | Verification boundary |
-| --- | --- | --- | --- | --- |
-| `CTX-0A` | Schema-addressed artifact-set envelope with open content references, one structured workspace-index anchor, and its own `contentHash` identity | `RH06-DOC` | Complete | 59 focused tests, schema build/lint, fresh review, Changeset, and full repository gate pass |
-| `CTX-0B` | Source-usage and journey record schemas with distinct form/root/usage/journey identities | `CTX-0A` | Ready | Identity, ambiguity, coverage, transition, and referential-integrity tests |
-| `CTX-0C` | Scenario references and exact commit/assertion/action/transition/repeater-capture authority | `CTX-0A` | Ready | Every selected ID resolves exactly; unsupported execution authority refuses |
-| `CTX-0D` | Minimal positive and negative synthetic walkthrough records | `CTX-0B`, `CTX-0C` | Pending | Deterministic fixture IDs validate and are visibly marked `synthetic` |
+| ID       | Observable output                                                                                                                              | Dependencies       | Status   | Verification boundary                                                                                                                                       |
+| -------- | ---------------------------------------------------------------------------------------------------------------------------------------------- | ------------------ | -------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `CTX-0A` | Schema-addressed artifact-set envelope with open content references, one structured workspace-index anchor, and its own `contentHash` identity | `RH06-DOC`         | Complete | 60 focused tests, schema build/lint, fresh review, Changeset, and full repository gate pass                                                                 |
+| `CTX-0B` | Source-usage and journey record schemas with distinct form/root/usage/journey identities                                                       | `CTX-0A`           | Complete | 48 focused tests, privacy/identity plus bounded-input and numeric-normalization regressions, schema checks, and focused post-fix review                     |
+| `CTX-0C` | Scenario references and exact commit/assertion/action/transition/repeater-capture authority                                                    | `CTX-0A`           | Complete | 51 focused tests, authority mutation plus bounded-input and numeric-normalization regressions, schema checks, and focused post-fix review                   |
+| `CTX-0D` | Minimal positive and negative synthetic walkthrough records                                                                                    | `CTX-0B`, `CTX-0C` | Complete | 31 focused and 190 integrated tests, bounded exact synthetic-boundary and cross-family projection validation, and three-pass independent-review remediation |
 
 No TypeScript source indexer, Angular host, application factory, MCP adapter, or
 Playwright driver is part of `CTX-0`. New producers may define their internal
@@ -740,13 +757,13 @@ The [RH-01 research packet](../../research/hardening/form-identity-and-source-li
 is approved evidence. Production source lineage remains pending and uses the
 execution-index IDs below so RH01's research task numbers remain stable.
 
-| Execution ID | RH-01 mapping | Workspace responsibility | Dependencies | Status |
-| --- | --- | --- | --- | --- |
-| `LIN-0` | RH01-T2 | Retain the representative leaf-tsconfig, project-reference, declaration-output, alias/barrel, lazy-route, privacy, bundle-isolation, and scale gate | `RH06-DOC` | Blocked: harness/public rehearsal complete; representative workplace evidence remains `inconclusive` |
-| `LIN-1` | RH01-T3 | Add typed definition/root anchors and creation provenance without serializing functions | `CTX-0A`, `LIN-0` go | Pending; must not begin before gate |
-| `LIN-2` | RH01-T4–T5 | Build per-leaf indexes, canonical cross-program joins, coverage, staleness, disclosure, and deterministic source-lineage artifact | `CTX-0B`, `LIN-1` | Pending |
-| `LIN-3` | RH01-T6 | Add artifact-only exact/ambiguous/unresolved/stale/incomplete queries | `LIN-2`, `CTX-1` | Pending |
-| `LIN-4` | RH01-T7–T8 | Add bounded Angular/route candidates and strict exceptional usage/journey annotations | `LIN-2`, journey schema from `CTX-0B`; Angular evidence when used | Pending |
+| Execution ID | RH-01 mapping | Workspace responsibility                                                                                                                            | Dependencies                                                      | Status                                                                                               |
+| ------------ | ------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------- |
+| `LIN-0`      | RH01-T2       | Retain the representative leaf-tsconfig, project-reference, declaration-output, alias/barrel, lazy-route, privacy, bundle-isolation, and scale gate | `RH06-DOC`                                                        | Blocked: harness/public rehearsal complete; representative workplace evidence remains `inconclusive` |
+| `LIN-1`      | RH01-T3       | Add typed definition/root anchors and creation provenance without serializing functions                                                             | `CTX-0A`, `LIN-0` go                                              | Pending; must not begin before gate                                                                  |
+| `LIN-2`      | RH01-T4–T5    | Build per-leaf indexes, canonical cross-program joins, coverage, staleness, disclosure, and deterministic source-lineage artifact                   | `CTX-0B`, `LIN-1`                                                 | Pending                                                                                              |
+| `LIN-3`      | RH01-T6       | Add artifact-only exact/ambiguous/unresolved/stale/incomplete queries                                                                               | `LIN-2`, `CTX-1`                                                  | Pending                                                                                              |
+| `LIN-4`      | RH01-T7–T8    | Add bounded Angular/route candidates and strict exceptional usage/journey annotations                                                               | `LIN-2`, journey schema from `CTX-0B`; Angular evidence when used | Pending                                                                                              |
 
 The form ID, root anchor ID, usage/callsite ID, and journey/step ID remain
 separate identities. Nx may enumerate the leaf programs and cache index targets,
@@ -756,16 +773,16 @@ program produces `incomplete`, not an authoritative empty usage list.
 
 ### Behavior/scenario and factory mappings
 
-| Execution IDs | Ownership in this plan | Status and boundary |
-| --- | --- | --- |
-| `BHV-0` | Approve the portable causal-edge/acausal-state/access-prerequisite topology and authority matrix | ADR 0010 proposed; ready for explicit maintainer approval |
-| `BHV-1` | Schema owns strict normalized conditions, behavior/scenario evidence, facet/scope completeness, and unknowns | Pending topology approval; `CTX-0A` is complete |
-| `BHV-2` | Compiler/workspace project existing v0.4 effects, wrapper prerequisites, and repeater access losslessly | Pending `BHV-1`; existing v0.4 source records remain implemented authority |
-| `BHV-3` | Compiler/workspace derive only the bounded closed grammar and emit conservative callback/hook scaffolds | Pending `BHV-2`; helpers/imports/pipelines remain refused |
-| `BHV-4` | Angular Task 8 produces exact contract-hash-bound replayable/compile-only scenario evidence | Pending `ANG-3`, `ANG-2P`, `BHV-1`, `CTX-0C`, and `CTX-0D`; these are direct publication dependencies |
-| `BHV-GATE` | A redacted workplace pilot measures construct frequency and scaffold acceptance before AST coverage expands | Pending `BHV-3` and `BHV-4` |
-| `FAC-1`–`FAC-2` | Schema/compiler own inert binding/value DTOs and pure projection; workspace owns the code-free sidecar and structural-identity gate | `FAC-1` ready; `FAC-2` pending `FAC-1` |
-| `FAC-3`–`FAC-4` | An external rootless OCI provider owns conformance; workspace may orchestrate only after it passes | **Blocked** until `oci-rootless-v1`, the catch-resistant runner ledger, structural controls, and retained negative cases pass |
+| Execution IDs   | Ownership in this plan                                                                                                              | Status and boundary                                                                                                           |
+| --------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
+| `BHV-0`         | Approve the portable causal-edge/acausal-state/access-prerequisite topology and authority matrix                                    | ADR 0010 proposed; ready for explicit maintainer approval                                                                     |
+| `BHV-1`         | Schema owns strict normalized conditions, behavior/scenario evidence, facet/scope completeness, and unknowns                        | Pending topology approval; `CTX-0A` is complete                                                                               |
+| `BHV-2`         | Compiler/workspace project existing v0.4 effects, wrapper prerequisites, and repeater access losslessly                             | Pending `BHV-1`; existing v0.4 source records remain implemented authority                                                    |
+| `BHV-3`         | Compiler/workspace derive only the bounded closed grammar and emit conservative callback/hook scaffolds                             | Pending `BHV-2`; helpers/imports/pipelines remain refused                                                                     |
+| `BHV-4`         | Angular Task 8 produces exact contract-hash-bound replayable/compile-only scenario evidence                                         | Pending `ANG-3`, `ANG-2P`, `BHV-1`, `CTX-0C`, and `CTX-0D`; these are direct publication dependencies                         |
+| `BHV-GATE`      | A redacted workplace pilot measures construct frequency and scaffold acceptance before AST coverage expands                         | Pending `BHV-3` and `BHV-4`                                                                                                   |
+| `FAC-1`–`FAC-2` | Schema/compiler own inert binding/value DTOs and pure projection; workspace owns the code-free sidecar and structural-identity gate | `FAC-1` ready; `FAC-2` pending `FAC-1`                                                                                        |
+| `FAC-3`–`FAC-4` | An external rootless OCI provider owns conformance; workspace may orchestrate only after it passes                                  | **Blocked** until `oci-rootless-v1`, the catch-resistant runner ledger, structural controls, and retained negative cases pass |
 
 The trusted JIT/config worker and the `isolated-ci-v1` CI provider are not
 factory containment. No future task may extend the current `create()` path with
@@ -777,27 +794,27 @@ The framework-neutral runtime-host mapping is explicit and precedes Angular
 execution. Task 7A.1 is already complete provenance work; it is not a hidden
 pending scheduler dependency.
 
-| Execution ID | Workspace-plan task | Exact dependencies |
-| --- | --- | --- |
-| `HOST-1` | Task 7A.2 framework-neutral runtime-host protocol | `CTX-0A` |
-| `HOST-2` | Task 7B.1 discovery/inventory split | `HOST-1` |
-| `HOST-3` | Task 7B.2 trusted-local worker lifecycle | `HOST-2` |
-| `HOST-4` | Task 7B.3 failure-safe aggregation/publication | `HOST-3`, `CTX-0A` |
+| Execution ID | Workspace-plan task                               | Exact dependencies |
+| ------------ | ------------------------------------------------- | ------------------ |
+| `HOST-1`     | Task 7A.2 framework-neutral runtime-host protocol | `CTX-0A`           |
+| `HOST-2`     | Task 7B.1 discovery/inventory split               | `HOST-1`           |
+| `HOST-3`     | Task 7B.2 trusted-local worker lifecycle          | `HOST-2`           |
+| `HOST-4`     | Task 7B.3 failure-safe aggregation/publication    | `HOST-3`, `CTX-0A` |
 
 The Angular execution-index mapping is likewise explicit:
 
-| Execution ID | Workspace-plan task(s) | Exact dependencies |
-| --- | --- | --- |
-| `ANG-0` | Schema-owned compatibility result in the prerequisite below | `CTX-0A` |
-| `ANG-1` | Retained Angular CLI/Nx application-target compatibility fixture gate | `ANG-0` |
-| `ANG-2` | Task 7A.3 dependency-light Angular package shell | `ANG-1` go, `HOST-1` |
-| `ANG-2P` | Task 7D Angular source providers plus Node-safe authoring/project-source descriptor | `ANG-2`, `CTX-0A` |
-| `ANG-2R` | Task 8B.1 schema-owned authoring report/scaffold contracts | `CTX-0A`, `ANG-1` go |
-| `ANG-3` | Task 7C guarded JIT/config host capability only; no scenario semantics or publication | `ANG-2`, `HOST-4` |
-| `ANG-4` | Task 8B.2 AOT browser host and Formly inventory | `ANG-2`, `ANG-2P`, `ANG-2R` |
-| `ANG-5` | Task 8B.3 source/template joins and review-only scaffolds | `ANG-4`; `LIN-2` where source joins are required |
-| `ANG-GATE` | Task 8B.4 workplace authoring-value pilot | `ANG-5` |
-| `ANG-6` | Optional Task 8C exact registry-bound conformance | `ANG-GATE` go, `BHV-4` |
+| Execution ID | Workspace-plan task(s)                                                                                                    | Exact dependencies                                       |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `ANG-0`      | Schema-owned compatibility result in the prerequisite below                                                               | `CTX-0A`                                                 |
+| `ANG-1`      | Retained Angular CLI/Nx application-target compatibility fixture gate                                                     | `ANG-0`                                                  |
+| `ANG-2`      | Task 7A.3 dependency-light Angular package shell                                                                          | `ANG-1` go, `HOST-1`                                     |
+| `ANG-2P`     | Task 7D Angular source-group providers plus Node-safe named-environment descriptors/project selection                     | `ANG-2`, `CTX-0A`, `AUTH-0` accepted                     |
+| `ANG-2R`     | Task 8B.1 schema-owned environment/adapter/generated-registry/report/conformance contracts                                | `CTX-0A`, `ANG-1` go, `AUTH-0` accepted                  |
+| `ANG-3`      | Task 7C guarded JIT/config host capability only; no scenario semantics or publication                                     | `ANG-2`, `HOST-4`                                        |
+| `ANG-4`      | Task 8B.2 AOT browser host and named-environment Formly inventory                                                         | `ANG-2`, `ANG-2P`, `ANG-2R`                              |
+| `ANG-5`      | Task 8B.3 adapter lowering, required conformance, generated registry/environment bundle, and optional migration scaffolds | `ANG-4`; `LIN-2` only for optional source/template joins |
+| `ANG-GATE`   | Task 8B.4 workplace authoring-value pilot                                                                                 | `ANG-5`                                                  |
+| `ANG-6`      | Optional Task 8C expanded registry-bound drift/browser-parity conformance                                                 | `ANG-GATE` go, `BHV-4`                                   |
 
 ### Task 7A: Publish the runtime-host contract and Angular package boundary
 
@@ -1178,21 +1195,34 @@ rendered custom fields, or serve as a fallback for a failed `ANG-1` gate.
 
 **Description:** Add the Angular integration package with a multi token,
 `provideFormContractSource`, and a deterministic catalog. Prove NgModule and
-standalone provider contribution using groups rather than individual root
-registrations. This task also owns the Node-safe `angularAuthoring` project
-descriptor that points to the application-owned target, trusted entry,
-tsconfig, configured scopes, source roots, and exact type dispositions. Generic
-workspace discovery validates those serializable pointers without importing
-Angular; Task 7B does not own or infer them.
+standalone provider contribution using source groups rather than individual
+root registrations. Under accepted ADR 0011, this task also owns Node-safe
+named Formly-environment descriptors and exact project selection. Environment
+descriptors point to the application-owned target, trusted authoring entry,
+tsconfig, configured root/lazy scopes, source roots, and adapter-catalog entry.
+Generic workspace discovery validates those serializable pointers without
+importing Angular; Task 7B does not own or infer them.
 
 **Acceptance criteria:**
 
 - [ ] Separate features contribute source groups through Angular public provider
       APIs.
 - [ ] The catalog sorts IDs, rejects duplicates, and returns fresh instances.
-- [ ] The Node-safe authoring descriptor validates confined workspace-relative
-      target/entry/tsconfig/source-root pointers, explicit feature scopes, and
-      exact type dispositions without importing the trusted Angular entry.
+- [ ] A contracted type contribution feeds the same public catalog/helper path
+      used by production Formly registration. A third-party registration may
+      instead use one explicit reviewed binding adapter whose exact
+      type/component/wrapper/scope join is proven by conformance.
+- [ ] Each explicit semantic form retains one `FormContractDefinition`; source
+      groups may adapt an existing registry, while fragments are not promoted
+      unless deliberately registered as standalone semantic forms.
+- [ ] The Node-safe environment descriptor validates confined
+      workspace-relative target/entry/tsconfig/source-root/catalog pointers,
+      explicit root/lazy scopes, stable environment identity, and exact project
+      selection without importing the trusted Angular entry.
+- [ ] One project selects at most one environment. Environment inheritance,
+      overlays, and merge precedence are unsupported in the first version.
+- [ ] Environment selection and legacy `fieldTypeProfiles` are mutually
+      exclusive and never silently merged.
 - [ ] Provider and descriptor inventory states configured scope explicitly;
       absent lazy features remain incomplete rather than silently absent.
 - [ ] The package declares Angular/Formly peers without adding them to
@@ -1206,7 +1236,8 @@ Angular; Task 7B does not own or infer them.
       Node-safe and that no Angular module or provider executes.
 - [ ] Angular production compilation succeeds.
 
-**Dependencies:** `ANG-2` (Task 7A.3) and `CTX-0A`
+**Dependencies:** `ANG-2` (Task 7A.3), `CTX-0A`, and accepted `AUTH-0` / ADR
+0011
 
 **Files likely touched:**
 
@@ -1274,49 +1305,57 @@ semantics or publication.
 
 ### Task 8B: Build the separate AOT field-profile authoring lane (`REQ-AUTHOR-01`)
 
-**Description:** Use the configured Angular application target and fresh browser
-contexts to inventory effective Formly registrations and produce
-evidence-tagged, review-required field-profile scaffolds. This lane never loads
-through Task 7C, never writes a reviewed registry, and never turns rendered DOM
-or source heuristics into semantic authority.
+**Description:** Use the configured named Formly environment, its Angular
+application target, and fresh browser contexts to inventory effective
+registrations and scopes. Aggregate reviewed compact adapter contributions,
+run required controlled-example conformance, and lower them deterministically
+to the existing canonical `FieldTypeProfileRegistry`. This lane never loads
+through Task 7C and never turns rendered DOM, source heuristics, or generated
+scaffolds into semantic authority. Optional scaffolds remain migration aids.
 
-#### Task 8B.1 (`ANG-2R`): Publish strict authoring report and scaffold contracts
+#### Task 8B.1 (`ANG-2R`): Publish strict environment, adapter, registry-build, report, scaffold, and conformance contracts
 
 **Acceptance criteria:**
 
-- [ ] Schema-owned DTOs cover environment/scope identity, raw/effective
-      registrations, inheritance/defaults/wrappers, evidence, unknowns,
-      dispositions, configured-scope coverage, diagnostics, observations, and
-      review-only scaffolds.
+- [ ] Schema-owned DTOs cover exact environment/scope identity, compact adapter
+      presets/contributions, raw/effective registrations,
+      inheritance/defaults/wrappers, generated-registry identity, evidence,
+      unknowns, dispositions, configured-scope coverage, diagnostics,
+      observations, conformance states, and optional review-only scaffolds.
 - [ ] Validators enforce exact IDs/references, canonical set ordering,
       built-in-vs-explicit precedence, closed diagnostic/unknown unions, and no
       Angular objects, paths outside the disclosure policy, or live values.
+- [ ] The registry-build manifest pins environment, scope-inventory,
+      adapter-catalog, generated-registry, tool-compatibility, and conformance
+      hashes plus omissions/conflicts.
 - [ ] Display/assertion-only and unsupported generic-operation gaps remain
       explicit dispositions/unknowns rather than invented executable profiles;
       no driver is implied before the schema-owned non-interactive decision.
 
 **Verification:**
 
-- [ ] Canonical round-trip, unknown-key, reference-mutation, coverage, evidence,
-      and precedence tests pass over the retained RH-03 matrix.
+- [ ] Canonical round-trip, unknown-key, reference-mutation, compact-to-canonical
+      parity, coverage, evidence, conflict, and conformance-state tests pass over
+      the retained RH-03 matrix.
 
-**Dependencies:** `CTX-0A` and `ANG-1` go
+**Dependencies:** `CTX-0A`, `ANG-1` go, and accepted `AUTH-0` / ADR 0011
 
 **Estimated scope:** Medium
 
-#### Task 8B.2 (`ANG-4`): Implement the isolated AOT browser host and Formly inventory
+#### Task 8B.2 (`ANG-4`): Implement the isolated AOT browser host and named-environment Formly inventory
 
 **Acceptance criteria:**
 
-- [ ] The selected Angular CLI/Nx application target consumes the exact
-      authoring entry and tsconfig, links partial libraries, resolves external
-      resources, and emits the confined browser shell.
+- [ ] The selected named environment's Angular CLI/Nx application target
+      consumes the exact authoring entry and tsconfig, links partial libraries,
+      resolves external resources, and emits the confined browser shell.
 - [ ] Each root/feature scope uses a fresh browser context/platform/injector,
       a one-shot schema-validated bridge, bounded time/output, and mandatory
       destroy/page/context cleanup.
 - [ ] Inventory distinguishes raw and effective registrations, inherited
-      components/defaults/wrappers, explicit scope provenance, alias conflicts,
-      missing profiles, and absent/unconfigured lazy scopes.
+      components/defaults/wrappers, explicit environment/scope provenance,
+      alias conflicts, missing adapter contributions, and absent/unconfigured
+      lazy scopes.
 - [ ] HTTP/WebSocket interception improves determinism but is not described as
       a process or OS sandbox.
 
@@ -1332,32 +1371,40 @@ not another `ANG-4` scheduler dependency.
 
 **Estimated scope:** Medium
 
-#### Task 8B.3 (`ANG-5`): Join source/template evidence and emit review scaffolds
+#### Task 8B.3 (`ANG-5`): Aggregate adapters, run required conformance, and publish the generated canonical registry
 
 **Acceptance criteria:**
 
-- [ ] Registration/component evidence joins deterministically to configured
-      source/template evidence with explicit ambiguity and unknown results.
-- [ ] Native-backed candidates are `derived`; overlays, autocomplete, tables,
-      repeaters, dynamic names, opaque children, parse failures, and multi-step
-      widgets remain non-actionable until a reviewed profile supplies exact
-      semantics.
-- [ ] Reviewed profiles authorize interaction only for interactive custom types.
-      Display/assertion-only fields and components retain an explicit
-      non-interactive disposition and remain non-executable or unknown until a
-      schema-owned no-driver/non-interactive profile branch is approved.
-- [ ] Output is canonical and review-only; no registry file or semantic contract
-      is created or updated automatically.
+- [ ] Reviewed adapter contributions join deterministically to exact
+      environment registrations/components/wrappers/scopes; duplicates,
+      conflicts, missing registrations, and ambiguous aliases fail closed.
+- [ ] Compact presets lower losslessly into the existing realistic canonical
+      registry matrix; the generated registry is reproducible and never edited
+      as source.
+- [ ] Every interactive profile required for actionability proves its exact
+      component, controlled example, codec/model sink, required parts, driver
+      operation, and configured scope through required conformance.
+- [ ] Display/assertion-only fields retain an explicit non-interactive
+      disposition and never receive an invented interaction or driver.
+- [ ] Optional source/template analysis and scaffolds are evidence-tagged
+      migration aids only. Native-backed candidates are `derived`; overlays,
+      autocomplete, tables, repeaters, dynamic names, opaque children, parse
+      failures, and multi-step widgets never gain authority from analysis.
+- [ ] Publication emits the exact generated registry and environment-build
+      manifest with complete/incomplete/non-actionable status; observations
+      never rewrite declarations.
 
 **Verification:**
 
 - [ ] Focused tests retain the native-backed, overlay, autocomplete, table,
       repeater, date-range, text-editor, display-only, wrapper, variant,
-      inherited-type, dynamic-name, and ambiguous-overlay matrix.
+      inherited-type, dynamic-name, and ambiguous-overlay matrix, including
+      compact-to-canonical parity and required conformance failures.
 - [ ] Source-derived joins use `LIN-2` identities/coverage when available;
       incomplete lineage produces a localized unknown, not a guessed join.
 
-**Dependencies:** `ANG-4` (Task 8B.2); `LIN-2` where source joins are required
+**Dependencies:** `ANG-4` (Task 8B.2); `LIN-2` only where optional
+source/template joins are requested
 
 **Estimated scope:** Medium
 
@@ -1380,13 +1427,13 @@ not another `ANG-4` scheduler dependency.
 
 **Estimated scope:** Small research/pilot gate
 
-### Task 8C: Add optional exact registry-bound conformance (`ANG-6`)
+### Task 8C: Add optional expanded registry-bound drift and browser-parity conformance (`ANG-6`)
 
-**Description:** After the authoring-value gate passes, optionally compare an
-already reviewed registry against TestBed and AOT browser scenarios. Exact
-registry/profile/driver/model-sink/part bindings and reviewed steps own the
-claim. Observation may corroborate or diagnose drift but never promotes a
-scaffold or rewrites the registry.
+**Description:** After the authoring-value gate passes, optionally expand beyond
+the required per-adapter publication conformance into broader TestBed and AOT
+browser drift/parity scenarios. Exact registry/profile/driver/model-sink/part
+bindings and reviewed steps own the claim. Observation may corroborate or
+diagnose drift but never promotes a scaffold or rewrites the registry.
 
 **Acceptance criteria:**
 
@@ -1426,9 +1473,11 @@ scaffold or rewrites the registry.
       browser interception is documented only as an I/O determinism guard.
 - [ ] Multiple Angular feature sources and both NgModule/standalone provider
       contributions are represented through Task 7D's Node-safe boundary.
-- [ ] Project configuration supplies a reviewed custom-field profile registry;
-      inventory/scaffolding reports coverage and unmapped types without
-      automatically authorizing derived or observed candidates.
+- [ ] Each Formly-producing project selects one exact named environment (or an
+      explicitly legacy raw registry, never both); reviewed compact adapters
+      lower to a conformed generated canonical registry, while inventory and
+      optional scaffolds report coverage and unmapped types without authorizing
+      derived or observed candidates.
 - [ ] The complex-widget matrix and `ANG-GATE` workplace metrics support an
       explicit go/narrow/stop decision. Optional Task 8C is not required to
       complete this authoring-value checkpoint.
@@ -1985,21 +2034,21 @@ maintainer review, remediate validated findings, and record final evidence.
 
 ## Risks and mitigations
 
-| Risk | Impact | Mitigation |
-| --- | --- | --- |
-| Config loader cannot resolve workplace aliases or Angular imports | High | Run Task 1 before public API work; keep compiled/JS source adapter fallback |
-| Root config becomes a nondeterministic arbitrary-code surface | High | Trusted local/CI boundary, runtime validation, explicit plugin imports, recorded identities, no MCP execution |
-| Nx version API churn expands scope | High | Gate on workplace `nx report`; support one confirmed major first; isolate Nx package |
-| Lazy modules appear registered but are not visible | High | Require explicit configured feature scopes; report configured-scope coverage and absent lazy scopes as incomplete; runtime capture remains later corroboration only |
-| Trusted JIT loading and AOT authoring are conflated | High | Keep Task 7C/8 and Task 8B on separate entry points, hosts, evidence, and compatibility gates; never fall back between them |
-| Source-lineage coverage appears complete when a leaf program or resolution input is missing | High | Run `LIN-0` before public indexing; retain per-program coverage, semantic-resolution closure hashes, hard staleness, and incomplete query results |
-| Application factory execution leaks live data or side effects | High | Limit FAC-1/FAC-2 to inert DTO/projector work; use a code-free sidecar; block all imports/execution until `oci-rootless-v1` and the retained negative controls pass |
-| Workspace index leaks model or environment information | High | Allowlisted index schema, privacy tests, no raw inputs or timestamps |
-| Package ecosystem fragments too early | Medium | Keep config/runner/CLI in `workspace`; add only Angular and Nx integration packages |
-| Nx topology is mistaken for form, usage, journey, or behavior authority | High | Limit Nx to explicit marker enumeration and scheduling; validate resulting pinned artifacts through the generic workspace layer |
-| 100-form runs or source indexing become slow | Medium | Measure cold/incremental time, memory, and artifact size at `LIN-0`; use bounded workers and aggregate Nx caching only after correctness gates pass |
-| Project/form IDs collide across products | Medium | Global deterministic duplicate gate before artifact success |
-| Migration capture is mistaken for completeness | Medium | Explicit incomplete status and separate evidence/inventory reports |
+| Risk                                                                                        | Impact | Mitigation                                                                                                                                                          |
+| ------------------------------------------------------------------------------------------- | ------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Config loader cannot resolve workplace aliases or Angular imports                           | High   | Run Task 1 before public API work; keep compiled/JS source adapter fallback                                                                                         |
+| Root config becomes a nondeterministic arbitrary-code surface                               | High   | Trusted local/CI boundary, runtime validation, explicit plugin imports, recorded identities, no MCP execution                                                       |
+| Nx version API churn expands scope                                                          | High   | Gate on workplace `nx report`; support one confirmed major first; isolate Nx package                                                                                |
+| Lazy modules appear registered but are not visible                                          | High   | Require explicit configured feature scopes; report configured-scope coverage and absent lazy scopes as incomplete; runtime capture remains later corroboration only |
+| Trusted JIT loading and AOT authoring are conflated                                         | High   | Keep Task 7C/8 and Task 8B on separate entry points, hosts, evidence, and compatibility gates; never fall back between them                                         |
+| Source-lineage coverage appears complete when a leaf program or resolution input is missing | High   | Run `LIN-0` before public indexing; retain per-program coverage, semantic-resolution closure hashes, hard staleness, and incomplete query results                   |
+| Application factory execution leaks live data or side effects                               | High   | Limit FAC-1/FAC-2 to inert DTO/projector work; use a code-free sidecar; block all imports/execution until `oci-rootless-v1` and the retained negative controls pass |
+| Workspace index leaks model or environment information                                      | High   | Allowlisted index schema, privacy tests, no raw inputs or timestamps                                                                                                |
+| Package ecosystem fragments too early                                                       | Medium | Keep config/runner/CLI in `workspace`; add only Angular and Nx integration packages                                                                                 |
+| Nx topology is mistaken for form, usage, journey, or behavior authority                     | High   | Limit Nx to explicit marker enumeration and scheduling; validate resulting pinned artifacts through the generic workspace layer                                     |
+| 100-form runs or source indexing become slow                                                | Medium | Measure cold/incremental time, memory, and artifact size at `LIN-0`; use bounded workers and aggregate Nx caching only after correctness gates pass                 |
+| Project/form IDs collide across products                                                    | Medium | Global deterministic duplicate gate before artifact success                                                                                                         |
+| Migration capture is mistaken for completeness                                              | Medium | Explicit incomplete status and separate evidence/inventory reports                                                                                                  |
 
 ## Open questions requiring maintainer or workplace evidence
 
@@ -2028,7 +2077,7 @@ maintainer review, remediate validated findings, and record final evidence.
 - [x] Keep Angular resolved scenarios in Checkpoint B rather than requiring them
       for the first generic workplace pilot.
 - [x] Complete `RH06-DOC` and `CTX-0A`.
-- [ ] Land `CTX-0B` through `CTX-0D` before any new producer publishes one of
+- [x] Land `CTX-0B` through `CTX-0D` before any new producer publishes one of
       those sibling artifact families.
 - [ ] Pass `LIN-0` before implementing public source-lineage indexing.
 - [ ] Implement `ANG-0` and pass the retained Angular CLI/Nx `ANG-1` gate before

@@ -68,12 +68,12 @@ Existing v0.4 behavior remains authoritative:
 
 Four identities must not be collapsed:
 
-| Identity | Meaning | Authority | Stability |
-| --- | --- | --- | --- |
-| Form ID | One semantic form definition and its generated contract | Project-owned form definition | Durable across builds when semantics remain the same |
-| Root anchor ID | The exported function, callable `const`, or class that creates the application form | Validated definition anchor plus TypeScript symbol identity | Durable while the public declaration identity remains stable |
-| Usage ID or callsite key | One source invocation of an anchored form | Explicit usage annotation for durable IDs; checker-derived callsite key otherwise | Durable only when explicitly declared; generated callsite keys are build-scoped |
-| Journey/step ID | Business navigation and step membership | Project-owned journey catalog or validated source annotation | Durable application metadata; never inferred from array order or names |
+| Identity                 | Meaning                                                                             | Authority                                                                         | Stability                                                                       |
+| ------------------------ | ----------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------- |
+| Form ID                  | One semantic form definition and its generated contract                             | Project-owned form definition                                                     | Durable across builds when semantics remain the same                            |
+| Root anchor ID           | The exported function, callable `const`, or class that creates the application form | Validated definition anchor plus TypeScript symbol identity                       | Durable while the public declaration identity remains stable                    |
+| Usage ID or callsite key | One source invocation of an anchored form                                           | Explicit usage annotation for durable IDs; checker-derived callsite key otherwise | Durable only when explicitly declared; generated callsite keys are build-scoped |
+| Journey/step ID          | Business navigation and step membership                                             | Project-owned journey catalog or validated source annotation                      | Durable application metadata; never inferred from array order or names          |
 
 One root may map to several forms and one form may have several roots or usages.
 Those are many-to-many relations, not errors by themselves. An unannotated
@@ -84,16 +84,16 @@ by score or naming similarity.
 
 The delivery system uses a reference graph, not one monolithic document.
 
-| Artifact or record family | Primary owner | Contains | Must not contain or imply |
-| --- | --- | --- | --- |
-| Form Contract `0.4.0` | `@formly-contract/schema` and compiler | Semantic form tree, profiles, domains, locators, effects, unknowns | Workspace paths, application journeys, runtime driver modules |
-| Workspace contract index | `@formly-contract/workspace` | Project/form inventory and contract hashes | TypeScript or Angular execution during agent queries |
-| Source-lineage index | Workspace source indexer | Root anchors, direct usages, program coverage, path/privacy mode, staleness inputs | Semantic form truth or inferred business journeys |
-| Journey catalog | Project authoring plus workspace validation | Entry, step, action, outcome, and exact transition records | Step inference from source order, labels, or route order |
-| Behavior/scenario evidence | Schema semantics; workspace/Angular producers | Normalized conditions, exact causal edges, access prerequisites, replay cases, scoped completeness | Automatic business verbs derived from arbitrary code |
-| Angular authoring report | Future `@formly-contract/angular` | Registration inventory, rendered roles/parts, coverage, observations, review scaffolds | Automatic approval of a field profile or whole-process sandbox claims |
-| Driver registry manifest | Future `@formly-contract/playwright` plus application registries | Reviewed driver IDs, versions, supported operations, registry hash | Agent-supplied module paths, selectors, or executable callbacks |
-| Agent context artifact set and owner references | Schema plus pure assembly/query layer | Open schema-addressed content references plus owner-specific usage, form, scenario, journey, and driver selections | A second copy of all source artifacts, one generic logical-ID grammar, or unpinned “latest” lookups |
+| Artifact or record family                       | Primary owner                                                    | Contains                                                                                                           | Must not contain or imply                                                                           |
+| ----------------------------------------------- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | --------------------------------------------------------------------------------------------------- |
+| Form Contract `0.4.0`                           | `@formly-contract/schema` and compiler                           | Semantic form tree, profiles, domains, locators, effects, unknowns                                                 | Workspace paths, application journeys, runtime driver modules                                       |
+| Workspace contract index                        | `@formly-contract/workspace`                                     | Project/form inventory and contract hashes                                                                         | TypeScript or Angular execution during agent queries                                                |
+| Source-lineage index                            | Workspace source indexer                                         | Root anchors, direct usages, program coverage, path/privacy mode, staleness inputs                                 | Semantic form truth or inferred business journeys                                                   |
+| Journey catalog                                 | Project authoring plus workspace validation                      | Entry, step, action, outcome, and exact transition records                                                         | Step inference from source order, labels, or route order                                            |
+| Behavior/scenario evidence                      | Schema semantics; workspace/Angular producers                    | Normalized conditions, exact causal edges, access prerequisites, replay cases, scoped completeness                 | Automatic business verbs derived from arbitrary code                                                |
+| Angular authoring report                        | Future `@formly-contract/angular`                                | Registration inventory, rendered roles/parts, coverage, observations, review scaffolds                             | Automatic approval of a field profile or whole-process sandbox claims                               |
+| Driver registry manifest                        | Future `@formly-contract/playwright` plus application registries | Reviewed driver IDs, versions, supported operations, registry hash                                                 | Agent-supplied module paths, selectors, or executable callbacks                                     |
+| Agent context artifact set and owner references | Schema plus pure assembly/query layer                            | Open schema-addressed content references plus owner-specific usage, form, scenario, journey, and driver selections | A second copy of all source artifacts, one generic logical-ID grammar, or unpinned “latest” lookups |
 
 Exact public DTO names are finalized in the first shared schema slice. Whatever
 names are selected must preserve these ownership and dependency directions.
@@ -176,18 +176,27 @@ publication. Task 8 is never mapped onto both sides of its own dependency.
 ## Custom Angular/Formly field path
 
 Interactive custom types such as `button-toggle`, `autocomplete`,
-`text-editor`, composite date ranges, and table selectors use a two-source
-model:
+`text-editor`, composite date ranges, and table selectors keep separate
+semantic authority and environment evidence. Under proposed
+[ADR 0011](../../decisions/0011-named-formly-environments-and-contracted-field-adapters.md):
 
-- reviewed field-type profiles declare semantic roles, operations, named
-  parts, value codecs, readiness, and stable locator targets; and
-- Angular authoring inventory supplies registration/source/template evidence,
-  rendered observations, configured-scope coverage, and review scaffolds.
+- reviewed compact contracted adapters, owned by the reusable field library
+  and consumed by the same catalog/helper path as production registration,
+  declare semantic roles, operations, named parts, value codecs, readiness, and
+  stable driver identities; third-party registrations use an explicit reviewed
+  binding adapter;
+- one named Formly environment owns exact registration and scope inventory;
+- the Angular host joins those inputs, runs required controlled conformance,
+  and deterministically produces the existing canonical
+  `FieldTypeProfileRegistry`; and
+- source/template analysis, observations, and generated scaffolds remain
+  non-authoritative migration and drift evidence.
 
-Generated scaffolds are suggestions. A project owner reviews and accepts the
-profile before it can authorize generic E2E interaction. Exact
+The canonical generated registry continues to authorize compiler projection;
+no inferred or observed fact promotes itself into it. Exact
 application-specific drivers remain available for behavior that is not safely
-generic.
+generic. Until ADR 0011 is accepted and implemented, project-owned raw
+registries remain the explicit legacy authoring path.
 
 Display/assertion-only components such as application information panels do
 not inherit interaction authority from that model. They require an explicit
@@ -199,11 +208,14 @@ The Angular lane is internally serialized:
 
 1. schema-owned host compatibility result;
 2. retained pinned application-target compatibility gate;
-3. optional `@formly-contract/angular` package and Node-safe workspace
-   descriptors;
-4. isolated AOT browser host and inventory/source joins;
-5. review scaffolds and workplace value pilot; and
-6. optional exact registry-bound conformance.
+3. optional `@formly-contract/angular` package, source-group providers, and
+   Node-safe named-environment descriptors;
+4. strict environment/adapter/report/conformance contracts;
+5. isolated AOT browser host and exact environment/scope inventory;
+6. adapter aggregation, required controlled conformance, and generated
+   canonical-registry publication, with optional migration scaffolds;
+7. workplace value pilot; and
+8. optional expanded drift/browser-parity conformance.
 
 The existing guarded JIT/config worker remains a separate trusted execution
 mode for config and scenario compilation. It is not the Angular AOT authoring
@@ -233,11 +245,11 @@ A trusted local child process is not that boundary.
 
 The project deliberately keeps three execution profiles distinct:
 
-| Profile | Purpose | Trust and containment statement |
-| --- | --- | --- |
-| Trusted config/JIT worker | Load project config and approved Angular/Formly scenario entries | Executes trusted repository code in a short-lived worker with policy/time/output controls; not an untrusted-code sandbox |
+| Profile                      | Purpose                                                                       | Trust and containment statement                                                                                                              |
+| ---------------------------- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
+| Trusted config/JIT worker    | Load project config and approved Angular/Formly scenario entries              | Executes trusted repository code in a short-lived worker with policy/time/output controls; not an untrusted-code sandbox                     |
 | AOT authoring browser worker | Build and observe real Angular components through a pinned application target | Executes trusted application code in isolated browser contexts; request/WebSocket interception improves determinism but is not an OS sandbox |
-| Rootless OCI factory runner | Future application-factory execution | Required containment profile for code whose side effects must be constrained; blocked until conformance and negative controls pass |
+| Rootless OCI factory runner  | Future application-factory execution                                          | Required containment profile for code whose side effects must be constrained; blocked until conformance and negative controls pass           |
 
 ## Agent-to-E2E consumer sequence
 
@@ -289,8 +301,10 @@ CTX-0A schema-addressed artifact-set envelope
         |
         +--> CTX-0B usage/journey records
         +--> CTX-0C execution-authority records
-                    |
-                 CTX-0D synthetic fixtures
+        |            |
+        +-----+------+
+              |
+           CTX-0D synthetic fixtures
                     |
              CTX-1 queries -> CTX-2 synthetic validator proof
                     |                     |
@@ -363,13 +377,13 @@ These are explicit gates, not reasons to block the shared pure foundation.
 
 ## Research traceability
 
-| Research packet | Adopted decision | Deferred or rejected claim |
-| --- | --- | --- |
-| RH-01 source lineage | Direct anchored symbol index, sibling artifact, coverage/staleness/privacy, explicit usage/journey authority | Automatic complete journey inference |
-| RH-02 factory/value semantics | Inert DTO/projector first, explicit dynamic unknowns, OCI gate for execution | Ordinary child process as containment; arbitrary provider execution |
-| RH-03 Angular authoring | Compatibility-first AOT host, inventory/observations/scaffolds, reviewed profiles | DOM observation as semantic approval; browser interception as OS sandbox |
-| RH-04 behavior/effects | Explicit business effects, bounded witnessed state rules, portable replay evidence | General callback/RxJS semantic interpretation |
-| RH-05 agent-to-E2E | Fixture-first pure query/validator, pilot before transport/browser, exact execution records | Raw-selector/model module authority; package layout that conflicts with ADR 0008 |
+| Research packet               | Adopted decision                                                                                             | Deferred or rejected claim                                                       |
+| ----------------------------- | ------------------------------------------------------------------------------------------------------------ | -------------------------------------------------------------------------------- |
+| RH-01 source lineage          | Direct anchored symbol index, sibling artifact, coverage/staleness/privacy, explicit usage/journey authority | Automatic complete journey inference                                             |
+| RH-02 factory/value semantics | Inert DTO/projector first, explicit dynamic unknowns, OCI gate for execution                                 | Ordinary child process as containment; arbitrary provider execution              |
+| RH-03 Angular authoring       | Compatibility-first AOT host, inventory/observations/scaffolds, reviewed profiles                            | DOM observation as semantic approval; browser interception as OS sandbox         |
+| RH-04 behavior/effects        | Explicit business effects, bounded witnessed state rules, portable replay evidence                           | General callback/RxJS semantic interpretation                                    |
+| RH-05 agent-to-E2E            | Fixture-first pure query/validator, pilot before transport/browser, exact execution records                  | Raw-selector/model module authority; package layout that conflicts with ADR 0008 |
 
 ## Completion criteria for RH-06
 

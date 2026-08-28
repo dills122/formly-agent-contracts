@@ -3,6 +3,14 @@
 - Status: Proposed
 - Date: 2026-08-25
 
+> **Partial supersession:** proposed
+> [ADR 0011](0011-named-formly-environments-and-contracted-field-adapters.md)
+> retains this ADR's explicit form-source/discovery model but replaces its
+> project-owned raw field-profile registry as the intended authoring UX with
+> named Formly environments, compact library-owned adapters, and a generated
+> canonical registry. Until ADR 0011 is accepted and implemented, the existing
+> project registry remains the compatible legacy path.
+
 ## Context
 
 The current Formly adapter compiles a supplied field tree or trusted scenario,
@@ -151,8 +159,9 @@ This ADR becomes Accepted only after a proof of concept demonstrates:
 - root and project config loading across representative module formats;
 - deterministic discovery and duplicate detection across three projects;
 - one bulk factory map and one existing-registry adapter;
-- one project-owned field-type profile reused across multiple form instances,
-  with deterministic identity and unmapped-type diagnostics;
+- one legacy project-owned field-type profile reused across multiple form
+  instances, with deterministic identity and unmapped-type diagnostics; ADR
+  0011 separately gates named environments and compact adapter generation;
 - one explicit per-form effect resolved against stable generated node IDs and
   field-profile capabilities, without callback inference;
 - declared and trusted resolved contract generation;

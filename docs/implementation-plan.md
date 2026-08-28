@@ -7,10 +7,11 @@ governed by the
 [RH-06 reconciliation](planning/agent-context-hardening/rh-06-reconciliation.md).
 
 **Current status:** Form Contract `0.4.0` is the implemented compatibility
-boundary. `RH06-DOC` and `CTX-0A` are complete. `CTX-0B`, `CTX-0C`, `HOST-1`,
-`ANG-0`, and `FAC-1` are dependency-ready; `BHV-0` awaits explicit approval of
-ADR 0010; and `LIN-0` is blocked on its sanitized representative workplace
-run after the public harness rehearsal returned `inconclusive`.
+boundary. `RH06-DOC` and `CTX-0A` through `CTX-0D` are complete. `CTX-1`,
+`DRV-0`, `HOST-1`, `ANG-0`, and `FAC-1` are dependency-ready; `BHV-0` and
+`AUTH-0` await explicit approval of ADRs 0010 and 0011; and `LIN-0` is blocked
+on its sanitized representative workplace run after the public harness
+rehearsal returned `inconclusive`.
 
 ## Delivery Target
 
@@ -133,14 +134,14 @@ buildable or creates an explicit stop/go decision.
 These are timeboxes, not estimates to defend. When a box expires, use its
 checkpoint to reduce scope instead of moving the parser shipping gate.
 
-| Elapsed working time | Target |
-| --- | --- |
-| 0-1 hour | Tasks 1-2 and Checkpoint A |
-| 1-2.5 hours | Tasks 3-4 and Checkpoint B |
-| 2.5-5.5 hours | Tasks 5-6 |
-| 5.5-6.5 hours | Task 7 and Checkpoint C |
-| 6.5-8 hours | Tasks 8-9 and clean-clone verification |
-| Remaining time | Optional Task 10 MCP inspector |
+| Elapsed working time | Target                                 |
+| -------------------- | -------------------------------------- |
+| 0-1 hour             | Tasks 1-2 and Checkpoint A             |
+| 1-2.5 hours          | Tasks 3-4 and Checkpoint B             |
+| 2.5-5.5 hours        | Tasks 5-6                              |
+| 5.5-6.5 hours        | Task 7 and Checkpoint C                |
+| 6.5-8 hours          | Tasks 8-9 and clean-clone verification |
+| Remaining time       | Optional Task 10 MCP inspector         |
 
 If compatibility or runtime-builder setup overruns, choose declared-config
 extraction and preserve the missing runtime behavior as diagnostics. If parser
@@ -190,9 +191,9 @@ builder without a rendered host.
 
 - [x] `FormlyFieldConfig[]` compiles against the pinned versions.
 - [x] The experiment records whether `FormlyFormBuilder` is usable in the
-  one-day harness.
+      one-day harness.
 - [x] Any peer, DI, or runtime incompatibility has a captured error and an
-  explicit architecture decision.
+      explicit architecture decision.
 
 **Verification:**
 
@@ -213,9 +214,9 @@ builder without a rendered host.
 ## Checkpoint A: Architecture Decision
 
 - [x] Basic Angular/Formly type compatibility is established for the exact
-  pinned pair.
+      pinned pair.
 - [x] Choose either controlled post-build extraction or declared-config
-  extraction based on executable evidence.
+      extraction based on executable evidence.
 - [x] Do not start MCP work.
 
 ## Phase 1: Establish the Contract
@@ -230,7 +231,7 @@ ordered form tree, model paths, constraints, options, evidence, and unknowns.
 - [x] Runtime validation accepts a complete representative contract.
 - [x] Malformed node identity, paths, and diagnostic values are rejected.
 - [x] Diagnostic codes cover functions, async/Observable-like values, unknown
-  field shapes, and unsupported rules.
+      field shapes, and unsupported rules.
 
 **Verification:**
 
@@ -279,7 +280,7 @@ on object insertion order or environment-specific values.
 - [x] Schema tests pass.
 - [x] Canonical output is readable and deterministic.
 - [x] Public v0 fields are sufficient for the golden form; additions require a
-  spec update.
+      spec update.
 
 ## Phase 2: Deliver One Complete Parser Slice
 
@@ -291,7 +292,7 @@ allowlist into contract nodes.
 **Acceptance criteria:**
 
 - [x] Field order, parent/child structure, key-derived model paths, type, and
-  presentation data are retained.
+      presentation data are retained.
 - [x] Required, length/range, pattern, and static options are represented.
 - [x] Input objects are not mutated.
 
@@ -364,15 +365,15 @@ conditional behavior while producing diagnostics for unsafe values.
 **Acceptance criteria:**
 
 - [x] `fieldArray` template structure is retained without requiring realized
-  model rows.
+      model rows.
 - [x] Safely representable condition metadata is preserved.
 - [x] Functions, remote/async values, and unsupported constructs produce stable
-  diagnostics instead of disappearing or being evaluated.
+      diagnostics instead of disappearing or being evaluated.
 
 **Verification:**
 
 - [x] Focused tests cover empty arrays, a conditional field, and every MVP
-  diagnostic code.
+      diagnostic code.
 
 **Dependencies:** Task 5
 
@@ -417,7 +418,7 @@ the complete contract easy to inspect from the repository root.
 
 - [x] Fresh-clone install, lint, test, build, and demo commands pass.
 - [x] Contract answers: what fields exist, in what order, at what model paths,
-  with what constraints/options, and what known flow/unknowns affect them.
+      with what constraints/options, and what known flow/unknowns affect them.
 - [x] Limitations are visible in output and README.
 - [ ] If time is nearly exhausted, ship here.
 
@@ -459,7 +460,7 @@ cloned and tested at work. This task does not depend on the optional MCP task.
 - [x] Repository owner, visibility, and license are approved.
 - [x] The feature branch and its test evidence are available on GitHub.
 - [x] A clone URL and exact verification commands are ready for the workplace
-  test.
+      test.
 
 **Verification:**
 
@@ -528,39 +529,42 @@ not add compilation, Angular execution, storage, or mutation to MCP requests.
 
 ## Risks and Mitigations
 
-| Risk | Impact | Mitigation |
-| --- | --- | --- |
-| Formly 6.x behaves incorrectly with an Angular 20+ combination despite its broad Angular peer range | High | Publish the broader usage target with the exact Angular `20.3.29` and Formly `6.1.8` reference pairing identified as the strongest executable evidence, and require consuming applications to validate other combinations. |
-| `FormlyFormBuilder` requires more Angular runtime setup than fits in one day | High | Fall back to a declared-config extractor and label runtime defaults/expressions unknown. |
-| “Understand flow” expands into full rule evaluation | High | Represent ordering, hierarchy, arrays, declarations, and unknowns; defer witness solving and runtime parity. |
-| MCP work consumes the delivery window | Medium | MCP starts only after Checkpoint C and remains removable. |
-| Public API hardens too early | Medium | Publish a versioned v0 contract and pre-1.0 package; require decisions for breaking changes. |
-| Synthetic fixture is too simple to expose real problems | Medium | Include nesting, arrays, validation, a condition, and an opaque construct in one small form. |
+| Risk                                                                                                | Impact | Mitigation                                                                                                                                                                                                                 |
+| --------------------------------------------------------------------------------------------------- | ------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Formly 6.x behaves incorrectly with an Angular 20+ combination despite its broad Angular peer range | High   | Publish the broader usage target with the exact Angular `20.3.29` and Formly `6.1.8` reference pairing identified as the strongest executable evidence, and require consuming applications to validate other combinations. |
+| `FormlyFormBuilder` requires more Angular runtime setup than fits in one day                        | High   | Fall back to a declared-config extractor and label runtime defaults/expressions unknown.                                                                                                                                   |
+| “Understand flow” expands into full rule evaluation                                                 | High   | Represent ordering, hierarchy, arrays, declarations, and unknowns; defer witness solving and runtime parity.                                                                                                               |
+| MCP work consumes the delivery window                                                               | Medium | MCP starts only after Checkpoint C and remains removable.                                                                                                                                                                  |
+| Public API hardens too early                                                                        | Medium | Publish a versioned v0 contract and pre-1.0 package; require decisions for breaking changes.                                                                                                                               |
+| Synthetic fixture is too simple to expose real problems                                             | Medium | Include nesting, arrays, validation, a condition, and an opaque construct in one small form.                                                                                                                               |
 
 ## Post-MVP Increments
 
 The earlier aspirational increment list is superseded by RH-06 and the
 execution index. The current order is:
 
-1. retain the completed `RH06-DOC` and `CTX-0A` foundations;
-2. land the now-ready `CTX-0B` and `CTX-0C` schemas, then the explicitly
-   synthetic `CTX-0D` fixtures;
-3. advance source-lineage, behavior/scenario, Angular, and safe factory
-   producers only when their execution-index schema and compatibility
-   dependencies are satisfied;
-4. implement `CTX-1` pure queries and `CTX-2` typed intent/validation over the
-   synthetic records; `CTX-2` exits only when the synthetic positive/negative
-   proof passes;
-5. advance the canonical real producers `LIN-4`, `BHV-4`, `ANG-5`, and `DRV-0`
-   according to the execution index;
-6. run `CTX-GATE` only when those producers and `CTX-2` join one current pinned
+1. retain the completed `RH06-DOC` and `CTX-0A` through `CTX-0D` shared
+   checkpoint;
+2. start two independent lanes: the consumer lane begins with the now-ready
+   `CTX-1` pure query core, while the producer lane begins with the now-ready
+   `DRV-0` driver-registry manifest and advances source-lineage,
+   behavior/scenario, Angular, and safe-factory work only when each task's
+   execution-index dependencies are satisfied;
+3. in the consumer lane, implement `CTX-2` typed intent/validation over the
+   synthetic records after `CTX-1`; `CTX-2` exits only when the synthetic
+   positive/negative proof passes;
+4. in the producer lane, advance the canonical real producers `LIN-4`,
+   `BHV-4`, and `ANG-5` according to the execution index, using the single
+   `DRV-0` manifest started in step 2 rather than scheduling a second copy;
+5. join the lanes at `CTX-GATE` only when `CTX-2`, `DRV-0`, and the required
+   real producers provide one current pinned
    representative producer/workplace context;
-7. add `MCP-1` in future `@formly-contract/mcp` after the real-context gate;
-8. schedule `PW-1` after both `CTX-GATE` and `MCP-1` in future
+6. add `MCP-1` in future `@formly-contract/mcp` after the real-context gate;
+7. schedule `PW-1` after both `CTX-GATE` and `MCP-1` in future
    `@formly-contract/playwright` for the native vertical;
-9. add `PW-2` only after resolved Angular/behavior producer evidence exists;
+8. add `PW-2` only after resolved Angular/behavior producer evidence exists;
    and
-10. add `PW-3` only after the custom/dynamic and browser-conformance gates.
+9. add `PW-3` only after the custom/dynamic and browser-conformance gates.
 
 The controlled-host requirements below still apply to the workspace/Angular
 producer branch. That increment is complete only when packed strict-pnpm
