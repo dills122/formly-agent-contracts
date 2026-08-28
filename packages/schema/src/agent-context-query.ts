@@ -13,11 +13,22 @@ import {
   AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_VERSION,
   createAgentContextExecutionAuthority,
   parseAgentContextExecutionAuthority,
+  type AgentContextCreatedItemCaptureAuthority,
   type AgentContextExecutionAuthority,
   type AgentContextExecutionBasis,
+  type AgentContextNodeInteractionAuthority,
+  type AgentContextPhysicalOperation,
   type AgentContextReadinessAuthority,
   type AgentContextScenarioReference,
-  type AgentContextUsageExecutionAuthority,
+  type AgentContextStateAssertionAuthority,
+  type AgentContextUsageActionAuthority,
+  type AgentContextUsageEntryAuthority,
+  type AgentContextUsageOutcomeAuthority,
+  type AgentContextUsageStepAuthority,
+  type AgentContextUsageTransitionAuthority,
+  type AgentContextValidationSurfaceAuthority,
+  type AgentContextValueAssertionAuthority,
+  type AgentContextValueCommitAuthority,
 } from './agent-context-execution-authority.js';
 import {
   AGENT_CONTEXT_JOURNEY_SCHEMA_ID,
@@ -41,6 +52,7 @@ import {
   type ContractConstraint,
   type ContractDiagnostic,
   type ContractEvidence,
+  type ContractEffectAnalysis,
   type ContractInteractionProfile,
   type ContractLocator,
   type ContractNodeKind,
@@ -1176,6 +1188,42 @@ export function canonicalizeAgentContextUsageSearchScope(input: unknown): string
   return canonicalStringify(parseAgentContextUsageSearchScope(input));
 }
 
+function validateAgentContextUsageSearchScopeAgainstParsedDataset(
+  dataset: AgentContextQueryDataset,
+  scopeInput: unknown,
+): AgentContextUsageSearchScope {
+  const scope = parseAgentContextUsageSearchScope(scopeInput);
+  assertSame(
+    scope.artifactSet,
+    {
+      schemaVersion: dataset.artifactSet.schemaVersion,
+      contentHash: dataset.artifactSet.contentHash,
+    },
+    'agentContextUsageSearchScope.artifactSet',
+  );
+  assertSame(
+    scope.workspaceIndex,
+    dataset.artifactSet.workspaceIndex,
+    'agentContextUsageSearchScope.workspaceIndex',
+  );
+  assertSame(
+    scope.sourceUsageCatalogs,
+    dataset.sourceUsageCatalogs.map(({ reference }) => reference),
+    'agentContextUsageSearchScope.sourceUsageCatalogs',
+  );
+  return scope;
+}
+
+export function validateAgentContextUsageSearchScope(
+  datasetInput: unknown,
+  scopeInput: unknown,
+): AgentContextUsageSearchScope {
+  return validateAgentContextUsageSearchScopeAgainstParsedDataset(
+    parseAgentContextQueryDataset(datasetInput),
+    scopeInput,
+  );
+}
+
 function findOwner<T extends OwnedArtifact>(
   entries: readonly T[],
   reference: AgentContextArtifactReference,
@@ -1197,20 +1245,13 @@ function assertSame(input: unknown, expected: unknown, path: string): void {
 function collectFormContractNodeIds(
   nodes: FormContract['nodes'],
 ): readonly string[] {
-  return nodes.flatMap((node) => [
-    node.id,
-    ...collectFormContractNodeIds(node.children),
-    ...(node.arrayTemplate === undefined
-      ? []
-      : collectFormContractNodeIds([node.arrayTemplate])),
-  ]);
+  return collectFormContractNodes(nodes).map(({ id }) => id);
 }
 
-export function validateAgentContextQuerySelection(
-  datasetInput: unknown,
+function validateAgentContextQuerySelectionAgainstParsedDataset(
+  dataset: AgentContextQueryDataset,
   selectionInput: unknown,
 ): AgentContextQuerySelection {
-  const dataset = parseAgentContextQueryDataset(datasetInput);
   const selection = parseAgentContextQuerySelection(selectionInput);
   assertSame(
     selection.artifactSet,
@@ -1411,13 +1452,33 @@ export function validateAgentContextQuerySelection(
     contractNodeIds,
     'agentContextQuerySelection.executionAuthority.usage.steps.nodeIds',
   );
+  const relevantStepIds = new Set(relevantJourneySteps.map(({ id }) => id));
+  const relevantActionIds = new Set(
+    relevantJourneySteps.flatMap(({ actionIds }) => actionIds),
+  );
+  const relevantActions = journey.actions.filter(({ id }) =>
+    relevantActionIds.has(id),
+  );
+  const relevantOutcomeIds = new Set(
+    relevantActions.flatMap(({ outcomeIds }) => outcomeIds),
+  );
+  const relevantOutcomes = journey.outcomes.filter(({ id }) =>
+    relevantOutcomeIds.has(id),
+  );
+  const relevantTransitions = journey.transitions.filter(
+    ({ fromStepId, toStepId, actionId, outcomeId }) =>
+      relevantStepIds.has(fromStepId) &&
+      relevantStepIds.has(toStepId) &&
+      relevantActionIds.has(actionId) &&
+      relevantOutcomeIds.has(outcomeId),
+  );
   assertSame(
     authority.usage.actions.map(({ id, kind, outcomeIds }) => ({
       id,
       kind,
       outcomeIds,
     })),
-    journey.actions.map(({ id, kind, outcomeIds }) => ({
+    relevantActions.map(({ id, kind, outcomeIds }) => ({
       id,
       kind,
       outcomeIds,
@@ -1426,7 +1487,7 @@ export function validateAgentContextQuerySelection(
   );
   assertSame(
     authority.usage.outcomes.map(({ id, kind }) => ({ id, kind })),
-    journey.outcomes.map(({ id, kind }) => ({ id, kind })),
+    relevantOutcomes.map(({ id, kind }) => ({ id, kind })),
     'agentContextQuerySelection.executionAuthority.usage.outcomes',
   );
   assertSame(
@@ -1440,7 +1501,7 @@ export function validateAgentContextQuerySelection(
         toStepId,
       }),
     ),
-    journey.transitions.map(
+    relevantTransitions.map(
       ({ id, version, fromStepId, actionId, outcomeId, toStepId }) => ({
         id,
         version,
@@ -1453,6 +1514,16 @@ export function validateAgentContextQuerySelection(
     'agentContextQuerySelection.executionAuthority.usage.transitions',
   );
   return selection;
+}
+
+export function validateAgentContextQuerySelection(
+  datasetInput: unknown,
+  selectionInput: unknown,
+): AgentContextQuerySelection {
+  return validateAgentContextQuerySelectionAgainstParsedDataset(
+    parseAgentContextQueryDataset(datasetInput),
+    selectionInput,
+  );
 }
 
 const QUERY_CAPABILITIES: readonly AgentContextQueryCapability[] = [
@@ -2116,14 +2187,76 @@ export interface AgentContextStepSummaryProjection {
   readonly actionIds: readonly string[];
 }
 
+export interface AgentContextExecutionAuthorityProjection {
+  readonly owner: AgentContextArtifactReference;
+  readonly entry: AgentContextUsageEntryAuthority;
+  readonly steps: AgentContextCompleteCollection<AgentContextUsageStepAuthority>;
+  readonly actions: AgentContextCompleteCollection<AgentContextUsageActionAuthority>;
+  readonly outcomes: AgentContextCompleteCollection<AgentContextUsageOutcomeAuthority>;
+  readonly transitions: AgentContextCompleteCollection<AgentContextUsageTransitionAuthority>;
+  readonly physicalOperations: AgentContextCompleteCollection<AgentContextPhysicalOperation>;
+  readonly readiness: AgentContextCompleteCollection<AgentContextReadinessAuthority>;
+  readonly interactions: AgentContextCompleteCollection<AgentContextNodeInteractionAuthority>;
+  readonly commits: AgentContextCompleteCollection<AgentContextValueCommitAuthority>;
+  readonly validationSurfaces: AgentContextCompleteCollection<AgentContextValidationSurfaceAuthority>;
+  readonly valueAssertions: AgentContextCompleteCollection<AgentContextValueAssertionAuthority>;
+  readonly stateAssertions: AgentContextCompleteCollection<AgentContextStateAssertionAuthority>;
+  readonly repeaterCaptures: AgentContextCompleteCollection<AgentContextCreatedItemCaptureAuthority>;
+}
+
 export interface AgentContextJourneyProjection {
   readonly identity: AgentContextIdentityReference;
-  readonly execution: AgentContextUsageExecutionAuthority;
+  readonly authority: AgentContextExecutionAuthorityProjection;
 }
+
+export interface AgentContextContextSummaryProjection {
+  readonly usageEntry: {
+    readonly usage: AgentContextDeclaredUsageSelection;
+    readonly entryId: string;
+    readonly landingStepId: string;
+    readonly capability: 'open-usage';
+  };
+  readonly form: {
+    readonly identity: AgentContextFormReference;
+    readonly nodeCount: number;
+  };
+  readonly diagnosticEvidenceCounts: {
+    readonly total: number;
+    readonly warnings: number;
+    readonly errors: number;
+  };
+  readonly executableCapabilities: AgentContextCompleteCollection<AgentContextQueryCapability>;
+  readonly scenarioIds: AgentContextCompleteCollection<string>;
+  readonly effectAnalysis:
+    | { readonly state: 'not-reported' }
+    | {
+        readonly state: 'reported';
+        readonly analysis: ContractEffectAnalysis;
+      };
+  readonly unknownEvidenceCounts: {
+    readonly total: number;
+    readonly diagnostics: number;
+    readonly interactionProfiles: number;
+    readonly effectAnalysisReasons: number;
+    readonly effectAnalysisUnreported: 0 | 1;
+  };
+}
+
+export type AgentContextDiagnosticEvidenceProjection =
+  | {
+      readonly kind: 'contract-diagnostic';
+      readonly owner: AgentContextArtifactReference;
+      readonly diagnostic: ContractDiagnostic;
+    }
+  | {
+      readonly kind: 'effect-analysis';
+      readonly owner: AgentContextArtifactReference;
+      readonly analysis: ContractEffectAnalysis;
+    };
 
 export interface AgentContextE2eSliceProjection {
   readonly withinStepId: string;
-  readonly authority: AgentContextExecutionAuthority;
+  readonly authority: AgentContextExecutionAuthorityProjection;
   readonly focusNodes: AgentContextCompleteCollection<AgentContextNodeCandidateProjection>;
   readonly closureNodes: AgentContextCompleteCollection<AgentContextNodeCandidateProjection>;
   readonly prerequisites: AgentContextCompleteCollection<AgentContextE2ePrerequisiteProjection>;
@@ -2217,6 +2350,7 @@ export type GetFormContextResult =
       readonly view: 'summary';
       readonly selection: AgentContextQuerySelection;
       readonly freshness: AgentContextFreshness;
+      readonly summary: AgentContextContextSummaryProjection;
       readonly steps: readonly AgentContextStepSummaryProjection[];
       readonly page: AgentContextPageResult<'steps'>;
     }
@@ -2227,7 +2361,7 @@ export type GetFormContextResult =
       readonly view: 'diagnostics';
       readonly selection: AgentContextQuerySelection;
       readonly freshness: AgentContextFreshness;
-      readonly reasons: readonly AgentContextQueryReason[];
+      readonly evidence: readonly AgentContextDiagnosticEvidenceProjection[];
       readonly page: AgentContextPageResult<'diagnostics'>;
     }
   | {
@@ -2271,7 +2405,7 @@ export type FindFormNodesResult =
       readonly status: 'complete';
       readonly selection: AgentContextQuerySelection;
       readonly freshness: AgentContextFreshness;
-      readonly authority: AgentContextExecutionAuthority;
+      readonly authority: AgentContextExecutionAuthorityProjection;
       readonly candidates: readonly AgentContextNodeCandidateProjection[];
       readonly page: AgentContextPageResult<'nodes'>;
     }
@@ -2281,7 +2415,7 @@ export type FindFormNodesResult =
       readonly status: 'ambiguous';
       readonly selection: AgentContextQuerySelection;
       readonly freshness: AgentContextFreshness;
-      readonly authority: AgentContextExecutionAuthority;
+      readonly authority: AgentContextExecutionAuthorityProjection;
       readonly candidates: readonly AgentContextNodeCandidateProjection[];
       readonly page: AgentContextPageResult<'nodes'>;
       readonly reason: Extract<AgentContextQueryReason, { kind: 'node-ambiguous' }>;
@@ -2489,6 +2623,9 @@ function parseUsageCandidate(
     required(value, 'projectId', path),
     `${path}.projectId`,
   );
+  if (usage.kind === 'callsite' && usage.projectId !== projectId) {
+    fail(`${path}.usage.projectId`, 'must equal the candidate projectId.');
+  }
   const form = optional(value, 'form');
   const parsedForm =
     form === undefined ? undefined : parseFormReference(form, `${path}.form`);
@@ -2538,6 +2675,12 @@ function parseUsageCandidate(
     if (parsedForm !== undefined) {
       assertSame(handoff.form, parsedForm, `${handoffPath}.form`);
     }
+  }
+  if (parsedForm === undefined && selectionHandoffs.items.length > 0) {
+    fail(
+      `${path}.selectionHandoffs`,
+      'must be empty when the candidate has no exact resolved form.',
+    );
   }
   if (
     usage.kind === 'declared' &&
@@ -3170,54 +3313,511 @@ function parseStepSummary(
   };
 }
 
+function parseExecutionAuthorityProjection(
+  input: unknown,
+  path: string,
+  selection: AgentContextQuerySelection,
+): AgentContextExecutionAuthorityProjection {
+  const collectionKeys = [
+    'steps',
+    'actions',
+    'outcomes',
+    'transitions',
+    'physicalOperations',
+    'readiness',
+    'interactions',
+    'commits',
+    'validationSurfaces',
+    'valueAssertions',
+    'stateAssertions',
+    'repeaterCaptures',
+  ] as const;
+  const value = record(
+    input,
+    path,
+    new Set(['owner', 'entry', ...collectionKeys]),
+  );
+  const owner = parseTypedArtifactReference(
+    required(value, 'owner', path),
+    `${path}.owner`,
+    AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_ID,
+    AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_VERSION,
+  );
+  assertSame(owner, selection.owners.executionAuthority, `${path}.owner`);
+  const collections = Object.fromEntries(
+    collectionKeys.map((key) => [
+      key,
+      parseCompleteCollection(
+        required(value, key, path),
+        `${path}.${key}`,
+        (entry) => entry,
+      ),
+    ]),
+  ) as Record<
+    (typeof collectionKeys)[number],
+    AgentContextCompleteCollection<unknown>
+  >;
+  const entry = required(value, 'entry', path);
+  let authority: AgentContextExecutionAuthority;
+  try {
+    authority = createAgentContextExecutionAuthority({
+      schemaVersion: AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_VERSION,
+      basis: selection.executionAuthority.basis,
+      scenario: selection.scenario,
+      physicalOperations: collections.physicalOperations
+        .items as readonly AgentContextPhysicalOperation[],
+      readiness: collections.readiness
+        .items as readonly AgentContextReadinessAuthority[],
+      interactions: collections.interactions
+        .items as readonly AgentContextNodeInteractionAuthority[],
+      commits: collections.commits
+        .items as readonly AgentContextValueCommitAuthority[],
+      validationSurfaces: collections.validationSurfaces
+        .items as readonly AgentContextValidationSurfaceAuthority[],
+      valueAssertions: collections.valueAssertions
+        .items as readonly AgentContextValueAssertionAuthority[],
+      stateAssertions: collections.stateAssertions
+        .items as readonly AgentContextStateAssertionAuthority[],
+      usage: {
+        id: selection.executionAuthority.usageId,
+        version: selection.executionAuthority.usageVersion,
+        basis: selection.executionAuthority.basis,
+        entry: entry as AgentContextUsageEntryAuthority,
+        steps: collections.steps.items as readonly AgentContextUsageStepAuthority[],
+        actions: collections.actions
+          .items as readonly AgentContextUsageActionAuthority[],
+        outcomes: collections.outcomes
+          .items as readonly AgentContextUsageOutcomeAuthority[],
+        transitions: collections.transitions
+          .items as readonly AgentContextUsageTransitionAuthority[],
+      },
+      repeaterCaptures: collections.repeaterCaptures
+        .items as readonly AgentContextCreatedItemCaptureAuthority[],
+    });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : 'is invalid';
+    fail(path, message);
+  }
+  const normalized = {
+    entry: authority.usage.entry,
+    steps: authority.usage.steps,
+    actions: authority.usage.actions,
+    outcomes: authority.usage.outcomes,
+    transitions: authority.usage.transitions,
+    physicalOperations: authority.physicalOperations,
+    readiness: authority.readiness,
+    interactions: authority.interactions,
+    commits: authority.commits,
+    validationSurfaces: authority.validationSurfaces,
+    valueAssertions: authority.valueAssertions,
+    stateAssertions: authority.stateAssertions,
+    repeaterCaptures: authority.repeaterCaptures,
+  };
+  assertSame(entry, normalized.entry, `${path}.entry`);
+  for (const key of collectionKeys) {
+    assertSame(collections[key].items, normalized[key], `${path}.${key}.items`);
+  }
+  return {
+    owner,
+    entry: normalized.entry,
+    steps: { complete: true, items: normalized.steps },
+    actions: { complete: true, items: normalized.actions },
+    outcomes: { complete: true, items: normalized.outcomes },
+    transitions: { complete: true, items: normalized.transitions },
+    physicalOperations: {
+      complete: true,
+      items: normalized.physicalOperations,
+    },
+    readiness: { complete: true, items: normalized.readiness },
+    interactions: { complete: true, items: normalized.interactions },
+    commits: { complete: true, items: normalized.commits },
+    validationSurfaces: {
+      complete: true,
+      items: normalized.validationSurfaces,
+    },
+    valueAssertions: { complete: true, items: normalized.valueAssertions },
+    stateAssertions: { complete: true, items: normalized.stateAssertions },
+    repeaterCaptures: {
+      complete: true,
+      items: normalized.repeaterCaptures,
+    },
+  };
+}
+
 function parseJourneyProjection(
   input: unknown,
   path: string,
   selection: AgentContextQuerySelection,
 ): AgentContextJourneyProjection {
-  const value = record(
-    input,
-    path,
-    new Set(['identity', 'execution']),
-  );
+  const value = record(input, path, new Set(['identity', 'authority']));
   const identity = parseIdentityReference(
     required(value, 'identity', path),
     `${path}.identity`,
   );
   assertSame(identity, selection.journey, `${path}.identity`);
-  const authority = createAgentContextExecutionAuthority({
-    schemaVersion: AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_VERSION,
-    basis: selection.executionAuthority.basis,
-    scenario: selection.scenario,
-    physicalOperations: [],
-    readiness: [],
-    interactions: [],
-    commits: [],
-    validationSurfaces: [],
-    valueAssertions: [],
-    stateAssertions: [],
-    usage: required(value, 'execution', path) as AgentContextUsageExecutionAuthority,
-    repeaterCaptures: [],
-  });
-  const execution = authority.usage;
-  if (
-    execution.id !== selection.executionAuthority.usageId ||
-    execution.version !== selection.executionAuthority.usageVersion
-  ) {
-    fail(
-      `${path}.execution`,
-      'must equal the selected execution-authority usage identity.',
-    );
-  }
-  assertSame(
-    execution.basis,
-    selection.executionAuthority.basis,
-    `${path}.execution.basis`,
-  );
   return {
     identity,
-    execution,
+    authority: parseExecutionAuthorityProjection(
+      required(value, 'authority', path),
+      `${path}.authority`,
+      selection,
+    ),
   };
+}
+
+const EFFECT_ANALYSIS_REASONS = [
+  'declared-partial',
+  'effect-cycle',
+  'form-not-declared',
+  'invalid-declared-effect',
+  'opaque-dynamic-rule',
+  'opaque-diagnostic',
+] as const;
+
+function parseEffectAnalysis(
+  input: unknown,
+  path: string,
+): ContractEffectAnalysis {
+  const value = record(input, path, new Set(['completeness', 'reasons']));
+  const completeness = enumValue(
+    required(value, 'completeness', path),
+    `${path}.completeness`,
+    ['complete', 'incomplete'] as const,
+  );
+  const reasons = array(required(value, 'reasons', path), `${path}.reasons`).map(
+    (reason, index) =>
+      enumValue(reason, `${path}.reasons[${index}]`, EFFECT_ANALYSIS_REASONS),
+  );
+  const uniqueReasons = new Set(reasons);
+  if (uniqueReasons.size !== reasons.length) {
+    fail(`${path}.reasons`, 'must not contain duplicates.');
+  }
+  if (
+    (completeness === 'complete' && reasons.length !== 0) ||
+    (completeness === 'incomplete' && reasons.length === 0)
+  ) {
+    fail(`${path}.reasons`, `must explain ${completeness} effect analysis.`);
+  }
+  return { completeness, reasons };
+}
+
+function parseContractDiagnosticEvidence(
+  input: unknown,
+  path: string,
+): ContractDiagnostic {
+  const value = record(
+    input,
+    path,
+    new Set(['code', 'severity', 'message', 'evidence', 'sourcePath', 'nodeId']),
+  );
+  const nodeId = optional(value, 'nodeId');
+  const diagnosticInput = input as ContractDiagnostic;
+  const node =
+    nodeId === undefined
+      ? []
+      : [
+          {
+            id: boundedId(nodeId, `${path}.nodeId`),
+            kind: 'group' as const,
+            modelPath: [],
+            evidence: 'declared' as const,
+            wrappers: [],
+            constraints: [],
+            options: [],
+            conditions: [],
+            dynamicRules: [],
+            locators: [],
+            children: [],
+          },
+        ];
+  const contract = parseFormContract(
+    createFormContract({
+      schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
+      formId: 'agent-context.query-diagnostic-evidence',
+      nodes: node,
+      diagnostics: [diagnosticInput],
+    }),
+  );
+  return contract.diagnostics[0]!;
+}
+
+function parseContextSummaryProjection(
+  input: unknown,
+  path: string,
+  selection: AgentContextQuerySelection,
+): AgentContextContextSummaryProjection {
+  const value = record(
+    input,
+    path,
+    new Set([
+      'usageEntry',
+      'form',
+      'diagnosticEvidenceCounts',
+      'executableCapabilities',
+      'scenarioIds',
+      'effectAnalysis',
+      'unknownEvidenceCounts',
+    ]),
+  );
+  const usageEntryValue = record(
+    required(value, 'usageEntry', path),
+    `${path}.usageEntry`,
+    new Set(['usage', 'entryId', 'landingStepId', 'capability']),
+  );
+  const usage = parseUsageIdentity(
+    required(usageEntryValue, 'usage', `${path}.usageEntry`),
+    `${path}.usageEntry.usage`,
+  );
+  if (usage.kind !== 'declared') {
+    fail(`${path}.usageEntry.usage.kind`, 'must be declared.');
+  }
+  assertSame(usage, selection.usage, `${path}.usageEntry.usage`);
+  if (
+    required(usageEntryValue, 'capability', `${path}.usageEntry`) !==
+    'open-usage'
+  ) {
+    fail(`${path}.usageEntry.capability`, 'must be open-usage.');
+  }
+  const formValue = record(
+    required(value, 'form', path),
+    `${path}.form`,
+    new Set(['identity', 'nodeCount']),
+  );
+  const formIdentity = parseFormReference(
+    required(formValue, 'identity', `${path}.form`),
+    `${path}.form.identity`,
+  );
+  assertSame(formIdentity, selection.form, `${path}.form.identity`);
+  const diagnosticCountsValue = record(
+    required(value, 'diagnosticEvidenceCounts', path),
+    `${path}.diagnosticEvidenceCounts`,
+    new Set(['total', 'warnings', 'errors']),
+  );
+  const diagnosticEvidenceCounts = {
+    total: nonNegativeInteger(
+      required(diagnosticCountsValue, 'total', `${path}.diagnosticEvidenceCounts`),
+      `${path}.diagnosticEvidenceCounts.total`,
+    ),
+    warnings: nonNegativeInteger(
+      required(
+        diagnosticCountsValue,
+        'warnings',
+        `${path}.diagnosticEvidenceCounts`,
+      ),
+      `${path}.diagnosticEvidenceCounts.warnings`,
+    ),
+    errors: nonNegativeInteger(
+      required(diagnosticCountsValue, 'errors', `${path}.diagnosticEvidenceCounts`),
+      `${path}.diagnosticEvidenceCounts.errors`,
+    ),
+  };
+  if (
+    diagnosticEvidenceCounts.total !==
+    diagnosticEvidenceCounts.warnings + diagnosticEvidenceCounts.errors
+  ) {
+    fail(
+      `${path}.diagnosticEvidenceCounts.total`,
+      'must equal warnings plus errors.',
+    );
+  }
+  const executableCapabilities = parseCanonicalCompleteCollection(
+    required(value, 'executableCapabilities', path),
+    `${path}.executableCapabilities`,
+    parseCapability,
+    (capability) => capability,
+    compareText,
+  );
+  const scenarioIds = parseCanonicalCompleteCollection(
+    required(value, 'scenarioIds', path),
+    `${path}.scenarioIds`,
+    boundedId,
+    (scenarioId) => scenarioId,
+    compareText,
+  );
+  assertSame(
+    scenarioIds.items,
+    [selection.scenario.id],
+    `${path}.scenarioIds.items`,
+  );
+  const effectUnion = record(
+    required(value, 'effectAnalysis', path),
+    `${path}.effectAnalysis`,
+    new Set(['state', 'analysis']),
+  );
+  const effectState = enumValue(
+    required(effectUnion, 'state', `${path}.effectAnalysis`),
+    `${path}.effectAnalysis.state`,
+    ['not-reported', 'reported'] as const,
+  );
+  let effectAnalysis: AgentContextContextSummaryProjection['effectAnalysis'];
+  if (effectState === 'not-reported') {
+    record(
+      required(value, 'effectAnalysis', path),
+      `${path}.effectAnalysis`,
+      new Set(['state']),
+    );
+    effectAnalysis = { state: effectState };
+  } else {
+    effectAnalysis = {
+      state: effectState,
+      analysis: parseEffectAnalysis(
+        required(effectUnion, 'analysis', `${path}.effectAnalysis`),
+        `${path}.effectAnalysis.analysis`,
+      ),
+    };
+  }
+  const unknownCountsValue = record(
+    required(value, 'unknownEvidenceCounts', path),
+    `${path}.unknownEvidenceCounts`,
+    new Set([
+      'total',
+      'diagnostics',
+      'interactionProfiles',
+      'effectAnalysisReasons',
+      'effectAnalysisUnreported',
+    ]),
+  );
+  const effectAnalysisUnreported = nonNegativeInteger(
+    required(
+      unknownCountsValue,
+      'effectAnalysisUnreported',
+      `${path}.unknownEvidenceCounts`,
+    ),
+    `${path}.unknownEvidenceCounts.effectAnalysisUnreported`,
+  );
+  if (effectAnalysisUnreported !== 0 && effectAnalysisUnreported !== 1) {
+    fail(
+      `${path}.unknownEvidenceCounts.effectAnalysisUnreported`,
+      'must be zero or one.',
+    );
+  }
+  const normalizedEffectAnalysisUnreported: 0 | 1 =
+    effectAnalysisUnreported === 0 ? 0 : 1;
+  const unknownEvidenceCounts = {
+    total: nonNegativeInteger(
+      required(unknownCountsValue, 'total', `${path}.unknownEvidenceCounts`),
+      `${path}.unknownEvidenceCounts.total`,
+    ),
+    diagnostics: nonNegativeInteger(
+      required(
+        unknownCountsValue,
+        'diagnostics',
+        `${path}.unknownEvidenceCounts`,
+      ),
+      `${path}.unknownEvidenceCounts.diagnostics`,
+    ),
+    interactionProfiles: nonNegativeInteger(
+      required(
+        unknownCountsValue,
+        'interactionProfiles',
+        `${path}.unknownEvidenceCounts`,
+      ),
+      `${path}.unknownEvidenceCounts.interactionProfiles`,
+    ),
+    effectAnalysisReasons: nonNegativeInteger(
+      required(
+        unknownCountsValue,
+        'effectAnalysisReasons',
+        `${path}.unknownEvidenceCounts`,
+      ),
+      `${path}.unknownEvidenceCounts.effectAnalysisReasons`,
+    ),
+    effectAnalysisUnreported: normalizedEffectAnalysisUnreported,
+  };
+  if (
+    unknownEvidenceCounts.total !==
+      unknownEvidenceCounts.diagnostics +
+        unknownEvidenceCounts.interactionProfiles +
+        unknownEvidenceCounts.effectAnalysisReasons +
+        unknownEvidenceCounts.effectAnalysisUnreported ||
+    unknownEvidenceCounts.diagnostics !== diagnosticEvidenceCounts.total ||
+    unknownEvidenceCounts.effectAnalysisUnreported !==
+      (effectAnalysis.state === 'not-reported' ? 1 : 0) ||
+    unknownEvidenceCounts.effectAnalysisReasons !==
+      (effectAnalysis.state === 'reported'
+        ? effectAnalysis.analysis.reasons.length
+        : 0)
+  ) {
+    fail(`${path}.unknownEvidenceCounts`, 'does not match the reported evidence.');
+  }
+  return {
+    usageEntry: {
+      usage,
+      entryId: boundedId(
+        required(usageEntryValue, 'entryId', `${path}.usageEntry`),
+        `${path}.usageEntry.entryId`,
+      ),
+      landingStepId: boundedId(
+        required(usageEntryValue, 'landingStepId', `${path}.usageEntry`),
+        `${path}.usageEntry.landingStepId`,
+      ),
+      capability: 'open-usage',
+    },
+    form: {
+      identity: formIdentity,
+      nodeCount: nonNegativeInteger(
+        required(formValue, 'nodeCount', `${path}.form`),
+        `${path}.form.nodeCount`,
+      ),
+    },
+    diagnosticEvidenceCounts,
+    executableCapabilities,
+    scenarioIds,
+    effectAnalysis,
+    unknownEvidenceCounts,
+  };
+}
+
+function parseDiagnosticEvidenceProjection(
+  input: unknown,
+  path: string,
+  selection: AgentContextQuerySelection,
+): AgentContextDiagnosticEvidenceProjection {
+  const union = record(
+    input,
+    path,
+    new Set(['kind', 'owner', 'diagnostic', 'analysis']),
+  );
+  const kind = enumValue(required(union, 'kind', path), `${path}.kind`, [
+    'contract-diagnostic',
+    'effect-analysis',
+  ] as const);
+  const value = record(
+    input,
+    path,
+    kind === 'contract-diagnostic'
+      ? new Set(['kind', 'owner', 'diagnostic'])
+      : new Set(['kind', 'owner', 'analysis']),
+  );
+  const owner = parseTypedArtifactReference(
+    required(value, 'owner', path),
+    `${path}.owner`,
+    FORM_CONTRACT_SCHEMA_ID,
+    FORM_CONTRACT_SCHEMA_VERSION,
+  );
+  if (
+    !sameJson(owner, selection.owners.formContract) &&
+    !sameJson(owner, selection.owners.scenarioArtifact)
+  ) {
+    fail(`${path}.owner`, 'must be a selected form evidence owner.');
+  }
+  return kind === 'contract-diagnostic'
+    ? {
+        kind,
+        owner,
+        diagnostic: parseContractDiagnosticEvidence(
+          required(value, 'diagnostic', path),
+          `${path}.diagnostic`,
+        ),
+      }
+    : {
+        kind,
+        owner,
+        analysis: parseEffectAnalysis(
+          required(value, 'analysis', path),
+          `${path}.analysis`,
+        ),
+      };
 }
 
 function parseContextResult(input: unknown, path: string): GetFormContextResult {
@@ -3233,8 +3833,9 @@ function parseContextResult(input: unknown, path: string): GetFormContextResult 
       'selection',
       'freshness',
       'authority',
+      'summary',
       'steps',
-      'reasons',
+      'evidence',
       'journey',
       'page',
       'reason',
@@ -3311,9 +3912,15 @@ function parseContextResult(input: unknown, path: string): GetFormContextResult 
         'view',
         'selection',
         'freshness',
+        'summary',
         'steps',
         'page',
       ]),
+    );
+    const summary = parseContextSummaryProjection(
+      required(value, 'summary', path),
+      `${path}.summary`,
+      selection,
     );
     const steps = parseCandidateList(
       required(value, 'steps', path),
@@ -3328,6 +3935,7 @@ function parseContextResult(input: unknown, path: string): GetFormContextResult 
       view,
       selection,
       freshness,
+      summary,
       steps,
       page: parsePageResult(required(value, 'page', path), `${path}.page`, 'steps'),
     };
@@ -3343,14 +3951,15 @@ function parseContextResult(input: unknown, path: string): GetFormContextResult 
         'view',
         'selection',
         'freshness',
-        'reasons',
+        'evidence',
         'page',
       ]),
     );
-    const reasons = parseCandidateList(
-      required(value, 'reasons', path),
-      `${path}.reasons`,
-      parseReason,
+    const evidence = parseCandidateList(
+      required(value, 'evidence', path),
+      `${path}.evidence`,
+      (entry, entryPath) =>
+        parseDiagnosticEvidenceProjection(entry, entryPath, selection),
       canonicalStringify,
     );
     return {
@@ -3360,7 +3969,7 @@ function parseContextResult(input: unknown, path: string): GetFormContextResult 
       view,
       selection,
       freshness,
-      reasons,
+      evidence,
       page: parsePageResult(
         required(value, 'page', path),
         `${path}.page`,
@@ -3394,28 +4003,6 @@ function parseContextResult(input: unknown, path: string): GetFormContextResult 
       selection,
     ),
   };
-}
-
-function parseSelectedExecutionAuthority(
-  input: unknown,
-  path: string,
-  selection: AgentContextQuerySelection,
-): AgentContextExecutionAuthority {
-  const authority = parseAgentContextExecutionAuthority(input);
-  if (
-    authority.contentHash !== selection.owners.executionAuthority.contentHash
-  ) {
-    fail(`${path}.contentHash`, 'must equal the selected authority owner.');
-  }
-  assertSame(authority.basis, selection.executionAuthority.basis, `${path}.basis`);
-  assertSame(authority.scenario, selection.scenario, `${path}.scenario`);
-  if (
-    authority.usage.id !== selection.executionAuthority.usageId ||
-    authority.usage.version !== selection.executionAuthority.usageVersion
-  ) {
-    fail(`${path}.usage`, 'must equal the selected usage identity.');
-  }
-  return authority;
 }
 
 function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
@@ -3494,14 +4081,14 @@ function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
   const authority =
     status === 'not-found'
       ? undefined
-      : parseSelectedExecutionAuthority(
+      : parseExecutionAuthorityProjection(
           required(value, 'authority', path),
           `${path}.authority`,
           selection,
         );
   if (authority !== undefined) {
     const authorityNodeIds = new Set(
-      authority.usage.steps.flatMap(({ nodeIds }) => nodeIds),
+      authority.steps.items.flatMap(({ nodeIds }) => nodeIds),
     );
     for (const [index, candidate] of candidates.entries()) {
       if (!authorityNodeIds.has(candidate.nodeId)) {
@@ -3583,12 +4170,12 @@ function parseSliceProjection(
     required(value, 'withinStepId', path),
     `${path}.withinStepId`,
   );
-  const authority = parseSelectedExecutionAuthority(
+  const authority = parseExecutionAuthorityProjection(
     required(value, 'authority', path),
     `${path}.authority`,
     selection,
   );
-  const step = authority.usage.steps.find(({ id }) => id === withinStepId);
+  const step = authority.steps.items.find(({ id }) => id === withinStepId);
   if (step === undefined) {
     fail(`${path}.withinStepId`, 'must resolve in the selected authority.');
   }
@@ -3712,7 +4299,7 @@ function parseSliceProjection(
       }
       if (kind === 'readiness') {
         const readinessInput = required(branch, 'readiness', entryPath);
-        const readiness = authority.readiness.find((candidate) =>
+        const readiness = authority.readiness.items.find((candidate) =>
           sameJson(candidate, readinessInput),
         );
         if (readiness?.nodeId !== node.nodeId) {
@@ -3847,8 +4434,9 @@ export function parseAgentContextQueryResult(
       'candidates',
       'page',
       'reason',
+      'summary',
       'steps',
-      'reasons',
+      'evidence',
       'journey',
       'slice',
     ]),
@@ -3863,6 +4451,497 @@ export function parseAgentContextQueryResult(
   if (operation === 'find-form-nodes') return parseNodeResult(detached, path);
   if (operation === 'get-e2e-slice') return parseSliceResult(detached, path);
   fail(`${path}.operation`, 'is not supported.');
+}
+
+function projectExecutionAuthority(
+  selection: AgentContextQuerySelection,
+  authority: AgentContextExecutionAuthority,
+  nodeIds: readonly string[],
+): AgentContextExecutionAuthorityProjection {
+  const requestedNodeIds = new Set(nodeIds);
+  const steps = authority.usage.steps.filter(
+    (step) =>
+      step.id === authority.usage.entry.landingStepId ||
+      step.nodeIds.some((nodeId) => requestedNodeIds.has(nodeId)),
+  );
+  const stepIds = new Set(steps.map(({ id }) => id));
+  const actionIds = new Set(steps.flatMap(({ actionIds: ids }) => ids));
+  const actions = authority.usage.actions.filter(({ id }) => actionIds.has(id));
+  const outcomeIds = new Set(actions.flatMap(({ outcomeIds: ids }) => ids));
+  const outcomes = authority.usage.outcomes.filter(({ id }) => outcomeIds.has(id));
+  const transitions = authority.usage.transitions.filter(
+    ({ fromStepId, actionId, outcomeId, toStepId }) =>
+      stepIds.has(fromStepId) &&
+      actionIds.has(actionId) &&
+      outcomeIds.has(outcomeId) &&
+      stepIds.has(toStepId),
+  );
+  const interactions = authority.interactions.filter(({ nodeId }) =>
+    requestedNodeIds.has(nodeId),
+  );
+  const interactionIds = new Set(interactions.map(({ id }) => id));
+  const repeaterCaptures = authority.repeaterCaptures.filter(
+    ({ repeaterNodeId }) => requestedNodeIds.has(repeaterNodeId),
+  );
+  const repeaterCaptureIds = new Set(repeaterCaptures.map(({ id }) => id));
+  const readiness = authority.readiness.filter(({ owner }) =>
+    owner.kind === 'interaction'
+      ? interactionIds.has(owner.interactionId)
+      : repeaterCaptureIds.has(owner.repeaterCaptureId),
+  );
+  const commits = authority.commits.filter(
+    ({ nodeId, interactionId }) =>
+      requestedNodeIds.has(nodeId) && interactionIds.has(interactionId),
+  );
+  const validationSurfaces = authority.validationSurfaces.filter(({ nodeId }) =>
+    requestedNodeIds.has(nodeId),
+  );
+  const valueAssertions = authority.valueAssertions.filter(({ nodeId }) =>
+    requestedNodeIds.has(nodeId),
+  );
+  const stateAssertions = authority.stateAssertions.filter(({ nodeId }) =>
+    requestedNodeIds.has(nodeId),
+  );
+  const physicalOperationIds = new Set([
+    ...commits.flatMap((commit) =>
+      commit.kind === 'node-local' && commit.execution === 'explicit-intent'
+        ? [commit.physicalOperationId]
+        : [],
+    ),
+    ...validationSurfaces.flatMap((surface) =>
+      surface.activation.kind === 'node-local'
+        ? [surface.activation.physicalOperationId]
+        : [],
+    ),
+  ]);
+  return {
+    owner: selection.owners.executionAuthority,
+    entry: authority.usage.entry,
+    steps: { complete: true, items: steps },
+    actions: { complete: true, items: actions },
+    outcomes: { complete: true, items: outcomes },
+    transitions: { complete: true, items: transitions },
+    physicalOperations: {
+      complete: true,
+      items: authority.physicalOperations.filter(({ id }) =>
+        physicalOperationIds.has(id),
+      ),
+    },
+    readiness: { complete: true, items: readiness },
+    interactions: { complete: true, items: interactions },
+    commits: { complete: true, items: commits },
+    validationSurfaces: { complete: true, items: validationSurfaces },
+    valueAssertions: { complete: true, items: valueAssertions },
+    stateAssertions: { complete: true, items: stateAssertions },
+    repeaterCaptures: { complete: true, items: repeaterCaptures },
+  };
+}
+
+function collectFormContractNodes(
+  nodes: FormContract['nodes'],
+): readonly FormContract['nodes'][number][] {
+  return nodes.flatMap((node) => [
+    node,
+    ...collectFormContractNodes(node.children),
+    ...(node.arrayTemplate === undefined
+      ? []
+      : collectFormContractNodes([node.arrayTemplate])),
+  ]);
+}
+
+function collectExecutableCapabilities(
+  authority: AgentContextExecutionAuthority,
+): readonly AgentContextQueryCapability[] {
+  const capabilities: AgentContextQueryCapability[] = [
+    authority.usage.entry.operation,
+    ...authority.usage.actions.map(({ operation }) => operation),
+    ...authority.usage.outcomes.map(({ operation }) => operation),
+    ...authority.readiness.map(({ operation }) => operation),
+    ...authority.interactions.map(({ operation }) => operation),
+    ...authority.commits.map(({ operation }) => operation),
+    ...authority.validationSurfaces.flatMap(({ activation, assertion }) => [
+      ...(activation.kind === 'none' ? [] : [activation.operation]),
+      assertion.operation,
+    ]),
+    ...authority.valueAssertions.map(({ operation }) => operation),
+    ...authority.stateAssertions.map(({ operation }) => operation),
+    ...authority.repeaterCaptures.map(({ operation }) => operation),
+  ];
+  return [...new Set(capabilities)].sort(compareText);
+}
+
+function collectNodeCapabilities(
+  authority: AgentContextExecutionAuthority,
+  nodeId: string,
+): readonly AgentContextQueryCapability[] {
+  const capabilities: AgentContextQueryCapability[] = [
+    ...authority.readiness
+      .filter((record) => record.nodeId === nodeId)
+      .map(({ operation }) => operation),
+    ...authority.interactions
+      .filter((record) => record.nodeId === nodeId)
+      .map(({ operation }) => operation),
+    ...authority.commits
+      .filter((record) => record.nodeId === nodeId)
+      .map(({ operation }) => operation),
+    ...authority.validationSurfaces
+      .filter((record) => record.nodeId === nodeId)
+      .flatMap(({ activation, assertion }) => [
+        ...(activation.kind === 'none' ? [] : [activation.operation]),
+        assertion.operation,
+      ]),
+    ...authority.valueAssertions
+      .filter((record) => record.nodeId === nodeId)
+      .map(({ operation }) => operation),
+    ...authority.stateAssertions
+      .filter((record) => record.nodeId === nodeId)
+      .map(({ operation }) => operation),
+    ...authority.repeaterCaptures
+      .filter((record) => record.repeaterNodeId === nodeId)
+      .map(({ operation }) => operation),
+  ];
+  return [...new Set(capabilities)].sort(compareText);
+}
+
+function projectContextSummary(
+  selection: AgentContextQuerySelection,
+  contract: FormContract,
+  authority: AgentContextExecutionAuthority,
+): AgentContextContextSummaryProjection {
+  const nodes = collectFormContractNodes(contract.nodes);
+  const diagnostics = contract.diagnostics;
+  const interactionProfiles = nodes.reduce(
+    (count, node) => count + (node.interactionProfile?.unknowns.length ?? 0),
+    0,
+  );
+  const effectAnalysisReasons = contract.effectAnalysis?.reasons.length ?? 0;
+  const effectAnalysisUnreported = contract.effectAnalysis === undefined ? 1 : 0;
+  return {
+    usageEntry: {
+      usage: selection.usage,
+      entryId: authority.usage.entry.id,
+      landingStepId: authority.usage.entry.landingStepId,
+      capability: 'open-usage',
+    },
+    form: { identity: selection.form, nodeCount: nodes.length },
+    diagnosticEvidenceCounts: {
+      total: diagnostics.length,
+      warnings: diagnostics.filter(({ severity }) => severity === 'warning')
+        .length,
+      errors: diagnostics.filter(({ severity }) => severity === 'error').length,
+    },
+    executableCapabilities: {
+      complete: true,
+      items: collectExecutableCapabilities(authority),
+    },
+    scenarioIds: { complete: true, items: [selection.scenario.id] },
+    effectAnalysis:
+      contract.effectAnalysis === undefined
+        ? { state: 'not-reported' }
+        : { state: 'reported', analysis: contract.effectAnalysis },
+    unknownEvidenceCounts: {
+      total:
+        diagnostics.length +
+        interactionProfiles +
+        effectAnalysisReasons +
+        effectAnalysisUnreported,
+      diagnostics: diagnostics.length,
+      interactionProfiles,
+      effectAnalysisReasons,
+      effectAnalysisUnreported,
+    },
+  };
+}
+
+function validateSearchCandidateAgainstDataset(
+  dataset: AgentContextQueryDataset,
+  candidate: AgentContextUsageCandidateProjection,
+  path: string,
+): void {
+  const catalog = findOwner(
+    dataset.sourceUsageCatalogs,
+    candidate.sourceUsageCatalog,
+    `${path}.sourceUsageCatalog`,
+  ).artifact;
+  const matches = catalog.usages.filter(({ identity }) =>
+    sameJson(identity, candidate.usage),
+  );
+  if (matches.length !== 1) {
+    fail(`${path}.usage`, 'must resolve exactly one source-usage owner record.');
+  }
+  const usage = matches[0]!;
+  if (usage.projectId !== candidate.projectId) {
+    fail(`${path}.projectId`, 'does not match the source-usage owner.');
+  }
+  if (
+    candidate.usage.kind === 'callsite' &&
+    candidate.usage.projectId !== candidate.projectId
+  ) {
+    fail(`${path}.usage.projectId`, 'does not match the source-usage owner.');
+  }
+  const exactForm =
+    usage.resolution.status === 'exact'
+      ? usage.resolution.candidate.form
+      : undefined;
+  if (candidate.form === undefined) {
+    if (candidate.usage.kind === 'declared' && exactForm !== undefined) {
+      fail(`${path}.form`, 'must surface the exact resolved form.');
+    }
+  } else {
+    if (exactForm === undefined || !sameJson(candidate.form, exactForm)) {
+      fail(`${path}.form`, 'does not match an exact source-usage resolution.');
+    }
+  }
+  for (const [index, handoff] of candidate.selectionHandoffs.items.entries()) {
+    validateAgentContextQuerySelectionAgainstParsedDataset(dataset, handoff);
+    if (candidate.form === undefined || !sameJson(handoff.form, candidate.form)) {
+      fail(
+        `${path}.selectionHandoffs.items[${index}]`,
+        'does not match the candidate form.',
+      );
+    }
+  }
+}
+
+function validateNodeProjectionAgainstOwners(
+  nodeById: ReadonlyMap<string, FormContract['nodes'][number]>,
+  contract: FormContract,
+  authority: AgentContextExecutionAuthority,
+  candidate: AgentContextNodeCandidateProjection,
+  path: string,
+): void {
+  const node = nodeById.get(candidate.nodeId);
+  if (node === undefined) {
+    fail(`${path}.nodeId`, 'must resolve exactly one selected form node.');
+  }
+  const basicProjection = {
+    nodeId: node.id,
+    kind: node.kind,
+    modelPath: node.modelPath,
+    ...(node.formlyType === undefined ? {} : { formlyType: node.formlyType }),
+    ...(node.semanticType === undefined
+      ? {}
+      : { semanticType: node.semanticType }),
+    evidence: node.evidence,
+    ...(node.presentation === undefined
+      ? {}
+      : { presentation: node.presentation }),
+    ...(node.state === undefined ? {} : { state: node.state }),
+    childNodeIds: node.children.map(({ id }) => id),
+    ...(node.arrayTemplate === undefined
+      ? {}
+      : { arrayTemplateNodeId: node.arrayTemplate.id }),
+  };
+  const candidateBasic = {
+    nodeId: candidate.nodeId,
+    kind: candidate.kind,
+    modelPath: candidate.modelPath,
+    ...(candidate.formlyType === undefined
+      ? {}
+      : { formlyType: candidate.formlyType }),
+    ...(candidate.semanticType === undefined
+      ? {}
+      : { semanticType: candidate.semanticType }),
+    evidence: candidate.evidence,
+    ...(candidate.presentation === undefined
+      ? {}
+      : { presentation: candidate.presentation }),
+    ...(candidate.state === undefined ? {} : { state: candidate.state }),
+    childNodeIds: candidate.childNodeIds,
+    ...(candidate.arrayTemplateNodeId === undefined
+      ? {}
+      : { arrayTemplateNodeId: candidate.arrayTemplateNodeId }),
+  };
+  assertSame(candidateBasic, basicProjection, path);
+  assertSame(
+    candidate.capabilities,
+    collectNodeCapabilities(authority, node.id),
+    `${path}.capabilities`,
+  );
+  const effects = (contract.declaredEffects ?? []).filter(
+    ({ trigger, target }) => trigger.nodeId === node.id || target.nodeId === node.id,
+  );
+  const diagnostics = contract.diagnostics.filter(
+    ({ nodeId }) => nodeId === node.id,
+  );
+  for (const aspect of candidate.included) {
+    const expected =
+      aspect === 'constraints'
+        ? { complete: true, items: node.constraints }
+        : aspect === 'domain'
+          ? {
+              options: { complete: true, items: node.options },
+              ...(node.optionSource === undefined
+                ? {}
+                : { optionSource: node.optionSource }),
+              ...(node.valueDomain === undefined
+                ? {}
+                : { valueDomain: node.valueDomain }),
+            }
+          : aspect === 'effects'
+            ? { complete: true, items: effects }
+            : aspect === 'interaction'
+              ? node.interactionProfile === undefined
+                ? {}
+                : { profile: node.interactionProfile }
+              : aspect === 'locators'
+                ? { complete: true, items: node.locators }
+                : { complete: true, items: diagnostics };
+    assertSame(candidate.details[aspect], expected, `${path}.details.${aspect}`);
+  }
+}
+
+export function validateAgentContextQueryResult(
+  datasetInput: unknown,
+  resultInput: unknown,
+): AgentContextQueryResult {
+  const dataset = parseAgentContextQueryDataset(datasetInput);
+  const result = parseAgentContextQueryResult(resultInput);
+  const path = 'agentContextQueryResult';
+  if (result.operation === 'search-form-usages') {
+    validateAgentContextUsageSearchScopeAgainstParsedDataset(
+      dataset,
+      result.scope,
+    );
+    if (result.status !== 'refused') {
+      for (const [index, candidate] of result.candidates.entries()) {
+        validateSearchCandidateAgainstDataset(
+          dataset,
+          candidate,
+          `${path}.candidates[${index}]`,
+        );
+      }
+    }
+    return result;
+  }
+  const selection = validateAgentContextQuerySelectionAgainstParsedDataset(
+    dataset,
+    result.selection,
+  );
+  if (result.status === 'refused') return result;
+  const contract = findOwner(
+    dataset.formContracts,
+    selection.owners.formContract,
+    `${path}.selection.owners.formContract`,
+  ).artifact;
+  const authority = findOwner(
+    dataset.executionAuthorities,
+    selection.owners.executionAuthority,
+    `${path}.selection.owners.executionAuthority`,
+  ).artifact;
+  const contractNodeById = new Map(
+    collectFormContractNodes(contract.nodes).map((node) => [node.id, node] as const),
+  );
+  if (result.operation === 'get-form-context') {
+    if (result.view === 'summary') {
+      assertSame(
+        result.summary,
+        projectContextSummary(selection, contract, authority),
+        `${path}.summary`,
+      );
+      const stepById = new Map(
+        authority.usage.steps.map((step) => [step.id, step] as const),
+      );
+      for (const [index, step] of result.steps.entries()) {
+        const ownerStep = stepById.get(step.id);
+        if (
+          ownerStep === undefined ||
+          !sameJson(step, {
+            id: ownerStep.id,
+            ordinal: ownerStep.ordinal,
+            nodeCount: ownerStep.nodeIds.length,
+            actionIds: ownerStep.actionIds,
+          })
+        ) {
+          fail(`${path}.steps[${index}]`, 'does not match the authority owner.');
+        }
+      }
+      return result;
+    }
+    if (result.view === 'diagnostics') {
+      for (const [index, evidence] of result.evidence.entries()) {
+        const owner = findOwner(
+          dataset.formContracts,
+          evidence.owner,
+          `${path}.evidence[${index}].owner`,
+        ).artifact;
+        const exact =
+          evidence.kind === 'contract-diagnostic'
+            ? owner.diagnostics.some((diagnostic) =>
+                sameJson(diagnostic, evidence.diagnostic),
+              )
+            : owner.effectAnalysis !== undefined &&
+              sameJson(owner.effectAnalysis, evidence.analysis);
+        if (!exact) {
+          fail(
+            `${path}.evidence[${index}]`,
+            'does not match raw diagnostic owner evidence.',
+          );
+        }
+      }
+      return result;
+    }
+    assertSame(
+      result.journey.authority,
+      projectExecutionAuthority(
+        selection,
+        authority,
+        authority.usage.steps.flatMap(({ nodeIds }) => nodeIds),
+      ),
+      `${path}.journey.authority`,
+    );
+    return result;
+  }
+  if (result.operation === 'find-form-nodes') {
+    if (result.status === 'not-found') return result;
+    for (const [index, candidate] of result.candidates.entries()) {
+      validateNodeProjectionAgainstOwners(
+        contractNodeById,
+        contract,
+        authority,
+        candidate,
+        `${path}.candidates[${index}]`,
+      );
+    }
+    assertSame(
+      result.authority,
+      projectExecutionAuthority(
+        selection,
+        authority,
+        result.candidates.map(({ nodeId }) => nodeId),
+      ),
+      `${path}.authority`,
+    );
+    return result;
+  }
+  for (const [index, candidate] of result.slice.closureNodes.items.entries()) {
+    validateNodeProjectionAgainstOwners(
+      contractNodeById,
+      contract,
+      authority,
+      candidate,
+      `${path}.slice.closureNodes.items[${index}]`,
+    );
+  }
+  assertSame(
+    result.slice.authority,
+    projectExecutionAuthority(
+      selection,
+      authority,
+      result.slice.closureNodes.items.map(({ nodeId }) => nodeId),
+    ),
+    `${path}.slice.authority`,
+  );
+  const declaredEffects = contract.declaredEffects ?? [];
+  for (const [index, effect] of result.slice.effects.items.entries()) {
+    if (!declaredEffects.some((candidate) => sameJson(candidate, effect))) {
+      fail(
+        `${path}.slice.effects.items[${index}]`,
+        'does not match a selected form effect.',
+      );
+    }
+  }
+  return result;
 }
 
 export function canonicalizeAgentContextQueryResult(input: unknown): string {
@@ -3964,6 +5043,7 @@ const REQUIRED_FRESHNESS_ROLES: Readonly<
     'workspace-index',
     'source-usage-catalog',
     'journey-catalog',
+    'execution-authority',
   ],
   'node-search': [
     'artifact-set',

@@ -102,20 +102,20 @@ function contextDiagnosticsQuery() {
 }
 
 function usageSearchScope(
-  sourceHash: AgentContextUsageSearchScope['sourceUsageCatalogs'][number]['contentHash'] =
+  sourceHashes: readonly AgentContextUsageSearchScope['sourceUsageCatalogs'][number]['contentHash'][] = [
     HASH_C,
+    HASH_D,
+  ],
 ): AgentContextUsageSearchScope {
   return {
     schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
     artifactSet: { schemaVersion: '0.1.0', contentHash: HASH_A },
     workspaceIndex: { schemaVersion: '0.2.0', contentHash: HASH_B },
-    sourceUsageCatalogs: [
-      {
+    sourceUsageCatalogs: sourceHashes.map((contentHash) => ({
         schemaId: 'agent-context.source-usage',
         schemaVersion: '0.1.0',
-        contentHash: sourceHash,
-      },
-    ],
+        contentHash,
+      })),
   };
 }
 
@@ -242,11 +242,26 @@ describe('opaque agent-context query cursors', () => {
       parseAgentContextQueryCursor({
         cursor,
         collection: 'candidates',
-        query: usageSearchQuery(usageSearchScope(HASH_D)),
+        query: usageSearchQuery(usageSearchScope([HASH_C, HASH_E])),
         now: NOW + 1,
         signingMaterial: SECRET,
       }),
     ).toThrow(/cursor.*invalid|invalid.*cursor/iu);
+    for (const sourceHashes of [
+      [HASH_C],
+      [HASH_C, HASH_D, HASH_E],
+      [HASH_D, HASH_C],
+    ] as const) {
+      expect(() =>
+        parseAgentContextQueryCursor({
+          cursor,
+          collection: 'candidates',
+          query: usageSearchQuery(usageSearchScope(sourceHashes)),
+          now: NOW + 1,
+          signingMaterial: SECRET,
+        }),
+      ).toThrow(/cursor.*invalid|invalid.*cursor|canonical/iu);
+    }
   });
 
   it('refuses tampering, non-canonical encoding, another secret, and malformed data', () => {

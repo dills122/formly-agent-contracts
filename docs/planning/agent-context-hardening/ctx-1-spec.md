@@ -19,7 +19,9 @@ pagination with opaque HMAC-protected cursors.
 The pure boundary lives in `@formly-contract/schema`; CTX-1 does not introduce
 another package. Production APIs accept the general query dataset below. The
 synthetic RH-05 fixture wrapper is test input from CTX-0D, not a production
-dataset type.
+dataset type. CTX-1A establishes unreleased source-module contracts only; the
+schema barrel export, package Changeset, and package-level consumability claim
+are deliberately deferred to CTX-1D.
 
 ## Invariants
 
@@ -68,6 +70,14 @@ workspaces without an unpinned aggregate lookup. The search query, every
 search result variant, aggregate search freshness, and a search continuation
 cursor all repeat or authenticate this exact scope.
 
+`validateAgentContextUsageSearchScope(dataset, scope)` is the production
+dataset boundary: it requires exact artifact-set and workspace-index equality
+and exact canonical equality to the dataset's complete source-usage owner set.
+A self-asserted subset, superset, reordered set, or owner substitution is not
+a valid production scope. Cursor creation remains structural because it has no
+dataset parameter; callers and the CTX-1B query core must run the dataset scope
+validator before creating or continuing a production search cursor.
+
 `AgentContextQuerySelection` contains:
 
 - the exact artifact-set `{ schemaVersion, contentHash }` identity;
@@ -101,7 +111,12 @@ Selection validation resolves every owner exactly once and proves these joins:
    selected Form Contract node set, including nested children and array
    templates;
 10. authority action `(id, kind, outcomeIds)`, outcome `(id, kind)`, and full
-    transition tuples exactly project the selected journey; and
+    transition tuples exactly project only the selected-usage subgraph: its
+    relevant steps are exactly the journey steps containing the selected usage
+    and form, actions are derived from those step memberships, outcomes are
+    derived from those actions, and transitions have both endpoints plus their
+    action and outcome inside that subgraph; unrelated usage records in the
+    same journey are ignored; and
 11. every selected schema-addressed reference occurs in the artifact set.
 
 Hash equality is necessary but does not replace these logical-identity and
@@ -115,7 +130,7 @@ discriminant.
 | Operation | Purpose | Pageable collection | Atomic secondary data |
 | --- | --- | --- | --- |
 | `search-form-usages` | Resolve bounded source/text/form/route/step/capability evidence within an exact multi-catalog scope | `candidates` | exact owner, match evidence, and complete exact-selection handoffs |
-| `get-form-context` | Return `summary`, `diagnostics`, or an atomic `journey` for a pinned selection | `steps` or `diagnostics`; journey is not pageable | identity, freshness, and non-primary summary facts |
+| `get-form-context` | Return `summary`, `diagnostics`, or an atomic `journey` for a pinned selection | summary pages `steps`; diagnostics pages `diagnostics`; journey is not pageable | identity, freshness, and non-primary summary/evidence facts |
 | `find-form-nodes` | Find nodes by exact ID/path or bounded presentation/capability filters | `nodes` | each node record and selected detail aspects |
 | `get-e2e-slice` | Return one exact step's focus and complete prerequisite/effect closure | none | the entire slice |
 
@@ -130,7 +145,12 @@ Each candidate names its exact source-usage catalog owner. A resolved declared
 candidate carries a non-empty, complete `selectionHandoffs` collection of
 fully pinned selections; each handoff must match the candidate usage/form,
 catalog owner, artifact set, and workspace index. Callsite candidates cannot
-claim an exact declared selection. `matchReasons` and `selectionHandoffs` use
+claim an exact declared selection and their identity `projectId` must equal the
+candidate `projectId`. A candidate without a matching resolved form has no
+handoffs; a declared candidate with a form has at least one exact matching
+handoff. Dataset-aware result validation additionally proves the candidate
+identity, project, and optional form against the named source-usage owner.
+`matchReasons` and `selectionHandoffs` use
 `{ complete: true, items }`; they are bounded atomic secondary collections,
 not independently pageable.
 
@@ -148,21 +168,52 @@ if that aspect is included:
 - `effects`: complete `DeclaredCrossFieldEffect` records; and
 - `unknowns`: complete `ContractDiagnostic` records.
 
-Complete and ambiguous node results additionally carry the exact selected
-`AgentContextExecutionAuthority`, which provides the executable interaction,
-readiness, commit, validation, assertion, repeater, and usage authority facts
-without executable modules or selectors invented by CTX-1.
+Complete and ambiguous node results carry an
+`AgentContextExecutionAuthorityProjection`, not the full authority artifact.
+The projection names the exact execution-authority owner and wraps every
+secondary record family in `{ complete: true, items }`. It contains the exact
+entry and relevant complete step/action/outcome/transition records required
+for referential integrity, but physical operation, readiness, interaction,
+commit, validation, assertion, and repeater records are filtered to the
+candidate nodes. The entry landing step is retained when needed to keep the
+projection independently valid. Full unrelated authority payload is illegal
+at the dataset-aware result boundary.
 
-The journey view is atomic `{ identity, execution }`: the selected source
-journey identity plus the complete `AgentContextUsageExecutionAuthority`
-entry, steps, actions, outcomes, and transitions. The E2E slice is atomic and
-contains the exact selected execution authority plus complete concrete
-`focusNodes`, `closureNodes`, `prerequisites`, and `effects` collections. Each
+The summary view has a dedicated, non-pageable `summary` projection. It
+contains exact usage-entry identity and `open-usage` capability, selected form
+identity and flattened node count, warning/error diagnostic evidence counts,
+the complete canonical executable-capability set, the exact scenario ID set,
+reported-or-not-reported effect-analysis state, and categorized raw unknown
+evidence counts. These are evidence facts, not CTX-2 blocker policy. `steps`
+is the summary view's only pageable primary list.
+
+The diagnostics view carries dedicated owner-addressed raw evidence variants:
+an existing `ContractDiagnostic` or an existing `ContractEffectAnalysis`.
+Complete diagnostic results cannot carry query overflow/failure reasons and
+do not add severity, phase, blocking, or remediation fields beyond the raw
+schema-owned record. The `diagnostics` page controls this evidence list.
+
+The journey view is atomic `{ identity, authority }`: the selected source
+journey identity plus an exact-owner authority projection containing the
+complete selected usage entry, steps, actions, outcomes, transitions, and all
+referentially complete authority records for that usage. The E2E slice is
+atomic and contains a filtered exact-owner authority projection for its entry,
+step/closure nodes, operations, and exact applicable transitions/actions/
+outcomes, plus complete concrete `focusNodes`, `closureNodes`, `prerequisites`,
+and `effects` collections. Each
 prerequisite carries an exact closure node plus one resolved cause: a concrete
 trigger effect, selected-authority readiness record, or included wrapper
 precondition. Focus and prerequisite nodes must be exact subsets of the
 closure; closure nodes must belong to the named authority step. No nested
 collection uses a cursor or truncation marker.
+
+`validateAgentContextQueryResult(dataset, result)` is the production result
+boundary. It revalidates the search scope or pinned selection, then proves
+candidate handoffs, summaries, step summaries, diagnostic evidence, node
+fields and requested details, journey authority, and slice authority/effects
+against the exact named owners. Structurally valid but owner-drifted entry or
+driver records, partial projections with omitted dependencies, and projections
+inflated with unrelated authority records fail this validation.
 
 ### Result variants and reasons
 
@@ -205,9 +256,9 @@ Required roles are view-specific:
 | View | Required live roles |
 | --- | --- |
 | `usage-search` | artifact set, workspace index, exact source-usage catalog set |
-| `context-summary` | usage-search roles plus journey, form, and execution authority |
+| `context-summary` | artifact set, workspace index, selected source-usage catalog, journey, form, and execution authority |
 | `context-diagnostics` | all roles |
-| `context-journey` | artifact set, workspace index, source-usage catalog, journey catalog |
+| `context-journey` | artifact set, workspace index, selected source-usage catalog, journey catalog, and execution authority |
 | `node-search` | artifact set, workspace index, source-usage catalog, form, scenario, execution authority |
 | `e2e-slice` | all roles |
 
@@ -280,8 +331,11 @@ CTX-1 does not:
   values, or execution authority;
 - define CTX-2 diagnostic policy, typed intent, validated plans, compilation,
   or stale/unknown execution refusal;
-- make repository revision a freshness or mixed-context proof; or
-- page atomic journeys, E2E closures, secondary metadata, or nested records.
+- make repository revision a freshness or mixed-context proof;
+- page atomic journeys, E2E closures, secondary metadata, or nested records;
+  and
+- publish the unreleased modules from `packages/schema/src/index.ts` or claim
+  package-level consumability before the CTX-1D barrel export and Changeset.
 
 ## Implementation packets
 
@@ -293,8 +347,10 @@ CTX-1 does not:
    dataset, including deterministic named-list pagination.
 3. **CTX-1C — atomic slice:** implement fixed-point same-step prerequisite
    closure, exact transition refusals, cycles, and atomic size caps.
-4. **CTX-1D — walkthrough/scale gate:** prove both CTX-0D walkthroughs and one
-   measured large-form case without loading a whole contract.
+4. **CTX-1D — walkthrough/scale/publication gate:** prove both CTX-0D
+   walkthroughs and one measured large-form case without loading a whole
+   contract, then deliberately publish the reviewed query/cursor modules from
+   the schema barrel and add the Changeset.
 
 Later packets may add projection fields only through a versioned contract
 change; they must not weaken the selection, freshness, or cursor invariants.
@@ -303,11 +359,13 @@ change; they must not weaken the selection, freshness, or cursor invariants.
 
 CTX-1A retains tests for strict canonical round-trips, unknown-key/version
 refusal, unsafe graph bounds, getter/proxy safety (including the freshness
-wrapper), owner-valid rehash/repin selection drift, full result projections,
-every operation/status/view/reason/page/result variant, malformed result
-relations, not-found non-truncation, canonical reasons, aggregate and selected
-freshness precedence, revision-only unknown status, fixed-input cursor
-determinism, cross-query/context/search-scope/disclosure replay refusal,
+wrapper), exact multi-catalog scope validation, owner-valid rehash/repin
+selection drift, valid multi-usage selected-subgraph comparison, exact-owner
+filtered authority projections, dedicated summary and raw diagnostic evidence,
+dataset-aware result drift, every operation/status/view/reason/page/result
+variant, malformed result relations, not-found non-truncation, aggregate and
+selected freshness precedence, revision-only unknown status, fixed-input
+cursor determinism, cross-query/context/search-scope/disclosure replay refusal,
 tamper/expiry refusal, explicit-time behavior, and bounded payload/signing
 material.
 

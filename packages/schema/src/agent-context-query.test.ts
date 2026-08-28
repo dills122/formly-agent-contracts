@@ -15,6 +15,7 @@ import {
   parseAgentContextQueryResult,
   parseAgentContextQuerySelection,
   parseAgentContextUsageSearchScope,
+  validateAgentContextUsageSearchScope,
   validateAgentContextQuerySelection,
   type AgentContextLiveOwnerReference,
   type AgentContextQueryDataset,
@@ -36,6 +37,9 @@ import {
   AGENT_CONTEXT_JOURNEY_SCHEMA_VERSION,
   AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_ID,
   AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_VERSION,
+  createAgentContextJourneyCatalog,
+  createAgentContextSourceUsageCatalog,
+  type AgentContextJourneyCatalogDraft,
 } from './agent-context-usage.js';
 import { createSyntheticRh05AgentContextFixtureSet } from './agent-context-walkthrough-fixtures.js';
 import {
@@ -216,6 +220,38 @@ function usageSearchScope(
   };
 }
 
+function withAdditionalSourceUsageCatalog(
+  dataset: AgentContextQueryDataset,
+): AgentContextQueryDataset {
+  const primary = dataset.sourceUsageCatalogs[0];
+  if (primary === undefined) throw new Error('missing primary usage catalog');
+  const artifact = createAgentContextSourceUsageCatalog({
+    schemaVersion: AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_VERSION,
+    workspaceIndex: primary.artifact.workspaceIndex,
+    coverage: primary.artifact.coverage,
+    usages: [],
+  });
+  const reference: AgentContextArtifactReference = {
+    schemaId: AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_ID,
+    schemaVersion: AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_VERSION,
+    contentHash: artifact.contentHash,
+  };
+  const artifactSet = createAgentContextArtifactSet({
+    schemaVersion: dataset.artifactSet.schemaVersion,
+    repositoryRevision: dataset.artifactSet.repositoryRevision,
+    workspaceIndex: dataset.artifactSet.workspaceIndex,
+    artifacts: [...dataset.artifactSet.artifacts, reference],
+  });
+  return {
+    ...dataset,
+    artifactSet,
+    sourceUsageCatalogs: [
+      ...dataset.sourceUsageCatalogs,
+      { reference, artifact },
+    ].sort((left, right) => compareReference(left.reference, right.reference)),
+  };
+}
+
 function deeplyNestedDataGraph(depth: number): Record<string, unknown> {
   const root: Record<string, unknown> = {};
   let cursor = root;
@@ -304,6 +340,114 @@ function repinExecutionAuthority(
       owners: { ...selection.owners, executionAuthority: reference },
     },
   };
+}
+
+function repinJourneyCatalog(
+  dataset: AgentContextQueryDataset,
+  selection: AgentContextQuerySelection,
+  mutate: (draft: AgentContextJourneyCatalogDraft) => AgentContextJourneyCatalogDraft,
+): {
+  readonly dataset: AgentContextQueryDataset;
+  readonly selection: AgentContextQuerySelection;
+} {
+  const selected = dataset.journeyCatalogs.find(
+    ({ reference }) =>
+      reference.contentHash === selection.owners.journeyCatalog.contentHash,
+  );
+  if (selected === undefined) throw new Error('missing selected journey catalog');
+  const artifact = createAgentContextJourneyCatalog(
+    mutate({
+      schemaVersion: selected.artifact.schemaVersion,
+      workspaceIndex: selected.artifact.workspaceIndex,
+      journeys: selected.artifact.journeys,
+    }),
+  );
+  const reference: AgentContextArtifactReference = {
+    ...selected.reference,
+    contentHash: artifact.contentHash,
+  };
+  const artifactSet = createAgentContextArtifactSet({
+    schemaVersion: dataset.artifactSet.schemaVersion,
+    repositoryRevision: dataset.artifactSet.repositoryRevision,
+    workspaceIndex: dataset.artifactSet.workspaceIndex,
+    artifacts: dataset.artifactSet.artifacts.map((candidate) =>
+      compareReference(candidate, selected.reference) === 0
+        ? reference
+        : candidate,
+    ),
+  });
+  return {
+    dataset: {
+      ...dataset,
+      artifactSet,
+      journeyCatalogs: dataset.journeyCatalogs
+        .map((owner) =>
+          compareReference(owner.reference, selected.reference) === 0
+            ? { reference, artifact }
+            : owner,
+        )
+        .sort((left, right) => compareReference(left.reference, right.reference)),
+    },
+    selection: {
+      ...selection,
+      artifactSet: {
+        schemaVersion: artifactSet.schemaVersion,
+        contentHash: artifactSet.contentHash,
+      },
+      owners: { ...selection.owners, journeyCatalog: reference },
+    },
+  };
+}
+
+function addUnrelatedJourneyUsage(
+  dataset: AgentContextQueryDataset,
+  selection: AgentContextQuerySelection,
+) {
+  return repinJourneyCatalog(dataset, selection, (draft) => ({
+    ...draft,
+    journeys: draft.journeys.map((journey) =>
+      journey.id === selection.journey.id &&
+      journey.version === selection.journey.version
+        ? {
+            ...journey,
+            steps: [
+              ...journey.steps,
+              {
+                id: 'synthetic.multi-usage.unrelated-step',
+                ordinal: 2,
+                label: 'Unrelated usage step',
+                forms: [selection.form],
+                usages: [
+                  {
+                    kind: 'declared' as const,
+                    usageId: 'synthetic.multi-usage.unrelated',
+                    version: 1,
+                  },
+                ],
+                actionIds: ['synthetic.multi-usage.unrelated-action'],
+              },
+            ],
+            actions: [
+              ...journey.actions,
+              {
+                id: 'synthetic.multi-usage.unrelated-action',
+                kind: 'cancel' as const,
+                outcomeIds: ['synthetic.multi-usage.unrelated-outcome'],
+                evidenceRefs: ['synthetic.multi-usage.evidence.action'],
+              },
+            ],
+            outcomes: [
+              ...journey.outcomes,
+              {
+                id: 'synthetic.multi-usage.unrelated-outcome',
+                kind: 'remains-on-step' as const,
+                evidenceRefs: ['synthetic.multi-usage.evidence.outcome'],
+              },
+            ],
+          }
+        : journey,
+    ),
+  }));
 }
 
 describe('agent-context query dataset and pinned selection', () => {
@@ -463,9 +607,120 @@ describe('agent-context query dataset and pinned selection', () => {
       ).toThrow(/journey|entry|step|node|projection/u);
     }
   });
+
+  it('compares only the selected-usage subgraph in a valid multi-usage journey', () => {
+    const original = fixtureBoundary();
+    const multiUsage = addUnrelatedJourneyUsage(
+      original.dataset,
+      original.selection,
+    );
+
+    expect(
+      validateAgentContextQuerySelection(
+        multiUsage.dataset,
+        multiUsage.selection,
+      ),
+    ).toEqual(multiUsage.selection);
+
+    const unrelatedDrift = repinJourneyCatalog(
+      multiUsage.dataset,
+      multiUsage.selection,
+      (draft) => ({
+        ...draft,
+        journeys: draft.journeys.map((journey) => ({
+          ...journey,
+          actions: journey.actions.map((action) =>
+            action.id === 'synthetic.multi-usage.unrelated-action'
+              ? { ...action, kind: 'submit' as const }
+              : action,
+          ),
+        })),
+      }),
+    );
+    expect(
+      validateAgentContextQuerySelection(
+        unrelatedDrift.dataset,
+        unrelatedDrift.selection,
+      ),
+    ).toEqual(unrelatedDrift.selection);
+
+    const relevantDrift = repinJourneyCatalog(
+      multiUsage.dataset,
+      multiUsage.selection,
+      (draft) => ({
+        ...draft,
+        journeys: draft.journeys.map((journey) => ({
+          ...journey,
+          steps: journey.steps.map((step) =>
+            step.usages.some(
+              (usage) =>
+                usage.kind === 'declared' &&
+                usage.usageId === multiUsage.selection.usage.usageId &&
+                usage.version === multiUsage.selection.usage.version,
+            )
+              ? { ...step, ordinal: step.ordinal + 10 }
+              : step,
+          ),
+        })),
+      }),
+    );
+    expect(() =>
+      validateAgentContextQuerySelection(
+        relevantDrift.dataset,
+        relevantDrift.selection,
+      ),
+    ).toThrow(/step|ordinal|projection/u);
+  });
 });
 
 describe('agent-context query and result DTOs', () => {
+  it('validates usage-search scope as the exact dataset owner set', () => {
+    const fixture = fixtureBoundary();
+    const dataset = withAdditionalSourceUsageCatalog(fixture.dataset);
+    const scope = usageSearchScope(dataset);
+
+    expect(validateAgentContextUsageSearchScope(dataset, scope)).toEqual(scope);
+    expect(() =>
+      validateAgentContextUsageSearchScope(dataset, {
+        ...scope,
+        sourceUsageCatalogs: scope.sourceUsageCatalogs.slice(0, 1),
+      }),
+    ).toThrow(/sourceUsageCatalogs|owner set|scope/u);
+    expect(() =>
+      validateAgentContextUsageSearchScope(dataset, {
+        ...scope,
+        sourceUsageCatalogs: [
+          ...scope.sourceUsageCatalogs,
+          {
+            ...scope.sourceUsageCatalogs.at(-1)!,
+            contentHash: HASH_ZERO,
+          },
+        ],
+      }),
+    ).toThrow(/sourceUsageCatalogs|owner set|scope/u);
+    expect(() =>
+      validateAgentContextUsageSearchScope(dataset, {
+        ...scope,
+        sourceUsageCatalogs: [...scope.sourceUsageCatalogs].reverse(),
+      }),
+    ).toThrow(/canonical|order|sourceUsageCatalogs/u);
+    expect(() =>
+      validateAgentContextUsageSearchScope(dataset, {
+        ...scope,
+        artifactSet: fixture.selection.artifactSet,
+      }),
+    ).toThrow(/artifactSet/u);
+    expect(() =>
+      validateAgentContextUsageSearchScope(dataset, {
+        ...scope,
+        workspaceIndex: {
+          ...scope.workspaceIndex,
+          contentHash: HASH_ZERO,
+        },
+      }),
+    ).toThrow(/workspaceIndex/u);
+  });
+
   it('pins usage search to an exact canonical multi-catalog scope', () => {
     const { dataset } = fixtureBoundary();
     const scope = usageSearchScope(dataset);
@@ -529,21 +784,43 @@ describe('agent-context query and result DTOs', () => {
 
   it('accepts only operation-specific result statuses and reason variants', () => {
     const { dataset, selection } = fixtureBoundary();
-    const nodeIds = [
-      'synthetic.rh05.operations.purchase-order::path:s_currency',
-      'synthetic.rh05.operations.purchase-order::path:s_supplier',
-    ];
+    const authority = dataset.executionAuthorities.find(
+      ({ reference }) =>
+        reference.contentHash ===
+        selection.owners.executionAuthority.contentHash,
+    )!.artifact;
+    const nodeIds = authority.usage.steps.flatMap(({ nodeIds: ids }) => ids);
     const result = {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation: 'find-form-nodes',
       status: 'ambiguous',
       selection,
       freshness: 'current',
-      authority: dataset.executionAuthorities.find(
-        ({ reference }) =>
-          reference.contentHash ===
-          selection.owners.executionAuthority.contentHash,
-      )!.artifact,
+      authority: {
+        owner: selection.owners.executionAuthority,
+        entry: authority.usage.entry,
+        steps: { complete: true, items: authority.usage.steps },
+        actions: { complete: true, items: authority.usage.actions },
+        outcomes: { complete: true, items: authority.usage.outcomes },
+        transitions: { complete: true, items: authority.usage.transitions },
+        physicalOperations: {
+          complete: true,
+          items: authority.physicalOperations,
+        },
+        readiness: { complete: true, items: authority.readiness },
+        interactions: { complete: true, items: authority.interactions },
+        commits: { complete: true, items: authority.commits },
+        validationSurfaces: {
+          complete: true,
+          items: authority.validationSurfaces,
+        },
+        valueAssertions: { complete: true, items: authority.valueAssertions },
+        stateAssertions: { complete: true, items: authority.stateAssertions },
+        repeaterCaptures: {
+          complete: true,
+          items: authority.repeaterCaptures,
+        },
+      },
       candidates: nodeIds.map((nodeId) => {
         const node = flattenContractNodes(
           dataset.formContracts.find(
@@ -647,7 +924,8 @@ describe('safe bounded parsing', () => {
 
 describe('role-scoped live freshness', () => {
   it('evaluates aggregate usage-search freshness against the exact source-owner set', () => {
-    const { dataset } = fixtureBoundary();
+    const fixture = fixtureBoundary();
+    const dataset = withAdditionalSourceUsageCatalog(fixture.dataset);
     const scope = usageSearchScope(dataset);
     const owners = createAgentContextUsageSearchScopeLiveOwners(scope);
 
@@ -688,6 +966,43 @@ describe('role-scoped live freshness', () => {
         },
       }),
     ).toBe('stale');
+
+    for (const references of [
+      sourceSet.references.slice(0, 1),
+      [
+        ...sourceSet.references,
+        { ...sourceSet.references[0]!, contentHash: HASH_ZERO },
+      ].sort(compareReference),
+    ]) {
+      expect(
+        evaluateAgentContextQueryFreshness({
+          view: 'usage-search',
+          scope,
+          live: {
+            schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+            owners: owners.map((owner) =>
+              owner.role === 'source-usage-catalog-set'
+                ? { ...owner, references }
+                : owner,
+            ),
+          },
+        }),
+      ).toBe('stale');
+    }
+    expect(() =>
+      evaluateAgentContextQueryFreshness({
+        view: 'usage-search',
+        scope,
+        live: {
+          schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+          owners: owners.map((owner) =>
+            owner.role === 'source-usage-catalog-set'
+              ? { ...owner, references: [...owner.references].reverse() }
+              : owner,
+          ),
+        },
+      }),
+    ).toThrow(/canonical|order|references/u);
   });
 
   it('returns current only when every role required by the view matches', () => {
@@ -711,6 +1026,7 @@ describe('role-scoped live freshness', () => {
         'workspace-index',
         'source-usage-catalog',
         'journey-catalog',
+        'execution-authority',
       ].includes(role),
     );
     expect(
@@ -724,14 +1040,38 @@ describe('role-scoped live freshness', () => {
       }),
     ).toBe('current');
 
-    const journeyWithIrrelevantScenarioDrift = journeyOwners.concat({
-      role: 'scenario-artifact',
-      reference: {
-        ...selection.owners.scenarioArtifact,
-        contentHash: HASH_ZERO,
-      },
-      scenario: selection.scenario,
-    });
+    expect(
+      evaluateAgentContextQueryFreshness({
+        view: 'context-journey',
+        selection,
+        live: {
+          schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+          owners: journeyOwners.filter(
+            ({ role }) => role !== 'execution-authority',
+          ),
+        },
+      }),
+    ).toBe('unknown');
+
+    const journeyWithIrrelevantScenarioDrift = owners
+      .filter(({ role }) =>
+        [
+          'artifact-set',
+          'workspace-index',
+          'source-usage-catalog',
+          'journey-catalog',
+          'scenario-artifact',
+          'execution-authority',
+        ].includes(role),
+      )
+      .map((owner) =>
+        owner.role === 'scenario-artifact'
+          ? {
+              ...owner,
+              reference: { ...owner.reference, contentHash: HASH_ZERO },
+            }
+          : owner,
+      );
     expect(
       evaluateAgentContextQueryFreshness({
         view: 'context-journey',
