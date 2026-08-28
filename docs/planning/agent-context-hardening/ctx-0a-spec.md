@@ -47,7 +47,9 @@ Success means:
 - exact references are unique and canonicalized in stable order;
 - parsing rejects unknown properties, accessors, exotic prototypes, symbols,
   sparse arrays, invalid schema IDs/versions/hashes, duplicates, an unsupported
-  artifact-set version, and a mismatched set hash; and
+  artifact-set version, and a mismatched set hash; after that descriptor-safe
+  walk, the original graph must structured-clone into the identical ordinary
+  data graph so prototype-disguised built-ins fail closed; and
 - synthetic fixtures can create and round-trip an incomplete but honest set
   without claiming that future producers already exist.
 
@@ -178,7 +180,9 @@ and avoids an API whose name silently omits a field.
 - references sort by `schemaId`, then `schemaVersion`, then `contentHash`, using
   code-unit ordering.
 - an exact duplicate `{ schemaId, schemaVersion, contentHash }` is invalid.
-- every object is closed and every array is dense, data-only, and symbol-free.
+- every object is closed and every array is dense, data-only, and symbol-free;
+  null-prototype objects are accepted only when structured clone preserves the
+  exact canonical data graph without hidden built-in state.
 
 ## Commands
 

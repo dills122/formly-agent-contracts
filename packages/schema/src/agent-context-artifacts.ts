@@ -67,30 +67,6 @@ function fail(path: string, message: string): never {
   throw new TypeError(`${path}: ${message}`);
 }
 
-function isRecognizedBuiltInObject(input: object): boolean {
-  return (
-    utilTypes.isAnyArrayBuffer(input) ||
-    utilTypes.isArrayBufferView(input) ||
-    utilTypes.isArgumentsObject(input) ||
-    utilTypes.isBoxedPrimitive(input) ||
-    utilTypes.isCryptoKey(input) ||
-    utilTypes.isDate(input) ||
-    utilTypes.isExternal(input) ||
-    utilTypes.isGeneratorObject(input) ||
-    utilTypes.isKeyObject(input) ||
-    utilTypes.isMap(input) ||
-    utilTypes.isMapIterator(input) ||
-    utilTypes.isModuleNamespaceObject(input) ||
-    utilTypes.isNativeError(input) ||
-    utilTypes.isPromise(input) ||
-    utilTypes.isRegExp(input) ||
-    utilTypes.isSet(input) ||
-    utilTypes.isSetIterator(input) ||
-    utilTypes.isWeakMap(input) ||
-    utilTypes.isWeakSet(input)
-  );
-}
-
 function cloneDataOnly(
   input: unknown,
   path: string,
@@ -123,9 +99,6 @@ function cloneDataOnly(
     fail(path, 'must be a JSON value.');
   }
   const objectInput = input as object;
-  if (isRecognizedBuiltInObject(objectInput)) {
-    fail(path, 'must not be a built-in object; use plain JSON data.');
-  }
   if (ancestors.has(objectInput)) {
     fail(path, 'must not contain a cycle.');
   }
@@ -209,6 +182,28 @@ function cloneDataOnly(
   } finally {
     ancestors.delete(objectInput);
   }
+}
+
+function cloneValidatedDataOnly(input: unknown, path: string): unknown {
+  const detached = cloneDataOnly(input, path);
+  let roundTripDetached: unknown;
+  try {
+    roundTripDetached = cloneDataOnly(structuredClone(input), path);
+  } catch {
+    fail(
+      path,
+      'must round-trip through structured clone as plain JSON data.',
+    );
+  }
+  if (
+    canonicalStringify(roundTripDetached) !== canonicalStringify(detached)
+  ) {
+    fail(
+      path,
+      'must round-trip through structured clone as identical plain JSON data.',
+    );
+  }
+  return detached;
 }
 
 function record(
@@ -376,7 +371,7 @@ function normalizeArtifactSetInput(
   requireCanonicalOrder: boolean,
 ): AgentContextArtifactSetDraft & { readonly contentHash?: Sha256Digest } {
   const path = 'agentContextArtifactSet';
-  const detached = cloneDataOnly(input, path);
+  const detached = cloneValidatedDataOnly(input, path);
   const value = record(
     detached,
     path,

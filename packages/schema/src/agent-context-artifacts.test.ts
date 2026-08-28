@@ -702,13 +702,13 @@ describe('agent context artifact-set data-only parsing', () => {
       createAgentContextArtifactSet(
         artifactSetDraft({ workspaceIndex: new Date() as never }),
       ),
-    ).toThrow(/workspaceIndex.*built-in object/u);
+    ).toThrow(/workspaceIndex.*plain object/u);
 
     const disguisedDate = Object.assign(new Date(0), artifactSetDraft());
     Object.setPrototypeOf(disguisedDate, null);
     expect(() =>
       createAgentContextArtifactSet(disguisedDate as never),
-    ).toThrow(/agentContextArtifactSet.*built-in object/u);
+    ).toThrow(/agentContextArtifactSet.*plain JSON data/u);
 
     const disguisedMap = Object.assign(new Map(), {
       schemaVersion: '0.2.0',
@@ -719,7 +719,7 @@ describe('agent context artifact-set data-only parsing', () => {
       createAgentContextArtifactSet(
         artifactSetDraft({ workspaceIndex: disguisedMap as never }),
       ),
-    ).toThrow(/workspaceIndex.*built-in object/u);
+    ).toThrow(/agentContextArtifactSet.*plain JSON data/u);
 
     const exotic = [artifactReference()];
     Object.setPrototypeOf(exotic, null);
@@ -728,6 +728,36 @@ describe('agent context artifact-set data-only parsing', () => {
         artifactSetDraft({ artifacts: exotic }),
       ),
     ).toThrow(/artifacts.*ordinary array/u);
+  });
+
+  it('rejects prototype-disguised built-ins outside the util.types brand set', () => {
+    const weakReferenceTarget = {};
+    const moduleBytes = new Uint8Array([0, 97, 115, 109, 1, 0, 0, 0]);
+    const WebAssemblyModule = (
+      globalThis as unknown as {
+        readonly WebAssembly: {
+          readonly Module: new (bytes: Uint8Array) => object;
+        };
+      }
+    ).WebAssembly.Module;
+    const disguisedBuiltIns: object[] = [
+      new URL('https://example.test'),
+      new URLSearchParams('key=value'),
+      new WeakRef(weakReferenceTarget),
+      new FinalizationRegistry(() => undefined),
+      new WebAssemblyModule(moduleBytes),
+    ];
+
+    for (const [index, disguisedBuiltIn] of disguisedBuiltIns.entries()) {
+      Object.assign(disguisedBuiltIn, artifactSetDraft());
+      Object.setPrototypeOf(
+        disguisedBuiltIn,
+        index % 2 === 0 ? null : Object.prototype,
+      );
+      expect(() =>
+        createAgentContextArtifactSet(disguisedBuiltIn as never),
+      ).toThrow(/agentContextArtifactSet.*plain JSON data/u);
+    }
   });
 
   it('rejects detectable proxies before Array.isArray or reflective traps run', () => {
