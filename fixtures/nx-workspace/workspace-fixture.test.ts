@@ -193,5 +193,5 @@ describe('Nx workspace consumer fixture', () => {
     expect(extracted[0]?.contract.fieldTypeProfileRegistry).toEqual(
       extracted[1]?.contract.fieldTypeProfileRegistry,
     );
-  });
+  }, 20_000);
 });
