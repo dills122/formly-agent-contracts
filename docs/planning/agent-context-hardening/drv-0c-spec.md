@@ -203,11 +203,15 @@ observable results and the absence of callback execution.
 | `DRV-0C1-REQ-03` exact binding | Compare complete implementation/allowlist inventories | all four canonical issue tests | In scope |
 | `DRV-0C1-REQ-04` exact resolution | Return original callable only for exact authorized requests | coexistence/no-fallback/no-invocation tests | In scope |
 | `DRV-0C1-REQ-05` private immutable executable state | Hide map and freeze public data | mutation/surface/identity tests | In scope |
-| `DRV-0C2-REQ-01` package integration | Add public index/build config/root paths/lock/release wiring | package and repository gates | Deferred to C2 |
-| `DRV-0C2-REQ-02` aggregate status reconciliation | Update execution index and governing plans after integration | docs/status review | Deferred to C2 |
+| `DRV-0C1I-REQ-01` package integration | Add the private package index/build config/root paths/lock wiring | package and repository gates | Deferred to the C1 integration packet |
+| `DRV-0C1I-REQ-02` C1 status reconciliation | Update the execution index and governing plans after integration while keeping aggregate `DRV-0` incomplete | docs/status review | Deferred to the C1 integration packet |
+| `DRV-0C2-REQ-01` validated-plan call binding | Bind the five CTX-2-reserved capabilities through the exact validated-plan/call ABI | CTX-2 positive/negative plan and exact-authority tests | Deferred until CTX-2 |
 | `PW-1/PW-2` browser conformance | Controlled browser fixtures and execution evidence | browser suites | Deferred |
 
-DRV-0C1 is accepted when the five packet files implement and prove the first
-five rows, focused tests/typecheck/lint/docs/diff checks pass, and the packet is
-committed cleanly. Aggregate `DRV-0` remains in progress through C2 and browser
+The DRV-0C1 core is accepted when the five packet files implement and prove the
+first five rows, focused tests/typecheck/lint/docs/diff checks pass, and the
+packet is committed cleanly. The follow-up C1 integration packet makes that
+private core part of the repository build and may mark DRV-0C1 complete, but it
+must keep aggregate `DRV-0` incomplete. DRV-0C2 begins only after CTX-2 defines
+the validated-plan/call ABI and binds its five reserved capabilities. Browser
 conformance remains separate.
