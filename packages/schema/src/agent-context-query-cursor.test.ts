@@ -8,6 +8,7 @@ import {
 import {
   AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
   type AgentContextQuerySelection,
+  type AgentContextUsageSearchScope,
 } from './agent-context-query.js';
 
 const HASH_A = `sha256:${'a'.repeat(64)}` as const;
@@ -100,6 +101,36 @@ function contextDiagnosticsQuery() {
   } as const;
 }
 
+function usageSearchScope(
+  sourceHash: AgentContextUsageSearchScope['sourceUsageCatalogs'][number]['contentHash'] =
+    HASH_C,
+): AgentContextUsageSearchScope {
+  return {
+    schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+    artifactSet: { schemaVersion: '0.1.0', contentHash: HASH_A },
+    workspaceIndex: { schemaVersion: '0.2.0', contentHash: HASH_B },
+    sourceUsageCatalogs: [
+      {
+        schemaId: 'agent-context.source-usage',
+        schemaVersion: '0.1.0',
+        contentHash: sourceHash,
+      },
+    ],
+  };
+}
+
+function usageSearchQuery(
+  scope: AgentContextUsageSearchScope = usageSearchScope(),
+) {
+  return {
+    schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+    operation: 'search-form-usages',
+    scope,
+    filters: { text: 'orders' },
+    page: { collection: 'candidates', limit: 25 },
+  } as const;
+}
+
 function createCursor(
   overrides: Partial<Parameters<typeof createAgentContextQueryCursor>[0]> = {},
 ): string {
@@ -184,6 +215,36 @@ describe('opaque agent-context query cursors', () => {
     expect(() =>
       continueCursor(cursor, {
         query: nodesQuery(selection(), ['constraints', 'domain']),
+      }),
+    ).toThrow(/cursor.*invalid|invalid.*cursor/iu);
+  });
+
+  it('binds usage-search cursors to the exact multi-catalog search scope', () => {
+    const cursor = createAgentContextQueryCursor({
+      collection: 'candidates',
+      query: usageSearchQuery(),
+      position: 25,
+      now: NOW,
+      ttlMs: 60_000,
+      signingMaterial: SECRET,
+    });
+
+    expect(
+      parseAgentContextQueryCursor({
+        cursor,
+        collection: 'candidates',
+        query: usageSearchQuery(),
+        now: NOW + 1,
+        signingMaterial: SECRET,
+      }),
+    ).toEqual({ position: 25 });
+    expect(() =>
+      parseAgentContextQueryCursor({
+        cursor,
+        collection: 'candidates',
+        query: usageSearchQuery(usageSearchScope(HASH_D)),
+        now: NOW + 1,
+        signingMaterial: SECRET,
       }),
     ).toThrow(/cursor.*invalid|invalid.*cursor/iu);
   });

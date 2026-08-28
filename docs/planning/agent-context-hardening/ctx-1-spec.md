@@ -2,6 +2,7 @@
 
 - Status: frozen for implementation
 - Schema version: `0.1.0`
+- Evolution: unreleased `0.1.0` reopened for review reconciliation
 - Owner: `@formly-contract/schema`
 - Research basis: RH-05, reconciled by RH-06
 - Prerequisite: `CTX-0D`
@@ -58,7 +59,14 @@ Every source-usage and journey catalog must use the artifact set's exact
 workspace-index reference. Owner arrays are duplicate-free and canonically
 ordered by schema ID, version, then content hash.
 
-## Pinned selection
+## Search scope and pinned selection
+
+`AgentContextUsageSearchScope` pins pre-selection discovery to the exact
+artifact-set identity, workspace-index reference, and a non-empty canonical
+set of exact source-usage catalog references. The set permits multi-catalog
+workspaces without an unpinned aggregate lookup. The search query, every
+search result variant, aggregate search freshness, and a search continuation
+cursor all repeat or authenticate this exact scope.
 
 `AgentContextQuerySelection` contains:
 
@@ -83,8 +91,18 @@ Selection validation resolves every owner exactly once and proves these joins:
 4. the declared Form Contract equals the selected form and basis;
 5. the scenario artifact equals the scenario artifact hash and form ID;
 6. the execution-authority content hash, usage identity, form basis, and
-   scenario identity/basis equal the selection; and
-7. every selected schema-addressed reference occurs in the artifact set.
+   scenario identity/basis equal the selection;
+7. the authority usage entry ID and landing step exactly project the selected
+   journey entry;
+8. every journey step for the selected usage includes the selected form, and
+   the authority step IDs, ordinals, and action memberships exactly project
+   those steps;
+9. the union of authority step node memberships exactly equals the complete
+   selected Form Contract node set, including nested children and array
+   templates;
+10. authority action `(id, kind, outcomeIds)`, outcome `(id, kind)`, and full
+    transition tuples exactly project the selected journey; and
+11. every selected schema-addressed reference occurs in the artifact set.
 
 Hash equality is necessary but does not replace these logical-identity and
 basis checks.
@@ -96,7 +114,7 @@ discriminant.
 
 | Operation | Purpose | Pageable collection | Atomic secondary data |
 | --- | --- | --- | --- |
-| `search-form-usages` | Resolve bounded source/text/form/route/step/capability evidence to compact usage candidates | `candidates` | candidate match evidence |
+| `search-form-usages` | Resolve bounded source/text/form/route/step/capability evidence within an exact multi-catalog scope | `candidates` | exact owner, match evidence, and complete exact-selection handoffs |
 | `get-form-context` | Return `summary`, `diagnostics`, or an atomic `journey` for a pinned selection | `steps` or `diagnostics`; journey is not pageable | identity, freshness, and non-primary summary facts |
 | `find-form-nodes` | Find nodes by exact ID/path or bounded presentation/capability filters | `nodes` | each node record and selected detail aspects |
 | `get-e2e-slice` | Return one exact step's focus and complete prerequisite/effect closure | none | the entire slice |
@@ -106,6 +124,45 @@ schemes, traversal segments, backslashes, control characters, or glob
 metacharacters. Model paths are typed, bounded segments. Set-like filters,
 includes, focus IDs, candidates, and result identities are duplicate-free and
 canonical.
+
+Every usage-search result repeats its exact scope and aggregate freshness.
+Each candidate names its exact source-usage catalog owner. A resolved declared
+candidate carries a non-empty, complete `selectionHandoffs` collection of
+fully pinned selections; each handoff must match the candidate usage/form,
+catalog owner, artifact set, and workspace index. Callsite candidates cannot
+claim an exact declared selection. `matchReasons` and `selectionHandoffs` use
+`{ complete: true, items }`; they are bounded atomic secondary collections,
+not independently pageable.
+
+Node candidates are bounded flattened projections with node identity, kind,
+model path, evidence, optional Formly/semantic/presentation/state facts,
+child/template identities, capabilities, and an exact `included` set.
+`details` has one legal key per include aspect and must have a key if and only
+if that aspect is included:
+
+- `constraints`: complete `ContractConstraint` records;
+- `domain`: complete `ContractOption` records plus optional exact option source
+  and value domain;
+- `interaction`: the existing schema-owned interaction profile, when known;
+- `locators`: complete `ContractLocator` records;
+- `effects`: complete `DeclaredCrossFieldEffect` records; and
+- `unknowns`: complete `ContractDiagnostic` records.
+
+Complete and ambiguous node results additionally carry the exact selected
+`AgentContextExecutionAuthority`, which provides the executable interaction,
+readiness, commit, validation, assertion, repeater, and usage authority facts
+without executable modules or selectors invented by CTX-1.
+
+The journey view is atomic `{ identity, execution }`: the selected source
+journey identity plus the complete `AgentContextUsageExecutionAuthority`
+entry, steps, actions, outcomes, and transitions. The E2E slice is atomic and
+contains the exact selected execution authority plus complete concrete
+`focusNodes`, `closureNodes`, `prerequisites`, and `effects` collections. Each
+prerequisite carries an exact closure node plus one resolved cause: a concrete
+trigger effect, selected-authority readiness record, or included wrapper
+precondition. Focus and prerequisite nodes must be exact subsets of the
+closure; closure nodes must belong to the named authority step. No nested
+collection uses a cursor or truncation marker.
 
 ### Result variants and reasons
 
@@ -135,16 +192,19 @@ location, remediation, or execution-refusal policy.
 
 Freshness input is a versioned set of optional, role-addressed live references
 plus optional repository-revision provenance. Roles are `artifact-set`,
-`workspace-index`, `source-usage-catalog`, `journey-catalog`, `form-contract`,
-`scenario-artifact`, and `execution-authority`. Form, scenario, and authority
-roles carry the same exact logical identities and bases as the selection, not
-only a content hash.
+`workspace-index`, `source-usage-catalog`, `source-usage-catalog-set`,
+`journey-catalog`, `form-contract`, `scenario-artifact`, and
+`execution-authority`. The source-catalog-set role is a non-empty canonical
+exact reference set used only by aggregate usage search; selection views use
+the singular selected catalog role. Form, scenario, and authority roles carry
+the same exact logical identities and bases as the selection, not only a
+content hash.
 
 Required roles are view-specific:
 
 | View | Required live roles |
 | --- | --- |
-| `usage-search` | artifact set, workspace index, source-usage catalog |
+| `usage-search` | artifact set, workspace index, exact source-usage catalog set |
 | `context-summary` | usage-search roles plus journey, form, and execution authority |
 | `context-diagnostics` | all roles |
 | `context-journey` | artifact set, workspace index, source-usage catalog, journey catalog |
@@ -173,8 +233,7 @@ cursor. The authenticated cursor binding includes:
 
 - the single collection name;
 - the normalized cursor-free query;
-- its pinned context selection, or the explicit absence of one for usage
-  search;
+- its pinned context selection, or its exact usage-search scope;
 - the operation's fixed sort order;
 - its disclosure/view scope;
 - the canonical node-detail include scope; and
@@ -196,6 +255,7 @@ expired, or version-unknown cursors also fail closed. Expiry occurs when
 | Input object graph nodes/properties | 100,000 |
 | Dataset owner entries per owner family | 10,000 |
 | Query/result collection entries | 10,000 |
+| Atomic secondary collection entries | 10,000 |
 | Page limit | 1–200 |
 | Identifier | 256 UTF-16 code units |
 | Search/presentation text | 4,096 UTF-16 code units |
@@ -242,16 +302,20 @@ change; they must not weaken the selection, freshness, or cursor invariants.
 ## Verification
 
 CTX-1A retains tests for strict canonical round-trips, unknown-key/version
-refusal, unsafe graph bounds, getter/proxy safety, exact selection joins,
+refusal, unsafe graph bounds, getter/proxy safety (including the freshness
+wrapper), owner-valid rehash/repin selection drift, full result projections,
+every operation/status/view/reason/page/result variant, malformed result
+relations, not-found non-truncation, canonical reasons, aggregate and selected
 freshness precedence, revision-only unknown status, fixed-input cursor
-determinism, cross-scope replay refusal, tamper/expiry refusal, explicit-time
-behavior, and bounded payload/signing material.
+determinism, cross-query/context/search-scope/disclosure replay refusal,
+tamper/expiry refusal, explicit-time behavior, and bounded payload/signing
+material.
 
 Required commands:
 
 ```sh
-pnpm exec vitest run packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-cursor.test.ts
+pnpm exec vitest run packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-result.test.ts packages/schema/src/agent-context-query-cursor.test.ts
 pnpm --filter @formly-contract/schema typecheck
-pnpm exec eslint packages/schema/src/agent-context-query.ts packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-cursor.ts packages/schema/src/agent-context-query-cursor.test.ts
+pnpm exec eslint packages/schema/src/agent-context-query.ts packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-result.test.ts packages/schema/src/agent-context-query-cursor.ts packages/schema/src/agent-context-query-cursor.test.ts
 git diff --check
 ```

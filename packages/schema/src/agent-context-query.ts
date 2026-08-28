@@ -11,10 +11,13 @@ import {
 import {
   AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_ID,
   AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_VERSION,
+  createAgentContextExecutionAuthority,
   parseAgentContextExecutionAuthority,
   type AgentContextExecutionAuthority,
   type AgentContextExecutionBasis,
+  type AgentContextReadinessAuthority,
   type AgentContextScenarioReference,
+  type AgentContextUsageExecutionAuthority,
 } from './agent-context-execution-authority.js';
 import {
   AGENT_CONTEXT_JOURNEY_SCHEMA_ID,
@@ -29,13 +32,31 @@ import {
 } from './agent-context-usage.js';
 import {
   canonicalStringify,
+  createFormContract,
   parseArrayIndexProperty,
 } from './canonical-json.js';
 import {
   FORM_CONTRACT_SCHEMA_ID,
   FORM_CONTRACT_SCHEMA_VERSION,
+  type ContractConstraint,
+  type ContractDiagnostic,
+  type ContractEvidence,
+  type ContractInteractionProfile,
+  type ContractLocator,
+  type ContractNodeKind,
+  type ContractNodeState,
+  type ContractOption,
+  type ContractOptionSource,
+  type ContractPresentation,
+  type ContractValueDomain,
   type FormContract,
 } from './contract.js';
+import {
+  CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+  parseCrossFieldEffectRegistry,
+  type DeclaredCrossFieldEffect,
+} from './cross-field-effect.js';
+import type { FieldTypeWrapperPrecondition } from './field-type-interaction.js';
 import { parseFormContract } from './validation.js';
 
 export const AGENT_CONTEXT_QUERY_SCHEMA_VERSION = '0.1.0' as const;
@@ -167,6 +188,13 @@ export interface AgentContextQuerySelection {
   readonly executionAuthority: AgentContextExecutionAuthoritySelection;
 }
 
+export interface AgentContextUsageSearchScope {
+  readonly schemaVersion: typeof AGENT_CONTEXT_QUERY_SCHEMA_VERSION;
+  readonly artifactSet: AgentContextArtifactSetIdentity;
+  readonly workspaceIndex: AgentContextWorkspaceIndexReference;
+  readonly sourceUsageCatalogs: readonly AgentContextArtifactReference[];
+}
+
 export interface AgentContextPageRequest<
   Collection extends AgentContextPageableCollection,
 > {
@@ -195,6 +223,7 @@ export interface AgentContextSearchUsageFilters {
 export interface SearchFormUsagesQuery {
   readonly schemaVersion: typeof AGENT_CONTEXT_QUERY_SCHEMA_VERSION;
   readonly operation: 'search-form-usages';
+  readonly scope: AgentContextUsageSearchScope;
   readonly filters: AgentContextSearchUsageFilters;
   readonly page: AgentContextPageRequest<'candidates'>;
 }
@@ -1081,6 +1110,72 @@ export function canonicalizeAgentContextQuerySelection(input: unknown): string {
   return canonicalStringify(parseAgentContextQuerySelection(input));
 }
 
+function parseUsageSearchScopeFromDetached(
+  input: unknown,
+  path: string,
+): AgentContextUsageSearchScope {
+  const value = record(
+    input,
+    path,
+    new Set([
+      'schemaVersion',
+      'artifactSet',
+      'workspaceIndex',
+      'sourceUsageCatalogs',
+    ]),
+  );
+  exactSchemaVersion(
+    required(value, 'schemaVersion', path),
+    `${path}.schemaVersion`,
+  );
+  const sourceUsageCatalogs = array(
+    required(value, 'sourceUsageCatalogs', path),
+    `${path}.sourceUsageCatalogs`,
+  ).map((reference, index) =>
+    parseTypedArtifactReference(
+      reference,
+      `${path}.sourceUsageCatalogs[${index}]`,
+      AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_ID,
+      AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_VERSION,
+    ),
+  );
+  if (sourceUsageCatalogs.length === 0) {
+    fail(`${path}.sourceUsageCatalogs`, 'must contain at least one owner.');
+  }
+  assertCanonicalSet(
+    sourceUsageCatalogs,
+    `${path}.sourceUsageCatalogs`,
+    referenceKey,
+    compareReference,
+  );
+  return {
+    schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+    artifactSet: parseArtifactSetIdentity(
+      required(value, 'artifactSet', path),
+      `${path}.artifactSet`,
+    ),
+    workspaceIndex: parseWorkspaceIndexReference(
+      required(value, 'workspaceIndex', path),
+      `${path}.workspaceIndex`,
+    ),
+    sourceUsageCatalogs,
+  };
+}
+
+export function parseAgentContextUsageSearchScope(
+  input: unknown,
+): AgentContextUsageSearchScope {
+  const path = 'agentContextUsageSearchScope';
+  return parseUsageSearchScopeFromDetached(
+    cloneValidatedDataOnly(input, path),
+    path,
+  );
+}
+
+export function canonicalizeAgentContextUsageSearchScope(input: unknown): string {
+  return canonicalStringify(parseAgentContextUsageSearchScope(input));
+}
+
 function findOwner<T extends OwnedArtifact>(
   entries: readonly T[],
   reference: AgentContextArtifactReference,
@@ -1097,6 +1192,18 @@ function findOwner<T extends OwnedArtifact>(
 
 function assertSame(input: unknown, expected: unknown, path: string): void {
   if (!sameJson(input, expected)) fail(path, 'does not match the selected owner.');
+}
+
+function collectFormContractNodeIds(
+  nodes: FormContract['nodes'],
+): readonly string[] {
+  return nodes.flatMap((node) => [
+    node.id,
+    ...collectFormContractNodeIds(node.children),
+    ...(node.arrayTemplate === undefined
+      ? []
+      : collectFormContractNodeIds([node.arrayTemplate])),
+  ]);
 }
 
 export function validateAgentContextQuerySelection(
@@ -1249,6 +1356,101 @@ export function validateAgentContextQuerySelection(
       contractHash: authority.basis.contractHash,
     },
     'agentContextQuerySelection.form',
+  );
+
+  assertSame(
+    {
+      id: authority.usage.entry.id,
+      landingStepId: authority.usage.entry.landingStepId,
+    },
+    {
+      id: journey.entry.id,
+      landingStepId: journey.entry.landingStepId,
+    },
+    'agentContextQuerySelection.executionAuthority.usage.entry',
+  );
+  const relevantJourneySteps = journey.steps.filter((step) =>
+    step.usages.some((usageReference) =>
+      sameJson(usageReference, selection.usage),
+    ),
+  );
+  if (
+    relevantJourneySteps.some(
+      (step) =>
+        !step.forms.some((formReference) =>
+          sameJson(formReference, selection.form),
+        ),
+    )
+  ) {
+    fail(
+      'agentContextQuerySelection.journey.steps',
+      'every selected-usage step must contain the selected form.',
+    );
+  }
+  assertSame(
+    authority.usage.steps.map(({ id, ordinal, actionIds }) => ({
+      id,
+      ordinal,
+      actionIds,
+    })),
+    relevantJourneySteps.map(({ id, ordinal, actionIds }) => ({
+      id,
+      ordinal,
+      actionIds,
+    })),
+    'agentContextQuerySelection.executionAuthority.usage.steps',
+  );
+  const authorityNodeIds = authority.usage.steps
+    .flatMap(({ nodeIds }) => nodeIds)
+    .sort(compareText);
+  const contractNodeIds = [...collectFormContractNodeIds(formContract.nodes)].sort(
+    compareText,
+  );
+  assertSame(
+    authorityNodeIds,
+    contractNodeIds,
+    'agentContextQuerySelection.executionAuthority.usage.steps.nodeIds',
+  );
+  assertSame(
+    authority.usage.actions.map(({ id, kind, outcomeIds }) => ({
+      id,
+      kind,
+      outcomeIds,
+    })),
+    journey.actions.map(({ id, kind, outcomeIds }) => ({
+      id,
+      kind,
+      outcomeIds,
+    })),
+    'agentContextQuerySelection.executionAuthority.usage.actions',
+  );
+  assertSame(
+    authority.usage.outcomes.map(({ id, kind }) => ({ id, kind })),
+    journey.outcomes.map(({ id, kind }) => ({ id, kind })),
+    'agentContextQuerySelection.executionAuthority.usage.outcomes',
+  );
+  assertSame(
+    authority.usage.transitions.map(
+      ({ id, version, fromStepId, actionId, outcomeId, toStepId }) => ({
+        id,
+        version,
+        fromStepId,
+        actionId,
+        outcomeId,
+        toStepId,
+      }),
+    ),
+    journey.transitions.map(
+      ({ id, version, fromStepId, actionId, outcomeId, toStepId }) => ({
+        id,
+        version,
+        fromStepId,
+        actionId,
+        outcomeId,
+        toStepId,
+      }),
+    ),
+    'agentContextQuerySelection.executionAuthority.usage.transitions',
   );
   return selection;
 }
@@ -1551,6 +1753,7 @@ function parseQueryFromDetached(input: unknown, path: string): AgentContextQuery
     new Set([
       'schemaVersion',
       'operation',
+      'scope',
       'filters',
       'page',
       'selection',
@@ -1571,11 +1774,15 @@ function parseQueryFromDetached(input: unknown, path: string): AgentContextQuery
     const value = record(
       input,
       path,
-      new Set(['schemaVersion', 'operation', 'filters', 'page']),
+      new Set(['schemaVersion', 'operation', 'scope', 'filters', 'page']),
     );
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation,
+      scope: parseUsageSearchScopeFromDetached(
+        required(value, 'scope', path),
+        `${path}.scope`,
+      ),
       filters: parseSearchFilters(
         required(value, 'filters', path),
         `${path}.filters`,
@@ -1730,7 +1937,7 @@ export function canonicalizeAgentContextQuery(input: unknown): string {
 export interface AgentContextQueryCursorBinding {
   readonly collection: AgentContextPageableCollection;
   readonly normalizedQuery: string;
-  readonly context: AgentContextQuerySelection | null;
+  readonly context: AgentContextQuerySelection | AgentContextUsageSearchScope;
   readonly sortOrder:
     | 'diagnostic-kind'
     | 'node-id'
@@ -1766,13 +1973,13 @@ export function createAgentContextQueryCursorBinding(
   let expectedCollection: AgentContextPageableCollection;
   let sortOrder: AgentContextQueryCursorBinding['sortOrder'];
   let disclosure: AgentContextQueryCursorBinding['disclosure'];
-  let context: AgentContextQuerySelection | null;
+  let context: AgentContextQuerySelection | AgentContextUsageSearchScope;
   let include: readonly AgentContextNodeDetailAspect[] = [];
   if (query.operation === 'search-form-usages') {
     expectedCollection = 'candidates';
     sortOrder = 'usage-identity';
     disclosure = 'usage-candidates';
-    context = null;
+    context = query.scope;
   } else if (query.operation === 'get-form-context') {
     if (query.view === 'journey') {
       fail('agentContextQueryCursor.collection', 'journey is not pageable.');
@@ -1811,7 +2018,7 @@ export function createAgentContextQueryCursorBinding(
 export type AgentContextQueryReason =
   | {
       readonly kind: 'usage-ambiguous';
-      readonly usages: readonly AgentContextUsageCandidateIdentity[];
+      readonly usages: readonly AgentContextUsageCandidateReference[];
     }
   | { readonly kind: 'usage-absent-authoritative' }
   | { readonly kind: 'usage-absence-not-authoritative' }
@@ -1848,19 +2055,58 @@ export type AgentContextUsageCandidateIdentity =
       readonly callsiteKey: string;
     };
 
+export interface AgentContextUsageCandidateReference {
+  readonly sourceUsageCatalog: AgentContextArtifactReference;
+  readonly usage: AgentContextUsageCandidateIdentity;
+}
+
 export interface AgentContextUsageCandidateProjection {
   readonly usage: AgentContextUsageCandidateIdentity;
   readonly projectId: string;
   readonly form?: AgentContextFormReference;
-  readonly matchReasons: readonly string[];
+  readonly sourceUsageCatalog: AgentContextArtifactReference;
+  readonly selectionHandoffs: AgentContextCompleteCollection<AgentContextQuerySelection>;
+  readonly matchReasons: AgentContextCompleteCollection<string>;
+}
+
+export interface AgentContextCompleteCollection<T> {
+  readonly complete: true;
+  readonly items: readonly T[];
+}
+
+export interface AgentContextNodeDomainProjection {
+  readonly options: AgentContextCompleteCollection<ContractOption>;
+  readonly optionSource?: ContractOptionSource;
+  readonly valueDomain?: ContractValueDomain;
+}
+
+export interface AgentContextNodeInteractionProjection {
+  readonly profile?: ContractInteractionProfile;
+}
+
+export interface AgentContextNodeDetailProjection {
+  readonly constraints?: AgentContextCompleteCollection<ContractConstraint>;
+  readonly domain?: AgentContextNodeDomainProjection;
+  readonly effects?: AgentContextCompleteCollection<DeclaredCrossFieldEffect>;
+  readonly interaction?: AgentContextNodeInteractionProjection;
+  readonly locators?: AgentContextCompleteCollection<ContractLocator>;
+  readonly unknowns?: AgentContextCompleteCollection<ContractDiagnostic>;
 }
 
 export interface AgentContextNodeCandidateProjection {
   readonly nodeId: string;
+  readonly kind: ContractNodeKind;
   readonly modelPath: readonly AgentContextQueryModelPathSegment[];
-  readonly label?: string;
+  readonly formlyType?: string;
   readonly semanticType?: string;
-  readonly capabilities?: readonly AgentContextQueryCapability[];
+  readonly evidence: ContractEvidence;
+  readonly presentation?: ContractPresentation;
+  readonly state?: ContractNodeState;
+  readonly childNodeIds: readonly string[];
+  readonly arrayTemplateNodeId?: string;
+  readonly capabilities: readonly AgentContextQueryCapability[];
+  readonly included: readonly AgentContextNodeDetailAspect[];
+  readonly details: AgentContextNodeDetailProjection;
 }
 
 export interface AgentContextStepSummaryProjection {
@@ -1870,24 +2116,36 @@ export interface AgentContextStepSummaryProjection {
   readonly actionIds: readonly string[];
 }
 
-export interface AgentContextJourneySummaryProjection {
-  readonly id: string;
-  readonly version: number;
-  readonly entryId: string;
-  readonly landingStepId: string;
-  readonly stepIds: readonly string[];
-  readonly actionIds: readonly string[];
-  readonly outcomeIds: readonly string[];
-  readonly transitionIds: readonly string[];
+export interface AgentContextJourneyProjection {
+  readonly identity: AgentContextIdentityReference;
+  readonly execution: AgentContextUsageExecutionAuthority;
 }
 
 export interface AgentContextE2eSliceProjection {
   readonly withinStepId: string;
-  readonly focusNodeIds: readonly string[];
-  readonly nodeIds: readonly string[];
-  readonly prerequisiteNodeIds: readonly string[];
-  readonly effectIds: readonly string[];
+  readonly authority: AgentContextExecutionAuthority;
+  readonly focusNodes: AgentContextCompleteCollection<AgentContextNodeCandidateProjection>;
+  readonly closureNodes: AgentContextCompleteCollection<AgentContextNodeCandidateProjection>;
+  readonly prerequisites: AgentContextCompleteCollection<AgentContextE2ePrerequisiteProjection>;
+  readonly effects: AgentContextCompleteCollection<DeclaredCrossFieldEffect>;
 }
+
+export type AgentContextE2ePrerequisiteProjection =
+  | {
+      readonly kind: 'effect-source';
+      readonly node: AgentContextNodeCandidateProjection;
+      readonly effect: DeclaredCrossFieldEffect;
+    }
+  | {
+      readonly kind: 'readiness';
+      readonly node: AgentContextNodeCandidateProjection;
+      readonly readiness: AgentContextReadinessAuthority;
+    }
+  | {
+      readonly kind: 'wrapper-precondition';
+      readonly node: AgentContextNodeCandidateProjection;
+      readonly precondition: FieldTypeWrapperPrecondition;
+    };
 
 export type AgentContextPageResult<
   Collection extends AgentContextPageableCollection,
@@ -1907,6 +2165,8 @@ export type SearchFormUsagesResult =
       readonly schemaVersion: typeof AGENT_CONTEXT_QUERY_SCHEMA_VERSION;
       readonly operation: 'search-form-usages';
       readonly status: 'complete';
+      readonly scope: AgentContextUsageSearchScope;
+      readonly freshness: AgentContextFreshness;
       readonly candidates: readonly AgentContextUsageCandidateProjection[];
       readonly page: AgentContextPageResult<'candidates'>;
     }
@@ -1914,6 +2174,8 @@ export type SearchFormUsagesResult =
       readonly schemaVersion: typeof AGENT_CONTEXT_QUERY_SCHEMA_VERSION;
       readonly operation: 'search-form-usages';
       readonly status: 'ambiguous';
+      readonly scope: AgentContextUsageSearchScope;
+      readonly freshness: AgentContextFreshness;
       readonly candidates: readonly AgentContextUsageCandidateProjection[];
       readonly page: AgentContextPageResult<'candidates'>;
       readonly reason: Extract<AgentContextQueryReason, { kind: 'usage-ambiguous' }>;
@@ -1922,6 +2184,8 @@ export type SearchFormUsagesResult =
       readonly schemaVersion: typeof AGENT_CONTEXT_QUERY_SCHEMA_VERSION;
       readonly operation: 'search-form-usages';
       readonly status: 'not-found';
+      readonly scope: AgentContextUsageSearchScope;
+      readonly freshness: AgentContextFreshness;
       readonly candidates: readonly [];
       readonly page: AgentContextPageResult<'candidates'>;
       readonly reason: Extract<
@@ -1937,6 +2201,8 @@ export type SearchFormUsagesResult =
       readonly schemaVersion: typeof AGENT_CONTEXT_QUERY_SCHEMA_VERSION;
       readonly operation: 'search-form-usages';
       readonly status: 'refused';
+      readonly scope: AgentContextUsageSearchScope;
+      readonly freshness: AgentContextFreshness;
       readonly reason: Extract<
         AgentContextQueryReason,
         { kind: 'atomic-record-too-large' }
@@ -1971,7 +2237,7 @@ export type GetFormContextResult =
       readonly view: 'journey';
       readonly selection: AgentContextQuerySelection;
       readonly freshness: AgentContextFreshness;
-      readonly journey: AgentContextJourneySummaryProjection;
+      readonly journey: AgentContextJourneyProjection;
     }
   | {
       readonly schemaVersion: typeof AGENT_CONTEXT_QUERY_SCHEMA_VERSION;
@@ -2005,6 +2271,7 @@ export type FindFormNodesResult =
       readonly status: 'complete';
       readonly selection: AgentContextQuerySelection;
       readonly freshness: AgentContextFreshness;
+      readonly authority: AgentContextExecutionAuthority;
       readonly candidates: readonly AgentContextNodeCandidateProjection[];
       readonly page: AgentContextPageResult<'nodes'>;
     }
@@ -2014,6 +2281,7 @@ export type FindFormNodesResult =
       readonly status: 'ambiguous';
       readonly selection: AgentContextQuerySelection;
       readonly freshness: AgentContextFreshness;
+      readonly authority: AgentContextExecutionAuthority;
       readonly candidates: readonly AgentContextNodeCandidateProjection[];
       readonly page: AgentContextPageResult<'nodes'>;
       readonly reason: Extract<AgentContextQueryReason, { kind: 'node-ambiguous' }>;
@@ -2167,24 +2435,134 @@ function parseFormReference(
   };
 }
 
+function parseCompleteCollection<T>(
+  input: unknown,
+  path: string,
+  parseItem: (entry: unknown, path: string) => T,
+): AgentContextCompleteCollection<T> {
+  const value = record(input, path, new Set(['complete', 'items']));
+  if (required(value, 'complete', path) !== true) {
+    fail(`${path}.complete`, 'must be true for an atomic collection.');
+  }
+  return {
+    complete: true,
+    items: array(required(value, 'items', path), `${path}.items`).map(
+      (entry, index) => parseItem(entry, `${path}.items[${index}]`),
+    ),
+  };
+}
+
+function parseCanonicalCompleteCollection<T>(
+  input: unknown,
+  path: string,
+  parseItem: (entry: unknown, path: string) => T,
+  identity: (entry: T) => string,
+  compare: (left: T, right: T) => number,
+): AgentContextCompleteCollection<T> {
+  const collection = parseCompleteCollection(input, path, parseItem);
+  assertCanonicalSet(collection.items, `${path}.items`, identity, compare);
+  return collection;
+}
+
 function parseUsageCandidate(
   input: unknown,
   path: string,
+  scope: AgentContextUsageSearchScope,
 ): AgentContextUsageCandidateProjection {
   const value = record(
     input,
     path,
-    new Set(['usage', 'projectId', 'form', 'matchReasons']),
+    new Set([
+      'usage',
+      'projectId',
+      'form',
+      'sourceUsageCatalog',
+      'selectionHandoffs',
+      'matchReasons',
+    ]),
+  );
+  const usage = parseUsageIdentity(
+    required(value, 'usage', path),
+    `${path}.usage`,
+  );
+  const projectId = boundedId(
+    required(value, 'projectId', path),
+    `${path}.projectId`,
   );
   const form = optional(value, 'form');
+  const parsedForm =
+    form === undefined ? undefined : parseFormReference(form, `${path}.form`);
+  if (parsedForm !== undefined && parsedForm.projectId !== projectId) {
+    fail(`${path}.form.projectId`, 'must equal the candidate projectId.');
+  }
+  const sourceUsageCatalog = parseTypedArtifactReference(
+    required(value, 'sourceUsageCatalog', path),
+    `${path}.sourceUsageCatalog`,
+    AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_ID,
+    AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_VERSION,
+  );
+  if (
+    !scope.sourceUsageCatalogs.some(
+      (reference) => referenceKey(reference) === referenceKey(sourceUsageCatalog),
+    )
+  ) {
+    fail(
+      `${path}.sourceUsageCatalog`,
+      'must be an exact owner in the search scope.',
+    );
+  }
+  const selectionHandoffs = parseCanonicalCompleteCollection(
+    required(value, 'selectionHandoffs', path),
+    `${path}.selectionHandoffs`,
+    (entry, entryPath) => parseSelectionFromDetached(entry, entryPath),
+    canonicalStringify,
+    (left, right) => compareText(canonicalStringify(left), canonicalStringify(right)),
+  );
+  for (const [index, handoff] of selectionHandoffs.items.entries()) {
+    const handoffPath = `${path}.selectionHandoffs.items[${index}]`;
+    assertSame(handoff.artifactSet, scope.artifactSet, `${handoffPath}.artifactSet`);
+    assertSame(
+      handoff.workspaceIndex,
+      scope.workspaceIndex,
+      `${handoffPath}.workspaceIndex`,
+    );
+    assertSame(
+      handoff.owners.sourceUsageCatalog,
+      sourceUsageCatalog,
+      `${handoffPath}.owners.sourceUsageCatalog`,
+    );
+    if (usage.kind !== 'declared') {
+      fail(handoffPath, 'callsite candidates cannot claim an exact selection.');
+    }
+    assertSame(handoff.usage, usage, `${handoffPath}.usage`);
+    if (parsedForm !== undefined) {
+      assertSame(handoff.form, parsedForm, `${handoffPath}.form`);
+    }
+  }
+  if (
+    usage.kind === 'declared' &&
+    parsedForm !== undefined &&
+    selectionHandoffs.items.length === 0
+  ) {
+    fail(
+      `${path}.selectionHandoffs`,
+      'must carry at least one exact selection for a resolved declared usage.',
+    );
+  }
+  const matchReasons = parseCanonicalCompleteCollection(
+    required(value, 'matchReasons', path),
+    `${path}.matchReasons`,
+    boundedText,
+    (reason) => reason,
+    compareText,
+  );
   return {
-    usage: parseUsageIdentity(required(value, 'usage', path), `${path}.usage`),
-    projectId: boundedId(required(value, 'projectId', path), `${path}.projectId`),
-    ...(form === undefined ? {} : { form: parseFormReference(form, `${path}.form`) }),
-    matchReasons: parseCanonicalStringSet(
-      required(value, 'matchReasons', path),
-      `${path}.matchReasons`,
-    ),
+    usage,
+    projectId,
+    ...(parsedForm === undefined ? {} : { form: parsedForm }),
+    sourceUsageCatalog,
+    selectionHandoffs,
+    matchReasons,
   };
 }
 
@@ -2195,24 +2573,313 @@ function parseNodeCandidate(
   const value = record(
     input,
     path,
-    new Set(['nodeId', 'modelPath', 'label', 'semanticType', 'capabilities']),
+    new Set([
+      'nodeId',
+      'kind',
+      'modelPath',
+      'formlyType',
+      'semanticType',
+      'evidence',
+      'presentation',
+      'state',
+      'childNodeIds',
+      'arrayTemplateNodeId',
+      'capabilities',
+      'included',
+      'details',
+    ]),
   );
-  const label = optional(value, 'label');
+  const nodeId = boundedId(required(value, 'nodeId', path), `${path}.nodeId`);
+  const kind = enumValue(required(value, 'kind', path), `${path}.kind`, [
+    'array',
+    'control',
+    'display',
+    'group',
+  ] as const);
+  const modelPath = parseModelPath(
+    required(value, 'modelPath', path),
+    `${path}.modelPath`,
+  );
+  const formlyType = optional(value, 'formlyType');
   const semanticType = optional(value, 'semanticType');
-  const capabilities = optional(value, 'capabilities');
+  const evidence = enumValue(
+    required(value, 'evidence', path),
+    `${path}.evidence`,
+    ['declared', 'observed', 'resolved'] as const,
+  );
+  const presentation = optional(value, 'presentation');
+  const state = optional(value, 'state');
+  const arrayTemplateNodeId = optional(value, 'arrayTemplateNodeId');
+  const childNodeIds = parseUniqueStringList(
+    required(value, 'childNodeIds', path),
+    `${path}.childNodeIds`,
+  );
+  const capabilities = parseCapabilitySet(
+    required(value, 'capabilities', path),
+    `${path}.capabilities`,
+  );
+  const included = parseIncludeSet(
+    required(value, 'included', path),
+    `${path}.included`,
+  );
+  const detailValue = record(
+    required(value, 'details', path),
+    `${path}.details`,
+    new Set(NODE_DETAIL_ASPECTS),
+  );
+  const includedSet = new Set(included);
+  for (const aspect of NODE_DETAIL_ASPECTS) {
+    if (Object.hasOwn(detailValue, aspect) !== includedSet.has(aspect)) {
+      fail(
+        `${path}.details.${aspect}`,
+        'must be present exactly when named by included.',
+      );
+    }
+  }
+
+  const constraintInput = optional(detailValue, 'constraints');
+  const constraints =
+    constraintInput === undefined
+      ? undefined
+      : parseCompleteCollection(
+          constraintInput,
+          `${path}.details.constraints`,
+          (entry) => entry,
+        );
+  const domainInput = optional(detailValue, 'domain');
+  let domain:
+    | {
+        readonly options: AgentContextCompleteCollection<unknown>;
+        readonly optionSource?: unknown;
+        readonly valueDomain?: unknown;
+      }
+    | undefined;
+  if (domainInput !== undefined) {
+    const domainValue = record(
+      domainInput,
+      `${path}.details.domain`,
+      new Set(['options', 'optionSource', 'valueDomain']),
+    );
+    const optionSource = optional(domainValue, 'optionSource');
+    const valueDomain = optional(domainValue, 'valueDomain');
+    domain = {
+      options: parseCompleteCollection(
+        required(domainValue, 'options', `${path}.details.domain`),
+        `${path}.details.domain.options`,
+        (entry) => entry,
+      ),
+      ...(optionSource === undefined ? {} : { optionSource }),
+      ...(valueDomain === undefined ? {} : { valueDomain }),
+    };
+  }
+  const interactionInput = optional(detailValue, 'interaction');
+  let interaction: { readonly profile?: unknown } | undefined;
+  if (interactionInput !== undefined) {
+    const interactionValue = record(
+      interactionInput,
+      `${path}.details.interaction`,
+      new Set(['profile']),
+    );
+    const profile = optional(interactionValue, 'profile');
+    interaction = profile === undefined ? {} : { profile };
+  }
+  const locatorInput = optional(detailValue, 'locators');
+  const locators =
+    locatorInput === undefined
+      ? undefined
+      : parseCompleteCollection(
+          locatorInput,
+          `${path}.details.locators`,
+          (entry) => entry,
+        );
+  const unknownInput = optional(detailValue, 'unknowns');
+  const unknowns =
+    unknownInput === undefined
+      ? undefined
+      : parseCompleteCollection(
+          unknownInput,
+          `${path}.details.unknowns`,
+          (entry) => entry,
+        );
+
+  const contract = parseFormContract(
+    createFormContract({
+      schemaVersion: FORM_CONTRACT_SCHEMA_VERSION,
+      formId: 'agent-context.query-node-projection',
+      nodes: [
+        {
+          id: nodeId,
+          kind,
+          modelPath,
+          ...(formlyType === undefined
+            ? {}
+            : { formlyType: boundedId(formlyType, `${path}.formlyType`) }),
+          ...(semanticType === undefined
+            ? {}
+            : {
+                semanticType: boundedId(
+                  semanticType,
+                  `${path}.semanticType`,
+                ),
+              }),
+          evidence,
+          ...(presentation === undefined
+            ? {}
+            : { presentation: presentation as ContractPresentation }),
+          wrappers: [],
+          constraints: (constraints?.items ?? []) as readonly ContractConstraint[],
+          options: (domain?.options.items ?? []) as readonly ContractOption[],
+          ...(domain?.optionSource === undefined
+            ? {}
+            : { optionSource: domain.optionSource as ContractOptionSource }),
+          ...(domain?.valueDomain === undefined
+            ? {}
+            : { valueDomain: domain.valueDomain as ContractValueDomain }),
+          ...(interaction?.profile === undefined
+            ? {}
+            : {
+                interactionProfile:
+                  interaction.profile as ContractInteractionProfile,
+              }),
+          conditions: [],
+          dynamicRules: [],
+          ...(state === undefined ? {} : { state: state as ContractNodeState }),
+          locators: (locators?.items ?? []) as readonly ContractLocator[],
+          children: [],
+        },
+      ],
+      diagnostics: (unknowns?.items ?? []) as readonly ContractDiagnostic[],
+    }),
+  );
+  const parsedNode = contract.nodes[0]!;
+  for (const [index, diagnostic] of contract.diagnostics.entries()) {
+    if (diagnostic.nodeId !== undefined && diagnostic.nodeId !== nodeId) {
+      fail(
+        `${path}.details.unknowns.items[${index}].nodeId`,
+        'must identify the projected node when present.',
+      );
+    }
+  }
+  const effectsInput = optional(detailValue, 'effects');
+  let effects: AgentContextCompleteCollection<DeclaredCrossFieldEffect> | undefined;
+  if (effectsInput !== undefined) {
+    const rawEffects = parseCompleteCollection(
+      effectsInput,
+      `${path}.details.effects`,
+      (entry) => entry,
+    );
+    const registry = parseCrossFieldEffectRegistry({
+      schemaVersion: CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+      id: 'agent-context.query-effects',
+      version: 1,
+      forms: [
+        {
+          formId: 'agent-context.query-node-projection',
+          coverage: 'partial',
+          effects: rawEffects.items,
+        },
+      ],
+    });
+    const parsedEffects = registry.forms[0]!.effects;
+    for (const [index, effect] of parsedEffects.entries()) {
+      if (effect.trigger.nodeId !== nodeId && effect.target.nodeId !== nodeId) {
+        fail(
+          `${path}.details.effects.items[${index}]`,
+          'must name the projected node as trigger or target.',
+        );
+      }
+    }
+    assertCanonicalSet(
+      parsedEffects,
+      `${path}.details.effects.items`,
+      (effect) => `${effect.identity.id}\0${effect.identity.version}`,
+      (left, right) =>
+        compareText(left.identity.id, right.identity.id) ||
+        left.identity.version - right.identity.version,
+    );
+    effects = { complete: true, items: parsedEffects };
+  }
+
+  const details: AgentContextNodeDetailProjection = {
+    ...(constraints === undefined
+      ? {}
+      : { constraints: { complete: true, items: parsedNode.constraints } }),
+    ...(domain === undefined
+      ? {}
+      : {
+          domain: {
+            options: { complete: true, items: parsedNode.options },
+            ...(parsedNode.optionSource === undefined
+              ? {}
+              : { optionSource: parsedNode.optionSource }),
+            ...(parsedNode.valueDomain === undefined
+              ? {}
+              : { valueDomain: parsedNode.valueDomain }),
+          },
+        }),
+    ...(effects === undefined ? {} : { effects }),
+    ...(interaction === undefined
+      ? {}
+      : {
+          interaction:
+            parsedNode.interactionProfile === undefined
+              ? {}
+              : { profile: parsedNode.interactionProfile },
+        }),
+    ...(locators === undefined
+      ? {}
+      : { locators: { complete: true, items: parsedNode.locators } }),
+    ...(unknowns === undefined
+      ? {}
+      : { unknowns: { complete: true, items: contract.diagnostics } }),
+  };
   return {
-    nodeId: boundedId(required(value, 'nodeId', path), `${path}.nodeId`),
-    modelPath: parseModelPath(
-      required(value, 'modelPath', path),
-      `${path}.modelPath`,
+    nodeId,
+    kind,
+    modelPath,
+    ...(parsedNode.formlyType === undefined
+      ? {}
+      : { formlyType: parsedNode.formlyType }),
+    ...(parsedNode.semanticType === undefined
+      ? {}
+      : { semanticType: parsedNode.semanticType }),
+    evidence,
+    ...(parsedNode.presentation === undefined
+      ? {}
+      : { presentation: parsedNode.presentation }),
+    ...(parsedNode.state === undefined ? {} : { state: parsedNode.state }),
+    childNodeIds,
+    ...(arrayTemplateNodeId === undefined
+      ? {}
+      : {
+          arrayTemplateNodeId: boundedId(
+            arrayTemplateNodeId,
+            `${path}.arrayTemplateNodeId`,
+          ),
+        }),
+    capabilities,
+    included,
+    details,
+  };
+}
+
+function parseUsageCandidateReference(
+  input: unknown,
+  path: string,
+): AgentContextUsageCandidateReference {
+  const value = record(
+    input,
+    path,
+    new Set(['sourceUsageCatalog', 'usage']),
+  );
+  return {
+    sourceUsageCatalog: parseTypedArtifactReference(
+      required(value, 'sourceUsageCatalog', path),
+      `${path}.sourceUsageCatalog`,
+      AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_ID,
+      AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_VERSION,
     ),
-    ...(label === undefined ? {} : { label: boundedText(label, `${path}.label`) }),
-    ...(semanticType === undefined
-      ? {}
-      : { semanticType: boundedId(semanticType, `${path}.semanticType`) }),
-    ...(capabilities === undefined
-      ? {}
-      : { capabilities: parseCapabilitySet(capabilities, `${path}.capabilities`) }),
+    usage: parseUsageIdentity(required(value, 'usage', path), `${path}.usage`),
   };
 }
 
@@ -2236,7 +2903,7 @@ function parseReason(input: unknown, path: string): AgentContextQueryReason {
     const usages = parseCandidateList(
       required(value, 'usages', path),
       `${path}.usages`,
-      parseUsageIdentity,
+      parseUsageCandidateReference,
       canonicalStringify,
     );
     if (usages.length < 2) {
@@ -2346,14 +3013,38 @@ function parseSearchResult(input: unknown, path: string): SearchFormUsagesResult
   const union = record(
     input,
     path,
-    new Set(['schemaVersion', 'operation', 'status', 'candidates', 'page', 'reason']),
+    new Set([
+      'schemaVersion',
+      'operation',
+      'status',
+      'scope',
+      'freshness',
+      'candidates',
+      'page',
+      'reason',
+    ]),
   );
   const status = required(union, 'status', path);
+  const scope = parseUsageSearchScopeFromDetached(
+    required(union, 'scope', path),
+    `${path}.scope`,
+  );
+  const freshness = parseFreshness(
+    required(union, 'freshness', path),
+    `${path}.freshness`,
+  );
   if (status === 'refused') {
     const value = record(
       input,
       path,
-      new Set(['schemaVersion', 'operation', 'status', 'reason']),
+      new Set([
+        'schemaVersion',
+        'operation',
+        'status',
+        'scope',
+        'freshness',
+        'reason',
+      ]),
     );
     const reason = parseReason(required(value, 'reason', path), `${path}.reason`);
     if (reason.kind !== 'atomic-record-too-large') {
@@ -2363,6 +3054,8 @@ function parseSearchResult(input: unknown, path: string): SearchFormUsagesResult
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation: 'search-form-usages',
       status,
+      scope,
+      freshness,
       reason,
     };
   }
@@ -2376,6 +3069,8 @@ function parseSearchResult(input: unknown, path: string): SearchFormUsagesResult
       'schemaVersion',
       'operation',
       'status',
+      'scope',
+      'freshness',
       'candidates',
       'page',
       ...(status === 'complete' ? [] : ['reason']),
@@ -2384,8 +3079,9 @@ function parseSearchResult(input: unknown, path: string): SearchFormUsagesResult
   const candidates = parseCandidateList(
     required(value, 'candidates', path),
     `${path}.candidates`,
-    parseUsageCandidate,
-    (candidate) => canonicalStringify(candidate.usage),
+    (entry, entryPath) => parseUsageCandidate(entry, entryPath, scope),
+    (candidate) =>
+      `${referenceKey(candidate.sourceUsageCatalog)}\0${canonicalStringify(candidate.usage)}`,
   );
   const page = parsePageResult(required(value, 'page', path), `${path}.page`, 'candidates');
   if (status === 'complete') {
@@ -2393,6 +3089,8 @@ function parseSearchResult(input: unknown, path: string): SearchFormUsagesResult
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation: 'search-form-usages',
       status,
+      scope,
+      freshness,
       candidates,
       page,
     };
@@ -2402,7 +3100,15 @@ function parseSearchResult(input: unknown, path: string): SearchFormUsagesResult
     if (reason.kind !== 'usage-ambiguous') {
       fail(`${path}.reason.kind`, 'must be usage-ambiguous.');
     }
-    if (!sameJson(candidates.map(({ usage }) => usage), reason.usages)) {
+    if (
+      !sameJson(
+        candidates.map(({ sourceUsageCatalog, usage }) => ({
+          sourceUsageCatalog,
+          usage,
+        })),
+        reason.usages,
+      )
+    ) {
       fail(
         `${path}.reason.usages`,
         'must equal the candidate usage identities.',
@@ -2412,6 +3118,8 @@ function parseSearchResult(input: unknown, path: string): SearchFormUsagesResult
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation: 'search-form-usages',
       status,
+      scope,
+      freshness,
       candidates,
       page,
       reason,
@@ -2424,10 +3132,15 @@ function parseSearchResult(input: unknown, path: string): SearchFormUsagesResult
   ) {
     fail(`${path}.reason.kind`, 'is not a usage absence reason.');
   }
+  if (page.truncated) {
+    fail(`${path}.page.truncated`, 'must be false for a not-found result.');
+  }
   return {
     schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
     operation: 'search-form-usages',
     status,
+    scope,
+    freshness,
     candidates: [],
     page,
     reason,
@@ -2457,48 +3170,53 @@ function parseStepSummary(
   };
 }
 
-function parseJourneySummary(
+function parseJourneyProjection(
   input: unknown,
   path: string,
-): AgentContextJourneySummaryProjection {
+  selection: AgentContextQuerySelection,
+): AgentContextJourneyProjection {
   const value = record(
     input,
     path,
-    new Set([
-      'id',
-      'version',
-      'entryId',
-      'landingStepId',
-      'stepIds',
-      'actionIds',
-      'outcomeIds',
-      'transitionIds',
-    ]),
+    new Set(['identity', 'execution']),
+  );
+  const identity = parseIdentityReference(
+    required(value, 'identity', path),
+    `${path}.identity`,
+  );
+  assertSame(identity, selection.journey, `${path}.identity`);
+  const authority = createAgentContextExecutionAuthority({
+    schemaVersion: AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_VERSION,
+    basis: selection.executionAuthority.basis,
+    scenario: selection.scenario,
+    physicalOperations: [],
+    readiness: [],
+    interactions: [],
+    commits: [],
+    validationSurfaces: [],
+    valueAssertions: [],
+    stateAssertions: [],
+    usage: required(value, 'execution', path) as AgentContextUsageExecutionAuthority,
+    repeaterCaptures: [],
+  });
+  const execution = authority.usage;
+  if (
+    execution.id !== selection.executionAuthority.usageId ||
+    execution.version !== selection.executionAuthority.usageVersion
+  ) {
+    fail(
+      `${path}.execution`,
+      'must equal the selected execution-authority usage identity.',
+    );
+  }
+  assertSame(
+    execution.basis,
+    selection.executionAuthority.basis,
+    `${path}.execution.basis`,
   );
   return {
-    id: boundedId(required(value, 'id', path), `${path}.id`),
-    version: positiveInteger(required(value, 'version', path), `${path}.version`),
-    entryId: boundedId(required(value, 'entryId', path), `${path}.entryId`),
-    landingStepId: boundedId(
-      required(value, 'landingStepId', path),
-      `${path}.landingStepId`,
-    ),
-    stepIds: parseUniqueStringList(
-      required(value, 'stepIds', path),
-      `${path}.stepIds`,
-    ),
-    actionIds: parseCanonicalStringSet(
-      required(value, 'actionIds', path),
-      `${path}.actionIds`,
-    ),
-    outcomeIds: parseCanonicalStringSet(
-      required(value, 'outcomeIds', path),
-      `${path}.outcomeIds`,
-    ),
-    transitionIds: parseCanonicalStringSet(
-      required(value, 'transitionIds', path),
-      `${path}.transitionIds`,
-    ),
+    identity,
+    execution,
   };
 }
 
@@ -2511,8 +3229,10 @@ function parseContextResult(input: unknown, path: string): GetFormContextResult 
       'operation',
       'status',
       'view',
+      'scope',
       'selection',
       'freshness',
+      'authority',
       'steps',
       'reasons',
       'journey',
@@ -2627,8 +3347,11 @@ function parseContextResult(input: unknown, path: string): GetFormContextResult 
         'page',
       ]),
     );
-    const reasons = array(required(value, 'reasons', path), `${path}.reasons`).map(
-      (entry, index) => parseReason(entry, `${path}.reasons[${index}]`),
+    const reasons = parseCandidateList(
+      required(value, 'reasons', path),
+      `${path}.reasons`,
+      parseReason,
+      canonicalStringify,
     );
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
@@ -2665,11 +3388,34 @@ function parseContextResult(input: unknown, path: string): GetFormContextResult 
     view,
     selection,
     freshness,
-    journey: parseJourneySummary(
+    journey: parseJourneyProjection(
       required(value, 'journey', path),
       `${path}.journey`,
+      selection,
     ),
   };
+}
+
+function parseSelectedExecutionAuthority(
+  input: unknown,
+  path: string,
+  selection: AgentContextQuerySelection,
+): AgentContextExecutionAuthority {
+  const authority = parseAgentContextExecutionAuthority(input);
+  if (
+    authority.contentHash !== selection.owners.executionAuthority.contentHash
+  ) {
+    fail(`${path}.contentHash`, 'must equal the selected authority owner.');
+  }
+  assertSame(authority.basis, selection.executionAuthority.basis, `${path}.basis`);
+  assertSame(authority.scenario, selection.scenario, `${path}.scenario`);
+  if (
+    authority.usage.id !== selection.executionAuthority.usageId ||
+    authority.usage.version !== selection.executionAuthority.usageVersion
+  ) {
+    fail(`${path}.usage`, 'must equal the selected usage identity.');
+  }
+  return authority;
 }
 
 function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
@@ -2682,6 +3428,7 @@ function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
       'status',
       'selection',
       'freshness',
+      'authority',
       'candidates',
       'page',
       'reason',
@@ -2731,6 +3478,7 @@ function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
       'status',
       'selection',
       'freshness',
+      ...(status === 'not-found' ? [] : ['authority']),
       'candidates',
       'page',
       ...(status === 'complete' ? [] : ['reason']),
@@ -2743,6 +3491,27 @@ function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
     (candidate) => candidate.nodeId,
   );
   const page = parsePageResult(required(value, 'page', path), `${path}.page`, 'nodes');
+  const authority =
+    status === 'not-found'
+      ? undefined
+      : parseSelectedExecutionAuthority(
+          required(value, 'authority', path),
+          `${path}.authority`,
+          selection,
+        );
+  if (authority !== undefined) {
+    const authorityNodeIds = new Set(
+      authority.usage.steps.flatMap(({ nodeIds }) => nodeIds),
+    );
+    for (const [index, candidate] of candidates.entries()) {
+      if (!authorityNodeIds.has(candidate.nodeId)) {
+        fail(
+          `${path}.candidates[${index}].nodeId`,
+          'must belong to the selected usage authority.',
+        );
+      }
+    }
+  }
   if (status === 'complete') {
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
@@ -2750,6 +3519,7 @@ function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
       status,
       selection,
       freshness,
+      authority: authority!,
       candidates,
       page,
     };
@@ -2769,6 +3539,7 @@ function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
       status,
       selection,
       freshness,
+      authority: authority!,
       candidates,
       page,
       reason,
@@ -2776,6 +3547,9 @@ function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
   }
   if (candidates.length !== 0) fail(`${path}.candidates`, 'must be empty.');
   if (reason.kind !== 'node-absent') fail(`${path}.reason.kind`, 'must be node-absent.');
+  if (page.truncated) {
+    fail(`${path}.page.truncated`, 'must be false for a not-found result.');
+  }
   return {
     schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
     operation: 'find-form-nodes',
@@ -2791,41 +3565,186 @@ function parseNodeResult(input: unknown, path: string): FindFormNodesResult {
 function parseSliceProjection(
   input: unknown,
   path: string,
+  selection: AgentContextQuerySelection,
 ): AgentContextE2eSliceProjection {
   const value = record(
     input,
     path,
     new Set([
       'withinStepId',
-      'focusNodeIds',
-      'nodeIds',
-      'prerequisiteNodeIds',
-      'effectIds',
+      'authority',
+      'focusNodes',
+      'closureNodes',
+      'prerequisites',
+      'effects',
     ]),
   );
+  const withinStepId = boundedId(
+    required(value, 'withinStepId', path),
+    `${path}.withinStepId`,
+  );
+  const authority = parseSelectedExecutionAuthority(
+    required(value, 'authority', path),
+    `${path}.authority`,
+    selection,
+  );
+  const step = authority.usage.steps.find(({ id }) => id === withinStepId);
+  if (step === undefined) {
+    fail(`${path}.withinStepId`, 'must resolve in the selected authority.');
+  }
+  const parseNodes = (
+    collectionInput: unknown,
+    collectionPath: string,
+    minimum: number,
+  ): AgentContextCompleteCollection<AgentContextNodeCandidateProjection> => {
+    const collection = parseCanonicalCompleteCollection(
+      collectionInput,
+      collectionPath,
+      parseNodeCandidate,
+      ({ nodeId }) => nodeId,
+      (left, right) => compareText(left.nodeId, right.nodeId),
+    );
+    if (collection.items.length < minimum) {
+      fail(`${collectionPath}.items`, `must contain at least ${minimum} entries.`);
+    }
+    return collection;
+  };
+  const focusNodes = parseNodes(
+    required(value, 'focusNodes', path),
+    `${path}.focusNodes`,
+    1,
+  );
+  const closureNodes = parseNodes(
+    required(value, 'closureNodes', path),
+    `${path}.closureNodes`,
+    1,
+  );
+  const closureById = new Map(
+    closureNodes.items.map((node) => [node.nodeId, node] as const),
+  );
+  for (const [index, node] of focusNodes.items.entries()) {
+    const closureNode = closureById.get(node.nodeId);
+    if (closureNode === undefined || !sameJson(closureNode, node)) {
+      fail(
+        `${path}.focusNodes.items[${index}]`,
+        'must be an exact subset of closureNodes.',
+      );
+    }
+  }
+  const stepNodeIds = new Set(step.nodeIds);
+  for (const [index, node] of closureNodes.items.entries()) {
+    if (!stepNodeIds.has(node.nodeId)) {
+      fail(
+        `${path}.closureNodes.items[${index}].nodeId`,
+        'must belong to withinStepId.',
+      );
+    }
+  }
+  const rawEffects = parseCompleteCollection(
+    required(value, 'effects', path),
+    `${path}.effects`,
+    (entry) => entry,
+  );
+  const registry = parseCrossFieldEffectRegistry({
+    schemaVersion: CROSS_FIELD_EFFECT_SCHEMA_VERSION,
+    id: 'agent-context.query-slice-effects',
+    version: 1,
+    forms: [
+      {
+        formId: 'agent-context.query-slice-projection',
+        coverage: 'partial',
+        effects: rawEffects.items,
+      },
+    ],
+  });
+  const parsedEffects = registry.forms[0]!.effects;
+  assertCanonicalSet(
+    parsedEffects,
+    `${path}.effects.items`,
+    (effect) => `${effect.identity.id}\0${effect.identity.version}`,
+    (left, right) =>
+      compareText(left.identity.id, right.identity.id) ||
+      left.identity.version - right.identity.version,
+  );
+  const prerequisites = parseCanonicalCompleteCollection(
+    required(value, 'prerequisites', path),
+    `${path}.prerequisites`,
+    (entry, entryPath): AgentContextE2ePrerequisiteProjection => {
+      const union = record(
+        entry,
+        entryPath,
+        new Set(['kind', 'node', 'effect', 'readiness', 'precondition']),
+      );
+      const kind = enumValue(required(union, 'kind', entryPath), `${entryPath}.kind`, [
+        'effect-source',
+        'readiness',
+        'wrapper-precondition',
+      ] as const);
+      const branch = record(
+        entry,
+        entryPath,
+        kind === 'effect-source'
+          ? new Set(['kind', 'node', 'effect'])
+          : kind === 'readiness'
+            ? new Set(['kind', 'node', 'readiness'])
+            : new Set(['kind', 'node', 'precondition']),
+      );
+      const node = parseNodeCandidate(
+        required(branch, 'node', entryPath),
+        `${entryPath}.node`,
+      );
+      const closureNode = closureById.get(node.nodeId);
+      if (closureNode === undefined || !sameJson(closureNode, node)) {
+        fail(`${entryPath}.node`, 'must be an exact closure node.');
+      }
+      if (kind === 'effect-source') {
+        const effectInput = required(branch, 'effect', entryPath);
+        const effect = parsedEffects.find((candidate) =>
+          sameJson(candidate, effectInput),
+        );
+        if (effect?.trigger.nodeId !== node.nodeId) {
+          fail(
+            `${entryPath}.effect`,
+            'must be an exact slice effect triggered by the prerequisite node.',
+          );
+        }
+        return { kind, node, effect };
+      }
+      if (kind === 'readiness') {
+        const readinessInput = required(branch, 'readiness', entryPath);
+        const readiness = authority.readiness.find((candidate) =>
+          sameJson(candidate, readinessInput),
+        );
+        if (readiness?.nodeId !== node.nodeId) {
+          fail(
+            `${entryPath}.readiness`,
+            'must be an exact selected-authority readiness for the prerequisite node.',
+          );
+        }
+        return { kind, node, readiness };
+      }
+      const preconditionInput = required(branch, 'precondition', entryPath);
+      const precondition = node.details.interaction?.profile?.preconditions.find(
+        (candidate) => sameJson(candidate, preconditionInput),
+      );
+      if (precondition === undefined) {
+        fail(
+          `${entryPath}.precondition`,
+          'must be an exact included wrapper precondition for the prerequisite node.',
+        );
+      }
+      return { kind, node, precondition };
+    },
+    canonicalStringify,
+    (left, right) => compareText(canonicalStringify(left), canonicalStringify(right)),
+  );
   return {
-    withinStepId: boundedId(
-      required(value, 'withinStepId', path),
-      `${path}.withinStepId`,
-    ),
-    focusNodeIds: parseCanonicalStringSet(
-      required(value, 'focusNodeIds', path),
-      `${path}.focusNodeIds`,
-      1,
-    ),
-    nodeIds: parseCanonicalStringSet(
-      required(value, 'nodeIds', path),
-      `${path}.nodeIds`,
-      1,
-    ),
-    prerequisiteNodeIds: parseCanonicalStringSet(
-      required(value, 'prerequisiteNodeIds', path),
-      `${path}.prerequisiteNodeIds`,
-    ),
-    effectIds: parseCanonicalStringSet(
-      required(value, 'effectIds', path),
-      `${path}.effectIds`,
-    ),
+    withinStepId,
+    authority,
+    focusNodes,
+    closureNodes,
+    prerequisites,
+    effects: { complete: true, items: parsedEffects },
   };
 }
 
@@ -2868,7 +3787,11 @@ function parseSliceResult(input: unknown, path: string): GetE2eSliceResult {
       status,
       selection,
       freshness,
-      slice: parseSliceProjection(required(value, 'slice', path), `${path}.slice`),
+      slice: parseSliceProjection(
+        required(value, 'slice', path),
+        `${path}.slice`,
+        selection,
+      ),
     };
   }
   if (status !== 'refused') fail(`${path}.status`, 'must be complete or refused.');
@@ -2917,8 +3840,10 @@ export function parseAgentContextQueryResult(
       'operation',
       'status',
       'view',
+      'scope',
       'selection',
       'freshness',
+      'authority',
       'candidates',
       'page',
       'reason',
@@ -2948,6 +3873,7 @@ export type AgentContextLiveOwnerRole =
   | 'artifact-set'
   | 'workspace-index'
   | 'source-usage-catalog'
+  | 'source-usage-catalog-set'
   | 'journey-catalog'
   | 'form-contract'
   | 'scenario-artifact'
@@ -2965,6 +3891,10 @@ export type AgentContextLiveOwnerReference =
   | {
       readonly role: 'source-usage-catalog' | 'journey-catalog';
       readonly reference: AgentContextArtifactReference;
+    }
+  | {
+      readonly role: 'source-usage-catalog-set';
+      readonly references: readonly AgentContextArtifactReference[];
     }
   | {
       readonly role: 'form-contract';
@@ -3000,11 +3930,17 @@ const LIVE_OWNER_ROLES: readonly AgentContextLiveOwnerRole[] = [
   'artifact-set',
   'workspace-index',
   'source-usage-catalog',
+  'source-usage-catalog-set',
   'journey-catalog',
   'form-contract',
   'scenario-artifact',
   'execution-authority',
 ];
+
+const PINNED_SELECTION_LIVE_OWNER_ROLES: readonly AgentContextLiveOwnerRole[] =
+  LIVE_OWNER_ROLES.filter(
+    (role) => role !== 'source-usage-catalog-set',
+  );
 
 const REQUIRED_FRESHNESS_ROLES: Readonly<
   Record<AgentContextFreshnessView, readonly AgentContextLiveOwnerRole[]>
@@ -3012,7 +3948,7 @@ const REQUIRED_FRESHNESS_ROLES: Readonly<
   'usage-search': [
     'artifact-set',
     'workspace-index',
-    'source-usage-catalog',
+    'source-usage-catalog-set',
   ],
   'context-summary': [
     'artifact-set',
@@ -3022,7 +3958,7 @@ const REQUIRED_FRESHNESS_ROLES: Readonly<
     'form-contract',
     'execution-authority',
   ],
-  'context-diagnostics': LIVE_OWNER_ROLES,
+  'context-diagnostics': PINNED_SELECTION_LIVE_OWNER_ROLES,
   'context-journey': [
     'artifact-set',
     'workspace-index',
@@ -3037,7 +3973,7 @@ const REQUIRED_FRESHNESS_ROLES: Readonly<
     'scenario-artifact',
     'execution-authority',
   ],
-  'e2e-slice': LIVE_OWNER_ROLES,
+  'e2e-slice': PINNED_SELECTION_LIVE_OWNER_ROLES,
 };
 
 function repositoryRevision(input: unknown, path: string): string {
@@ -3129,7 +4065,14 @@ function parseLiveOwnerReference(
   const union = record(
     input,
     path,
-    new Set(['role', 'reference', 'identity', 'scenario', 'executionAuthority']),
+    new Set([
+      'role',
+      'reference',
+      'references',
+      'identity',
+      'scenario',
+      'executionAuthority',
+    ]),
   );
   const role = enumValue(required(union, 'role', path), `${path}.role`, LIVE_OWNER_ROLES);
   if (role === 'artifact-set') {
@@ -3151,6 +4094,30 @@ function parseLiveOwnerReference(
         `${path}.reference`,
       ),
     };
+  }
+  if (role === 'source-usage-catalog-set') {
+    const value = record(input, path, new Set(['role', 'references']));
+    const references = array(
+      required(value, 'references', path),
+      `${path}.references`,
+    ).map((reference, index) =>
+      parseTypedArtifactReference(
+        reference,
+        `${path}.references[${index}]`,
+        AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_ID,
+        AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_VERSION,
+      ),
+    );
+    if (references.length === 0) {
+      fail(`${path}.references`, 'must contain at least one owner.');
+    }
+    assertCanonicalSet(
+      references,
+      `${path}.references`,
+      referenceKey,
+      compareReference,
+    );
+    return { role, references };
   }
   if (role === 'source-usage-catalog' || role === 'journey-catalog') {
     const value = record(input, path, new Set(['role', 'reference']));
@@ -3297,12 +4264,48 @@ export function createAgentContextPinnedLiveOwners(
   ];
 }
 
-export function evaluateAgentContextQueryFreshness(input: {
-  readonly view: AgentContextFreshnessView;
-  readonly selection: unknown;
-  readonly live: unknown;
-}): AgentContextFreshness {
-  const view = enumValue(input.view, 'agentContextFreshness.view', [
+export function createAgentContextUsageSearchScopeLiveOwners(
+  scopeInput: unknown,
+): readonly AgentContextLiveOwnerReference[] {
+  const scope = parseAgentContextUsageSearchScope(scopeInput);
+  return [
+    { role: 'artifact-set', reference: scope.artifactSet },
+    { role: 'workspace-index', reference: scope.workspaceIndex },
+    {
+      role: 'source-usage-catalog-set',
+      references: scope.sourceUsageCatalogs,
+    },
+  ];
+}
+
+type SelectionFreshnessView = Exclude<
+  AgentContextFreshnessView,
+  'usage-search'
+>;
+
+export type AgentContextQueryFreshnessInput =
+  | {
+      readonly view: 'usage-search';
+      readonly scope: unknown;
+      readonly live: unknown;
+    }
+  | {
+      readonly view: SelectionFreshnessView;
+      readonly selection: unknown;
+      readonly live: unknown;
+    };
+
+export function evaluateAgentContextQueryFreshness(
+  input: AgentContextQueryFreshnessInput,
+): AgentContextFreshness {
+  const path = 'agentContextFreshness';
+  const detached = cloneValidatedDataOnly(input, path);
+  const union = record(
+    detached,
+    path,
+    new Set(['view', 'scope', 'selection', 'live']),
+  );
+  const view = enumValue(required(union, 'view', path), `${path}.view`, [
     'usage-search',
     'context-summary',
     'context-diagnostics',
@@ -3310,8 +4313,22 @@ export function evaluateAgentContextQueryFreshness(input: {
     'node-search',
     'e2e-slice',
   ] as const);
-  const expectedOwners = createAgentContextPinnedLiveOwners(input.selection);
-  const live = parseAgentContextLiveOwnerState(input.live);
+  const value = record(
+    detached,
+    path,
+    view === 'usage-search'
+      ? new Set(['view', 'scope', 'live'])
+      : new Set(['view', 'selection', 'live']),
+  );
+  const expectedOwners =
+    view === 'usage-search'
+      ? createAgentContextUsageSearchScopeLiveOwners(
+          required(value, 'scope', path),
+        )
+      : createAgentContextPinnedLiveOwners(
+          required(value, 'selection', path),
+        );
+  const live = parseAgentContextLiveOwnerState(required(value, 'live', path));
   const expectedByRole = new Map(
     expectedOwners.map((owner) => [owner.role, owner] as const),
   );

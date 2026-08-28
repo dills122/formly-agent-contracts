@@ -6,6 +6,7 @@ import {
   canonicalizeAgentContextQuery,
   canonicalizeAgentContextQueryResult,
   canonicalizeAgentContextQuerySelection,
+  createAgentContextUsageSearchScopeLiveOwners,
   createAgentContextPinnedLiveOwners,
   evaluateAgentContextQueryFreshness,
   parseAgentContextLiveOwnerState,
@@ -13,14 +14,22 @@ import {
   parseAgentContextQueryDataset,
   parseAgentContextQueryResult,
   parseAgentContextQuerySelection,
+  parseAgentContextUsageSearchScope,
   validateAgentContextQuerySelection,
   type AgentContextLiveOwnerReference,
   type AgentContextQueryDataset,
   type AgentContextQuerySelection,
+  type AgentContextUsageSearchScope,
 } from './agent-context-query.js';
+import {
+  createAgentContextArtifactSet,
+  type AgentContextArtifactReference,
+} from './agent-context-artifacts.js';
 import {
   AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_ID,
   AGENT_CONTEXT_EXECUTION_AUTHORITY_SCHEMA_VERSION,
+  createAgentContextExecutionAuthority,
+  type AgentContextExecutionAuthorityDraft,
 } from './agent-context-execution-authority.js';
 import {
   AGENT_CONTEXT_JOURNEY_SCHEMA_ID,
@@ -32,6 +41,7 @@ import { createSyntheticRh05AgentContextFixtureSet } from './agent-context-walkt
 import {
   FORM_CONTRACT_SCHEMA_ID,
   FORM_CONTRACT_SCHEMA_VERSION,
+  type ContractNode,
 } from './contract.js';
 
 const HASH_ZERO = `sha256:${'0'.repeat(64)}` as const;
@@ -190,6 +200,22 @@ function nodeQuery(selection: AgentContextQuerySelection) {
   } as const;
 }
 
+function usageSearchScope(
+  dataset: AgentContextQueryDataset,
+): AgentContextUsageSearchScope {
+  return {
+    schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+    artifactSet: {
+      schemaVersion: dataset.artifactSet.schemaVersion,
+      contentHash: dataset.artifactSet.contentHash,
+    },
+    workspaceIndex: dataset.artifactSet.workspaceIndex,
+    sourceUsageCatalogs: dataset.sourceUsageCatalogs.map(
+      ({ reference }) => reference,
+    ),
+  };
+}
+
 function deeplyNestedDataGraph(depth: number): Record<string, unknown> {
   const root: Record<string, unknown> = {};
   let cursor = root;
@@ -199,6 +225,85 @@ function deeplyNestedDataGraph(depth: number): Record<string, unknown> {
     cursor = next;
   }
   return root;
+}
+
+function flattenContractNodes(
+  nodes: readonly ContractNode[],
+): readonly ContractNode[] {
+  return nodes.flatMap((node) => [
+    node,
+    ...flattenContractNodes(node.children),
+    ...(node.arrayTemplate === undefined
+      ? []
+      : flattenContractNodes([node.arrayTemplate])),
+  ]);
+}
+
+function repinExecutionAuthority(
+  dataset: AgentContextQueryDataset,
+  selection: AgentContextQuerySelection,
+  mutate: (
+    draft: AgentContextExecutionAuthorityDraft,
+  ) => AgentContextExecutionAuthorityDraft,
+): {
+  readonly dataset: AgentContextQueryDataset;
+  readonly selection: AgentContextQuerySelection;
+} {
+  const selected = dataset.executionAuthorities.find(
+    ({ reference }) =>
+      reference.contentHash === selection.owners.executionAuthority.contentHash,
+  );
+  if (selected === undefined) throw new Error('missing selected authority');
+  const draft: AgentContextExecutionAuthorityDraft = {
+    schemaVersion: selected.artifact.schemaVersion,
+    basis: selected.artifact.basis,
+    scenario: selected.artifact.scenario,
+    physicalOperations: selected.artifact.physicalOperations,
+    readiness: selected.artifact.readiness,
+    interactions: selected.artifact.interactions,
+    commits: selected.artifact.commits,
+    validationSurfaces: selected.artifact.validationSurfaces,
+    valueAssertions: selected.artifact.valueAssertions,
+    stateAssertions: selected.artifact.stateAssertions,
+    usage: selected.artifact.usage,
+    repeaterCaptures: selected.artifact.repeaterCaptures,
+  };
+  const artifact = createAgentContextExecutionAuthority(mutate(draft));
+  const reference: AgentContextArtifactReference = {
+    ...selected.reference,
+    contentHash: artifact.contentHash,
+  };
+  const artifactSet = createAgentContextArtifactSet({
+    schemaVersion: dataset.artifactSet.schemaVersion,
+    repositoryRevision: dataset.artifactSet.repositoryRevision,
+    workspaceIndex: dataset.artifactSet.workspaceIndex,
+    artifacts: dataset.artifactSet.artifacts.map((candidate) =>
+      compareReference(candidate, selected.reference) === 0
+        ? reference
+        : candidate,
+    ),
+  });
+  return {
+    dataset: {
+      ...dataset,
+      artifactSet,
+      executionAuthorities: dataset.executionAuthorities
+        .map((owner) =>
+          compareReference(owner.reference, selected.reference) === 0
+            ? { reference, artifact }
+            : owner,
+        )
+        .sort((left, right) => compareReference(left.reference, right.reference)),
+    },
+    selection: {
+      ...selection,
+      artifactSet: {
+        schemaVersion: artifactSet.schemaVersion,
+        contentHash: artifactSet.contentHash,
+      },
+      owners: { ...selection.owners, executionAuthority: reference },
+    },
+  };
 }
 
 describe('agent-context query dataset and pinned selection', () => {
@@ -306,9 +411,88 @@ describe('agent-context query dataset and pinned selection', () => {
       ).toThrow(/selection|usage|journey|execution/u);
     }
   });
+
+  it('rejects owner-valid rehashes whose authority no longer exactly projects the journey and form', () => {
+    const original = fixtureBoundary();
+    const mutations: readonly ((
+      draft: AgentContextExecutionAuthorityDraft,
+    ) => AgentContextExecutionAuthorityDraft)[] = [
+      (draft) => ({
+        ...draft,
+        usage: {
+          ...draft.usage,
+          entry: { ...draft.usage.entry, id: `${draft.usage.entry.id}.drift` },
+        },
+      }),
+      (draft) => ({
+        ...draft,
+        usage: {
+          ...draft.usage,
+          steps: draft.usage.steps.map((step, index) =>
+            index === 0 ? { ...step, ordinal: step.ordinal + 1 } : step,
+          ),
+        },
+      }),
+      (draft) => ({
+        ...draft,
+        usage: {
+          ...draft.usage,
+          steps: draft.usage.steps.map((step, index) =>
+            index === 0
+              ? {
+                  ...step,
+                  nodeIds: [...step.nodeIds, 'synthetic.owner-valid.extra-node'],
+                }
+              : step,
+          ),
+        },
+      }),
+    ];
+
+    for (const mutate of mutations) {
+      const repinned = repinExecutionAuthority(
+        original.dataset,
+        original.selection,
+        mutate,
+      );
+      expect(() =>
+        validateAgentContextQuerySelection(
+          repinned.dataset,
+          repinned.selection,
+        ),
+      ).toThrow(/journey|entry|step|node|projection/u);
+    }
+  });
 });
 
 describe('agent-context query and result DTOs', () => {
+  it('pins usage search to an exact canonical multi-catalog scope', () => {
+    const { dataset } = fixtureBoundary();
+    const scope = usageSearchScope(dataset);
+    const query = {
+      schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+      operation: 'search-form-usages',
+      scope,
+      filters: { text: 'purchase order' },
+      page: { collection: 'candidates', limit: 25 },
+    } as const;
+
+    expect(parseAgentContextUsageSearchScope(scope)).toEqual(scope);
+    expect(parseAgentContextQuery(query)).toEqual(query);
+    expect(() =>
+      parseAgentContextUsageSearchScope({
+        ...scope,
+        sourceUsageCatalogs: [
+          ...scope.sourceUsageCatalogs,
+          scope.sourceUsageCatalogs[0],
+        ],
+      }),
+    ).toThrow(/sourceUsageCatalogs|duplicate|canonical/u);
+    expect(() =>
+      parseAgentContextUsageSearchScope({ ...scope, buildId: 'not-currentness' }),
+    ).toThrow(/buildId/u);
+  });
+
   it('strictly parses and canonically round-trips a bounded node query', () => {
     const { selection } = fixtureBoundary();
     const query = nodeQuery(selection);
@@ -321,10 +505,13 @@ describe('agent-context query and result DTOs', () => {
   });
 
   it('confines source paths and bounds presentation payloads', () => {
+    const { dataset } = fixtureBoundary();
+    const scope = usageSearchScope(dataset);
     expect(() =>
       parseAgentContextQuery({
         schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
         operation: 'search-form-usages',
+        scope,
         filters: { sourcePath: '../outside.ts' },
         page: { collection: 'candidates', limit: 25 },
       }),
@@ -333,6 +520,7 @@ describe('agent-context query and result DTOs', () => {
       parseAgentContextQuery({
         schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
         operation: 'search-form-usages',
+        scope,
         filters: { text: 'x'.repeat(4_097) },
         page: { collection: 'candidates', limit: 25 },
       }),
@@ -340,7 +528,7 @@ describe('agent-context query and result DTOs', () => {
   });
 
   it('accepts only operation-specific result statuses and reason variants', () => {
-    const { selection } = fixtureBoundary();
+    const { dataset, selection } = fixtureBoundary();
     const nodeIds = [
       'synthetic.rh05.operations.purchase-order::path:s_currency',
       'synthetic.rh05.operations.purchase-order::path:s_supplier',
@@ -351,7 +539,40 @@ describe('agent-context query and result DTOs', () => {
       status: 'ambiguous',
       selection,
       freshness: 'current',
-      candidates: nodeIds.map((nodeId) => ({ nodeId, modelPath: [] })),
+      authority: dataset.executionAuthorities.find(
+        ({ reference }) =>
+          reference.contentHash ===
+          selection.owners.executionAuthority.contentHash,
+      )!.artifact,
+      candidates: nodeIds.map((nodeId) => {
+        const node = flattenContractNodes(
+          dataset.formContracts.find(
+            ({ reference }) =>
+              reference.contentHash === selection.owners.formContract.contentHash,
+          )!.artifact.nodes,
+        ).find(({ id }) => id === nodeId)!;
+        return {
+          nodeId,
+          kind: node.kind,
+          modelPath: node.modelPath,
+          ...(node.formlyType === undefined ? {} : { formlyType: node.formlyType }),
+          ...(node.semanticType === undefined
+            ? {}
+            : { semanticType: node.semanticType }),
+          evidence: node.evidence,
+          ...(node.presentation === undefined
+            ? {}
+            : { presentation: node.presentation }),
+          ...(node.state === undefined ? {} : { state: node.state }),
+          childNodeIds: node.children.map(({ id }) => id),
+          ...(node.arrayTemplate === undefined
+            ? {}
+            : { arrayTemplateNodeId: node.arrayTemplate.id }),
+          capabilities: [],
+          included: [],
+          details: {},
+        };
+      }),
       page: { collection: 'nodes', truncated: false },
       reason: { kind: 'node-ambiguous', nodeIds },
     } as const;
@@ -378,7 +599,7 @@ describe('agent-context query and result DTOs', () => {
         ...result,
         operation: 'get-e2e-slice',
       }),
-    ).toThrow(/operation|status|reason|candidates/u);
+    ).toThrow(/operation|status|reason|candidates|authority/u);
   });
 });
 
@@ -425,6 +646,50 @@ describe('safe bounded parsing', () => {
 });
 
 describe('role-scoped live freshness', () => {
+  it('evaluates aggregate usage-search freshness against the exact source-owner set', () => {
+    const { dataset } = fixtureBoundary();
+    const scope = usageSearchScope(dataset);
+    const owners = createAgentContextUsageSearchScopeLiveOwners(scope);
+
+    expect(
+      evaluateAgentContextQueryFreshness({
+        view: 'usage-search',
+        scope,
+        live: {
+          schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+          owners,
+        },
+      }),
+    ).toBe('current');
+    const sourceSet = owners.find(
+      (owner) => owner.role === 'source-usage-catalog-set',
+    );
+    if (sourceSet?.role !== 'source-usage-catalog-set') {
+      throw new Error('missing source usage owner set');
+    }
+    expect(
+      evaluateAgentContextQueryFreshness({
+        view: 'usage-search',
+        scope,
+        live: {
+          schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+          owners: owners.map((owner) =>
+            owner.role === 'source-usage-catalog-set'
+              ? {
+                  ...sourceSet,
+                  references: sourceSet.references.map((reference, index) =>
+                    index === 0
+                      ? { ...reference, contentHash: HASH_ZERO }
+                      : reference,
+                  ),
+                }
+              : owner,
+          ),
+        },
+      }),
+    ).toBe('stale');
+  });
+
   it('returns current only when every role required by the view matches', () => {
     const { selection } = fixtureBoundary();
     const owners = createAgentContextPinnedLiveOwners(selection);
@@ -514,6 +779,7 @@ describe('role-scoped live freshness', () => {
 
   it('returns unknown for missing required live owners even when revision matches', () => {
     const { dataset, selection } = fixtureBoundary();
+    const scope = usageSearchScope(dataset);
     const live = parseAgentContextLiveOwnerState({
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       repositoryRevision: dataset.artifactSet.repositoryRevision,
@@ -523,9 +789,51 @@ describe('role-scoped live freshness', () => {
     expect(
       evaluateAgentContextQueryFreshness({
         view: 'usage-search',
-        selection,
+        scope,
         live,
       }),
     ).toBe('unknown');
+
+    expect(selection).toBeDefined();
+  });
+
+  it('does not invoke freshness-wrapper getters or proxy traps', () => {
+    const { selection } = fixtureBoundary();
+    const live = {
+      schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+      owners: createAgentContextPinnedLiveOwners(selection),
+    };
+    let getterCalls = 0;
+    const accessorInput: Record<string, unknown> = { selection, live };
+    Object.defineProperty(accessorInput, 'view', {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return 'e2e-slice';
+      },
+    });
+    expect(() =>
+      evaluateAgentContextQueryFreshness(
+        accessorInput as Parameters<
+          typeof evaluateAgentContextQueryFreshness
+        >[0],
+      ),
+    ).toThrow(/data property/u);
+    expect(getterCalls).toBe(0);
+
+    let proxyTrapCalls = 0;
+    const proxyInput = new Proxy(
+      { view: 'e2e-slice', selection, live } as const,
+      {
+        get() {
+          proxyTrapCalls += 1;
+          return undefined;
+        },
+      },
+    );
+    expect(() => evaluateAgentContextQueryFreshness(proxyInput)).toThrow(
+      /proxy/u,
+    );
+    expect(proxyTrapCalls).toBe(0);
   });
 });
