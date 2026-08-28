@@ -19,9 +19,10 @@ pagination with opaque HMAC-protected cursors.
 The pure boundary lives in `@formly-contract/schema`; CTX-1 does not introduce
 another package. Production APIs accept the general query dataset below. The
 synthetic RH-05 fixture wrapper is test input from CTX-0D, not a production
-dataset type. CTX-1A establishes unreleased source-module contracts only; the
-schema barrel export, package Changeset, and package-level consumability claim
-are deliberately deferred to CTX-1D.
+dataset type. CTX-1A establishes the unreleased DTO, validation, freshness, and
+cursor source modules. CTX-1B adds the unreleased pure executor source module.
+The schema barrel export, package Changeset, and package-level consumability
+claim are deliberately deferred to CTX-1D.
 
 ## Invariants
 
@@ -107,9 +108,9 @@ Selection validation resolves every owner exactly once and proves these joins:
 8. every journey step for the selected usage includes the selected form, and
    the authority step IDs, ordinals, and action memberships exactly project
    those steps;
-9. the union of authority step node memberships exactly equals the complete
-   selected Form Contract node set, including nested children and array
-   templates;
+9. the flattened scenario-artifact node IDs exactly equal both the complete
+   selected declared Form Contract node set and the union of authority step
+   node memberships, including nested children and array templates;
 10. authority action `(id, kind, outcomeIds)`, outcome `(id, kind)`, and full
     transition tuples exactly project only the selected-usage subgraph: its
     relevant steps are exactly the journey steps containing the selected usage
@@ -142,14 +143,16 @@ canonical.
 
 Every usage-search result repeats its exact scope and aggregate freshness.
 Each candidate names its exact source-usage catalog owner. A resolved declared
-candidate carries a non-empty, complete `selectionHandoffs` collection of
-fully pinned selections; each handoff must match the candidate usage/form,
-catalog owner, artifact set, and workspace index. Callsite candidates cannot
-claim an exact declared selection and their identity `projectId` must equal the
-candidate `projectId`. A candidate without a matching resolved form has no
-handoffs; a declared candidate with a form has at least one exact matching
-handoff. Dataset-aware result validation additionally proves the candidate
-identity, project, and optional form against the named source-usage owner.
+candidate carries a complete `selectionHandoffs` collection of fully pinned
+selections; each handoff must match the candidate usage/form, catalog owner,
+artifact set, and workspace index. An empty collection means that the exact
+usage and form are known but no complete pinned selection can be assembled;
+CTX-1 adds no separate selection-availability flag. Callsite candidates cannot
+carry handoffs and their identity `projectId` must equal the candidate
+`projectId`. A candidate without a matching resolved form also has no
+handoffs. Dataset-aware result validation additionally proves the candidate
+identity, project, optional form, and every handoff against the named
+source-usage owner.
 `matchReasons` and `selectionHandoffs` use
 `{ complete: true, items }`; they are bounded atomic secondary collections,
 not independently pageable.
@@ -168,6 +171,12 @@ if that aspect is included:
 - `effects`: complete `DeclaredCrossFieldEffect` records; and
 - `unknowns`: complete `ContractDiagnostic` records.
 
+All node basics and requested details come from the selected resolved scenario
+artifact. The declared Form Contract remains the selected identity/basis owner
+but is not a substitute projection source. The interaction-profile parser may
+use a fixed internal registry identity solely as a validation scaffold; that
+synthetic identity is never emitted as result data or diagnostic evidence.
+
 Complete and ambiguous node results carry an
 `AgentContextExecutionAuthorityProjection`, not the full authority artifact.
 The projection names the exact execution-authority owner and wraps every
@@ -184,14 +193,20 @@ contains exact usage-entry identity and `open-usage` capability, selected form
 identity and flattened node count, warning/error diagnostic evidence counts,
 the complete canonical executable-capability set, the exact scenario ID set,
 reported-or-not-reported effect-analysis state, and categorized raw unknown
-evidence counts. These are evidence facts, not CTX-2 blocker policy. `steps`
-is the summary view's only pageable primary list.
+evidence counts. Form identity and basis remain declared-owner facts; node,
+diagnostic, capability, scenario, effect-analysis, and unknown facts come from
+the resolved scenario artifact and selected authority. These are evidence
+facts, not CTX-2 blocker policy. `steps` is the summary view's only pageable
+primary list.
 
 The diagnostics view carries dedicated owner-addressed raw evidence variants:
 an existing `ContractDiagnostic` or an existing `ContractEffectAnalysis`.
 Complete diagnostic results cannot carry query overflow/failure reasons and
 do not add severity, phase, blocking, or remediation fields beyond the raw
-schema-owned record. The `diagnostics` page controls this evidence list.
+schema-owned record. Evidence is the canonical union of only the selected
+declared Form Contract and resolved scenario artifact owners; identical
+owner-addressed records are deduplicated, and evidence from any unrelated form
+owner is illegal. The `diagnostics` page controls this evidence list.
 
 The journey view is atomic `{ identity, authority }`: the selected source
 journey identity plus an exact-owner authority projection containing the
@@ -205,7 +220,8 @@ prerequisite carries an exact closure node plus one resolved cause: a concrete
 trigger effect, selected-authority readiness record, or included wrapper
 precondition. Focus and prerequisite nodes must be exact subsets of the
 closure; closure nodes must belong to the named authority step. No nested
-collection uses a cursor or truncation marker.
+collection uses a cursor or truncation marker. CTX-1C must source slice nodes,
+node details, and effect records from the selected resolved scenario artifact.
 
 `validateAgentContextQueryResult(dataset, result)` is the production result
 boundary. It revalidates the search scope or pinned selection, then proves
@@ -214,6 +230,61 @@ fields and requested details, journey authority, and slice authority/effects
 against the exact named owners. Structurally valid but owner-drifted entry or
 driver records, partial projections with omitted dependencies, and projections
 inflated with unrelated authority records fail this validation.
+
+The source module exposes internal parsed-dataset validation seams for scope,
+selection, and result validation. The executor parses and detaches the dataset
+once, then uses those seams while enumerating handoffs and validating its final
+result; it must not reparse the complete dataset once per plausible handoff.
+These seams remain source-module APIs until the deliberate CTX-1D publication
+review.
+
+### Pure execution API
+
+CTX-1B defines this browser- and application-runtime-free source entry point:
+
+```ts
+executeAgentContextQuery(
+  datasetInput: unknown,
+  queryInput: unknown,
+  liveInput: unknown,
+  paginationInput?: unknown,
+): AgentContextQueryResult
+```
+
+Its exported pagination runtime is exactly
+`{ now: number; ttlMs: number; signingMaterial: string }`. All four inputs are
+strictly parsed and detached before execution. The flat pagination object also
+rejects missing or unknown fields, symbols, accessors, proxies, exotic
+prototypes, unsafe time arithmetic, and out-of-bound signing material without
+invoking caller code. Pagination is required for usage search, context summary
+or diagnostics, and node search; it is prohibited for the atomic journey and
+E2E-slice operations. Time and signing material are always caller-supplied.
+
+`get-e2e-slice` remains deliberately unsupported in CTX-1B and throws an input
+or unsupported-operation error after safe parsing. It does not fabricate a
+query-refusal result before CTX-1C implements and validates the closure.
+
+Search filters are conjunctive. Identity, path/location, model path, scenario,
+semantic type, and capability values use exact equality; text and label use a
+case-sensitive UTF-16 substring. Capability arrays require every supplied
+capability, and model-path plus label must match the same resolved-scenario
+node. Handoff-dependent filters require at least one complete matching handoff;
+an unavailable downstream fact does not match. The bounded text corpus is
+limited to usage/project facts; invocation location, symbol, syntax-kind, and
+syntax-token facts; form/context IDs; journey/step identity and labels;
+scenario identity; resolved-node identity/type/model path/presentation; and
+capabilities. Content hashes and raw evidence are excluded.
+
+Candidates sort by source owner reference and canonical usage, handoffs by
+canonical selection JSON, reasons lexically, steps by ordinal then ID,
+diagnostics by canonical evidence JSON, and nodes by ID. Zero matches is
+`not-found`, one is `complete`, and more than one is `ambiguous`, based on the
+total unpaged match set. An ambiguity reason carries the bounded
+`totalMatches` and exactly the page-local candidate/node identities, so a
+limit-one first page remains ambiguous. Usage absence is authoritative only
+when every scoped catalog reports complete coverage and no potential
+source-level match was excluded solely because downstream handoff evidence was
+unavailable.
 
 ### Result variants and reasons
 
@@ -256,7 +327,7 @@ Required roles are view-specific:
 | View | Required live roles |
 | --- | --- |
 | `usage-search` | artifact set, workspace index, exact source-usage catalog set |
-| `context-summary` | artifact set, workspace index, selected source-usage catalog, journey, form, and execution authority |
+| `context-summary` | artifact set, workspace index, selected source-usage catalog, journey, form, scenario, and execution authority |
 | `context-diagnostics` | all roles |
 | `context-journey` | artifact set, workspace index, selected source-usage catalog, journey catalog, and execution authority |
 | `node-search` | artifact set, workspace index, source-usage catalog, form, scenario, execution authority |
@@ -296,7 +367,12 @@ HMAC with constant-time comparison and recomputes the entire binding. A cursor
 presented for another collection, query, context, sort, view/disclosure, or
 include scope is replay and fails closed. Malformed, non-canonical, tampered,
 expired, or version-unknown cursors also fail closed. Expiry occurs when
-`now >= expiresAt`.
+`now >= expiresAt`. Each successful non-final continuation issues its next
+cursor with a fresh lease ending at that call's explicit `now + ttlMs`; it does
+not mutate or extend the cursor that was consumed. Thus an old cursor still
+expires at its authenticated expiry while the newly issued cursor remains
+valid only through its own authenticated expiry. A supplied cursor is
+authenticated before an output-size refusal can be returned.
 
 ## Published bounds
 
@@ -307,6 +383,8 @@ expired, or version-unknown cursors also fail closed. Expiry occurs when
 | Dataset owner entries per owner family | 10,000 |
 | Query/result collection entries | 10,000 |
 | Atomic secondary collection entries | 10,000 |
+| One atomic record data graph | 10,000 nodes/properties |
+| One complete atomic result data graph | 100,000 nodes/properties |
 | Page limit | 1–200 |
 | Identifier | 256 UTF-16 code units |
 | Search/presentation text | 4,096 UTF-16 code units |
@@ -316,8 +394,15 @@ expired, or version-unknown cursors also fail closed. Expiry occurs when
 | Signing material | 16–4,096 UTF-8 bytes |
 | Cursor TTL | 1–86,400,000 milliseconds |
 
-Counts are checked before allocating normalized output. Numeric inputs must be
-finite safe integers; negative zero is normalized only where zero is legal.
+Data-graph counts include the root plus every enumerable data-property value;
+an array's non-enumerable `length` is excluded. Every individual collection
+is capped at 10,000 entries. An individual record is checked before its
+enclosing complete atomic result: a record above 10,000 yields
+`atomic-record-too-large`, while a complete atomic result above 100,000 yields
+`atomic-view-too-large` where that result variant permits it. Implementations
+must not substitute summed collection lengths for this graph count. Counts are
+enforced before an output is returned. Numeric inputs must be finite safe
+integers; negative zero is normalized only where zero is legal.
 
 ## Non-goals
 
@@ -344,7 +429,8 @@ CTX-1 does not:
    role-scoped freshness and HMAC cursor primitives.
 2. **CTX-1B — progressive projections:** implement usage candidates, context
    summary/diagnostics/journey, and node projections over the validated
-   dataset, including deterministic named-list pagination.
+   dataset, including deterministic named-list pagination; parse the dataset
+   once per execution and fail closed for the still-unimplemented E2E slice.
 3. **CTX-1C — atomic slice:** implement fixed-point same-step prerequisite
    closure, exact transition refusals, cycles, and atomic size caps.
 4. **CTX-1D — walkthrough/scale/publication gate:** prove both CTX-0D
@@ -369,11 +455,21 @@ cursor determinism, cross-query/context/search-scope/disclosure replay refusal,
 tamper/expiry refusal, explicit-time behavior, and bounded payload/signing
 material.
 
+CTX-1B additionally retains a matrix for two-catalog ordering, every search
+filter and conjunctive combinations, complete and empty handoffs, ambiguous
+limit-one continuation with total match counts, coverage-sensitive absence,
+summary step pages, selected-owner diagnostic union/deduplication, atomic
+journey, nested/array node discovery, every node include and capability
+filter, page-specific authority, current/stale/unknown freshness, deterministic
+continuation and refreshed expiry, replay/out-of-range refusal, unsafe runtime
+objects, exact graph overflow, scenario-only facts, declared-only projection
+rejection, scenario node-set drift, and the CTX-1C slice fail-closed boundary.
+
 Required commands:
 
 ```sh
-pnpm exec vitest run packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-result.test.ts packages/schema/src/agent-context-query-cursor.test.ts
+pnpm exec vitest run packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-result.test.ts packages/schema/src/agent-context-query-cursor.test.ts packages/schema/src/agent-context-query-core.test.ts
 pnpm --filter @formly-contract/schema typecheck
-pnpm exec eslint packages/schema/src/agent-context-query.ts packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-result.test.ts packages/schema/src/agent-context-query-cursor.ts packages/schema/src/agent-context-query-cursor.test.ts
+pnpm exec eslint packages/schema/src/agent-context-query.ts packages/schema/src/agent-context-query.test.ts packages/schema/src/agent-context-query-result.test.ts packages/schema/src/agent-context-query-cursor.ts packages/schema/src/agent-context-query-cursor.test.ts packages/schema/src/agent-context-query-core.ts packages/schema/src/agent-context-query-core.test.ts
 git diff --check
 ```

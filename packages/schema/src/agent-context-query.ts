@@ -1189,7 +1189,8 @@ export function canonicalizeAgentContextUsageSearchScope(input: unknown): string
   return canonicalStringify(parseAgentContextUsageSearchScope(input));
 }
 
-function validateAgentContextUsageSearchScopeAgainstParsedDataset(
+/** @internal CTX-1 source-module seam; package publication remains CTX-1D. */
+export function validateAgentContextUsageSearchScopeAgainstParsedDataset(
   dataset: AgentContextQueryDataset,
   scopeInput: unknown,
 ): AgentContextUsageSearchScope {
@@ -1249,7 +1250,8 @@ function collectFormContractNodeIds(
   return collectFormContractNodes(nodes).map(({ id }) => id);
 }
 
-function validateAgentContextQuerySelectionAgainstParsedDataset(
+/** @internal CTX-1 source-module seam; package publication remains CTX-1D. */
+export function validateAgentContextQuerySelectionAgainstParsedDataset(
   dataset: AgentContextQueryDataset,
   selectionInput: unknown,
 ): AgentContextQuerySelection {
@@ -2899,6 +2901,11 @@ function parseNodeCandidate(
       ...(interaction?.profile === undefined
         ? {}
         : {
+            // Form Contract validation requires a registry identity whenever
+            // it validates an interaction profile. This fixed identity is a
+            // parser-only scaffold: the returned node projection contains
+            // only the parsed profile and never exposes this identity as
+            // owner evidence.
             fieldTypeProfileRegistry: {
               schemaVersion: FIELD_TYPE_PROFILE_SCHEMA_VERSION,
               id: 'agent-context.query-node-projection-profiles',
@@ -3065,6 +3072,12 @@ function parseReason(input: unknown, path: string): AgentContextQueryReason {
     if (totalMatches < 2) {
       fail(`${path}.totalMatches`, 'must be at least two for ambiguity.');
     }
+    if (totalMatches > AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE) {
+      fail(
+        `${path}.totalMatches`,
+        `must be at most ${AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE}.`,
+      );
+    }
     const usages = parseCandidateList(
       required(value, 'usages', path),
       `${path}.usages`,
@@ -3091,6 +3104,12 @@ function parseReason(input: unknown, path: string): AgentContextQueryReason {
     );
     if (totalMatches < 2) {
       fail(`${path}.totalMatches`, 'must be at least two for ambiguity.');
+    }
+    if (totalMatches > AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE) {
+      fail(
+        `${path}.totalMatches`,
+        `must be at most ${AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE}.`,
+      );
     }
     const nodeIds = parseCanonicalStringSet(
       required(value, 'nodeIds', path),
@@ -4495,51 +4514,75 @@ function projectExecutionAuthority(
   selection: AgentContextQuerySelection,
   authority: AgentContextExecutionAuthority,
   nodeIds: readonly string[],
+  projectionScope: 'nodes' | 'complete-usage' = 'nodes',
 ): AgentContextExecutionAuthorityProjection {
+  const completeUsage = projectionScope === 'complete-usage';
   const requestedNodeIds = new Set(nodeIds);
-  const steps = authority.usage.steps.filter(
-    (step) =>
-      step.id === authority.usage.entry.landingStepId ||
-      step.nodeIds.some((nodeId) => requestedNodeIds.has(nodeId)),
-  );
+  const steps = completeUsage
+    ? authority.usage.steps
+    : authority.usage.steps.filter(
+        (step) =>
+          step.id === authority.usage.entry.landingStepId ||
+          step.nodeIds.some((nodeId) => requestedNodeIds.has(nodeId)),
+      );
   const stepIds = new Set(steps.map(({ id }) => id));
   const actionIds = new Set(steps.flatMap(({ actionIds: ids }) => ids));
-  const actions = authority.usage.actions.filter(({ id }) => actionIds.has(id));
+  const actions = completeUsage
+    ? authority.usage.actions
+    : authority.usage.actions.filter(({ id }) => actionIds.has(id));
   const outcomeIds = new Set(actions.flatMap(({ outcomeIds: ids }) => ids));
-  const outcomes = authority.usage.outcomes.filter(({ id }) => outcomeIds.has(id));
-  const transitions = authority.usage.transitions.filter(
-    ({ fromStepId, actionId, outcomeId, toStepId }) =>
-      stepIds.has(fromStepId) &&
-      actionIds.has(actionId) &&
-      outcomeIds.has(outcomeId) &&
-      stepIds.has(toStepId),
-  );
-  const interactions = authority.interactions.filter(({ nodeId }) =>
-    requestedNodeIds.has(nodeId),
-  );
+  const outcomes = completeUsage
+    ? authority.usage.outcomes
+    : authority.usage.outcomes.filter(({ id }) => outcomeIds.has(id));
+  const transitions = completeUsage
+    ? authority.usage.transitions
+    : authority.usage.transitions.filter(
+        ({ fromStepId, actionId, outcomeId, toStepId }) =>
+          stepIds.has(fromStepId) &&
+          actionIds.has(actionId) &&
+          outcomeIds.has(outcomeId) &&
+          stepIds.has(toStepId),
+      );
+  const interactions = completeUsage
+    ? authority.interactions
+    : authority.interactions.filter(({ nodeId }) =>
+        requestedNodeIds.has(nodeId),
+      );
   const interactionIds = new Set(interactions.map(({ id }) => id));
-  const repeaterCaptures = authority.repeaterCaptures.filter(
-    ({ repeaterNodeId }) => requestedNodeIds.has(repeaterNodeId),
-  );
+  const repeaterCaptures = completeUsage
+    ? authority.repeaterCaptures
+    : authority.repeaterCaptures.filter(({ repeaterNodeId }) =>
+        requestedNodeIds.has(repeaterNodeId),
+      );
   const repeaterCaptureIds = new Set(repeaterCaptures.map(({ id }) => id));
-  const readiness = authority.readiness.filter(({ owner }) =>
-    owner.kind === 'interaction'
-      ? interactionIds.has(owner.interactionId)
-      : repeaterCaptureIds.has(owner.repeaterCaptureId),
-  );
-  const commits = authority.commits.filter(
-    ({ nodeId, interactionId }) =>
-      requestedNodeIds.has(nodeId) && interactionIds.has(interactionId),
-  );
-  const validationSurfaces = authority.validationSurfaces.filter(({ nodeId }) =>
-    requestedNodeIds.has(nodeId),
-  );
-  const valueAssertions = authority.valueAssertions.filter(({ nodeId }) =>
-    requestedNodeIds.has(nodeId),
-  );
-  const stateAssertions = authority.stateAssertions.filter(({ nodeId }) =>
-    requestedNodeIds.has(nodeId),
-  );
+  const readiness = completeUsage
+    ? authority.readiness
+    : authority.readiness.filter(({ owner }) =>
+        owner.kind === 'interaction'
+          ? interactionIds.has(owner.interactionId)
+          : repeaterCaptureIds.has(owner.repeaterCaptureId),
+      );
+  const commits = completeUsage
+    ? authority.commits
+    : authority.commits.filter(
+        ({ nodeId, interactionId }) =>
+          requestedNodeIds.has(nodeId) && interactionIds.has(interactionId),
+      );
+  const validationSurfaces = completeUsage
+    ? authority.validationSurfaces
+    : authority.validationSurfaces.filter(({ nodeId }) =>
+        requestedNodeIds.has(nodeId),
+      );
+  const valueAssertions = completeUsage
+    ? authority.valueAssertions
+    : authority.valueAssertions.filter(({ nodeId }) =>
+        requestedNodeIds.has(nodeId),
+      );
+  const stateAssertions = completeUsage
+    ? authority.stateAssertions
+    : authority.stateAssertions.filter(({ nodeId }) =>
+        requestedNodeIds.has(nodeId),
+      );
   const physicalOperationIds = new Set([
     ...commits.flatMap((commit) =>
       commit.kind === 'node-local' && commit.execution === 'explicit-intent'
@@ -4561,9 +4604,11 @@ function projectExecutionAuthority(
     transitions: { complete: true, items: transitions },
     physicalOperations: {
       complete: true,
-      items: authority.physicalOperations.filter(({ id }) =>
-        physicalOperationIds.has(id),
-      ),
+      items: completeUsage
+        ? authority.physicalOperations
+        : authority.physicalOperations.filter(({ id }) =>
+            physicalOperationIds.has(id),
+          ),
     },
     readiness: { complete: true, items: readiness },
     interactions: { complete: true, items: interactions },
@@ -4829,11 +4874,11 @@ function validateNodeProjectionAgainstOwners(
   }
 }
 
-export function validateAgentContextQueryResult(
-  datasetInput: unknown,
+/** @internal CTX-1 source-module seam; package publication remains CTX-1D. */
+export function validateAgentContextQueryResultAgainstParsedDataset(
+  dataset: AgentContextQueryDataset,
   resultInput: unknown,
 ): AgentContextQueryResult {
-  const dataset = parseAgentContextQueryDataset(datasetInput);
   const result = parseAgentContextQueryResult(resultInput);
   const path = 'agentContextQueryResult';
   if (result.operation === 'search-form-usages') {
@@ -4927,6 +4972,7 @@ export function validateAgentContextQueryResult(
         selection,
         authority,
         authority.usage.steps.flatMap(({ nodeIds }) => nodeIds),
+        'complete-usage',
       ),
       `${path}.journey.authority`,
     );
@@ -4982,6 +5028,16 @@ export function validateAgentContextQueryResult(
     }
   }
   return result;
+}
+
+export function validateAgentContextQueryResult(
+  datasetInput: unknown,
+  resultInput: unknown,
+): AgentContextQueryResult {
+  return validateAgentContextQueryResultAgainstParsedDataset(
+    parseAgentContextQueryDataset(datasetInput),
+    resultInput,
+  );
 }
 
 export function canonicalizeAgentContextQueryResult(input: unknown): string {
@@ -5075,6 +5131,7 @@ const REQUIRED_FRESHNESS_ROLES: Readonly<
     'source-usage-catalog',
     'journey-catalog',
     'form-contract',
+    'scenario-artifact',
     'execution-authority',
   ],
   'context-diagnostics': PINNED_SELECTION_LIVE_OWNER_ROLES,

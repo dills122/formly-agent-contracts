@@ -851,7 +851,11 @@ describe('agent-context query and result DTOs', () => {
         };
       }),
       page: { collection: 'nodes', truncated: false },
-      reason: { kind: 'node-ambiguous', nodeIds },
+      reason: {
+        kind: 'node-ambiguous',
+        totalMatches: nodeIds.length,
+        nodeIds,
+      },
     } as const;
 
     expect(parseAgentContextQueryResult(result)).toEqual(result);
@@ -866,6 +870,7 @@ describe('agent-context query and result DTOs', () => {
         ...result,
         reason: {
           kind: 'node-ambiguous',
+          totalMatches: nodeIds.length,
           nodeIds,
           severity: 'error',
         },

@@ -6,6 +6,7 @@ import {
 } from './agent-context-artifacts.js';
 import {
   AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+  AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE,
   canonicalizeAgentContextQueryResult,
   parseAgentContextQueryResult,
   validateAgentContextQuerySelection,
@@ -715,6 +716,29 @@ describe('agent-context query result contract', () => {
         ],
       }),
     ).toThrow(/diagnostic|evidence|owner|projection/u);
+
+    const unrelatedOwner = value.dataset.formContracts.find(
+      ({ reference }) =>
+        compareReference(reference, value.selection.owners.formContract) !==
+          0 &&
+        compareReference(reference, value.selection.owners.scenarioArtifact) !==
+          0,
+    );
+    if (unrelatedOwner === undefined) {
+      throw new Error('fixture needs an unrelated form owner');
+    }
+    expect(() =>
+      parseAgentContextQueryResult({
+        ...diagnosticResult,
+        evidence: [
+          {
+            kind: 'contract-diagnostic',
+            owner: unrelatedOwner.reference,
+            diagnostic: unrelatedOwner.artifact.diagnostics[0],
+          },
+        ],
+      }),
+    ).toThrow(/evidence|owner|selected form/u);
   });
 
   it('requires the resolved scenario node set to equal the declared and authority node sets', () => {
@@ -1068,11 +1092,25 @@ describe('agent-context query result contract', () => {
       },
       {
         ...pagedUsageAmbiguity,
+        reason: {
+          ...pagedUsageAmbiguity.reason,
+          totalMatches: AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE + 1,
+        },
+      },
+      {
+        ...pagedUsageAmbiguity,
         reason: { ...pagedUsageAmbiguity.reason, usages: [] },
       },
       {
         ...pagedNodeAmbiguity,
         reason: { ...pagedNodeAmbiguity.reason, totalMatches: 1 },
+      },
+      {
+        ...pagedNodeAmbiguity,
+        reason: {
+          ...pagedNodeAmbiguity.reason,
+          totalMatches: AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE + 1,
+        },
       },
       {
         ...pagedNodeAmbiguity,
@@ -1461,5 +1499,21 @@ describe('agent-context query result contract', () => {
     ).toThrow(/authority|projection/u);
 
     expect(authority.contentHash).toBe(value.selection.owners.executionAuthority.contentHash);
+  });
+
+  it('rejects a declared-only node projection when the selected scenario differs', () => {
+    const { value, node, nodeBase } = baseResults();
+    const result = {
+      ...nodeBase,
+      status: 'complete',
+      authority: authorityProjection(value, [node.nodeId]),
+      candidates: [{ ...node, evidence: 'declared' }],
+      page: { collection: 'nodes', truncated: false },
+    } as const;
+
+    expect(() => parseAgentContextQueryResult(result)).not.toThrow();
+    expect(() =>
+      validateAgentContextQueryResult(value.dataset, result),
+    ).toThrow(/candidate|selected owner|scenario|projection/u);
   });
 });
