@@ -191,4 +191,12 @@ describe('npmTagForVersion', () => {
   it('uses next for prerelease versions', () => {
     expect(npmTagForVersion('1.2.3-rc.1')).toBe('next');
   });
+
+  it('uses latest for a stable version with a hyphenated build', () => {
+    expect(npmTagForVersion('1.2.3+build-5')).toBe('latest');
+  });
+
+  it('uses next for a prerelease version with build metadata', () => {
+    expect(npmTagForVersion('1.2.3-rc.1+build.5')).toBe('next');
+  });
 });

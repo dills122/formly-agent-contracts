@@ -25,8 +25,7 @@ import {
   OverlaySelectFieldComponent,
   TableSelectFieldComponent,
 } from './interaction-matrix-field-types.js';
-
-const postalCodePattern = /^[A-Z][0-9][A-Z] [0-9][A-Z][0-9]$/;
+import { postalCodePattern } from './postal-code.js';
 
 function postalCodeValidator(control: AbstractControl): ValidationErrors | null {
   if (control.value == null || control.value === '') {

@@ -9,6 +9,24 @@ export type TestFormDefinitionGroups = readonly (
   readonly TestFormDefinition[]
 )[];
 
+/**
+ * Angular multi-provider token for registering a group of test forms into
+ * the app-wide catalog. Each `*-forms.module.ts` provides its own
+ * `TestFormDefinition[]` under this token with `multi: true`:
+ *
+ * ```ts
+ * providers: [
+ *   { provide: TEST_FORM_DEFINITION_GROUPS, useValue: MY_TEST_FORMS, multi: true },
+ * ]
+ * ```
+ *
+ * Angular collects every provided array into one `TestFormDefinitionGroups`
+ * (an array of arrays), which `TestFormCatalog` flattens and sorts by id.
+ * Omitting `multi: true` silently replaces every other module's forms
+ * instead of adding to them. Every `TestFormDefinition.id` across all
+ * groups must be unique — `TestFormCatalog`'s constructor throws on the
+ * first duplicate it finds.
+ */
 export const TEST_FORM_DEFINITION_GROUPS =
   new InjectionToken<TestFormDefinitionGroups>(
     'formly-test-app.test-form-definition-groups',

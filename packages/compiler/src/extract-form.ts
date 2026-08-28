@@ -138,6 +138,9 @@ const DEFAULT_TEST_ID_ATTRIBUTES = [
 
 const LOCATOR_TARGET_PUNCTUATION = '._:[]*-%';
 
+/** Every locator this extractor emits targets the field's own control. */
+const DEFAULT_LOCATOR_TARGET = 'control';
+
 const BUILT_IN_FORM_TYPES = new Set([
   'checkbox',
   'formly-template',
@@ -1339,7 +1342,7 @@ function readLocators(
     const value = textAttributeValue(attributes[attribute]);
     if (value !== undefined) {
       exactTestIds.push({
-        target: 'control',
+        target: DEFAULT_LOCATOR_TARGET,
         strategy: 'testId',
         attribute,
         value,
@@ -1391,7 +1394,7 @@ function readLocators(
   const accessibleName = textAttributeValue(attributes['aria-label']);
   if (role !== undefined) {
     explicitSemantics.push({
-      target: 'control',
+      target: DEFAULT_LOCATOR_TARGET,
       strategy: 'role',
       value: role,
       ...(accessibleName === undefined ? {} : { accessibleName }),
@@ -1401,7 +1404,7 @@ function readLocators(
   }
   if (accessibleName !== undefined) {
     explicitSemantics.push({
-      target: 'control',
+      target: DEFAULT_LOCATOR_TARGET,
       strategy: 'label',
       value: accessibleName,
       evidence: context.evidence,
@@ -1412,7 +1415,7 @@ function readLocators(
   const placeholder = textAttributeValue(props.placeholder);
   if (placeholder !== undefined) {
     explicitSemantics.push({
-      target: 'control',
+      target: DEFAULT_LOCATOR_TARGET,
       strategy: 'placeholder',
       value: placeholder,
       evidence: context.evidence,
@@ -1431,7 +1434,7 @@ function readLocators(
       );
     } else {
       domIds.push({
-        target: 'control',
+        target: DEFAULT_LOCATOR_TARGET,
         strategy: 'domId',
         value: field.id,
         evidence: context.evidence,
@@ -1534,10 +1537,27 @@ function diagnoseUnsupportedFieldBehavior(
   }
 }
 
-function readWrappers(field: FormlyFieldConfig): string[] {
-  return (field.wrappers ?? []).filter(
-    (wrapper): wrapper is string => typeof wrapper === 'string',
-  );
+function readWrappers(
+  field: FormlyFieldConfig,
+  sourcePath: readonly ModelPathSegment[],
+  nodeId: string,
+  context: ExtractionContext,
+): string[] {
+  const names: string[] = [];
+  (field.wrappers ?? []).forEach((wrapper, index) => {
+    if (typeof wrapper === 'string') {
+      names.push(wrapper);
+      return;
+    }
+    addDiagnostic(
+      context,
+      'UNKNOWN_FIELD_SHAPE',
+      'Wrapper metadata must contain only directly declared string wrapper names.',
+      [...sourcePath, 'wrappers', index],
+      nodeId,
+    );
+  });
+  return names;
 }
 
 function readSemanticType(
@@ -1752,7 +1772,7 @@ function extractNode(
     ...(presentation === undefined ? {} : { presentation }),
     ...(display === undefined ? {} : { display }),
     ...(defaultValue === undefined ? {} : { defaultValue }),
-    wrappers: readWrappers(field),
+    wrappers: readWrappers(field, location.sourcePath, id, context),
     constraints,
     options,
     ...(optionSource === undefined ? {} : { optionSource }),

@@ -14,30 +14,21 @@ import { dirname, join, relative, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { fileURLToPath } from 'node:url';
 
+import { loadReleaseManifest } from './release-manifest.mjs';
+import {
+  PNPM_EXECUTABLE,
+  hasWorkspaceDependency,
+  readPackedManifest,
+} from './tarball.mjs';
+
 const execFile = promisify(execFileCallback);
-const PNPM_EXECUTABLE = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-const PACKAGE_DIRECTORIES = [
-  'packages/schema',
-  'packages/compiler',
-  'packages/workspace',
-];
+// packages/workspace stays private (see docs/releasing.md) and never shows
+// up in loadReleaseManifest()'s publishable list, but the packed-consumer
+// smoke test still needs to pack and install its CLI, so it's added back
+// explicitly here.
+const WORKSPACE_PACKAGE_DIRECTORY = 'packages/workspace';
 const WORKSPACE_PACKAGE_NAME = '@formly-contract/workspace';
 const CLI_RELATIVE_PATH = 'dist/cli-main.js';
-
-function hasWorkspaceDependency(manifest) {
-  return [
-    manifest.dependencies,
-    manifest.optionalDependencies,
-    manifest.peerDependencies,
-  ].some(
-    (dependencies) =>
-      dependencies !== undefined &&
-      Object.values(dependencies).some(
-        (version) =>
-          typeof version === 'string' && version.startsWith('workspace:'),
-      ),
-  );
-}
 
 export function verifyPackedWorkspaceManifest(manifest) {
   if (manifest.name !== WORKSPACE_PACKAGE_NAME) {
@@ -280,15 +271,6 @@ async function runLinkedSmoke(rootDirectory, temporaryDirectory) {
   }
 }
 
-async function readPackedManifest(tarballPath) {
-  const { stdout } = await execFile('tar', [
-    '-xOf',
-    tarballPath,
-    'package/package.json',
-  ]);
-  return JSON.parse(stdout);
-}
-
 async function packPackage(rootDirectory, packageDirectory, tarballDirectory) {
   const { stdout } = await runPnpm(
     [
@@ -369,8 +351,13 @@ async function seedPackedConsumer(consumerRoot, packages) {
 async function runPackedSmoke(rootDirectory, temporaryDirectory) {
   const tarballDirectory = join(temporaryDirectory, 'tarballs');
   await mkdir(tarballDirectory, { recursive: true });
+  const release = await loadReleaseManifest({ rootDirectory });
+  const packageDirectories = [
+    ...release.packages.map(({ directory }) => directory),
+    WORKSPACE_PACKAGE_DIRECTORY,
+  ];
   const packages = [];
-  for (const packageDirectory of PACKAGE_DIRECTORIES) {
+  for (const packageDirectory of packageDirectories) {
     packages.push(
       await packPackage(rootDirectory, packageDirectory, tarballDirectory),
     );

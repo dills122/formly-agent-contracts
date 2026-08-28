@@ -1,3 +1,4 @@
+import { compareText } from './canonical-json.js';
 import type {
   ContractCondition,
   ContractNode,
@@ -6,10 +7,6 @@ import type {
   CrossFieldEffectTargetProperty,
   DeclaredCrossFieldEffect,
 } from './cross-field-effect.js';
-
-function compareText(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
-}
 
 const BASE_CONTROL_TARGETS = [
   'enabled',

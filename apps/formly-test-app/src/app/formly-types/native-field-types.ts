@@ -30,6 +30,21 @@ function normalizeOptions(
   return of((options ?? []) as SelectOption[]);
 }
 
+/** Shared by SelectFieldComponent and RadioFieldComponent. */
+abstract class ChoiceFieldTypeBase extends FieldType<ChoiceFieldConfig> {
+  get options$(): Observable<SelectOption[]> {
+    return normalizeOptions(this.props.options);
+  }
+
+  optionLabel(option: SelectOption): unknown {
+    return option[this.props.labelProp ?? 'label'];
+  }
+
+  optionValue(option: SelectOption): unknown {
+    return option[this.props.valueProp ?? 'value'];
+  }
+}
+
 @Component({
   selector: 'test-formly-input',
   standalone: false,
@@ -101,19 +116,7 @@ export class CheckboxFieldComponent extends FieldType<FieldTypeConfig> {}
     </select>
   `,
 })
-export class SelectFieldComponent extends FieldType<ChoiceFieldConfig> {
-  get options$(): Observable<SelectOption[]> {
-    return normalizeOptions(this.props.options);
-  }
-
-  optionLabel(option: SelectOption): unknown {
-    return option[this.props.labelProp ?? 'label'];
-  }
-
-  optionValue(option: SelectOption): unknown {
-    return option[this.props.valueProp ?? 'value'];
-  }
-}
+export class SelectFieldComponent extends ChoiceFieldTypeBase {}
 
 @Component({
   selector: 'test-formly-radio',
@@ -135,16 +138,4 @@ export class SelectFieldComponent extends FieldType<ChoiceFieldConfig> {
     </div>
   `,
 })
-export class RadioFieldComponent extends FieldType<ChoiceFieldConfig> {
-  get options$(): Observable<SelectOption[]> {
-    return normalizeOptions(this.props.options);
-  }
-
-  optionLabel(option: SelectOption): unknown {
-    return option[this.props.labelProp ?? 'label'];
-  }
-
-  optionValue(option: SelectOption): unknown {
-    return option[this.props.valueProp ?? 'value'];
-  }
-}
+export class RadioFieldComponent extends ChoiceFieldTypeBase {}

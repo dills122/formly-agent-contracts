@@ -17,6 +17,8 @@ import {
   type DeclaredCrossFieldEffect,
 } from '@formly-contract/schema';
 
+import { deepFreezeRegistryValue } from './freeze.js';
+
 export interface CrossFieldEffectExtractionRegistry {
   readonly schemaVersion: CrossFieldEffectRegistry['schemaVersion'];
   readonly id: string;
@@ -51,16 +53,6 @@ function compareText(left: string, right: string): number {
 }
 
 const preparedRegistryBundles = new WeakSet<object>();
-
-function deepFreezeRegistryValue<T>(value: T): T {
-  if (typeof value !== 'object' || value === null || Object.isFrozen(value)) {
-    return value;
-  }
-  for (const child of Object.values(value)) {
-    deepFreezeRegistryValue(child);
-  }
-  return Object.freeze(value);
-}
 
 function effectPath(
   formId: string,
@@ -241,7 +233,11 @@ export function resolveCrossFieldEffects(
           `Effect target does not support property "${effect.target.property}".`,
           input.formId,
           effect,
-          target!.id,
+          // 'unsupported-target' implies validateContractEffectReferences
+          // resolved a target node, but that invariant lives in another
+          // package — fall back to the declared node id defensively rather
+          // than risk a non-null assertion throwing here.
+          target?.id ?? effect.target.nodeId,
         ),
       );
       isValid = false;

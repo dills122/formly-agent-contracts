@@ -15,6 +15,8 @@ import {
   type WorkspaceRunResult,
 } from './run-workspace.js';
 
+const DEFAULT_ROOT_CONFIG_PATH = 'formly-contracts.config.ts';
+
 const HELP = `Usage: formly-contracts <command> [options]
 
 Commands:
@@ -24,7 +26,7 @@ Commands:
 
 Options:
   --workspace-root <path>  Workspace root (default: current directory)
-  --config <path>          Root config path (default: formly-contracts.config.ts)
+  --config <path>          Root config path (default: ${DEFAULT_ROOT_CONFIG_PATH})
   --output <path>          Override output for generate or check
   --fail-on <severity>     Fail on warning or error; generate or check only
   -h, --help               Show this help
@@ -136,8 +138,7 @@ function parseWorkspaceCommand(
   return {
     name,
     workspaceRoot: parsed.values['workspace-root'] ?? cwd(),
-    rootConfigPath:
-      parsed.values.config ?? 'formly-contracts.config.ts',
+    rootConfigPath: parsed.values.config ?? DEFAULT_ROOT_CONFIG_PATH,
     ...(parsed.values.output === undefined
       ? {}
       : { outputDirectory: parsed.values.output }),

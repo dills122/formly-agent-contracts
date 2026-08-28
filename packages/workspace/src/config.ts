@@ -90,6 +90,23 @@ export interface ResolvedWorkspacePluginIdentity {
   readonly options?: JsonValue;
 }
 
+/**
+ * @internal Shared by config.ts and run-workspace.ts to project any
+ * `{id, version, configSchemaVersion, options?}`-shaped plugin (declared or
+ * already-resolved) down to its identity, omitting `options` when absent
+ * instead of serializing it as `undefined`. Not part of the package barrel.
+ */
+export function toPluginIdentity(
+  plugin: ResolvedWorkspacePluginIdentity,
+): ResolvedWorkspacePluginIdentity {
+  return {
+    id: plugin.id,
+    version: plugin.version,
+    configSchemaVersion: plugin.configSchemaVersion,
+    ...(plugin.options === undefined ? {} : { options: plugin.options }),
+  };
+}
+
 export interface ResolvedFieldTypeProfileRegistry {
   readonly schemaVersion: FieldTypeProfileRegistry['schemaVersion'];
   readonly id: string;
@@ -296,14 +313,13 @@ function validateDiagnostics(value: unknown, path: string): void {
 function validateEffects(value: unknown, path: string): void {
   const effects = requireRecord(value, path);
   rejectUnknownKeys(effects, EFFECT_KEYS, path);
-  const descriptor = Object.getOwnPropertyDescriptor(effects, 'cyclePolicy');
-  if (descriptor === undefined) {
+  if (!('cyclePolicy' in effects)) {
     invalid(`${path}.cyclePolicy`, 'is required.');
   }
-  if (!('value' in descriptor)) {
-    invalid(`${path}.cyclePolicy`, 'must be an own data property.');
-  }
-  requireSeverity(descriptor.value, `${path}.cyclePolicy`);
+  requireSeverity(
+    readOptionalOwnDataProperty(effects, 'cyclePolicy', `${path}.cyclePolicy`),
+    `${path}.cyclePolicy`,
+  );
 }
 
 function requireVersion(value: unknown, path: string): string {
@@ -548,12 +564,9 @@ export function resolveWorkspaceProjectConfig(
     testIdAttributes: [...testIdAttributes],
     failOn: [...failOn],
     effectCyclePolicy,
-    plugins: [...(root.plugins ?? [])].sort(compareIds).map((plugin) => ({
-      id: plugin.id,
-      version: plugin.version,
-      configSchemaVersion: plugin.configSchemaVersion,
-      ...(plugin.options === undefined ? {} : { options: plugin.options }),
-    })),
+    plugins: [...(root.plugins ?? [])]
+      .sort(compareIds)
+      .map((plugin) => toPluginIdentity(plugin)),
     sourceIds: (project.sources ?? [])
       .map((source) => source.sourceId)
       .sort(),

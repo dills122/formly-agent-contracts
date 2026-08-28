@@ -1,3 +1,12 @@
+// Builds `npm pack` tarballs for every publishable package (per
+// release-manifest.mjs) and verifies each one before it's allowed to ship:
+// correct manifest fields, no leftover `workspace:` dependency ranges, the
+// required files present, and (for packages/compiler) the Formly 6.x peer
+// range retained. Invoked as `pnpm pack:check` (verify only) and
+// `pnpm release:pack --destination <dir>` (also copy tarballs out) from
+// `.github/workflows/release.yml`. Assumes `packages/*/dist` has already
+// been built (e.g. via `pnpm build:demo`) — it does not build anything
+// itself.
 import { execFile as execFileCallback } from 'node:child_process';
 import {
   mkdir,
@@ -15,6 +24,11 @@ import {
   NPM_REGISTRY_URL,
   RELEASE_REPOSITORY_URL,
 } from './release-manifest.mjs';
+import {
+  PNPM_EXECUTABLE,
+  hasWorkspaceDependency,
+  readPackedManifest,
+} from './tarball.mjs';
 
 const execFile = promisify(execFileCallback);
 const REQUIRED_FILES = [
@@ -24,26 +38,6 @@ const REQUIRED_FILES = [
   'dist/index.js',
   'package.json',
 ];
-
-function hasWorkspaceDependency(manifest) {
-  for (const field of [
-    'dependencies',
-    'optionalDependencies',
-    'peerDependencies',
-  ]) {
-    const dependencies = manifest[field];
-    if (
-      dependencies !== undefined &&
-      Object.values(dependencies).some(
-        (version) =>
-          typeof version === 'string' && version.startsWith('workspace:'),
-      )
-    ) {
-      return true;
-    }
-  }
-  return false;
-}
 
 export function verifyPackedPackage({
   packedFiles,
@@ -106,15 +100,6 @@ export function verifyPackedPackage({
       );
     }
   }
-}
-
-async function readPackedManifest(tarballPath) {
-  const { stdout } = await execFile('tar', [
-    '-xOf',
-    tarballPath,
-    'package/package.json',
-  ]);
-  return JSON.parse(stdout);
 }
 
 // Packages with a known required export get a specific regression check.
@@ -188,11 +173,10 @@ export async function packReleasePackages({
   try {
     const release = await loadReleaseManifest({ rootDirectory: resolvedRoot });
     const packedPackages = [];
-    const pnpmExecutable = process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
 
     for (const releasePackage of release.packages) {
       const { stdout } = await execFile(
-        pnpmExecutable,
+        PNPM_EXECUTABLE,
         [
           '--dir',
           join(resolvedRoot, releasePackage.directory),

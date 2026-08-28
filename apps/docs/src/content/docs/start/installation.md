@@ -17,8 +17,12 @@ The compatibility suite is pinned to Angular `20.3.29` and Formly `6.1.8`.
 
 ## Link the packages before the first release
 
-The packages are not published to npm yet. Clone this repository beside the
-consumer and build the three public tooling packages:
+`@formly-contract/schema` and `@formly-contract/compiler` are not published
+to npm yet. `@formly-contract/workspace` is experimental and stays private
+(see [`docs/releasing.md`](https://github.com/dills122/formly-contract/blob/main/docs/releasing.md)
+for the current release scope) — it isn't on the same npm-publish track as
+the other two, but it links the same way for local development. Clone this
+repository beside the consumer and build all three packages:
 
 ```sh
 git clone https://github.com/dills122/formly-contract.git

@@ -505,8 +505,8 @@ Open <http://127.0.0.1:4200/> and choose a fixture from the catalog.
 
 Workplace forms and data should remain in a private work repository. A private
 fixture module can implement `TestFormDefinition` and register a group through
-`TEST_FORM_GROUPS` without copying workplace labels, identifiers, options, or
-rules into this public project.
+`TEST_FORM_DEFINITION_GROUPS` without copying workplace labels, identifiers,
+options, or rules into this public project.
 
 ## Repository layout
 
@@ -516,12 +516,14 @@ packages/
   compiler/          Declared extraction and trusted Formly scenario builds
   workspace/         Config loading, discovery, artifact runner, index, and CLI
 fixtures/
-  synthetic-form/    Public golden form and real-builder compatibility fixture
-  angular-monorepo/  Deep six-form Angular CLI discovery/interaction corpus
-  nx-workspace/      Real four-project Nx graph, build, and cache anchor
+  synthetic-form/            Public golden form and real-builder compatibility fixture
+  angular-monorepo/          Deep six-form Angular CLI discovery/interaction corpus
+  nx-workspace/              Real four-project Nx graph, build, and cache anchor
+  workspace-config-loader/   ESM/CJS/TS config-loading fixtures for workspace tests
 apps/
   demo-cli/          Prints the deterministic golden contract
   formly-test-app/   Browser-rendered Angular/Formly fixture catalog
+  docs/              Astro Starlight documentation site
 docs/                Specifications, ADRs, delivery plans, and evidence
 ```
 

@@ -6,10 +6,12 @@ import type {
   FieldTypeProfileUnknownAspect,
   FieldTypeWrapperPrecondition,
 } from './field-type-interaction.js';
+import { CROSS_FIELD_EFFECT_SCHEMA_VERSION } from './cross-field-effect.js';
 import type {
   DeclaredCrossFieldEffect,
   FieldTypeEffectCapabilities,
 } from './cross-field-effect.js';
+import { FIELD_TYPE_PROFILE_SCHEMA_VERSION } from './field-type-profile.js';
 
 export const FORM_CONTRACT_SCHEMA_ID = 'formly-contract.form-contract' as const;
 export const FORM_CONTRACT_SCHEMA_VERSION = '0.4.0' as const;
@@ -137,14 +139,14 @@ export interface ContractNodeState {
 }
 
 export interface ContractFieldTypeProfileRegistryIdentity {
-  readonly schemaVersion: '0.4.0';
+  readonly schemaVersion: typeof FIELD_TYPE_PROFILE_SCHEMA_VERSION;
   readonly id: string;
   readonly version: number;
   readonly contentHash: string;
 }
 
 export interface ContractCrossFieldEffectRegistryIdentity {
-  readonly schemaVersion: '0.4.0';
+  readonly schemaVersion: typeof CROSS_FIELD_EFFECT_SCHEMA_VERSION;
   readonly id: string;
   readonly version: number;
   readonly contentHash: string;

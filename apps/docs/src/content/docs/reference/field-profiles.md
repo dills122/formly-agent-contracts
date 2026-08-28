@@ -24,6 +24,27 @@ A profile declares:
 Registrations map a Formly `type` and optional variant to a profile. Wrapper
 profiles may add parts, preconditions, and unknowns.
 
+### Selecting a variant
+
+A registration's `variants` list maps named variants to their own profile
+reference. A field selects a non-default variant through the data-only root
+field metadata `formlyContract: { profileVariant: 'variant-name' }`:
+
+```ts
+{
+  key: 'contactMethod',
+  type: 'custom-select',
+  formlyContract: { profileVariant: 'compact' },
+  props: { /* ... */ },
+}
+```
+
+Fields cannot embed arbitrary interaction overrides through `formlyContract`
+— `profileVariant` is the only field it currently supports. Omitting it (or
+naming a variant the registration doesn't declare, which produces an
+`UNMAPPED_PROFILE_VARIANT` diagnostic) resolves to the registration's
+`defaultProfile`.
+
 ## Generic versus application drivers
 
 Generic IDs currently describe validated data contracts:

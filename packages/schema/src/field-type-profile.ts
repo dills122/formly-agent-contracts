@@ -1,14 +1,17 @@
 import { createHash } from 'node:crypto';
 
 import {
+  assertCanonicalJsonShape,
   canonicalStringify,
-  parseArrayIndexProperty,
+  compareText,
+  isNamespacedId,
 } from './canonical-json.js';
 import type {
   ContractEvidence,
   ContractValueDomain,
   JsonValue,
 } from './contract.js';
+import { TARGET_PROPERTIES } from './cross-field-effect.js';
 import type {
   CrossFieldEffectTargetProperty,
   FieldTypeEffectCapabilities,
@@ -267,112 +270,6 @@ const UNKNOWN_ASPECTS = [
   'interaction-sequence',
 ] as const satisfies readonly FieldTypeProfileUnknownAspect[];
 
-const EFFECT_TARGET_PROPERTIES = [
-  'enabled',
-  'options',
-  'required',
-  'value',
-  'visibility',
-] as const satisfies readonly CrossFieldEffectTargetProperty[];
-
-function assertCanonicalJsonShape(
-  value: unknown,
-  path: string,
-  ancestors = new Set<object>(),
-): void {
-  if (
-    value === null ||
-    typeof value === 'string' ||
-    typeof value === 'boolean'
-  ) {
-    return;
-  }
-  if (typeof value === 'number') {
-    if (!Number.isFinite(value)) {
-      throw new TypeError(`${path} must be a finite JSON number`);
-    }
-    return;
-  }
-  if (typeof value !== 'object') {
-    throw new TypeError(`${path} must be a JSON value`);
-  }
-  if (ancestors.has(value)) {
-    throw new TypeError(`${path} must not contain a cycle`);
-  }
-
-  const prototype = Object.getPrototypeOf(value) as unknown;
-  if (
-    !Array.isArray(value) &&
-    prototype !== Object.prototype &&
-    prototype !== null
-  ) {
-    throw new TypeError(`${path} must be a plain or null-prototype object`);
-  }
-  if (Object.getOwnPropertySymbols(value).length > 0) {
-    throw new TypeError(`${path} must not contain symbol-keyed properties`);
-  }
-
-  ancestors.add(value);
-  try {
-    const descriptors = Object.getOwnPropertyDescriptors(value);
-    if (Array.isArray(value)) {
-      const indexedDescriptors: [number, PropertyDescriptor][] = [];
-      for (const [key, descriptor] of Object.entries(descriptors)) {
-        if (key === 'length') {
-          continue;
-        }
-        const index = parseArrayIndexProperty(key, value.length);
-        if (index === undefined) {
-          throw new TypeError(
-            `${path}.${key} must not be an additional array property`,
-          );
-        }
-        const itemPath = `${path}[${index}]`;
-        if (!('value' in descriptor)) {
-          throw new TypeError(`${itemPath} must not be an accessor property`);
-        }
-        indexedDescriptors.push([index, descriptor]);
-      }
-
-      indexedDescriptors.sort(([left], [right]) => left - right);
-      if (indexedDescriptors.length !== value.length) {
-        let missingIndex = 0;
-        for (const [index] of indexedDescriptors) {
-          if (index !== missingIndex) {
-            break;
-          }
-          missingIndex += 1;
-        }
-        throw new TypeError(
-          `${path}[${missingIndex}] must not be a sparse array element`,
-        );
-      }
-      for (const [index, descriptor] of indexedDescriptors) {
-        const itemPath = `${path}[${index}]`;
-        assertCanonicalJsonShape(descriptor.value, itemPath, ancestors);
-      }
-      return;
-    }
-
-    for (const [key, descriptor] of Object.entries(descriptors)) {
-      const propertyPath = `${path}.${key}`;
-      if (!descriptor.enumerable) {
-        throw new TypeError(
-          `${propertyPath} must be an enumerable JSON property`,
-        );
-      }
-      if (!('value' in descriptor)) {
-        throw new TypeError(
-          `${propertyPath} must not be an accessor property`,
-        );
-      }
-      assertCanonicalJsonShape(descriptor.value, propertyPath, ancestors);
-    }
-  } finally {
-    ancestors.delete(value);
-  }
-}
-
 function requireRecord(
   value: unknown,
   path: string,
@@ -419,7 +316,7 @@ function requireToken(value: unknown, path: string): string {
 
 function requireNamespacedId(value: unknown, path: string): string {
   const id = requireString(value, path);
-  if (!/^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$/u.test(id)) {
+  if (!isNamespacedId(id)) {
     throw new TypeError(`${path} must be a stable namespaced identifier`);
   }
   return id;
@@ -927,7 +824,7 @@ function validateEffectCapabilities(
   targetProperties.forEach((property, index) => {
     const itemPath = `${path}.targetProperties[${index}]`;
     if (
-      !EFFECT_TARGET_PROPERTIES.includes(
+      !TARGET_PROPERTIES.includes(
         property as CrossFieldEffectTargetProperty,
       )
     ) {
@@ -955,7 +852,7 @@ function validateEffectCapabilities(
     }
     readinessIds.add(id);
     if (
-      !EFFECT_TARGET_PROPERTIES.includes(
+      !TARGET_PROPERTIES.includes(
         capability.targetProperty as CrossFieldEffectTargetProperty,
       )
     ) {
@@ -1178,10 +1075,6 @@ export function parseFieldTypeProfileRegistry(
   });
 
   return input as FieldTypeProfileRegistry;
-}
-
-function compareText(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function compareIdentity(

@@ -183,6 +183,12 @@ The compiler must not serialize live field objects. Built fields contain circula
 
 #### Controlled project execution hosts
 
+> This subsection describes the long-term, per-project child-process host
+> (see "Current implementation boundary" above). Today, `runWorkspace`
+> extracts in-process — its recorded runtime provenance worker id is
+> `@formly-contract/workspace/in-process` — not via the child-process
+> protocol below.
+
 Trusted project configuration and future Formly/Angular execution must not run
 in the root orchestrator, Nx daemon, or MCP request process. The workspace
 package owns the framework-neutral orchestration boundary and a versioned,
@@ -212,14 +218,17 @@ the pre-factory global duplicate gate or contend for the same generation lock
 and index. Finer-grained Nx sharding requires a separate protocol design that
 retains those invariants.
 
-`@formly-contract/workspace` is the publishable framework-neutral host and
-orchestrator. A future `@formly-contract/angular` peer will own Angular-specific
-JIT and AOT integration; schema owns portable compatibility and provenance
-DTOs. Angular packages must resolve from the explicit project runtime base
-without treating TypeScript aliases as runtime package authority. Any
-core/compiler anchor preflight is a bounded compatibility check, not proof of
-whole-graph singleton enforcement; private or bundled Angular copies remain
-unsupported until a retained compatibility gate proves otherwise.
+`@formly-contract/workspace` is the framework-neutral host and orchestrator;
+it stays `private: true` and experimental for now (see
+[Releasing](releasing.md)), unlike `@formly-contract/schema` and
+`@formly-contract/compiler`, which are on the npm-publish path. A future
+`@formly-contract/angular` peer will own Angular-specific JIT and AOT
+integration; schema owns portable compatibility and provenance DTOs. Angular
+packages must resolve from the explicit project runtime base without
+treating TypeScript aliases as runtime package authority. Any core/compiler
+anchor preflight is a bounded compatibility check, not proof of whole-graph
+singleton enforcement; private or bundled Angular copies remain unsupported
+until a retained compatibility gate proves otherwise.
 
 A project child contains compiler-facade/module-cache state, crashes, timeouts,
 and failed-import contamination, but it is not a hostile-code or network

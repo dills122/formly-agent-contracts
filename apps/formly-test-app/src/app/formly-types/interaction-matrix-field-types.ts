@@ -28,6 +28,15 @@ function isMatrixOption(value: unknown): value is MatrixOption {
   );
 }
 
+/** Shared by ButtonToggleFieldComponent, OverlaySelectFieldComponent, and
+ * AutocompleteFieldComponent: reads `props.options` as a `MatrixOption[]`,
+ * or `[]` if it isn't shaped that way. */
+function readMatrixOptions(options: unknown): readonly MatrixOption[] {
+  return Array.isArray(options) && options.every(isMatrixOption)
+    ? options
+    : [];
+}
+
 function isMatrixRow(value: unknown): value is MatrixRow {
   return (
     isRecord(value) &&
@@ -58,8 +67,7 @@ function isMatrixRow(value: unknown): value is MatrixRow {
 })
 export class ButtonToggleFieldComponent extends FieldType<FieldTypeConfig> {
   get choiceOptions(): readonly MatrixOption[] {
-    const options: unknown = this.props.options;
-    return Array.isArray(options) && options.every(isMatrixOption) ? options : [];
+    return readMatrixOptions(this.props.options);
   }
 
   select(value: unknown): void {
@@ -106,8 +114,7 @@ export class OverlaySelectFieldComponent extends FieldType<FieldTypeConfig> {
   open = false;
 
   get choiceOptions(): readonly MatrixOption[] {
-    const options: unknown = this.props.options;
-    return Array.isArray(options) && options.every(isMatrixOption) ? options : [];
+    return readMatrixOptions(this.props.options);
   }
 
   get selectedLabel(): string | undefined {
@@ -167,8 +174,7 @@ export class AutocompleteFieldComponent extends FieldType<FieldTypeConfig> {
   query = '';
 
   get choiceOptions(): readonly MatrixOption[] {
-    const options: unknown = this.props.options;
-    return Array.isArray(options) && options.every(isMatrixOption) ? options : [];
+    return readMatrixOptions(this.props.options);
   }
 
   get filteredOptions(): readonly MatrixOption[] {
@@ -285,5 +291,28 @@ export class ExpandableRepeaterFieldComponent extends FieldArrayType {
     const newIndex = this.field.fieldGroup?.length ?? 0;
     this.add();
     this.expandedItems.add(newIndex);
+  }
+
+  override remove(
+    index: number,
+    options?: { markAsDirty: boolean },
+  ): void {
+    // Keep expandedItems' indices aligned with the array after a removal:
+    // drop the removed index and shift every later index down by one, or
+    // super.remove() would leave later items' expand/collapse state
+    // pointing at the wrong row.
+    const shifted = new Set<number>();
+    for (const expandedIndex of this.expandedItems) {
+      if (expandedIndex < index) {
+        shifted.add(expandedIndex);
+      } else if (expandedIndex > index) {
+        shifted.add(expandedIndex - 1);
+      }
+    }
+    this.expandedItems.clear();
+    for (const expandedIndex of shifted) {
+      this.expandedItems.add(expandedIndex);
+    }
+    super.remove(index, options);
   }
 }

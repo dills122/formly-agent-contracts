@@ -166,16 +166,25 @@ function readProps(field: ContractFormlyFieldConfig): OwnPropertyResult {
   return ownProperty(field, 'templateOptions');
 }
 
+const PROFILE_COLLECTION_PATH_PREFIX = 'props.';
+
 function readProfileCollection(
   field: ContractFormlyFieldConfig,
   collectionPath: string,
 ): OwnPropertyResult {
-  const segments = collectionPath.split('.');
+  if (!collectionPath.startsWith(PROFILE_COLLECTION_PATH_PREFIX)) {
+    throw new TypeError(
+      `Field type profile collectionPath "${collectionPath}" must start with "${PROFILE_COLLECTION_PATH_PREFIX}".`,
+    );
+  }
+  const segments = collectionPath
+    .slice(PROFILE_COLLECTION_PATH_PREFIX.length)
+    .split('.');
   const props = readProps(field);
   if (props.kind !== 'value') {
     return props;
   }
-  return readPath(props.value, segments.slice(1));
+  return readPath(props.value, segments);
 }
 
 function readArrayItem(value: readonly unknown[], index: number): OwnPropertyResult {
