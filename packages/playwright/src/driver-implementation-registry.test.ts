@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  AGENT_CONTEXT_DRIVER_CAPABILITIES,
   AGENT_CONTEXT_DRIVER_REGISTRY_SCHEMA_VERSION,
   createAgentContextDriverRegistryManifest,
   type AgentContextDriverCapability,
@@ -35,6 +36,41 @@ function applicationSource(
   drivers: AgentContextApplicationDriverImplementationSource['drivers'],
 ): AgentContextApplicationDriverImplementationSource {
   return { sourceId, kind: 'application', drivers };
+}
+
+function generatedDriver(
+  id: string,
+  version = 1,
+): AgentContextGenericDriverImplementationSource['drivers'][number] {
+  return {
+    id,
+    version,
+    capabilities: ['fill'],
+    implementation: fillV1,
+  };
+}
+
+function renameFunction(input: object, name: string): void {
+  Object.defineProperty(input, 'name', {
+    configurable: true,
+    value: name,
+  });
+}
+
+function throwingProxy<T extends object>(
+  target: T,
+  onTrap: () => void,
+): T {
+  return new Proxy(target, {
+    get() {
+      onTrap();
+      throw new Error('nested proxy get trap must not run');
+    },
+    ownKeys() {
+      onTrap();
+      throw new Error('nested proxy ownKeys trap must not run');
+    },
+  });
 }
 
 function registration(
@@ -329,7 +365,7 @@ describe('trusted-local driver implementation inventory', () => {
           },
         ]),
       ]),
-    ).toThrow(/bound function/u);
+    ).toThrow(/native-code callable/u);
 
     let trapCount = 0;
     const proxiedImplementation = new Proxy(fillV1, {
@@ -351,6 +387,65 @@ describe('trusted-local driver implementation inventory', () => {
       ]),
     ).toThrow(/implementation.*proxy/u);
     expect(trapCount).toBe(0);
+  });
+
+  it('rejects every native-code callable form independently of its mutable name without invoking it', () => {
+    let invocationCount = 0;
+    function authoredDriver(): void {
+      invocationCount += 1;
+    }
+    const arrowDriver: AgentContextDriverImplementation = () => {
+      invocationCount += 1;
+    };
+    class DriverClass {
+      constructor() {
+        invocationCount += 1;
+      }
+    }
+    const renamedBoundClass = DriverClass.bind(null);
+    const renamedBoundAuthored = authoredDriver.bind(null);
+    renameFunction(renamedBoundClass, 'renamed-class-driver');
+    renameFunction(renamedBoundAuthored, 'renamed-authored-driver');
+
+    for (const implementation of [
+      renamedBoundClass,
+      renamedBoundAuthored,
+      Math.max,
+    ]) {
+      expect(() =>
+        createAgentContextDriverImplementationRegistry([
+          genericSource('forms.native', [
+            {
+              id: 'shared.native',
+              version: 1,
+              capabilities: ['fill'],
+              implementation:
+                implementation as unknown as AgentContextDriverImplementation,
+            },
+          ]),
+        ]),
+      ).toThrow(/native-code callable/u);
+    }
+
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        genericSource('forms.authored', [
+          {
+            id: 'shared.normal',
+            version: 1,
+            capabilities: ['fill'],
+            implementation: authoredDriver,
+          },
+          {
+            id: 'shared.arrow',
+            version: 1,
+            capabilities: ['fill'],
+            implementation: arrowDriver,
+          },
+        ]),
+      ]),
+    ).not.toThrow();
+    expect(invocationCount).toBe(0);
   });
 
   it('rejects proxy, accessor, sparse, and exotic source containers without invoking user accessors or traps', () => {
@@ -412,6 +507,162 @@ describe('trusted-local driver implementation inventory', () => {
         exoticSource as unknown as AgentContextDriverImplementationSource,
       ]),
     ).toThrow(/plain object/u);
+  });
+
+  it('accepts exact collection limits and rejects one-over limits before composition', () => {
+    const exactSources = Array.from({ length: 10_000 }, (_entry, index) =>
+      genericSource(`source.${index}`, []),
+    );
+    expect(
+      createAgentContextDriverImplementationRegistry(exactSources).manifest
+        .registrations,
+    ).toEqual([]);
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        ...exactSources,
+        genericSource('source.10000', []),
+      ]),
+    ).toThrow(/sources.*at most 10000 entries/u);
+
+    const exactDrivers = Array.from({ length: 10_000 }, (_entry, index) =>
+      generatedDriver(`driver.${index}`),
+    );
+    expect(
+      createAgentContextDriverImplementationRegistry([
+        genericSource('forms.exact-drivers', exactDrivers),
+      ]).manifest.registrations,
+    ).toHaveLength(10_000);
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        genericSource('forms.exact-drivers', exactDrivers),
+        genericSource('forms.one-extra-driver', [
+          generatedDriver('driver.10000'),
+        ]),
+      ]),
+    ).toThrow(/sources.*at most 10000 drivers/u);
+  }, 20_000);
+
+  it('enforces exact identifier, capability, and positive-safe version boundaries', () => {
+    const sourceId256 = `s${'x'.repeat(255)}`;
+    const sourceId257 = `s${'x'.repeat(256)}`;
+    const driverId256 = `d${'x'.repeat(255)}`;
+    const driverId257 = `d${'x'.repeat(256)}`;
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        genericSource(sourceId256, [
+          generatedDriver('driver.minimum-version', 1),
+          generatedDriver('driver.maximum-version', Number.MAX_SAFE_INTEGER),
+          {
+            ...generatedDriver(driverId256),
+            capabilities: AGENT_CONTEXT_DRIVER_CAPABILITIES,
+          },
+        ]),
+      ]),
+    ).not.toThrow();
+
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        genericSource(sourceId257, []),
+      ]),
+    ).toThrow(/sourceId.*1-256/u);
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        genericSource('forms.over-id', [generatedDriver(driverId257)]),
+      ]),
+    ).toThrow(/\.id.*1-256/u);
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        genericSource('forms.over-capabilities', [
+          {
+            ...generatedDriver('driver.over-capabilities'),
+            capabilities: [
+              ...AGENT_CONTEXT_DRIVER_CAPABILITIES,
+              'fill',
+            ] as never,
+          },
+        ]),
+      ]),
+    ).toThrow(/capabilities.*at most 18 entries/u);
+
+    for (const invalidVersion of [0, -1, Number.MAX_SAFE_INTEGER + 1]) {
+      expect(() =>
+        createAgentContextDriverImplementationRegistry([
+          genericSource('forms.invalid-version', [
+            generatedDriver('driver.invalid-version', invalidVersion),
+          ]),
+        ]),
+      ).toThrow(/version.*positive safe integer/u);
+    }
+  });
+
+  it('rejects nested proxy and accessor containers without invoking their traps', () => {
+    let trapCount = 0;
+    let getterCount = 0;
+    const proxiedDriver = throwingProxy(
+      generatedDriver('driver.proxy'),
+      () => {
+        trapCount += 1;
+      },
+    );
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        genericSource('forms.driver-proxy', [proxiedDriver]),
+      ]),
+    ).toThrow(/drivers\[0\].*proxy/u);
+
+    const proxiedDrivers = throwingProxy(
+      [generatedDriver('driver.array-proxy')],
+      () => {
+        trapCount += 1;
+      },
+    );
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        genericSource('forms.drivers-proxy', proxiedDrivers),
+      ]),
+    ).toThrow(/drivers.*proxy/u);
+
+    const proxiedCapabilities = throwingProxy(
+      ['fill'] as AgentContextDriverCapability[],
+      () => {
+        trapCount += 1;
+      },
+    );
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        genericSource('forms.capabilities-proxy', [
+          {
+            ...generatedDriver('driver.capabilities-proxy'),
+            capabilities: proxiedCapabilities as never,
+          },
+        ]),
+      ]),
+    ).toThrow(/capabilities.*proxy/u);
+
+    const accessorDriver = Object.defineProperty(
+      {
+        version: 1,
+        capabilities: ['fill'],
+        implementation: fillV1,
+      },
+      'id',
+      {
+        enumerable: true,
+        get() {
+          getterCount += 1;
+          return 'driver.accessor';
+        },
+      },
+    );
+    expect(() =>
+      createAgentContextDriverImplementationRegistry([
+        genericSource('forms.driver-accessor', [
+          accessorDriver as unknown as AgentContextGenericDriverImplementationSource['drivers'][number],
+        ]),
+      ]),
+    ).toThrow(/\.id.*data property/u);
+    expect(trapCount).toBe(0);
+    expect(getterCount).toBe(0);
   });
 });
 

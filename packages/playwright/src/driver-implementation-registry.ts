@@ -417,17 +417,11 @@ function directlyCallableImplementation(
     fail(path, 'must be directly callable.');
   }
   const source = Function.prototype.toString.call(input);
+  if (source.includes('[native code]')) {
+    fail(path, 'must be an authored callable, not a native-code callable.');
+  }
   if (/^\s*class(?:\s|\{)/u.test(source)) {
     fail(path, 'must be directly callable, not a class constructor.');
-  }
-  const nameDescriptor = Object.getOwnPropertyDescriptor(input, 'name');
-  if (
-    nameDescriptor !== undefined &&
-    'value' in nameDescriptor &&
-    typeof nameDescriptor.value === 'string' &&
-    nameDescriptor.value.startsWith('bound ')
-  ) {
-    fail(path, 'must be an authored callable, not a bound function.');
   }
   return input as AgentContextDriverImplementation;
 }

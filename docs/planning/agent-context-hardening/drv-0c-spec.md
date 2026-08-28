@@ -28,6 +28,12 @@ single Node process. It does not execute a driver or prove browser behavior.
   a lower bound: unlisted drivers and unlisted capabilities make binding fail.
 - Implementations are opaque callable identities. This package never invokes,
   clones, serializes, hashes, or exposes them through the generated manifest.
+- JavaScript exposes no non-invoking test that distinguishes a callable bound
+  function from a non-callable bound class constructor, and a function's
+  `name` property is mutable. The boundary therefore rejects every callable
+  whose intrinsic `Function.prototype.toString` form contains `[native code]`.
+  This conservatively excludes bound and platform-native functions; authors
+  must contribute a normal or arrow wrapper function instead.
 - Browser execution and conformance belong to `PW-1`/`PW-2`, not DRV-0C.
 
 ## Exact authoring and runtime API
@@ -99,9 +105,11 @@ and is never exported or returned.
 - Every container must be an ordinary dense array or a plain/null-prototype
   object with enumerable data properties only, no unknown or symbol keys.
   Proxies, accessors, sparse/exotic arrays, exotic objects, callable proxies,
-  classes, unverifiable bound functions, and non-callable implementations are
-  rejected. Validation never reads through a getter or invokes an
-  implementation.
+  classes, all `[native code]` forms (including renamed bound functions and
+  platform-native callables), and non-callable implementations are rejected.
+  Validation never relies on mutable function names, reads through a getter,
+  or invokes an implementation. Normal authored and arrow functions remain
+  accepted.
 - The returned registry and manifest view are deeply frozen. The private map is
   built once, never exposed, and never mutated after creation.
 
