@@ -7,11 +7,12 @@ governed by the
 [RH-06 reconciliation](planning/agent-context-hardening/rh-06-reconciliation.md).
 
 **Current status:** Form Contract `0.4.0` is the implemented compatibility
-boundary. `RH06-DOC` and `CTX-0A` through `CTX-0D` are complete. `CTX-1`,
-`DRV-0`, `HOST-1`, `ANG-0`, and `FAC-1` are dependency-ready; `BHV-0` and
-`AUTH-0` await explicit approval of ADRs 0010 and 0011; and `LIN-0` is blocked
-on its sanitized representative workplace run after the public harness
-rehearsal returned `inconclusive`.
+boundary. `RH06-DOC`, `CTX-0A` through `CTX-1`, `DRV-0A/B`, and `DRV-0C1` are
+complete. `CTX-2`, `HOST-1`, `ANG-0`, and `FAC-1` are dependency-ready;
+aggregate `DRV-0` remains incomplete because `DRV-0C2` follows the validated
+plan/call ABI from `CTX-2`; `BHV-0` and `AUTH-0` await explicit approval of
+ADRs 0010 and 0011; and `LIN-0` is blocked on its sanitized representative
+workplace run after the public harness rehearsal returned `inconclusive`.
 
 ## Delivery Target
 
@@ -543,19 +544,16 @@ not add compilation, Angular execution, storage, or mutation to MCP requests.
 The earlier aspirational increment list is superseded by RH-06 and the
 execution index. The current order is:
 
-1. retain the completed `RH06-DOC` and `CTX-0A` through `CTX-0D` shared
-   checkpoint;
-2. start two independent lanes: the consumer lane begins with the now-ready
-   `CTX-1` pure query core, while the producer lane begins with the now-ready
-   `DRV-0` driver-registry manifest and advances source-lineage,
-   behavior/scenario, Angular, and safe-factory work only when each task's
-   execution-index dependencies are satisfied;
-3. in the consumer lane, implement `CTX-2` typed intent/validation over the
-   synthetic records after `CTX-1`; `CTX-2` exits only when the synthetic
-   positive/negative proof passes;
-4. in the producer lane, advance the canonical real producers `LIN-4`,
+1. retain the completed `RH06-DOC`, `CTX-0A` through `CTX-1`, `DRV-0A/B`, and
+   `DRV-0C1` checkpoints;
+2. in the consumer lane, implement the now-ready `CTX-2` typed
+   intent/validation over the synthetic records; `CTX-2` exits only when the
+   synthetic positive/negative proof passes;
+3. after `CTX-2` fixes the validated plan/call ABI, complete `DRV-0C2` exact
+   call binding and then mark aggregate `DRV-0` complete;
+4. in the producer lanes, advance the canonical real producers `LIN-4`,
    `BHV-4`, and `ANG-5` according to the execution index, using the single
-   `DRV-0` manifest started in step 2 rather than scheduling a second copy;
+   `DRV-0` manifest rather than scheduling a second copy;
 5. join the lanes at `CTX-GATE` only when `CTX-2`, `DRV-0`, and the required
    real producers provide one current pinned
    representative producer/workplace context;

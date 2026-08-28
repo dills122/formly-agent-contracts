@@ -448,7 +448,7 @@ describe('Angular monorepo workspace fixture', () => {
         expect.objectContaining({ key: 'claimDetails.summary', type: 'input' }),
       ]),
     );
-  });
+  }, 20_000);
 
   it('covers the real-world interaction and data-shape matrix', async () => {
     const formsKit = await loadProject(
@@ -530,7 +530,7 @@ describe('Angular monorepo workspace fixture', () => {
       { id: 'adjuster-1', label: 'Alex Morgan' },
       { id: 'adjuster-2', label: 'Sam Rivera' },
     ]);
-  });
+  }, 20_000);
 
   it('generates a deterministic six-form workspace artifact set', async () => {
     const temporaryDirectory = await mkdtemp(

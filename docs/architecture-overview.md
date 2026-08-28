@@ -20,11 +20,15 @@ later layers. They must consume or extend the same contracts rather than move
 trusted application execution into routine agent requests.
 
 Form Contract `0.4.0` remains the implemented semantic compatibility boundary.
-Source lineage, journeys, resolved scenario evidence, Angular authoring reports,
-driver registries, and agent-context manifests are planned as separately
-versioned sibling artifacts; this document does not imply that they already
-exist in the production packages or that they are fields of the v0.4 contract.
-The canonical ownership and delivery order are recorded in the
+Separately versioned sibling schema families now exist for the artifact-set
+envelope, source usage and journeys, scenario references and execution
+authority, the driver-registry manifest, and progressive agent-context query
+DTOs. The schema package publishes the pure query API, and the private
+experimental Playwright package contains the trusted-local driver
+implementation inventory. These are not fields of the v0.4 contract and do not
+imply that real source-lineage/scenario/Angular producers, production MCP
+transport, or browser execution exist yet. The canonical ownership and delivery
+order are recorded in the
 [RH-06 reconciliation](planning/agent-context-hardening/rh-06-reconciliation.md)
 and [execution index](planning/agent-context-hardening/execution-index.md).
 

@@ -48,14 +48,20 @@ not begin until it is accepted.
 
 | ID         | Scope                                                                                                            | Primary owner                                                                        | Depends on                                  | Status  | Exit gate                                                                                                                                                                 |
 | ---------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `CTX-1`    | Pure progressive usage/context/node/E2E-slice query core, including live freshness comparison/status             | Schema-backed pure module boundary selected in this task                             | `CTX-0D`                                    | ready   | Complete-or-refuse projections, bounded pagination, staleness/ambiguity tests                                                                                             |
-| `CTX-2`    | Typed intent, pure validator, canonical plan, and exhaustive stable diagnostic DTO/policy                        | `packages/schema` plus the Playwright-neutral validator module selected in this task | `CTX-1`                                     | pending | Both synthetic walkthroughs validate/refuse exactly; no browser or registry lookup                                                                                        |
-| `DRV-0`    | Hash-addressed driver-registry manifest and native/application registration inventory, without browser execution | future `@formly-contract/playwright` plus schema-owned records from `CTX-0C`         | `CTX-0C`                                    | ready   | Exact driver IDs, versions, capabilities, registry hash, duplicate/refusal, and no agent-selected modules                                                                 |
+| `CTX-1`    | Pure progressive usage/context/node/E2E-slice query core, including live freshness comparison/status             | Schema-backed pure module boundary selected in this task                             | `CTX-0D`                                    | complete | Both CTX-0D slices, complete-or-refuse projections, bounded pagination, staleness/ambiguity, package publication, and a measured 512-node progressive-disclosure gate pass |
+| `CTX-2`    | Typed intent, pure validator, canonical plan, and exhaustive stable diagnostic DTO/policy                        | `packages/schema` plus the Playwright-neutral validator module selected in this task | `CTX-1`                                     | ready   | Both synthetic walkthroughs validate/refuse exactly; no browser or registry lookup                                                                                        |
+| `DRV-0`    | Hash-addressed driver-registry manifest and native/application registration inventory, without browser execution | `packages/schema` plus private experimental `@formly-contract/playwright`            | `CTX-0C`                                    | ready   | Exact driver IDs, versions, capabilities, registry hash, duplicate/refusal, and no agent-selected modules                                                                 |
 | `CTX-GATE` | Real representative producer/workplace context pilot                                                             | Maintainer/research                                                                  | `CTX-2`, `LIN-4`, `BHV-4`, `ANG-5`, `DRV-0` | pending | One redacted current pinned context proves exact usage/journey selection, complete-or-refuse planning, payload/remediation value, and retained producer coverage evidence |
 | `MCP-1`    | Read-only MCP transport adapter                                                                                  | future `@formly-contract/mcp`                                                        | `CTX-GATE` go                               | pending | Transport exactly preserves pure query/validation semantics                                                                                                               |
 | `PW-1`     | Native positive/negative Playwright vertical                                                                     | future `@formly-contract/playwright`                                                 | `MCP-1`, `CTX-GATE` go                      | pending | No raw selectors; exact revalidation and stable browser tests                                                                                                             |
 | `PW-2`     | Custom/dynamic vertical                                                                                          | future `@formly-contract/playwright` plus app registry                               | `PW-1`, Angular/behavior producer evidence  | pending | Required metadata removals produce exact blockers                                                                                                                         |
 | `PW-3`     | Repeater, parity, and change-analysis vertical                                                                   | future `@formly-contract/playwright`                                                 | `PW-2`, browser conformance                 | pending | Exact created-item capture and scoped expansion survive DOM/count changes                                                                                                 |
+
+`DRV-0A/B` and the private-package `DRV-0C1` implementation inventory are
+complete. Aggregate `DRV-0` intentionally remains `ready`, not `complete`,
+because `DRV-0C2` must bind the five reserved capabilities to the validated
+plan/call ABI produced by `CTX-2`. The `ready` aggregate status records that its
+implemented packets are usable while preserving that remaining dependency.
 
 ## Source lineage producer
 
@@ -126,8 +132,9 @@ topology evidence before a public Nx package is necessary.
 
 ## Immediate dispatch rule
 
-`CTX-0A` through `CTX-0D` are complete. `CTX-1` and `DRV-0` are now ready and
-may proceed independently. `HOST-1`, `ANG-0`, and `FAC-1` are also
+`CTX-0A` through `CTX-1` are complete. `CTX-2` is now ready for immediate
+dispatch; it also supplies the validated plan/call ABI required by the
+remaining `DRV-0C2` packet. `HOST-1`, `ANG-0`, and `FAC-1` are also
 dependency-ready, but they remain separate producer task packets and must not
 freeze named-environment or adapter-authority APIs before `AUTH-0` is accepted.
 `LIN-0` is blocked on its representative workplace run. `BHV-0` and `AUTH-0`
