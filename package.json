@@ -14,7 +14,7 @@
     "app:serve": "pnpm --filter @formly-contract/formly-test-app serve",
     "audit": "pnpm audit --audit-level=high",
     "build": "pnpm build:demo && pnpm --filter @formly-contract/formly-test-app build && pnpm build:fixtures",
-    "build:demo": "pnpm --filter @formly-contract/schema build && pnpm --filter @formly-contract/compiler build && pnpm --filter @formly-contract/workspace build && pnpm --filter @formly-contract/synthetic-form build && pnpm --filter @formly-contract/demo-cli build",
+    "build:demo": "pnpm --filter @formly-contract/schema build && pnpm --filter @formly-contract/playwright build && pnpm --filter @formly-contract/compiler build && pnpm --filter @formly-contract/workspace build && pnpm --filter @formly-contract/synthetic-form build && pnpm --filter @formly-contract/demo-cli build",
     "build:fixture": "pnpm build:fixtures",
     "build:fixtures": "pnpm --filter @formly-contract/angular-monorepo-fixture build && pnpm --filter @formly-contract/nx-workspace-fixture build",
     "fixture:angular:serve": "pnpm --filter @formly-contract/angular-monorepo-fixture serve",

@@ -5,7 +5,17 @@
   "description": "Experimental trusted-local driver inventory for Formly Contract.",
   "license": "MIT",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
   "scripts": {
+    "build": "pnpm typecheck && tsc --project tsconfig.build.json",
     "typecheck": "tsc --project tsconfig.json"
   },
   "engines": {

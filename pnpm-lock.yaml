@@ -261,6 +261,12 @@ importers:
         specifier: 6.1.8
         version: 6.1.8(@angular/forms@20.3.29(@angular/common@20.3.29(@angular/core@20.3.29(@angular/compiler@20.3.29)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@20.3.29(@angular/compiler@20.3.29)(rxjs@7.8.2)(zone.js@0.15.1))(@angular/platform-browser@20.3.29(@angular/common@20.3.29(@angular/core@20.3.29(@angular/compiler@20.3.29)(rxjs@7.8.2)(zone.js@0.15.1))(rxjs@7.8.2))(@angular/core@20.3.29(@angular/compiler@20.3.29)(rxjs@7.8.2)(zone.js@0.15.1)))(rxjs@7.8.2))(rxjs@7.8.2)
 
+  packages/playwright:
+    dependencies:
+      '@formly-contract/schema':
+        specifier: workspace:*
+        version: link:../schema
+
   packages/schema: {}
 
   packages/workspace:
