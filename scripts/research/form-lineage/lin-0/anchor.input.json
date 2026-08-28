@@ -16,7 +16,7 @@
       "leaf": false,
       "projectId": "public-angular-fixture",
       "purpose": "anchor",
-      "tsconfig": "fixtures/angular-monorepo/tsconfig.json"
+      "tsconfig": "scripts/research/form-lineage/lin-0/anchor.tsconfig.json"
     }
   ],
   "symbolProbes": [

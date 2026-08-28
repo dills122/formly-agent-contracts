@@ -26,7 +26,8 @@ those harness behaviors with temporary synthetic inputs.
 
 The retained public Angular rehearsal is not representative workplace evidence.
 It reproduced four exact direct factory calls with zero TypeScript diagnostics,
-but it has one workspace-wide config, no project reference, no declaration
+but its harness-owned config intentionally selects only two fixture callsite
+roots, with no project reference, no declaration
 consumer/source-redirect pair, no lazy route, no overlapping program case, no
 application-bundle isolation input, and no approved workplace performance
 budgets or samples. Its exact retained decision is therefore `inconclusive`.
@@ -92,10 +93,13 @@ programs.
 ### Reproduced observations
 
 **`LIN0-OBS-01` — The anchor program is healthy but topologically narrow.** On
-Node.js 22.22.1 and TypeScript 5.9.3, the public fixture config loaded 46
-configured root files, 524 semantic files including declarations and resolved
-dependencies, 452 declaration files, and 7,449,171 semantic input bytes. It had
-zero pre-emit diagnostics and zero project references.
+Node.js 22.22.1 and TypeScript 5.9.3, the harness-owned anchor config loaded two
+configured fixture callsite roots, 300 semantic files including declarations
+and resolved dependencies, 286 declaration files, and 4,043,357 semantic input
+bytes. It had zero pre-emit diagnostics and zero project references. The narrow
+config deliberately excludes unrelated mutable product-package source from the
+public rehearsal; the byte-identical retained-report check detects changes to
+the selected fixture closure.
 
 **`LIN0-OBS-02` — Four public direct usages resolved exactly.** The harness
 resolved the claim-intake, claims-assignment, customer-onboarding, and incident
@@ -110,7 +114,7 @@ classes, callable consts, export-list-only declarations, namespace/aliased
 factory imports, or workplace prevalence.
 
 **`LIN0-OBS-04` — The anchor has no registered lazy feature evidence.** The
-selected program contains 72 in-scope application/workspace candidate files,
+selected program contains 14 in-scope application/workspace candidate files,
 but the anchor manifest supplies no reviewed router registration. The harness
 therefore traverses no route array and retains zero literal/dynamic lazy counts;
 it does not infer that either the fixture or workplace has no lazy features.
@@ -165,7 +169,7 @@ peak-RSS, or artifact-size budgets and no three-run measurement set.
 
 | Fixed check | Public anchor result | Exact representative evidence required |
 | --- | --- | --- |
-| Leaf tsconfig selection | Missing: zero leaf configs; one aggregate fixture config | Complete reviewed inventory, at least three exact leaf configs, zero blocking diagnostics, explicit host/source-redirect modes |
+| Leaf tsconfig selection | Missing: zero leaf configs; one harness-owned narrow fixture config | Complete reviewed inventory, at least three exact leaf configs, zero blocking diagnostics, explicit host/source-redirect modes |
 | Project references | Missing: zero | At least one real project reference among the selected leaves |
 | Declaration/source redirects | Missing | One exact portable join observed through declaration output and one through a project-reference source redirect |
 | Symbol/import conventions | Missing: relative direct functions only | Exact probes for path aliases, barrels, namespace and renamed imports, functions, classes, callable consts, plus an exhaustive convention inventory |

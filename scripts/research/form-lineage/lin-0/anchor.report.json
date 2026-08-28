@@ -39,7 +39,7 @@
         "registrationExactCount": 0,
         "registrationMismatchCount": 0,
         "registrationUnresolvedCount": 0,
-        "scannedFileCount": 72,
+        "scannedFileCount": 14,
         "scannedProgramCount": 1
       },
       "id": "lazy-feature-topology",
@@ -82,10 +82,10 @@
     },
     {
       "evidence": {
-        "configuredRootFileCount": 46,
+        "configuredRootFileCount": 2,
         "sampleCount": 0,
-        "semanticFileCount": 524,
-        "semanticInputBytes": 7449171
+        "semanticFileCount": 300,
+        "semanticInputBytes": 4043357
       },
       "id": "scale-budgets",
       "reasons": [
@@ -144,7 +144,7 @@
       "registrationExactCount": 0,
       "registrationMismatchCount": 0,
       "registrationUnresolvedCount": 0,
-      "scannedFileCount": 72,
+      "scannedFileCount": 14,
       "scannedProgramCount": 1
     },
     "overlapCases": [],
@@ -154,16 +154,16 @@
     },
     "programs": [
       {
-        "configuredRootFileCount": 46,
-        "declarationFileCount": 452,
+        "configuredRootFileCount": 2,
+        "declarationFileCount": 286,
         "diagnosticCount": 0,
         "id": "anchor-angular-program",
         "leaf": false,
         "projectId": "public-angular-fixture",
         "projectReferenceCount": 0,
         "purpose": "anchor",
-        "semanticFileCount": 524,
-        "semanticInputBytes": 7449171,
+        "semanticFileCount": 300,
+        "semanticInputBytes": 4043357,
         "sourceRedirectEnabled": false
       }
     ],

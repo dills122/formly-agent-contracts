@@ -20,6 +20,13 @@ node scripts/research/form-lineage/lin-0/run-gate.mjs \
 
 The public Angular fixture is only an anchor. Its retained decision is
 `inconclusive`; it cannot satisfy the representative-workplace requirement.
+The rehearsal uses the harness-owned `anchor.tsconfig.json`, which selects only
+the two fixture callsite roots and the imports required by those roots. This
+keeps unrelated product-package source (including mutable schema, compiler, and
+workspace implementation files) out of the anchor's semantic closure. The
+checked-in canonical report is the staleness check for that bounded closure;
+intentional fixture, compiler-option, or dependency changes require an explicit
+report review.
 
 ## Command contract
 

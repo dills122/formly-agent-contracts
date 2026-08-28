@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { URL } from 'node:url';
@@ -175,6 +175,10 @@ describe('LIN-0 public anchor rehearsal', () => {
     const report = await buildGateReport(
       new URL('./anchor.input.json', import.meta.url),
     );
+    const retainedReport = await readFile(
+      new URL('./anchor.report.json', import.meta.url),
+      'utf8',
+    );
 
     expect(report.decision.status).toBe('inconclusive');
     expect(report.decision.reasons).toContain(
@@ -182,11 +186,14 @@ describe('LIN-0 public anchor rehearsal', () => {
     );
     expect(report.measurements.programs).toEqual([
       expect.objectContaining({
-        configuredRootFileCount: 46,
+        configuredRootFileCount: 2,
+        declarationFileCount: 286,
         diagnosticCount: 0,
         id: 'anchor-angular-program',
         leaf: false,
         projectReferenceCount: 0,
+        semanticFileCount: 300,
+        semanticInputBytes: 4_043_357,
       }),
     ]);
     expect(report.measurements.symbolProbes).toHaveLength(4);
@@ -209,6 +216,7 @@ describe('LIN-0 public anchor rehearsal', () => {
       'symbol-conventions': 'missing',
     });
     expect(auditRetainedReport(report)).toEqual([]);
+    expect(canonicalJson(report)).toBe(retainedReport);
   }, 30_000);
 
   it('observes path aliases, barrels, renamed imports, namespaces, classes, and callable consts', async () => {
