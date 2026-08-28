@@ -8,7 +8,9 @@ import {
   AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
   AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE,
   canonicalizeAgentContextQueryResult,
+  classifyAgentContextE2eSliceOverflow,
   parseAgentContextQueryResult,
+  resolveAgentContextE2eSliceAgainstParsedDataset,
   validateAgentContextQuerySelection,
   validateAgentContextQueryResult,
   type AgentContextQueryDataset,
@@ -544,6 +546,12 @@ function baseResults() {
     operation: 'get-e2e-slice',
     selection: value.selection,
     freshness: 'current',
+    request: {
+      withinStepId: value.step.id,
+      nodeIds: [value.focusNode.id],
+      goal: 'positive',
+      includeOutgoingEffects: false,
+    },
   } as const;
   return {
     value,
@@ -556,6 +564,26 @@ function baseResults() {
     contextBase,
     nodeBase,
     sliceBase,
+  };
+}
+
+function validSliceResult() {
+  const base = baseResults();
+  const resolution = resolveAgentContextE2eSliceAgainstParsedDataset(
+    base.value.dataset,
+    base.value.selection,
+    base.sliceBase.request,
+  );
+  if (resolution.status !== 'complete') {
+    throw new Error('positive slice must resolve completely');
+  }
+  return {
+    base,
+    result: {
+      ...base.sliceBase,
+      status: 'complete',
+      slice: resolution.slice,
+    } as const,
   };
 }
 
@@ -891,6 +919,20 @@ describe('agent-context query result contract', () => {
       left.nodeId.localeCompare(right.nodeId),
     );
     const nodeIds = nodeCandidates.map(({ nodeId }) => nodeId);
+    const sliceNode = nodeProjection(value, value.focusNode, true);
+    const witness = {
+      effect: { id: 'synthetic.rh05.cross-step-effect', version: 1 },
+      trigger: { nodeId: 'synthetic.rh05.source', stepId: 'entry' },
+      target: { nodeId: sliceNode.nodeId, stepId: value.step.id },
+    } as const;
+    const transition = {
+      id: 'synthetic.rh05.entry.next',
+      version: 1,
+      fromStepId: 'entry',
+      actionId: 'synthetic.rh05.entry.next.action',
+      outcomeId: 'synthetic.rh05.entry.next.outcome',
+      toStepId: value.step.id,
+    } as const;
     const results: readonly unknown[] = [
       {
         ...searchBase,
@@ -1004,31 +1046,45 @@ describe('agent-context query result contract', () => {
         status: 'complete',
         slice: {
           withinStepId: value.step.id,
-          authority: authorityProjection(value, [node.nodeId]),
-          focusNodes: complete([node]),
-          closureNodes: complete([node]),
+          authority: authorityProjection(value, [sliceNode.nodeId]),
+          focusNodes: complete([sliceNode]),
+          closureNodes: complete([sliceNode]),
           prerequisites: complete([]),
           effects: complete([]),
         },
       },
       ...([
-        { kind: 'step-scope-mismatch', nodeIds: [node.nodeId] },
+        { kind: 'step-absent', stepId: value.step.id },
+        { kind: 'slice-focus-node-absent', nodeIds: [sliceNode.nodeId] },
+        { kind: 'step-scope-mismatch', nodeIds: [sliceNode.nodeId] },
         {
           kind: 'cross-step-prerequisite-required',
-          fromStepId: 'entry',
-          transitionId: 'entry.next',
-          toStepId: 'review',
+          witness,
+          transition,
         },
         {
           kind: 'cross-step-transition-ambiguous',
-          transitionIds: ['entry.next-a', 'entry.next-b'],
+          witness,
+          transitions: [
+            transition,
+            { ...transition, id: 'synthetic.rh05.entry.next-alternative' },
+          ].sort((left, right) => {
+            const leftKey = canonicalStringify(left);
+            const rightKey = canonicalStringify(right);
+            return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+          }),
         },
         {
           kind: 'cross-step-transition-unavailable',
-          fromStepId: 'entry',
-          toStepId: 'review',
+          witness,
         },
-        { kind: 'prerequisite-cycle', nodeIds: [node.nodeId] },
+        {
+          kind: 'prerequisite-readiness-unavailable',
+          effect: witness.effect,
+          nodeId: sliceNode.nodeId,
+          readinessId: 'synthetic.rh05.readiness.missing',
+        },
+        { kind: 'prerequisite-cycle', nodeIds: [sliceNode.nodeId] },
         { kind: 'atomic-record-too-large' },
         { kind: 'atomic-view-too-large' },
       ] as const).map((reason) => ({
@@ -1238,6 +1294,21 @@ describe('agent-context query result contract', () => {
         },
       }),
     ).toThrow(/focus|prerequisite|closure|subset/u);
+    const unrelatedEffect =
+      value.fixture.walkthroughs.negative.resolvedContract.declaredEffects?.[0];
+    if (unrelatedEffect === undefined) {
+      throw new Error('negative walkthrough needs an unrelated effect');
+    }
+    const exactSlice = validSliceResult().result;
+    expect(() =>
+      parseAgentContextQueryResult({
+        ...exactSlice,
+        slice: {
+          ...exactSlice.slice,
+          effects: complete([unrelatedEffect]),
+        },
+      }),
+    ).toThrow(/effect.*(closure|endpoint)|(closure|endpoint).*effect/u);
 
     expect(() =>
       parseAgentContextQueryResult({
@@ -1499,6 +1570,170 @@ describe('agent-context query result contract', () => {
     ).toThrow(/authority|projection/u);
 
     expect(authority.contentHash).toBe(value.selection.owners.executionAuthority.contentHash);
+  });
+
+  it('recomputes slices and rejects omitted, inflated, or invented refusal data', () => {
+    const { base, result } = validSliceResult();
+    expect(validateAgentContextQueryResult(base.value.dataset, result)).toEqual(
+      result,
+    );
+    expect(() =>
+      validateAgentContextQueryResult(base.value.dataset, {
+        ...result,
+        slice: { ...result.slice, prerequisites: complete([]) },
+      }),
+    ).toThrow(/slice|prerequisite|recomputed|projection/u);
+
+    const extraSource = base.value.nodes.find(
+      ({ id }) => !result.request.nodeIds.includes(id),
+    );
+    if (extraSource === undefined) throw new Error('missing extra slice node');
+    const extraNode = nodeProjection(base.value, extraSource, true);
+    const closureNodes = [...result.slice.closureNodes.items, extraNode].sort(
+      (left, right) => left.nodeId.localeCompare(right.nodeId),
+    );
+    expect(() =>
+      validateAgentContextQueryResult(base.value.dataset, {
+        ...result,
+        slice: {
+          ...result.slice,
+          authority: authorityProjection(
+            base.value,
+            closureNodes.map(({ nodeId }) => nodeId),
+          ),
+          closureNodes: complete(closureNodes),
+        },
+      }),
+    ).toThrow(/slice|closure|recomputed|projection/u);
+
+    for (const kind of [
+      'atomic-record-too-large',
+      'atomic-view-too-large',
+    ] as const) {
+      expect(() =>
+        validateAgentContextQueryResult(base.value.dataset, {
+          ...base.sliceBase,
+          status: 'refused',
+          reason: { kind },
+        }),
+      ).toThrow(/reason|recomputed|outcome|projection/u);
+    }
+  });
+
+  it('classifies request, semantic-refusal, collection, and view graph caps record-first', () => {
+    const { base, result } = validSliceResult();
+    const nodeIds = Array.from(
+      { length: 9_996 },
+      (_, index) => `synthetic.rh05.node.${String(index).padStart(5, '0')}`,
+    );
+    expect(
+      classifyAgentContextE2eSliceOverflow({
+        ...result,
+        request: { ...result.request, nodeIds: nodeIds.slice(0, 9_995) },
+      }),
+    ).toBeUndefined();
+    expect(
+      classifyAgentContextE2eSliceOverflow({
+        ...result,
+        request: { ...result.request, nodeIds },
+      }),
+    ).toEqual({ kind: 'atomic-record-too-large' });
+    const recomputedOverflow = {
+      ...base.sliceBase,
+      request: { ...base.sliceBase.request, nodeIds },
+      status: 'refused',
+      reason: { kind: 'atomic-record-too-large' },
+    } as const;
+    expect(
+      validateAgentContextQueryResult(base.value.dataset, recomputedOverflow),
+    ).toEqual(recomputedOverflow);
+    expect(() =>
+      validateAgentContextQueryResult(base.value.dataset, {
+        ...recomputedOverflow,
+        reason: { kind: 'atomic-view-too-large' },
+      }),
+    ).toThrow(/reason|atomic-record-too-large/u);
+
+    const transition = {
+      id: 'synthetic.rh05.transition.0000',
+      version: 1,
+      fromStepId: 'synthetic.rh05.step.source',
+      actionId: 'synthetic.rh05.action.0000',
+      outcomeId: 'synthetic.rh05.outcome.0000',
+      toStepId: result.request.withinStepId,
+    } as const;
+    const witness = {
+      effect: { id: 'synthetic.rh05.effect.cross-step', version: 1 },
+      trigger: {
+        nodeId: 'synthetic.rh05.node.source',
+        stepId: transition.fromStepId,
+      },
+      target: {
+        nodeId: result.request.nodeIds[0],
+        stepId: transition.toStepId,
+      },
+    } as const;
+    const transitions = Array.from({ length: 1_500 }, (_, index) => ({
+      ...transition,
+      id: `synthetic.rh05.transition.${String(index).padStart(4, '0')}`,
+      actionId: `synthetic.rh05.action.${String(index).padStart(4, '0')}`,
+      outcomeId: `synthetic.rh05.outcome.${String(index).padStart(4, '0')}`,
+    }));
+    expect(
+      classifyAgentContextE2eSliceOverflow({
+        ...base.sliceBase,
+        status: 'refused',
+        reason: {
+          kind: 'cross-step-transition-ambiguous',
+          witness,
+          transitions,
+        },
+      }),
+    ).toEqual({ kind: 'atomic-record-too-large' });
+
+    const effect =
+      base.value.fixture.walkthroughs.negative.resolvedContract
+        .declaredEffects?.[0];
+    if (effect === undefined) throw new Error('missing cap effect');
+    const withEffectCount = (count: number) => ({
+      ...result,
+      slice: {
+        ...result.slice,
+        effects: complete(
+          Array.from({ length: count }, (_, index) => ({
+            ...effect,
+            identity: {
+              ...effect.identity,
+              id: `synthetic.rh05.effect.${String(index).padStart(5, '0')}`,
+            },
+          })),
+        ),
+      },
+    });
+    let lower = 0;
+    let upper = AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE;
+    while (lower + 1 < upper) {
+      const middle = Math.floor((lower + upper) / 2);
+      if (
+        classifyAgentContextE2eSliceOverflow(withEffectCount(middle)) ===
+        undefined
+      ) {
+        lower = middle;
+      } else {
+        upper = middle;
+      }
+    }
+    expect(
+      classifyAgentContextE2eSliceOverflow(withEffectCount(lower)),
+    ).toBeUndefined();
+    expect(
+      classifyAgentContextE2eSliceOverflow(withEffectCount(upper)),
+    ).toEqual({ kind: 'atomic-view-too-large' });
+    expect(
+      classifyAgentContextE2eSliceOverflow(
+        withEffectCount(AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE + 1),
+      ),
+    ).toEqual({ kind: 'atomic-record-too-large' });
   });
 
   it('rejects a declared-only node projection when the selected scenario differs', () => {

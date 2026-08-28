@@ -80,6 +80,11 @@ export const AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE = 10_000;
 export const AGENT_CONTEXT_QUERY_MAX_PAGE_SIZE = 200;
 export const AGENT_CONTEXT_QUERY_MAX_CURSOR_LENGTH = 8_192;
 
+/** @internal CTX-1 atomic projection bound; package publication remains CTX-1D. */
+export const AGENT_CONTEXT_QUERY_MAX_ATOMIC_RECORD_GRAPH_NODES = 10_000;
+/** @internal CTX-1 atomic projection bound; package publication remains CTX-1D. */
+export const AGENT_CONTEXT_QUERY_MAX_ATOMIC_VIEW_GRAPH_NODES = 100_000;
+
 const MAX_ID_LENGTH = 256;
 const MAX_TEXT_LENGTH = 4_096;
 const MAX_PATH_LENGTH = 1_024;
@@ -286,6 +291,13 @@ export interface GetE2eSliceQuery {
   readonly schemaVersion: typeof AGENT_CONTEXT_QUERY_SCHEMA_VERSION;
   readonly operation: 'get-e2e-slice';
   readonly selection: AgentContextQuerySelection;
+  readonly withinStepId: string;
+  readonly nodeIds: readonly string[];
+  readonly goal: 'boundary' | 'negative' | 'positive';
+  readonly includeOutgoingEffects: boolean;
+}
+
+export interface AgentContextE2eSliceRequest {
   readonly withinStepId: string;
   readonly nodeIds: readonly string[];
   readonly goal: 'boundary' | 'negative' | 'positive';
@@ -1828,6 +1840,37 @@ function parseFindNodeFilters(
   };
 }
 
+function parseE2eSliceRequest(
+  input: unknown,
+  path: string,
+): AgentContextE2eSliceRequest {
+  const value = record(
+    input,
+    path,
+    new Set(['withinStepId', 'nodeIds', 'goal', 'includeOutgoingEffects']),
+  );
+  return {
+    withinStepId: boundedId(
+      required(value, 'withinStepId', path),
+      `${path}.withinStepId`,
+    ),
+    nodeIds: parseCanonicalStringSet(
+      required(value, 'nodeIds', path),
+      `${path}.nodeIds`,
+      1,
+    ),
+    goal: enumValue(required(value, 'goal', path), `${path}.goal`, [
+      'boundary',
+      'negative',
+      'positive',
+    ] as const),
+    includeOutgoingEffects: booleanValue(
+      required(value, 'includeOutgoingEffects', path),
+      `${path}.includeOutgoingEffects`,
+    ),
+  };
+}
+
 function parseQueryFromDetached(input: unknown, path: string): AgentContextQuery {
   const unionValue = record(
     input,
@@ -1977,6 +2020,15 @@ function parseQueryFromDetached(input: unknown, path: string): AgentContextQuery
         'includeOutgoingEffects',
       ]),
     );
+    const request = parseE2eSliceRequest(
+      {
+        withinStepId: required(value, 'withinStepId', path),
+        nodeIds: required(value, 'nodeIds', path),
+        goal: required(value, 'goal', path),
+        includeOutgoingEffects: required(value, 'includeOutgoingEffects', path),
+      },
+      path,
+    );
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation,
@@ -1984,24 +2036,7 @@ function parseQueryFromDetached(input: unknown, path: string): AgentContextQuery
         required(value, 'selection', path),
         `${path}.selection`,
       ),
-      withinStepId: boundedId(
-        required(value, 'withinStepId', path),
-        `${path}.withinStepId`,
-      ),
-      nodeIds: parseCanonicalStringSet(
-        required(value, 'nodeIds', path),
-        `${path}.nodeIds`,
-        1,
-      ),
-      goal: enumValue(required(value, 'goal', path), `${path}.goal`, [
-        'boundary',
-        'negative',
-        'positive',
-      ] as const),
-      includeOutgoingEffects: booleanValue(
-        required(value, 'includeOutgoingEffects', path),
-        `${path}.includeOutgoingEffects`,
-      ),
+      ...request,
     };
   }
   fail(`${path}.operation`, 'is not supported.');
@@ -2111,21 +2146,31 @@ export type AgentContextQueryReason =
       readonly nodeIds: readonly string[];
     }
   | { readonly kind: 'node-absent' }
+  | { readonly kind: 'step-absent'; readonly stepId: string }
+  | {
+      readonly kind: 'slice-focus-node-absent';
+      readonly nodeIds: readonly string[];
+    }
   | { readonly kind: 'step-scope-mismatch'; readonly nodeIds: readonly string[] }
   | {
       readonly kind: 'cross-step-prerequisite-required';
-      readonly fromStepId: string;
-      readonly transitionId: string;
-      readonly toStepId: string;
+      readonly witness: AgentContextCrossStepWitness;
+      readonly transition: AgentContextUsageTransitionAuthority;
     }
   | {
       readonly kind: 'cross-step-transition-ambiguous';
-      readonly transitionIds: readonly string[];
+      readonly witness: AgentContextCrossStepWitness;
+      readonly transitions: readonly AgentContextUsageTransitionAuthority[];
     }
   | {
       readonly kind: 'cross-step-transition-unavailable';
-      readonly fromStepId: string;
-      readonly toStepId: string;
+      readonly witness: AgentContextCrossStepWitness;
+    }
+  | {
+      readonly kind: 'prerequisite-readiness-unavailable';
+      readonly effect: DeclaredCrossFieldEffect['identity'];
+      readonly nodeId: string;
+      readonly readinessId: string;
     }
   | {
       readonly kind: 'prerequisite-cycle';
@@ -2133,6 +2178,18 @@ export type AgentContextQueryReason =
     }
   | { readonly kind: 'atomic-record-too-large' }
   | { readonly kind: 'atomic-view-too-large' };
+
+export interface AgentContextCrossStepWitness {
+  readonly effect: DeclaredCrossFieldEffect['identity'];
+  readonly trigger: {
+    readonly nodeId: string;
+    readonly stepId: string;
+  };
+  readonly target: {
+    readonly nodeId: string;
+    readonly stepId: string;
+  };
+}
 
 export type AgentContextUsageCandidateIdentity =
   | AgentContextDeclaredUsageSelection
@@ -2293,6 +2350,7 @@ export type AgentContextE2ePrerequisiteProjection =
   | {
       readonly kind: 'wrapper-precondition';
       readonly node: AgentContextNodeCandidateProjection;
+      readonly preconditionIndex: number;
       readonly precondition: FieldTypeWrapperPrecondition;
     };
 
@@ -2465,6 +2523,7 @@ export type GetE2eSliceResult =
       readonly status: 'complete';
       readonly selection: AgentContextQuerySelection;
       readonly freshness: AgentContextFreshness;
+      readonly request: AgentContextE2eSliceRequest;
       readonly slice: AgentContextE2eSliceProjection;
     }
   | {
@@ -2473,14 +2532,18 @@ export type GetE2eSliceResult =
       readonly status: 'refused';
       readonly selection: AgentContextQuerySelection;
       readonly freshness: AgentContextFreshness;
+      readonly request: AgentContextE2eSliceRequest;
       readonly reason: Extract<
         AgentContextQueryReason,
         {
           kind:
             | 'step-scope-mismatch'
+            | 'step-absent'
+            | 'slice-focus-node-absent'
             | 'cross-step-prerequisite-required'
             | 'cross-step-transition-ambiguous'
             | 'cross-step-transition-unavailable'
+            | 'prerequisite-readiness-unavailable'
             | 'prerequisite-cycle'
             | 'atomic-record-too-large'
             | 'atomic-view-too-large';
@@ -3047,6 +3110,105 @@ function parseUsageCandidateReference(
   };
 }
 
+function parseCrossStepWitness(
+  input: unknown,
+  path: string,
+): AgentContextCrossStepWitness {
+  const value = record(input, path, new Set(['effect', 'trigger', 'target']));
+  const parseEndpoint = (
+    endpointInput: unknown,
+    endpointPath: string,
+  ): { readonly nodeId: string; readonly stepId: string } => {
+    const endpoint = record(
+      endpointInput,
+      endpointPath,
+      new Set(['nodeId', 'stepId']),
+    );
+    return {
+      nodeId: boundedId(
+        required(endpoint, 'nodeId', endpointPath),
+        `${endpointPath}.nodeId`,
+      ),
+      stepId: boundedId(
+        required(endpoint, 'stepId', endpointPath),
+        `${endpointPath}.stepId`,
+      ),
+    };
+  };
+  const witness = {
+    effect: parseIdentityReference(
+      required(value, 'effect', path),
+      `${path}.effect`,
+    ),
+    trigger: parseEndpoint(
+      required(value, 'trigger', path),
+      `${path}.trigger`,
+    ),
+    target: parseEndpoint(
+      required(value, 'target', path),
+      `${path}.target`,
+    ),
+  };
+  if (witness.trigger.stepId === witness.target.stepId) {
+    fail(path, 'must describe a cross-step effect.');
+  }
+  return witness;
+}
+
+function parseUsageTransition(
+  input: unknown,
+  path: string,
+): AgentContextUsageTransitionAuthority {
+  const value = record(
+    input,
+    path,
+    new Set([
+      'id',
+      'version',
+      'fromStepId',
+      'actionId',
+      'outcomeId',
+      'toStepId',
+    ]),
+  );
+  return {
+    id: boundedId(required(value, 'id', path), `${path}.id`),
+    version: positiveInteger(
+      required(value, 'version', path),
+      `${path}.version`,
+    ),
+    fromStepId: boundedId(
+      required(value, 'fromStepId', path),
+      `${path}.fromStepId`,
+    ),
+    actionId: boundedId(
+      required(value, 'actionId', path),
+      `${path}.actionId`,
+    ),
+    outcomeId: boundedId(
+      required(value, 'outcomeId', path),
+      `${path}.outcomeId`,
+    ),
+    toStepId: boundedId(
+      required(value, 'toStepId', path),
+      `${path}.toStepId`,
+    ),
+  };
+}
+
+function assertTransitionMatchesWitness(
+  transition: AgentContextUsageTransitionAuthority,
+  witness: AgentContextCrossStepWitness,
+  path: string,
+): void {
+  if (
+    transition.fromStepId !== witness.trigger.stepId ||
+    transition.toStepId !== witness.target.stepId
+  ) {
+    fail(path, 'must connect the exact cross-step witness steps.');
+  }
+}
+
 function parseReason(input: unknown, path: string): AgentContextQueryReason {
   const union = record(
     input,
@@ -3055,10 +3217,17 @@ function parseReason(input: unknown, path: string): AgentContextQueryReason {
       'kind',
       'usages',
       'nodeIds',
+      'stepId',
       'fromStepId',
       'transitionId',
       'toStepId',
       'transitionIds',
+      'witness',
+      'transition',
+      'transitions',
+      'effect',
+      'nodeId',
+      'readinessId',
       'totalMatches',
     ]),
   );
@@ -3125,7 +3294,11 @@ function parseReason(input: unknown, path: string): AgentContextQueryReason {
       nodeIds,
     };
   }
-  if (kind === 'step-scope-mismatch' || kind === 'prerequisite-cycle') {
+  if (
+    kind === 'slice-focus-node-absent' ||
+    kind === 'step-scope-mismatch' ||
+    kind === 'prerequisite-cycle'
+  ) {
     const value = record(input, path, new Set(['kind', 'nodeIds']));
     return {
       kind,
@@ -3136,49 +3309,87 @@ function parseReason(input: unknown, path: string): AgentContextQueryReason {
       ),
     };
   }
+  if (kind === 'step-absent') {
+    const value = record(input, path, new Set(['kind', 'stepId']));
+    return {
+      kind,
+      stepId: boundedId(required(value, 'stepId', path), `${path}.stepId`),
+    };
+  }
   if (kind === 'cross-step-prerequisite-required') {
     const value = record(
       input,
       path,
-      new Set(['kind', 'fromStepId', 'transitionId', 'toStepId']),
+      new Set(['kind', 'witness', 'transition']),
     );
-    return {
-      kind,
-      fromStepId: boundedId(
-        required(value, 'fromStepId', path),
-        `${path}.fromStepId`,
-      ),
-      transitionId: boundedId(
-        required(value, 'transitionId', path),
-        `${path}.transitionId`,
-      ),
-      toStepId: boundedId(required(value, 'toStepId', path), `${path}.toStepId`),
-    };
+    const witness = parseCrossStepWitness(
+      required(value, 'witness', path),
+      `${path}.witness`,
+    );
+    const transition = parseUsageTransition(
+      required(value, 'transition', path),
+      `${path}.transition`,
+    );
+    assertTransitionMatchesWitness(transition, witness, `${path}.transition`);
+    return { kind, witness, transition };
   }
   if (kind === 'cross-step-transition-ambiguous') {
-    const value = record(input, path, new Set(['kind', 'transitionIds']));
+    const value = record(input, path, new Set(['kind', 'witness', 'transitions']));
+    const witness = parseCrossStepWitness(
+      required(value, 'witness', path),
+      `${path}.witness`,
+    );
+    const transitions = parseCandidateList(
+      required(value, 'transitions', path),
+      `${path}.transitions`,
+      parseUsageTransition,
+      canonicalStringify,
+    );
+    if (
+      transitions.length < 2 ||
+      transitions.length > AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE
+    ) {
+      fail(
+        `${path}.transitions`,
+        `must contain 2-${AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE} exact transitions.`,
+      );
+    }
+    for (const [index, transition] of transitions.entries()) {
+      assertTransitionMatchesWitness(
+        transition,
+        witness,
+        `${path}.transitions[${index}]`,
+      );
+    }
+    return { kind, witness, transitions };
+  }
+  if (kind === 'cross-step-transition-unavailable') {
+    const value = record(input, path, new Set(['kind', 'witness']));
     return {
       kind,
-      transitionIds: parseCanonicalStringSet(
-        required(value, 'transitionIds', path),
-        `${path}.transitionIds`,
-        2,
+      witness: parseCrossStepWitness(
+        required(value, 'witness', path),
+        `${path}.witness`,
       ),
     };
   }
-  if (kind === 'cross-step-transition-unavailable') {
+  if (kind === 'prerequisite-readiness-unavailable') {
     const value = record(
       input,
       path,
-      new Set(['kind', 'fromStepId', 'toStepId']),
+      new Set(['kind', 'effect', 'nodeId', 'readinessId']),
     );
     return {
       kind,
-      fromStepId: boundedId(
-        required(value, 'fromStepId', path),
-        `${path}.fromStepId`,
+      effect: parseIdentityReference(
+        required(value, 'effect', path),
+        `${path}.effect`,
       ),
-      toStepId: boundedId(required(value, 'toStepId', path), `${path}.toStepId`),
+      nodeId: boundedId(required(value, 'nodeId', path), `${path}.nodeId`),
+      readinessId: boundedId(
+        required(value, 'readinessId', path),
+        `${path}.readinessId`,
+      ),
     };
   }
   if (
@@ -4283,6 +4494,12 @@ function parseSliceProjection(
         'must belong to withinStepId.',
       );
     }
+    if (!sameJson(node.included, NODE_DETAIL_ASPECTS)) {
+      fail(
+        `${path}.closureNodes.items[${index}].included`,
+        'must contain the full canonical slice include set.',
+      );
+    }
   }
   const rawEffects = parseCompleteCollection(
     required(value, 'effects', path),
@@ -4310,6 +4527,17 @@ function parseSliceProjection(
       compareText(left.identity.id, right.identity.id) ||
       left.identity.version - right.identity.version,
   );
+  for (const [index, effect] of parsedEffects.entries()) {
+    if (
+      !closureById.has(effect.trigger.nodeId) ||
+      !closureById.has(effect.target.nodeId)
+    ) {
+      fail(
+        `${path}.effects.items[${index}]`,
+        'must have both effect endpoints in the exact closure.',
+      );
+    }
+  }
   const prerequisites = parseCanonicalCompleteCollection(
     required(value, 'prerequisites', path),
     `${path}.prerequisites`,
@@ -4317,7 +4545,14 @@ function parseSliceProjection(
       const union = record(
         entry,
         entryPath,
-        new Set(['kind', 'node', 'effect', 'readiness', 'precondition']),
+        new Set([
+          'kind',
+          'node',
+          'effect',
+          'readiness',
+          'preconditionIndex',
+          'precondition',
+        ]),
       );
       const kind = enumValue(required(union, 'kind', entryPath), `${entryPath}.kind`, [
         'effect-source',
@@ -4331,7 +4566,12 @@ function parseSliceProjection(
           ? new Set(['kind', 'node', 'effect'])
           : kind === 'readiness'
             ? new Set(['kind', 'node', 'readiness'])
-            : new Set(['kind', 'node', 'precondition']),
+            : new Set([
+                'kind',
+                'node',
+                'preconditionIndex',
+                'precondition',
+              ]),
       );
       const node = parseNodeCandidate(
         required(branch, 'node', entryPath),
@@ -4367,17 +4607,20 @@ function parseSliceProjection(
         }
         return { kind, node, readiness };
       }
-      const preconditionInput = required(branch, 'precondition', entryPath);
-      const precondition = node.details.interaction?.profile?.preconditions.find(
-        (candidate) => sameJson(candidate, preconditionInput),
+      const preconditionIndex = nonNegativeInteger(
+        required(branch, 'preconditionIndex', entryPath),
+        `${entryPath}.preconditionIndex`,
       );
-      if (precondition === undefined) {
+      const preconditionInput = required(branch, 'precondition', entryPath);
+      const precondition =
+        node.details.interaction?.profile?.preconditions[preconditionIndex];
+      if (precondition === undefined || !sameJson(precondition, preconditionInput)) {
         fail(
           `${entryPath}.precondition`,
-          'must be an exact included wrapper precondition for the prerequisite node.',
+          'must equal the included wrapper precondition at preconditionIndex.',
         );
       }
-      return { kind, node, precondition };
+      return { kind, node, preconditionIndex, precondition };
     },
     canonicalStringify,
     (left, right) => compareText(canonicalStringify(left), canonicalStringify(right)),
@@ -4402,6 +4645,7 @@ function parseSliceResult(input: unknown, path: string): GetE2eSliceResult {
       'status',
       'selection',
       'freshness',
+      'request',
       'slice',
       'reason',
     ]),
@@ -4412,6 +4656,10 @@ function parseSliceResult(input: unknown, path: string): GetE2eSliceResult {
     `${path}.selection`,
   );
   const freshness = parseFreshness(required(union, 'freshness', path), `${path}.freshness`);
+  const request = parseE2eSliceRequest(
+    required(union, 'request', path),
+    `${path}.request`,
+  );
   if (status === 'complete') {
     const value = record(
       input,
@@ -4422,8 +4670,22 @@ function parseSliceResult(input: unknown, path: string): GetE2eSliceResult {
         'status',
         'selection',
         'freshness',
+        'request',
         'slice',
       ]),
+    );
+    const slice = parseSliceProjection(
+      required(value, 'slice', path),
+      `${path}.slice`,
+      selection,
+    );
+    if (slice.withinStepId !== request.withinStepId) {
+      fail(`${path}.slice.withinStepId`, 'must equal request.withinStepId.');
+    }
+    assertSame(
+      slice.focusNodes.items.map(({ nodeId }) => nodeId),
+      request.nodeIds,
+      `${path}.slice.focusNodes`,
     );
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
@@ -4431,11 +4693,8 @@ function parseSliceResult(input: unknown, path: string): GetE2eSliceResult {
       status,
       selection,
       freshness,
-      slice: parseSliceProjection(
-        required(value, 'slice', path),
-        `${path}.slice`,
-        selection,
-      ),
+      request,
+      slice,
     };
   }
   if (status !== 'refused') fail(`${path}.status`, 'must be complete or refused.');
@@ -4448,6 +4707,7 @@ function parseSliceResult(input: unknown, path: string): GetE2eSliceResult {
       'status',
       'selection',
       'freshness',
+      'request',
       'reason',
     ]),
   );
@@ -4467,6 +4727,7 @@ function parseSliceResult(input: unknown, path: string): GetE2eSliceResult {
     status,
     selection,
     freshness,
+    request,
     reason,
   };
 }
@@ -4495,6 +4756,7 @@ export function parseAgentContextQueryResult(
       'steps',
       'evidence',
       'journey',
+      'request',
       'slice',
     ]),
   );
@@ -4874,6 +5136,543 @@ function validateNodeProjectionAgainstOwners(
   }
 }
 
+type AgentContextE2eSliceSemanticReason = Extract<
+  AgentContextQueryReason,
+  {
+    kind:
+      | 'step-absent'
+      | 'slice-focus-node-absent'
+      | 'step-scope-mismatch'
+      | 'cross-step-prerequisite-required'
+      | 'cross-step-transition-ambiguous'
+      | 'cross-step-transition-unavailable'
+      | 'prerequisite-readiness-unavailable'
+      | 'prerequisite-cycle';
+  }
+>;
+
+/** @internal CTX-1 source-module seam; package publication remains CTX-1D. */
+export type AgentContextE2eSliceResolution =
+  | {
+      readonly status: 'complete';
+      readonly slice: AgentContextE2eSliceProjection;
+    }
+  | {
+      readonly status: 'refused';
+      readonly reason: AgentContextE2eSliceSemanticReason;
+    };
+
+function projectNodeCandidate(
+  contract: FormContract,
+  authority: AgentContextExecutionAuthority,
+  node: FormContract['nodes'][number],
+  included: readonly AgentContextNodeDetailAspect[],
+): AgentContextNodeCandidateProjection {
+  const includeSet = new Set(included);
+  const effects = (contract.declaredEffects ?? [])
+    .filter(
+      ({ trigger, target }) =>
+        trigger.nodeId === node.id || target.nodeId === node.id,
+    )
+    .sort(
+      (left, right) =>
+        compareText(left.identity.id, right.identity.id) ||
+        left.identity.version - right.identity.version,
+    );
+  const diagnostics = contract.diagnostics.filter(
+    ({ nodeId }) => nodeId === node.id,
+  );
+  return {
+    nodeId: node.id,
+    kind: node.kind,
+    modelPath: node.modelPath,
+    ...(node.formlyType === undefined ? {} : { formlyType: node.formlyType }),
+    ...(node.semanticType === undefined
+      ? {}
+      : { semanticType: node.semanticType }),
+    evidence: node.evidence,
+    ...(node.presentation === undefined
+      ? {}
+      : { presentation: node.presentation }),
+    ...(node.state === undefined ? {} : { state: node.state }),
+    childNodeIds: node.children.map(({ id }) => id),
+    ...(node.arrayTemplate === undefined
+      ? {}
+      : { arrayTemplateNodeId: node.arrayTemplate.id }),
+    capabilities: collectNodeCapabilities(authority, node.id),
+    included,
+    details: {
+      ...(includeSet.has('constraints')
+        ? { constraints: { complete: true, items: node.constraints } }
+        : {}),
+      ...(includeSet.has('domain')
+        ? {
+            domain: {
+              options: { complete: true, items: node.options },
+              ...(node.optionSource === undefined
+                ? {}
+                : { optionSource: node.optionSource }),
+              ...(node.valueDomain === undefined
+                ? {}
+                : { valueDomain: node.valueDomain }),
+            },
+          }
+        : {}),
+      ...(includeSet.has('effects')
+        ? { effects: { complete: true, items: effects } }
+        : {}),
+      ...(includeSet.has('interaction')
+        ? {
+            interaction:
+              node.interactionProfile === undefined
+                ? {}
+                : { profile: node.interactionProfile },
+          }
+        : {}),
+      ...(includeSet.has('locators')
+        ? { locators: { complete: true, items: node.locators } }
+        : {}),
+      ...(includeSet.has('unknowns')
+        ? { unknowns: { complete: true, items: diagnostics } }
+        : {}),
+    },
+  };
+}
+
+function firstPrerequisiteCycle(
+  nodeIds: ReadonlySet<string>,
+  effects: readonly DeclaredCrossFieldEffect[],
+): readonly string[] | undefined {
+  const adjacency = new Map<string, string[]>();
+  const reverseAdjacency = new Map<string, string[]>();
+  for (const nodeId of [...nodeIds].sort(compareText)) adjacency.set(nodeId, []);
+  for (const nodeId of adjacency.keys()) reverseAdjacency.set(nodeId, []);
+  for (const effect of effects) {
+    if (
+      effect.ordering !== 'source-before-target' ||
+      !nodeIds.has(effect.trigger.nodeId) ||
+      !nodeIds.has(effect.target.nodeId)
+    ) {
+      continue;
+    }
+    adjacency.get(effect.target.nodeId)!.push(effect.trigger.nodeId);
+    reverseAdjacency.get(effect.trigger.nodeId)!.push(effect.target.nodeId);
+  }
+  for (const targets of adjacency.values()) targets.sort(compareText);
+  for (const targets of reverseAdjacency.values()) targets.sort(compareText);
+
+  const visited = new Set<string>();
+  const finishOrder: string[] = [];
+  for (const root of [...adjacency.keys()].sort(compareText)) {
+    if (visited.has(root)) continue;
+    visited.add(root);
+    const stack: { readonly nodeId: string; nextIndex: number }[] = [
+      { nodeId: root, nextIndex: 0 },
+    ];
+    while (stack.length > 0) {
+      const frame = stack[stack.length - 1]!;
+      const targets = adjacency.get(frame.nodeId) ?? [];
+      const targetId = targets[frame.nextIndex];
+      if (targetId === undefined) {
+        finishOrder.push(frame.nodeId);
+        stack.pop();
+        continue;
+      }
+      frame.nextIndex += 1;
+      if (visited.has(targetId)) continue;
+      visited.add(targetId);
+      stack.push({ nodeId: targetId, nextIndex: 0 });
+    }
+  }
+
+  const assigned = new Set<string>();
+  const cycles: string[][] = [];
+  for (const root of finishOrder.reverse()) {
+    if (assigned.has(root)) continue;
+    const component: string[] = [];
+    const stack = [root];
+    assigned.add(root);
+    while (stack.length > 0) {
+      const nodeId = stack.pop()!;
+      component.push(nodeId);
+      const targets = reverseAdjacency.get(nodeId) ?? [];
+      for (let index = targets.length - 1; index >= 0; index -= 1) {
+        const targetId = targets[index]!;
+        if (assigned.has(targetId)) continue;
+        assigned.add(targetId);
+        stack.push(targetId);
+      }
+    }
+    component.sort(compareText);
+    if (
+      component.length > 1 ||
+      (component.length === 1 &&
+        (adjacency.get(component[0]!) ?? []).includes(component[0]!))
+    ) {
+      cycles.push(component);
+    }
+  }
+  cycles.sort((left, right) =>
+    compareText(canonicalStringify(left), canonicalStringify(right)),
+  );
+  return cycles[0];
+}
+
+function crossStepWitness(
+  effect: DeclaredCrossFieldEffect,
+  triggerStepId: string,
+  targetStepId: string,
+): AgentContextCrossStepWitness {
+  return {
+    effect: effect.identity,
+    trigger: { nodeId: effect.trigger.nodeId, stepId: triggerStepId },
+    target: { nodeId: effect.target.nodeId, stepId: targetStepId },
+  };
+}
+
+/** @internal CTX-1 source-module seam; package publication remains CTX-1D. */
+export function resolveAgentContextE2eSliceAgainstParsedDataset(
+  dataset: AgentContextQueryDataset,
+  selection: AgentContextQuerySelection,
+  request: AgentContextE2eSliceRequest,
+): AgentContextE2eSliceResolution {
+  const scenarioArtifact = findOwner(
+    dataset.formContracts,
+    selection.owners.scenarioArtifact,
+    'agentContextQuerySlice.selection.owners.scenarioArtifact',
+  ).artifact;
+  const authority = findOwner(
+    dataset.executionAuthorities,
+    selection.owners.executionAuthority,
+    'agentContextQuerySlice.selection.owners.executionAuthority',
+  ).artifact;
+  const selectedStep = authority.usage.steps.find(
+    ({ id }) => id === request.withinStepId,
+  );
+  if (selectedStep === undefined) {
+    return {
+      status: 'refused',
+      reason: { kind: 'step-absent', stepId: request.withinStepId },
+    };
+  }
+  const scenarioNodes = collectFormContractNodes(scenarioArtifact.nodes);
+  const scenarioNodeById = new Map(
+    scenarioNodes.map((node) => [node.id, node] as const),
+  );
+  const absentNodeIds = request.nodeIds.filter(
+    (nodeId) => !scenarioNodeById.has(nodeId),
+  );
+  if (absentNodeIds.length > 0) {
+    return {
+      status: 'refused',
+      reason: { kind: 'slice-focus-node-absent', nodeIds: absentNodeIds },
+    };
+  }
+  const selectedStepNodeIds = new Set(selectedStep.nodeIds);
+  const outOfScopeNodeIds = request.nodeIds.filter(
+    (nodeId) => !selectedStepNodeIds.has(nodeId),
+  );
+  if (outOfScopeNodeIds.length > 0) {
+    return {
+      status: 'refused',
+      reason: { kind: 'step-scope-mismatch', nodeIds: outOfScopeNodeIds },
+    };
+  }
+
+  const stepByNodeId = new Map<string, string>();
+  for (const step of authority.usage.steps) {
+    for (const nodeId of step.nodeIds) stepByNodeId.set(nodeId, step.id);
+  }
+  const scenarioEffects = scenarioArtifact.declaredEffects ?? [];
+  for (const [index, effect] of scenarioEffects.entries()) {
+    for (const [role, nodeId] of [
+      ['trigger', effect.trigger.nodeId],
+      ['target', effect.target.nodeId],
+    ] as const) {
+      if (!scenarioNodeById.has(nodeId) || !stepByNodeId.has(nodeId)) {
+        fail(
+          `agentContextQuerySlice.effects[${index}].${role}.nodeId`,
+          'must resolve in both the scenario artifact and execution-authority steps.',
+        );
+      }
+    }
+  }
+  const closureNodeIds = new Set(request.nodeIds);
+  const includedEffects = new Map<string, DeclaredCrossFieldEffect>();
+  const crossStepWitnesses = new Map<string, AgentContextCrossStepWitness>();
+  const incomingByTarget = new Map<string, DeclaredCrossFieldEffect[]>();
+  const sameStepOutgoingByTrigger = new Map<
+    string,
+    DeclaredCrossFieldEffect[]
+  >();
+  for (const effect of scenarioEffects) {
+    if (effect.ordering === 'source-before-target') {
+      const incoming = incomingByTarget.get(effect.target.nodeId) ?? [];
+      incoming.push(effect);
+      incomingByTarget.set(effect.target.nodeId, incoming);
+    }
+    if (
+      stepByNodeId.get(effect.trigger.nodeId) ===
+      stepByNodeId.get(effect.target.nodeId)
+    ) {
+      const outgoing = sameStepOutgoingByTrigger.get(effect.trigger.nodeId) ?? [];
+      outgoing.push(effect);
+      sameStepOutgoingByTrigger.set(effect.trigger.nodeId, outgoing);
+    }
+  }
+  const closeIncoming = (seedNodeIds: readonly string[]): void => {
+    const pendingNodeIds = [...seedNodeIds];
+    let pendingIndex = 0;
+    while (pendingIndex < pendingNodeIds.length) {
+      const nodeId = pendingNodeIds[pendingIndex]!;
+      pendingIndex += 1;
+      for (const effect of incomingByTarget.get(nodeId) ?? []) {
+        const effectKey = `${effect.identity.id}\0${effect.identity.version}`;
+        const triggerStepId = stepByNodeId.get(effect.trigger.nodeId)!;
+        const targetStepId = stepByNodeId.get(effect.target.nodeId)!;
+        if (triggerStepId !== targetStepId) {
+          const witness = crossStepWitness(effect, triggerStepId, targetStepId);
+          crossStepWitnesses.set(canonicalStringify(witness), witness);
+          continue;
+        }
+        includedEffects.set(effectKey, effect);
+        if (!closureNodeIds.has(effect.trigger.nodeId)) {
+          closureNodeIds.add(effect.trigger.nodeId);
+          pendingNodeIds.push(effect.trigger.nodeId);
+        }
+      }
+    }
+  };
+  closeIncoming(request.nodeIds);
+  if (request.includeOutgoingEffects) {
+    const outgoingSourceNodeIds = [...closureNodeIds];
+    const outgoingTargetNodeIds: string[] = [];
+    for (const nodeId of outgoingSourceNodeIds) {
+      for (const effect of sameStepOutgoingByTrigger.get(nodeId) ?? []) {
+        const effectKey = `${effect.identity.id}\0${effect.identity.version}`;
+        includedEffects.set(effectKey, effect);
+        if (!closureNodeIds.has(effect.target.nodeId)) {
+          closureNodeIds.add(effect.target.nodeId);
+          outgoingTargetNodeIds.push(effect.target.nodeId);
+        }
+      }
+    }
+    closeIncoming(outgoingTargetNodeIds);
+  }
+
+  const firstWitness = [...crossStepWitnesses.entries()]
+    .sort(([left], [right]) => compareText(left, right))
+    .map(([, witness]) => witness)[0];
+  if (firstWitness !== undefined) {
+    const transitions = authority.usage.transitions
+      .filter(
+        ({ fromStepId, toStepId }) =>
+          fromStepId === firstWitness.trigger.stepId &&
+          toStepId === firstWitness.target.stepId,
+      )
+      .sort((left, right) =>
+        compareText(canonicalStringify(left), canonicalStringify(right)),
+      );
+    if (transitions.length === 0) {
+      return {
+        status: 'refused',
+        reason: {
+          kind: 'cross-step-transition-unavailable',
+          witness: firstWitness,
+        },
+      };
+    }
+    if (transitions.length > 1) {
+      return {
+        status: 'refused',
+        reason: {
+          kind: 'cross-step-transition-ambiguous',
+          witness: firstWitness,
+          transitions,
+        },
+      };
+    }
+    return {
+      status: 'refused',
+      reason: {
+        kind: 'cross-step-prerequisite-required',
+        witness: firstWitness,
+        transition: transitions[0]!,
+      },
+    };
+  }
+
+  const effects = [...includedEffects.values()].sort(
+    (left, right) =>
+      compareText(left.identity.id, right.identity.id) ||
+      left.identity.version - right.identity.version,
+  );
+  const cycle = firstPrerequisiteCycle(closureNodeIds, effects);
+  if (cycle !== undefined) {
+    return {
+      status: 'refused',
+      reason: { kind: 'prerequisite-cycle', nodeIds: cycle },
+    };
+  }
+  for (const effect of effects) {
+    if (effect.timing.mode !== 'async') continue;
+    const readinessId = effect.timing.readinessId;
+    const readiness = authority.readiness.filter(
+      ({ id, nodeId }) =>
+        id === readinessId && nodeId === effect.target.nodeId,
+    );
+    if (readiness.length !== 1) {
+      return {
+        status: 'refused',
+        reason: {
+          kind: 'prerequisite-readiness-unavailable',
+          effect: effect.identity,
+          nodeId: effect.target.nodeId,
+          readinessId,
+        },
+      };
+    }
+  }
+
+  const closureNodes = [...closureNodeIds]
+    .sort(compareText)
+    .map((nodeId) =>
+      projectNodeCandidate(
+        scenarioArtifact,
+        authority,
+        scenarioNodeById.get(nodeId)!,
+        NODE_DETAIL_ASPECTS,
+      ),
+    );
+  const nodeProjectionById = new Map(
+    closureNodes.map((node) => [node.nodeId, node] as const),
+  );
+  const prerequisites: AgentContextE2ePrerequisiteProjection[] = [
+    ...effects
+      .filter(({ ordering }) => ordering === 'source-before-target')
+      .map((effect) => ({
+        kind: 'effect-source' as const,
+        node: nodeProjectionById.get(effect.trigger.nodeId)!,
+        effect,
+      })),
+    ...authority.readiness
+      .filter(({ nodeId }) => closureNodeIds.has(nodeId))
+      .map((readiness) => ({
+        kind: 'readiness' as const,
+        node: nodeProjectionById.get(readiness.nodeId)!,
+        readiness,
+      })),
+    ...closureNodes.flatMap((node) =>
+      (node.details.interaction?.profile?.preconditions ?? []).map(
+        (precondition, preconditionIndex) => ({
+          kind: 'wrapper-precondition' as const,
+          node,
+          preconditionIndex,
+          precondition,
+        }),
+      ),
+    ),
+  ].sort((left, right) =>
+    compareText(canonicalStringify(left), canonicalStringify(right)),
+  );
+  const focusNodes = request.nodeIds.map(
+    (nodeId) => nodeProjectionById.get(nodeId)!,
+  );
+  return {
+    status: 'complete',
+    slice: {
+      withinStepId: request.withinStepId,
+      authority: projectExecutionAuthority(
+        selection,
+        authority,
+        closureNodes.map(({ nodeId }) => nodeId),
+      ),
+      focusNodes: { complete: true, items: focusNodes },
+      closureNodes: { complete: true, items: closureNodes },
+      prerequisites: { complete: true, items: prerequisites },
+      effects: { complete: true, items: effects },
+    },
+  };
+}
+
+function dataGraphExceeds(input: unknown, maximum: number): boolean {
+  let count = 1;
+  const pending: unknown[] = [input];
+  while (pending.length > 0) {
+    const value = pending.pop();
+    if (typeof value !== 'object' || value === null) continue;
+    for (const descriptor of Object.values(
+      Object.getOwnPropertyDescriptors(value),
+    )) {
+      if (!descriptor.enumerable || !('value' in descriptor)) continue;
+      count += 1;
+      if (count > maximum) return true;
+      pending.push(descriptor.value);
+    }
+  }
+  return false;
+}
+
+/** @internal CTX-1 source-module seam; package publication remains CTX-1D. */
+export function classifyAgentContextE2eSliceOverflow(
+  result: GetE2eSliceResult,
+):
+  | Extract<
+      AgentContextQueryReason,
+      { readonly kind: 'atomic-record-too-large' | 'atomic-view-too-large' }
+    >
+  | undefined {
+  const collections =
+    result.status === 'complete'
+      ? [
+          result.slice.authority.steps.items,
+          result.slice.authority.actions.items,
+          result.slice.authority.outcomes.items,
+          result.slice.authority.transitions.items,
+          result.slice.authority.physicalOperations.items,
+          result.slice.authority.readiness.items,
+          result.slice.authority.interactions.items,
+          result.slice.authority.commits.items,
+          result.slice.authority.validationSurfaces.items,
+          result.slice.authority.valueAssertions.items,
+          result.slice.authority.stateAssertions.items,
+          result.slice.authority.repeaterCaptures.items,
+          result.slice.focusNodes.items,
+          result.slice.closureNodes.items,
+          result.slice.prerequisites.items,
+          result.slice.effects.items,
+        ]
+      : result.reason.kind === 'cross-step-transition-ambiguous'
+        ? [result.reason.transitions]
+        : [];
+  const records =
+    result.status === 'complete'
+      ? [result.request, result.slice.authority.entry, ...collections.flat()]
+      : [result.request, result.reason];
+  if (
+    collections.some(
+      (items) => items.length > AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE,
+    ) ||
+    records.some((record) =>
+      dataGraphExceeds(
+        record,
+        AGENT_CONTEXT_QUERY_MAX_ATOMIC_RECORD_GRAPH_NODES,
+      ),
+    )
+  ) {
+    return { kind: 'atomic-record-too-large' };
+  }
+  if (
+    dataGraphExceeds(
+      result,
+      AGENT_CONTEXT_QUERY_MAX_ATOMIC_VIEW_GRAPH_NODES,
+    )
+  ) {
+    return { kind: 'atomic-view-too-large' };
+  }
+  return undefined;
+}
+
 /** @internal CTX-1 source-module seam; package publication remains CTX-1D. */
 export function validateAgentContextQueryResultAgainstParsedDataset(
   dataset: AgentContextQueryDataset,
@@ -4901,6 +5700,49 @@ export function validateAgentContextQueryResultAgainstParsedDataset(
     dataset,
     result.selection,
   );
+  if (result.operation === 'get-e2e-slice') {
+    const resolution = resolveAgentContextE2eSliceAgainstParsedDataset(
+      dataset,
+      selection,
+      result.request,
+    );
+    const semanticResult: GetE2eSliceResult =
+      resolution.status === 'complete'
+        ? {
+            schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+            operation: 'get-e2e-slice',
+            status: 'complete',
+            selection,
+            freshness: result.freshness,
+            request: result.request,
+            slice: resolution.slice,
+          }
+        : {
+            schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+            operation: 'get-e2e-slice',
+            status: 'refused',
+            selection,
+            freshness: result.freshness,
+            request: result.request,
+            reason: resolution.reason,
+          };
+    const overflow = classifyAgentContextE2eSliceOverflow(semanticResult);
+    if (result.status === 'refused') {
+      const expectedReason =
+        overflow ??
+        (resolution.status === 'refused' ? resolution.reason : undefined);
+      if (expectedReason === undefined) {
+        fail(`${path}.reason`, 'does not match the recomputed slice outcome.');
+      }
+      assertSame(result.reason, expectedReason, `${path}.reason`);
+      return result;
+    }
+    if (resolution.status !== 'complete' || overflow !== undefined) {
+      fail(`${path}.slice`, 'does not match the recomputed slice outcome.');
+    }
+    assertSame(result.slice, resolution.slice, `${path}.slice`);
+    return result;
+  }
   if (result.status === 'refused') return result;
   const scenarioContract = findOwner(
     dataset.formContracts,
@@ -4999,33 +5841,6 @@ export function validateAgentContextQueryResultAgainstParsedDataset(
       `${path}.authority`,
     );
     return result;
-  }
-  for (const [index, candidate] of result.slice.closureNodes.items.entries()) {
-    validateNodeProjectionAgainstOwners(
-      contractNodeById,
-      scenarioContract,
-      authority,
-      candidate,
-      `${path}.slice.closureNodes.items[${index}]`,
-    );
-  }
-  assertSame(
-    result.slice.authority,
-    projectExecutionAuthority(
-      selection,
-      authority,
-      result.slice.closureNodes.items.map(({ nodeId }) => nodeId),
-    ),
-    `${path}.slice.authority`,
-  );
-  const declaredEffects = scenarioContract.declaredEffects ?? [];
-  for (const [index, effect] of result.slice.effects.items.entries()) {
-    if (!declaredEffects.some((candidate) => sameJson(candidate, effect))) {
-      fail(
-        `${path}.slice.effects.items[${index}]`,
-        'does not match a selected form effect.',
-      );
-    }
   }
   return result;
 }

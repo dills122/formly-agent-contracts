@@ -14,6 +14,9 @@ import {
   AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
   createAgentContextPinnedLiveOwners,
   createAgentContextUsageSearchScopeLiveOwners,
+  parseAgentContextQueryDataset,
+  resolveAgentContextE2eSliceAgainstParsedDataset,
+  validateAgentContextQueryResult,
   type AgentContextQueryDataset,
   type AgentContextQuerySelection,
   type AgentContextSearchUsageFilters,
@@ -44,6 +47,7 @@ import {
   type ContractNode,
   type FormContract,
 } from './contract.js';
+import type { DeclaredCrossFieldEffect } from './cross-field-effect.js';
 
 const PAGINATION: AgentContextQueryPaginationRuntime = {
   now: 1_000,
@@ -87,6 +91,14 @@ function flattenNodes(nodes: readonly ContractNode[]): readonly ContractNode[] {
       ? []
       : flattenNodes([node.arrayTemplate])),
   ]);
+}
+
+function withoutFormContractContentHash(
+  contract: FormContract,
+): Omit<FormContract, 'contentHash'> {
+  const { contentHash, ...draft } = contract;
+  void contentHash;
+  return draft;
 }
 
 function boundary() {
@@ -235,6 +247,38 @@ function searchQuery(
       ...(cursor === undefined ? {} : { cursor }),
     },
   };
+}
+
+function selectionForWalkthrough(
+  value: ReturnType<typeof boundary>,
+  polarity: 'negative' | 'positive',
+): AgentContextQuerySelection {
+  const walkthrough = value.fixture.walkthroughs[polarity];
+  const selection = value.selections.find(
+    ({ usage }) => usage.usageId === walkthrough.usage.usageId,
+  );
+  if (selection === undefined) throw new Error(`missing ${polarity} selection`);
+  return selection;
+}
+
+function sliceQuery(
+  selection: AgentContextQuerySelection,
+  input: {
+    readonly withinStepId: string;
+    readonly nodeIds: readonly string[];
+    readonly goal?: 'boundary' | 'negative' | 'positive';
+    readonly includeOutgoingEffects?: boolean;
+  },
+) {
+  return {
+    schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+    operation: 'get-e2e-slice',
+    selection,
+    withinStepId: input.withinStepId,
+    nodeIds: input.nodeIds,
+    goal: input.goal ?? 'positive',
+    includeOutgoingEffects: input.includeOutgoingEffects ?? false,
+  } as const;
 }
 
 function scopeFor(
@@ -498,6 +542,42 @@ function repinScenarioArtifact(
   };
 }
 
+function repinScenarioEffects(
+  dataset: AgentContextQueryDataset,
+  selection: AgentContextQuerySelection,
+  effects: readonly DeclaredCrossFieldEffect[],
+) {
+  const owner = dataset.formContracts.find(
+    ({ reference }) =>
+      reference.contentHash === selection.owners.scenarioArtifact.contentHash,
+  );
+  if (owner === undefined) throw new Error('missing scenario effect owner');
+  const draft = withoutFormContractContentHash(owner.artifact);
+  const artifact = createFormContract({ ...draft, declaredEffects: effects });
+  return repinScenarioOwner(dataset, selection, artifact);
+}
+
+function repinScenarioOwner(
+  dataset: AgentContextQueryDataset,
+  selection: AgentContextQuerySelection,
+  artifact: FormContract,
+) {
+  const scenarioRepin = repinScenarioArtifact(dataset, selection, artifact);
+  const authorityRepin = repinExecutionAuthority(
+    scenarioRepin.dataset,
+    scenarioRepin.selection,
+    (authority) => ({
+      ...authority,
+      scenario: {
+        ...authority.scenario,
+        artifactHash:
+          artifact.contentHash as AgentContextArtifactReference['contentHash'],
+      },
+    }),
+  );
+  return { ...authorityRepin, scenarioArtifact: artifact };
+}
+
 function threeStepBoundary() {
   const value = boundary();
   const selection = value.selections.find(
@@ -608,6 +688,144 @@ function journeyWithEmptyStepBoundary() {
     }),
   );
   return { ...authorityRepin, emptyStepId };
+}
+
+function crossStepSliceBoundary(transitionCount: 0 | 1 | 2) {
+  const value = boundary();
+  const selection = selectionForWalkthrough(value, 'negative');
+  const walkthrough = value.fixture.walkthroughs.negative;
+  const sourceStepId = walkthrough.stepId;
+  const targetStepId = `${sourceStepId}.other-details`;
+  const targetNodeId = walkthrough.focusNodeIds[0]!;
+  const sourceNodeIds = walkthrough.executionAuthority.usage.steps[0]!.nodeIds
+    .filter((nodeId) => nodeId !== targetNodeId)
+    .sort();
+  const actionIds = Array.from(
+    { length: transitionCount },
+    (_, index) => `synthetic.rh05.claims.cross-step.action-${String(index + 1)}`,
+  );
+  const outcomeIds = Array.from(
+    { length: transitionCount },
+    (_, index) => `synthetic.rh05.claims.cross-step.outcome-${String(index + 1)}`,
+  );
+  const transitions = Array.from({ length: transitionCount }, (_, index) => ({
+    id: `synthetic.rh05.claims.cross-step.transition-${String(index + 1)}`,
+    version: 1,
+    fromStepId: sourceStepId,
+    actionId: actionIds[index]!,
+    outcomeId: outcomeIds[index]!,
+    toStepId: targetStepId,
+  }));
+  const journeyRepin = repinJourneyCatalog(
+    value.dataset,
+    selection,
+    (draft) => ({
+      ...draft,
+      journeys: draft.journeys.map((journey) =>
+        journey.id === selection.journey.id &&
+        journey.version === selection.journey.version
+          ? {
+              ...journey,
+              steps: [
+                {
+                  id: sourceStepId,
+                  ordinal: 1,
+                  label: 'Synthetic source step',
+                  forms: [selection.form],
+                  usages: [selection.usage],
+                  actionIds,
+                },
+                {
+                  id: targetStepId,
+                  ordinal: 2,
+                  label: 'Synthetic target step',
+                  forms: [selection.form],
+                  usages: [selection.usage],
+                  actionIds: [],
+                },
+              ],
+              actions: actionIds.map((id, index) => ({
+                id,
+                kind: 'next' as const,
+                outcomeIds: [outcomeIds[index]!],
+                evidenceRefs: [`synthetic:rh05:cross-step-action-${String(index + 1)}`],
+              })),
+              outcomes: outcomeIds.map((id, index) => ({
+                id,
+                kind: 'step-changed' as const,
+                evidenceRefs: [`synthetic:rh05:cross-step-outcome-${String(index + 1)}`],
+              })),
+              transitions: transitions.map((transition, index) => ({
+                ...transition,
+                evidenceRefs: [
+                  `synthetic:rh05:cross-step-transition-${String(index + 1)}`,
+                ],
+              })),
+            }
+          : journey,
+      ),
+    }),
+  );
+  const authorityRepin = repinExecutionAuthority(
+    journeyRepin.dataset,
+    journeyRepin.selection,
+    (draft) => ({
+      ...draft,
+      interactions: draft.interactions.map((interaction) => ({
+        ...interaction,
+        stepId:
+          interaction.nodeId === targetNodeId ? targetStepId : sourceStepId,
+      })),
+      repeaterCaptures: draft.repeaterCaptures.map((capture) => ({
+        ...capture,
+        stepId:
+          capture.repeaterNodeId === targetNodeId
+            ? targetStepId
+            : sourceStepId,
+      })),
+      usage: {
+        ...draft.usage,
+        steps: [
+          {
+            id: sourceStepId,
+            ordinal: 1,
+            nodeIds: sourceNodeIds,
+            actionIds,
+          },
+          {
+            id: targetStepId,
+            ordinal: 2,
+            nodeIds: [targetNodeId],
+            actionIds: [],
+          },
+        ],
+        actions: actionIds.map((id, index) => ({
+          id,
+          operation: 'invoke-usage-action' as const,
+          kind: 'next' as const,
+          driver: draft.usage.entry.driver,
+          outcomeIds: [outcomeIds[index]!],
+        })),
+        outcomes: outcomeIds.map((id) => ({
+          id,
+          operation: 'assert-outcome' as const,
+          kind: 'step-changed' as const,
+          assertionDriver: draft.usage.entry.driver,
+          assertionTargetRef: `${id}.target`,
+        })),
+        transitions,
+      },
+    }),
+  );
+  return {
+    ...authorityRepin,
+    value,
+    walkthrough,
+    sourceStepId,
+    targetStepId,
+    targetNodeId,
+    transitions,
+  };
 }
 
 describe('agent-context pure query core', () => {
@@ -2054,25 +2272,904 @@ describe('agent-context pure query core', () => {
     }
   });
 
-  it('fails the CTX-1C slice operation closed and prohibits pagination for atomic views', () => {
+  it('builds the CTX-0D positive and negative atomic slice closures', () => {
     const value = boundary();
-    const selection = value.selections[0]!;
-    const sliceQuery = {
-      schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
-      operation: 'get-e2e-slice',
+    for (const walkthrough of Object.values(value.fixture.walkthroughs)) {
+      const selection = value.selections.find(
+        ({ usage }) => usage.usageId === walkthrough.usage.usageId,
+      );
+      if (selection === undefined) throw new Error('missing slice selection');
+      const focusNodeIds = [...walkthrough.focusNodeIds].sort();
+      const result = executeAgentContextQuery(
+        value.dataset,
+        {
+          schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+          operation: 'get-e2e-slice',
+          selection,
+          withinStepId: walkthrough.stepId,
+          nodeIds: focusNodeIds,
+          goal: walkthrough.polarity,
+          includeOutgoingEffects: false,
+        },
+        value.selectedLive(selection),
+      );
+      expect(result).toMatchObject({
+        operation: 'get-e2e-slice',
+        status: 'complete',
+        freshness: 'current',
+        request: {
+          withinStepId: walkthrough.stepId,
+          nodeIds: focusNodeIds,
+          goal: walkthrough.polarity,
+          includeOutgoingEffects: false,
+        },
+      });
+      if (result.operation !== 'get-e2e-slice' || result.status !== 'complete') {
+        throw new Error('expected complete slice');
+      }
+      expect(result.slice.closureNodes.items.map(({ nodeId }) => nodeId)).toEqual(
+        [...walkthrough.expectedNodeIds].sort(),
+      );
+      expect(result.slice.focusNodes.items.map(({ nodeId }) => nodeId)).toEqual(
+        focusNodeIds,
+      );
+      expect(result.slice.closureNodes.items.every(({ included }) =>
+        canonicalStringify(included) ===
+        canonicalStringify([
+          'constraints',
+          'domain',
+          'effects',
+          'interaction',
+          'locators',
+          'unknowns',
+        ]),
+      )).toBe(true);
+      expect(result.slice.effects.items).toEqual(
+        walkthrough.resolvedContract.declaredEffects ?? [],
+      );
+      expect(
+        result.slice.prerequisites.items.filter(
+          ({ kind }) => kind === 'readiness',
+        ),
+      ).toHaveLength(1);
+      expect(
+        result.slice.prerequisites.items.filter(
+          ({ kind }) => kind === 'effect-source',
+        ),
+      ).toHaveLength(walkthrough.polarity === 'negative' ? 2 : 0);
+    }
+  });
+
+  it('expands one same-step outgoing phase then re-closes incoming edges', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.negative;
+    const selection = selectionForWalkthrough(value, 'negative');
+    const [productNode] = walkthrough.resolvedContract.nodes;
+    if (productNode === undefined) throw new Error('missing product node');
+    const query = sliceQuery(selection, {
+      withinStepId: walkthrough.stepId,
+      nodeIds: [productNode.id],
+      goal: 'negative',
+    });
+    const withoutOutgoing = executeAgentContextQuery(
+      value.dataset,
+      query,
+      value.selectedLive(selection),
+    );
+    const withOutgoing = executeAgentContextQuery(
+      value.dataset,
+      { ...query, includeOutgoingEffects: true },
+      value.selectedLive(selection),
+    );
+    if (
+      withoutOutgoing.operation !== 'get-e2e-slice' ||
+      withoutOutgoing.status !== 'complete' ||
+      withOutgoing.operation !== 'get-e2e-slice' ||
+      withOutgoing.status !== 'complete'
+    ) {
+      throw new Error('expected complete outgoing slice results');
+    }
+    expect(
+      withoutOutgoing.slice.closureNodes.items.map(({ nodeId }) => nodeId),
+    ).toEqual([productNode.id]);
+    expect(withoutOutgoing.slice.effects.items).toEqual([]);
+    const productEffect = (
+      walkthrough.resolvedContract.declaredEffects ?? []
+    ).find(({ trigger }) => trigger.nodeId === productNode.id);
+    if (productEffect === undefined) throw new Error('missing product effect');
+    expect(withOutgoing.slice.closureNodes.items.map(({ nodeId }) => nodeId)).toEqual(
+      [productNode.id, productEffect.target.nodeId].sort(),
+    );
+    expect(withOutgoing.slice.effects.items).toEqual([productEffect]);
+  });
+
+  it('does not re-expand outgoing effects from nodes added by the final incoming closure', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.negative;
+    const selection = selectionForWalkthrough(value, 'negative');
+    const effects = walkthrough.resolvedContract.declaredEffects ?? [];
+    const optionsEffect = effects.find(
+      ({ target }) => target.property === 'options',
+    );
+    const visibilityEffect = effects.find(
+      ({ target }) => target.property === 'visibility',
+    );
+    if (optionsEffect === undefined || visibilityEffect === undefined) {
+      throw new Error('negative walkthrough needs two effects');
+    }
+    const focusNodeId = optionsEffect.trigger.nodeId;
+    const outgoingTargetId = optionsEffect.target.nodeId;
+    const finalPrerequisiteId = visibilityEffect.target.nodeId;
+    const phasePrefix = 'synthetic.rh05.claims.slice.phase';
+    const phasedEffects = [
+      {
+        ...optionsEffect,
+        identity: { id: `${phasePrefix}-1`, version: 1 },
+        ordering: 'none' as const,
+      },
+      {
+        ...optionsEffect,
+        identity: { id: `${phasePrefix}-2`, version: 1 },
+        trigger: { ...optionsEffect.trigger, nodeId: finalPrerequisiteId },
+        target: { ...optionsEffect.target, nodeId: outgoingTargetId },
+      },
+      {
+        ...optionsEffect,
+        identity: { id: `${phasePrefix}-3`, version: 1 },
+        trigger: { ...optionsEffect.trigger, nodeId: finalPrerequisiteId },
+        target: { ...optionsEffect.target, nodeId: focusNodeId },
+        ordering: 'none' as const,
+      },
+    ];
+    const phased = repinScenarioEffects(
+      value.dataset,
       selection,
-      withinStepId: value.fixture.walkthroughs.positive.stepId,
-      nodeIds: [value.fixture.walkthroughs.positive.focusNodeIds[0]!],
-      goal: 'positive',
-      includeOutgoingEffects: false,
+      phasedEffects,
+    );
+    const result = executeAgentContextQuery(
+      phased.dataset,
+      sliceQuery(phased.selection, {
+        withinStepId: walkthrough.stepId,
+        nodeIds: [focusNodeId],
+        goal: 'negative',
+        includeOutgoingEffects: true,
+      }),
+      {
+        schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+        owners: createAgentContextPinnedLiveOwners(phased.selection),
+      },
+    );
+    if (result.operation !== 'get-e2e-slice' || result.status !== 'complete') {
+      throw new Error('expected phased outgoing slice');
+    }
+    expect(result.slice.closureNodes.items.map(({ nodeId }) => nodeId)).toEqual(
+      [focusNodeId, outgoingTargetId, finalPrerequisiteId].sort(),
+    );
+    expect(
+      result.slice.effects.items.map(({ identity }) => identity.id),
+    ).toEqual([`${phasePrefix}-1`, `${phasePrefix}-2`]);
+  });
+
+  it('sources slice effects from the resolved scenario and rejects declared-owner substitution', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.negative;
+    const selection = selectionForWalkthrough(value, 'negative');
+    const query = sliceQuery(selection, {
+      withinStepId: walkthrough.stepId,
+      nodeIds: [...walkthrough.focusNodeIds],
+      goal: 'negative',
+    });
+    const original = executeAgentContextQuery(
+      value.dataset,
+      query,
+      value.selectedLive(selection),
+    );
+    if (original.operation !== 'get-e2e-slice' || original.status !== 'complete') {
+      throw new Error('expected original complete slice');
+    }
+    const scenarioDraft = withoutFormContractContentHash(
+      walkthrough.resolvedContract,
+    );
+    const scenarioWithoutEffects = createFormContract({
+      ...scenarioDraft,
+      declaredEffects: [],
+    });
+    const scenarioRepin = repinScenarioArtifact(
+      value.dataset,
+      selection,
+      scenarioWithoutEffects,
+    );
+    const authorityRepin = repinExecutionAuthority(
+      scenarioRepin.dataset,
+      scenarioRepin.selection,
+      (draft) => ({
+        ...draft,
+        scenario: {
+          ...draft.scenario,
+          artifactHash:
+            scenarioWithoutEffects.contentHash as AgentContextArtifactReference['contentHash'],
+        },
+      }),
+    );
+    const driftQuery = { ...query, selection: authorityRepin.selection };
+    const driftLive = {
+      schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+      owners: createAgentContextPinnedLiveOwners(authorityRepin.selection),
     } as const;
+    const scenarioResult = executeAgentContextQuery(
+      authorityRepin.dataset,
+      driftQuery,
+      driftLive,
+    );
+    if (
+      scenarioResult.operation !== 'get-e2e-slice' ||
+      scenarioResult.status !== 'complete'
+    ) {
+      throw new Error('expected scenario-only complete slice');
+    }
+    expect(scenarioResult.slice.effects.items).toEqual([]);
+    expect(
+      scenarioResult.slice.closureNodes.items.map(({ nodeId }) => nodeId),
+    ).toEqual(walkthrough.focusNodeIds);
+
+    const forgedDeclaredProjection = {
+      ...scenarioResult,
+      slice: {
+        ...original.slice,
+        authority: {
+          ...original.slice.authority,
+          owner: authorityRepin.selection.owners.executionAuthority,
+        },
+      },
+    } as const;
+    expect(() =>
+      validateAgentContextQueryResult(
+        authorityRepin.dataset,
+        forgedDeclaredProjection,
+      ),
+    ).toThrow(/slice|recomputed|projection|effect/u);
+  });
+
+  it('is invariant to scenario node and effect declaration order', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.negative;
+    const selection = selectionForWalkthrough(value, 'negative');
+    const query = sliceQuery(selection, {
+      withinStepId: walkthrough.stepId,
+      nodeIds: [...walkthrough.focusNodeIds],
+      goal: 'negative',
+    });
+    const original = executeAgentContextQuery(
+      value.dataset,
+      query,
+      value.selectedLive(selection),
+    );
+    if (original.operation !== 'get-e2e-slice' || original.status !== 'complete') {
+      throw new Error('expected original order slice');
+    }
+    const draft = withoutFormContractContentHash(walkthrough.resolvedContract);
+    const reorderedScenario = createFormContract({
+      ...draft,
+      nodes: [...draft.nodes].reverse(),
+      declaredEffects: [...(draft.declaredEffects ?? [])].reverse(),
+    });
+    const reordered = repinScenarioOwner(
+      value.dataset,
+      selection,
+      reorderedScenario,
+    );
+    const reorderedResult = executeAgentContextQuery(
+      reordered.dataset,
+      { ...query, selection: reordered.selection },
+      {
+        schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+        owners: createAgentContextPinnedLiveOwners(reordered.selection),
+      },
+    );
+    if (
+      reorderedResult.operation !== 'get-e2e-slice' ||
+      reorderedResult.status !== 'complete'
+    ) {
+      throw new Error('expected reordered complete slice');
+    }
+    expect(reorderedResult.slice.focusNodes).toEqual(original.slice.focusNodes);
+    expect(reorderedResult.slice.closureNodes).toEqual(original.slice.closureNodes);
+    expect(reorderedResult.slice.prerequisites).toEqual(
+      original.slice.prerequisites,
+    );
+    expect(reorderedResult.slice.effects).toEqual(original.slice.effects);
+    expect({ ...reorderedResult.slice.authority, owner: undefined }).toEqual({
+      ...original.slice.authority,
+      owner: undefined,
+    });
+  });
+
+  it('treats conditions conservatively and unordered effects as non-prerequisites', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.negative;
+    const selection = selectionForWalkthrough(value, 'negative');
+    const effects = walkthrough.resolvedContract.declaredEffects ?? [];
+    const conditionRuleId = 'synthetic.rh05.claims.slice.condition';
+    const conditionedEffects = effects.map((effect) =>
+      effect.target.nodeId === walkthrough.focusNodeIds[0]
+        ? { ...effect, conditionRuleId }
+        : effect,
+    );
+    const conditionedDraft = withoutFormContractContentHash(
+      walkthrough.resolvedContract,
+    );
+    const conditionedScenario = createFormContract({
+      ...conditionedDraft,
+      nodes: conditionedDraft.nodes.map((node) =>
+        node.id === walkthrough.focusNodeIds[0]
+          ? {
+              ...node,
+              conditions: [
+                ...node.conditions,
+                {
+                  id: conditionRuleId,
+                  property: 'hide',
+                  expression: 'model.claimDetails.caseType === "other"',
+                  evidence: 'declared' as const,
+                },
+              ],
+            }
+          : node,
+      ),
+      declaredEffects: conditionedEffects,
+    });
+    const conditioned = repinScenarioOwner(
+      value.dataset,
+      selection,
+      conditionedScenario,
+    );
+    const conditionedResult = executeAgentContextQuery(
+      conditioned.dataset,
+      sliceQuery(conditioned.selection, {
+        withinStepId: walkthrough.stepId,
+        nodeIds: [...walkthrough.focusNodeIds],
+        goal: 'negative',
+      }),
+      {
+        schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+        owners: createAgentContextPinnedLiveOwners(conditioned.selection),
+      },
+    );
+    expect(conditionedResult).toMatchObject({
+      status: 'complete',
+      slice: {
+        closureNodes: {
+          items: [...walkthrough.expectedNodeIds]
+            .sort()
+            .map((nodeId) => ({ nodeId })),
+        },
+      },
+    });
+
+    const unordered = repinScenarioEffects(
+      value.dataset,
+      selection,
+      effects.map((effect) => ({ ...effect, ordering: 'none' as const })),
+    );
+    const unorderedResult = executeAgentContextQuery(
+      unordered.dataset,
+      sliceQuery(unordered.selection, {
+        withinStepId: walkthrough.stepId,
+        nodeIds: [...walkthrough.focusNodeIds],
+        goal: 'negative',
+      }),
+      {
+        schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+        owners: createAgentContextPinnedLiveOwners(unordered.selection),
+      },
+    );
+    expect(unorderedResult).toMatchObject({
+      status: 'complete',
+      slice: {
+        closureNodes: {
+          items: walkthrough.focusNodeIds.map((nodeId) => ({ nodeId })),
+        },
+        effects: { items: [] },
+        prerequisites: { items: [] },
+      },
+    });
+  });
+
+  it('refuses deterministic strongly connected prerequisite cycles without recursion', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.negative;
+    const selection = selectionForWalkthrough(value, 'negative');
+    const nodes = walkthrough.resolvedContract.nodes;
+    const product = nodes[0]!;
+    const otherDetails = nodes[2]!;
+    const reverseEffect: DeclaredCrossFieldEffect = {
+      identity: { id: 'synthetic.rh05.claims.other-controls-product', version: 1 },
+      trigger: { nodeId: otherDetails.id, event: 'valueChanged' },
+      target: { nodeId: product.id, property: 'visibility' },
+      kind: 'controls-state',
+      timing: { mode: 'sync' },
+      ordering: 'source-before-target',
+      evidence: 'declared',
+      opacity: 'transparent',
+    };
+    const effects = [
+      ...(walkthrough.resolvedContract.declaredEffects ?? []),
+      reverseEffect,
+    ].sort(
+      (left, right) =>
+        left.identity.id.localeCompare(right.identity.id) ||
+        left.identity.version - right.identity.version,
+    );
+    const cycleDraft = withoutFormContractContentHash(
+      walkthrough.resolvedContract,
+    );
+    const cycleScenario = createFormContract({
+      ...cycleDraft,
+      declaredEffects: effects,
+      effectAnalysis: {
+        completeness: 'incomplete',
+        reasons: ['effect-cycle', 'opaque-dynamic-rule'],
+      },
+    });
+    const cycle = repinScenarioOwner(
+      value.dataset,
+      selection,
+      cycleScenario,
+    );
+    const result = executeAgentContextQuery(
+      cycle.dataset,
+      sliceQuery(cycle.selection, {
+        withinStepId: walkthrough.stepId,
+        nodeIds: [...walkthrough.focusNodeIds],
+        goal: 'negative',
+      }),
+      {
+        schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+        owners: createAgentContextPinnedLiveOwners(cycle.selection),
+      },
+    );
+    expect(result).toMatchObject({
+      status: 'refused',
+      reason: {
+        kind: 'prerequisite-cycle',
+        nodeIds: [...walkthrough.expectedNodeIds].sort(),
+      },
+    });
+  });
+
+  it('returns exact zero, unique, and ambiguous cross-step transition evidence', () => {
+    for (const transitionCount of [0, 1, 2] as const) {
+      const value = crossStepSliceBoundary(transitionCount);
+      const result = executeAgentContextQuery(
+        value.dataset,
+        sliceQuery(value.selection, {
+          withinStepId: value.targetStepId,
+          nodeIds: [value.targetNodeId],
+          goal: 'negative',
+        }),
+        {
+          schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+          owners: createAgentContextPinnedLiveOwners(value.selection),
+        },
+      );
+      const effect = value.walkthrough.resolvedContract.declaredEffects?.find(
+        ({ target }) => target.nodeId === value.targetNodeId,
+      );
+      if (effect === undefined) throw new Error('missing cross-step effect');
+      const witness = {
+        effect: effect.identity,
+        trigger: {
+          nodeId: effect.trigger.nodeId,
+          stepId: value.sourceStepId,
+        },
+        target: {
+          nodeId: effect.target.nodeId,
+          stepId: value.targetStepId,
+        },
+      };
+      expect(result).toMatchObject({
+        operation: 'get-e2e-slice',
+        status: 'refused',
+        reason:
+          transitionCount === 0
+            ? { kind: 'cross-step-transition-unavailable', witness }
+            : transitionCount === 1
+              ? {
+                  kind: 'cross-step-prerequisite-required',
+                  witness,
+                  transition: value.transitions[0],
+                }
+              : {
+                  kind: 'cross-step-transition-ambiguous',
+                  witness,
+                  transitions: value.transitions,
+                },
+      });
+    }
+  });
+
+  it('requires exact async target readiness and includes exact matches', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.negative;
+    const selection = selectionForWalkthrough(value, 'negative');
+    const effects = walkthrough.resolvedContract.declaredEffects ?? [];
+    const readiness = walkthrough.executionAuthority.readiness[0]!;
+    const readinessNode = walkthrough.resolvedContract.nodes.find(
+      ({ id }) => id === readiness.nodeId,
+    );
+    const profileReadinessId =
+      readinessNode?.interactionProfile?.effectCapabilities.readiness[0]?.id;
+    if (profileReadinessId === undefined) {
+      throw new Error('missing profile readiness capability');
+    }
+    const exactEffects = effects.map((effect) =>
+      effect.target.nodeId === readiness.nodeId
+        ? {
+            ...effect,
+            timing: { mode: 'async' as const, readinessId: readiness.id },
+          }
+        : effect,
+    );
+    const exactDraft = withoutFormContractContentHash(
+      walkthrough.resolvedContract,
+    );
+    const exactScenario = createFormContract({
+      ...exactDraft,
+      nodes: exactDraft.nodes.map((node) =>
+        node.id === readiness.nodeId
+          ? {
+              ...node,
+              interactionProfile: {
+                ...node.interactionProfile!,
+                effectCapabilities: {
+                  ...node.interactionProfile!.effectCapabilities,
+                  readiness:
+                    node.interactionProfile!.effectCapabilities.readiness.map(
+                      (capability) => ({ ...capability, id: readiness.id }),
+                    ),
+                },
+              },
+            }
+          : node,
+      ),
+      declaredEffects: exactEffects,
+    });
+    const exact = repinScenarioOwner(
+      value.dataset,
+      selection,
+      exactScenario,
+    );
+    expect(
+      executeAgentContextQuery(
+        exact.dataset,
+        sliceQuery(exact.selection, {
+          withinStepId: walkthrough.stepId,
+          nodeIds: [...walkthrough.focusNodeIds],
+          goal: 'negative',
+        }),
+        {
+          schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+          owners: createAgentContextPinnedLiveOwners(exact.selection),
+        },
+      ),
+    ).toMatchObject({ status: 'complete' });
+
+    const mismatchEffects = effects.map((effect) =>
+      effect.target.nodeId === readiness.nodeId
+        ? {
+            ...effect,
+            timing: {
+              mode: 'async' as const,
+              readinessId: profileReadinessId,
+            },
+          }
+        : effect,
+    );
+    const mismatch = repinScenarioEffects(
+      value.dataset,
+      selection,
+      mismatchEffects,
+    );
+    expect(
+      executeAgentContextQuery(
+        mismatch.dataset,
+        sliceQuery(mismatch.selection, {
+          withinStepId: walkthrough.stepId,
+          nodeIds: [...walkthrough.focusNodeIds],
+          goal: 'negative',
+        }),
+        {
+          schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+          owners: createAgentContextPinnedLiveOwners(mismatch.selection),
+        },
+      ),
+    ).toMatchObject({
+      status: 'refused',
+      reason: {
+        kind: 'prerequisite-readiness-unavailable',
+        nodeId: readiness.nodeId,
+        readinessId: profileReadinessId,
+      },
+    });
+  });
+
+  it('preserves duplicate wrapper preconditions by exact declaration index', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.negative;
+    const selection = selectionForWalkthrough(value, 'negative');
+    const draft = withoutFormContractContentHash(walkthrough.resolvedContract);
+    const wrapperNodeId = walkthrough.executionAuthority.readiness[0]!.nodeId;
+    const precondition = {
+      kind: 'activate',
+      part: 'trigger',
+      operation: 'click',
+      evidence: 'declared',
+    } as const;
+    const scenario = createFormContract({
+      ...draft,
+      nodes: draft.nodes.map((node) =>
+        node.id === wrapperNodeId
+          ? {
+              ...node,
+              interactionProfile: {
+                ...node.interactionProfile!,
+                preconditions: [precondition, precondition],
+              },
+            }
+          : node,
+      ),
+    });
+    const repin = repinScenarioOwner(value.dataset, selection, scenario);
+    const result = executeAgentContextQuery(
+      repin.dataset,
+      sliceQuery(repin.selection, {
+        withinStepId: walkthrough.stepId,
+        nodeIds: [...walkthrough.focusNodeIds],
+        goal: 'negative',
+      }),
+      {
+        schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+        owners: createAgentContextPinnedLiveOwners(repin.selection),
+      },
+    );
+    if (result.operation !== 'get-e2e-slice' || result.status !== 'complete') {
+      throw new Error('expected wrapper-precondition slice');
+    }
+    expect(
+      result.slice.prerequisites.items.filter(
+        ({ kind }) => kind === 'wrapper-precondition',
+      ),
+    ).toMatchObject([
+      { preconditionIndex: 0, precondition },
+      { preconditionIndex: 1, precondition },
+    ]);
+  });
+
+  it('echoes every goal without changing the computed slice', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.positive;
+    const selection = selectionForWalkthrough(value, 'positive');
+    const slices = (['boundary', 'negative', 'positive'] as const).map((goal) => {
+      const result = executeAgentContextQuery(
+        value.dataset,
+        sliceQuery(selection, {
+          withinStepId: walkthrough.stepId,
+          nodeIds: [...walkthrough.focusNodeIds].sort(),
+          goal,
+        }),
+        value.selectedLive(selection),
+      );
+      if (result.operation !== 'get-e2e-slice' || result.status !== 'complete') {
+        throw new Error('expected complete goal slice');
+      }
+      expect(result.request.goal).toBe(goal);
+      return result.slice;
+    });
+    expect(slices[1]).toEqual(slices[0]);
+    expect(slices[2]).toEqual(slices[0]);
+  });
+
+  it('returns closed step, focus, and step-scope refusals', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.positive;
+    const selection = selectionForWalkthrough(value, 'positive');
+    const focusNodeId = [...walkthrough.focusNodeIds].sort()[0]!;
+    const cases = [
+      {
+        query: sliceQuery(selection, {
+          withinStepId: 'synthetic.rh05.step.missing',
+          nodeIds: [focusNodeId],
+        }),
+        reason: { kind: 'step-absent', stepId: 'synthetic.rh05.step.missing' },
+      },
+      {
+        query: sliceQuery(selection, {
+          withinStepId: walkthrough.stepId,
+          nodeIds: ['synthetic.rh05.node.missing'],
+        }),
+        reason: {
+          kind: 'slice-focus-node-absent',
+          nodeIds: ['synthetic.rh05.node.missing'],
+        },
+      },
+    ] as const;
+    for (const testCase of cases) {
+      expect(
+        executeAgentContextQuery(
+          value.dataset,
+          testCase.query,
+          value.selectedLive(selection),
+        ),
+      ).toMatchObject({
+        operation: 'get-e2e-slice',
+        status: 'refused',
+        reason: testCase.reason,
+      });
+    }
+
+    const split = threeStepBoundary();
+    const firstNodeId = split.dataset.executionAuthorities
+      .find(
+        ({ reference }) =>
+          reference.contentHash ===
+          split.selection.owners.executionAuthority.contentHash,
+      )!
+      .artifact.usage.steps[0]!.nodeIds[0]!;
+    expect(
+      executeAgentContextQuery(
+        split.dataset,
+        sliceQuery(split.selection, {
+          withinStepId: split.stepIds[1],
+          nodeIds: [firstNodeId],
+        }),
+        {
+          schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+          owners: createAgentContextPinnedLiveOwners(split.selection),
+        },
+      ),
+    ).toMatchObject({
+      operation: 'get-e2e-slice',
+      status: 'refused',
+      reason: { kind: 'step-scope-mismatch', nodeIds: [firstNodeId] },
+    });
+  });
+
+  it('fails closed when an internal scenario effect endpoint has no node or step owner', () => {
+    const value = boundary();
+    const selection = selectionForWalkthrough(value, 'negative');
+    const walkthrough = value.fixture.walkthroughs.negative;
+    const dataset = parseAgentContextQueryDataset(value.dataset);
+    const ownerIndex = dataset.formContracts.findIndex(
+      ({ reference }) =>
+        reference.contentHash === selection.owners.scenarioArtifact.contentHash,
+    );
+    const owner = dataset.formContracts[ownerIndex];
+    const effect = owner?.artifact.declaredEffects?.[0];
+    if (owner === undefined || effect === undefined) {
+      throw new Error('missing scenario endpoint fixture');
+    }
+    const brokenDataset: AgentContextQueryDataset = {
+      ...dataset,
+      formContracts: dataset.formContracts.map((candidate, index) =>
+        index === ownerIndex
+          ? {
+              ...candidate,
+              artifact: {
+                ...candidate.artifact,
+                declaredEffects: [
+                  {
+                    ...effect,
+                    target: {
+                      ...effect.target,
+                      nodeId: 'synthetic.rh05.node.unowned',
+                    },
+                  },
+                ],
+              },
+            }
+          : candidate,
+      ),
+    };
+    expect(() =>
+      resolveAgentContextE2eSliceAgainstParsedDataset(
+        brokenDataset,
+        selection,
+        {
+          withinStepId: walkthrough.stepId,
+          nodeIds: [...walkthrough.focusNodeIds],
+          goal: 'negative',
+          includeOutgoingEffects: false,
+        },
+      ),
+    ).toThrow(/effects\[0\]\.target\.nodeId|scenario artifact|authority/u);
+  });
+
+  it('rejects slice query accessors and proxies without invoking traps', () => {
+    const value = boundary();
+    const selection = selectionForWalkthrough(value, 'positive');
+    const walkthrough = value.fixture.walkthroughs.positive;
+    const query = sliceQuery(selection, {
+      withinStepId: walkthrough.stepId,
+      nodeIds: [...walkthrough.focusNodeIds].sort(),
+    });
+    let getterReads = 0;
+    const accessor = { ...query } as Record<string, unknown>;
+    Object.defineProperty(accessor, 'nodeIds', {
+      enumerable: true,
+      get() {
+        getterReads += 1;
+        return query.nodeIds;
+      },
+    });
     expect(() =>
       executeAgentContextQuery(
         value.dataset,
-        sliceQuery,
+        accessor,
         value.selectedLive(selection),
       ),
-    ).toThrow(/get-e2e-slice|CTX-1C|unsupported/u);
+    ).toThrow(/nodeIds|data property|accessor/u);
+    expect(getterReads).toBe(0);
+
+    let proxyReads = 0;
+    const proxy = new Proxy(query, {
+      get(target, property, receiver) {
+        proxyReads += 1;
+        const result: unknown = Reflect.get(target, property, receiver);
+        return result;
+      },
+    });
+    expect(() =>
+      executeAgentContextQuery(
+        value.dataset,
+        proxy,
+        value.selectedLive(selection),
+      ),
+    ).toThrow(/query|proxy/u);
+    expect(proxyReads).toBe(0);
+  });
+
+  it('computes current, unknown, and stale slice freshness', () => {
+    const value = boundary();
+    const walkthrough = value.fixture.walkthroughs.negative;
+    const selection = selectionForWalkthrough(value, 'negative');
+    const query = sliceQuery(selection, {
+      withinStepId: walkthrough.stepId,
+      nodeIds: [...walkthrough.focusNodeIds],
+      goal: 'negative',
+    });
+    const current = value.selectedLive(selection);
+    const unknown = {
+      ...current,
+      owners: current.owners.filter(({ role }) => role !== 'form-contract'),
+    };
+    const stale = {
+      ...current,
+      owners: current.owners.map((owner) =>
+        owner.role === 'scenario-artifact'
+          ? {
+              ...owner,
+              reference: {
+                ...owner.reference,
+                contentHash: `sha256:${'0'.repeat(64)}` as const,
+              },
+            }
+          : owner,
+      ),
+    };
+    for (const [live, freshness] of [
+      [current, 'current'],
+      [unknown, 'unknown'],
+      [stale, 'stale'],
+    ] as const) {
+      expect(
+        executeAgentContextQuery(value.dataset, query, live),
+      ).toMatchObject({ freshness });
+    }
+  });
+
+  it('prohibits pagination for atomic views', () => {
+    const value = boundary();
+    const selection = value.selections[0]!;
     expect(() =>
       executeAgentContextQuery(
         value.dataset,

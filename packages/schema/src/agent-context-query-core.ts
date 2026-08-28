@@ -8,12 +8,16 @@ import {
   parseAgentContextQueryCursor,
 } from './agent-context-query-cursor.js';
 import {
+  AGENT_CONTEXT_QUERY_MAX_ATOMIC_RECORD_GRAPH_NODES,
+  AGENT_CONTEXT_QUERY_MAX_ATOMIC_VIEW_GRAPH_NODES,
   AGENT_CONTEXT_QUERY_MAX_COLLECTION_SIZE,
   AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+  classifyAgentContextE2eSliceOverflow,
   evaluateAgentContextQueryFreshness,
   parseAgentContextLiveOwnerState,
   parseAgentContextQuery,
   parseAgentContextQueryDataset,
+  resolveAgentContextE2eSliceAgainstParsedDataset,
   validateAgentContextQueryResultAgainstParsedDataset,
   validateAgentContextQuerySelectionAgainstParsedDataset,
   validateAgentContextUsageSearchScopeAgainstParsedDataset,
@@ -40,6 +44,8 @@ import {
   type FindFormNodesResult,
   type GetFormContextQuery,
   type GetFormContextResult,
+  type GetE2eSliceQuery,
+  type GetE2eSliceResult,
   type SearchFormUsagesQuery,
   type SearchFormUsagesResult,
 } from './agent-context-query.js';
@@ -64,8 +70,6 @@ interface SelectionOwners {
 }
 
 const PAGINATION_KEYS = new Set(['now', 'ttlMs', 'signingMaterial']);
-const MAX_ATOMIC_RECORD_GRAPH_NODES = 10_000;
-const MAX_ATOMIC_VIEW_GRAPH_NODES = 100_000;
 
 function fail(path: string, message: string): never {
   throw new TypeError(`${path}: ${message}`);
@@ -121,7 +125,7 @@ function hasOversizedCollection(input: unknown): boolean {
 function recordIsOversized(input: unknown): boolean {
   return (
     hasOversizedCollection(input) ||
-    graphExceeds(input, MAX_ATOMIC_RECORD_GRAPH_NODES)
+    graphExceeds(input, AGENT_CONTEXT_QUERY_MAX_ATOMIC_RECORD_GRAPH_NODES)
   );
 }
 
@@ -857,7 +861,7 @@ function executeUsageSearch(
             })),
           },
         };
-  if (graphExceeds(result, MAX_ATOMIC_VIEW_GRAPH_NODES)) {
+  if (graphExceeds(result, AGENT_CONTEXT_QUERY_MAX_ATOMIC_VIEW_GRAPH_NODES)) {
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation: 'search-form-usages',
@@ -1106,10 +1110,69 @@ function selectionFreshness(
     | 'context-summary'
     | 'context-diagnostics'
     | 'context-journey'
-    | 'node-search',
+    | 'node-search'
+    | 'e2e-slice',
   live: unknown,
 ): AgentContextFreshness {
   return evaluateAgentContextQueryFreshness({ view, selection, live });
+}
+
+function executeSliceQuery(
+  dataset: AgentContextQueryDataset,
+  query: GetE2eSliceQuery,
+  live: unknown,
+): GetE2eSliceResult {
+  const selection = validateAgentContextQuerySelectionAgainstParsedDataset(
+    dataset,
+    query.selection,
+  );
+  const freshness = selectionFreshness(selection, 'e2e-slice', live);
+  const request = {
+    withinStepId: query.withinStepId,
+    nodeIds: query.nodeIds,
+    goal: query.goal,
+    includeOutgoingEffects: query.includeOutgoingEffects,
+  } as const;
+  const resolution = resolveAgentContextE2eSliceAgainstParsedDataset(
+    dataset,
+    selection,
+    request,
+  );
+  if (resolution.status === 'refused') {
+    const result: GetE2eSliceResult = {
+      schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+      operation: 'get-e2e-slice',
+      status: 'refused',
+      selection,
+      freshness,
+      request,
+      reason: resolution.reason,
+    };
+    const overflow = classifyAgentContextE2eSliceOverflow(result);
+    return overflow === undefined ? result : { ...result, reason: overflow };
+  }
+  const result: GetE2eSliceResult = {
+    schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+    operation: 'get-e2e-slice',
+    status: 'complete',
+    selection,
+    freshness,
+    request,
+    slice: resolution.slice,
+  };
+  const overflow = classifyAgentContextE2eSliceOverflow(result);
+  if (overflow !== undefined) {
+    return {
+      schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
+      operation: 'get-e2e-slice',
+      status: 'refused',
+      selection,
+      freshness,
+      request,
+      reason: overflow,
+    };
+  }
+  return result;
 }
 
 function executeContextQuery(
@@ -1183,7 +1246,7 @@ function executeContextQuery(
       steps: paged.items,
       page: paged.page,
     };
-    if (graphExceeds(result, MAX_ATOMIC_VIEW_GRAPH_NODES)) {
+    if (graphExceeds(result, AGENT_CONTEXT_QUERY_MAX_ATOMIC_VIEW_GRAPH_NODES)) {
       return {
         schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
         operation: 'get-form-context',
@@ -1243,7 +1306,7 @@ function executeContextQuery(
       evidence: paged.items,
       page: paged.page,
     };
-    if (graphExceeds(result, MAX_ATOMIC_VIEW_GRAPH_NODES)) {
+    if (graphExceeds(result, AGENT_CONTEXT_QUERY_MAX_ATOMIC_VIEW_GRAPH_NODES)) {
       return {
         schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
         operation: 'get-form-context',
@@ -1283,7 +1346,7 @@ function executeContextQuery(
     freshness,
     journey: { identity: selection.journey, authority: projection },
   };
-  if (graphExceeds(result, MAX_ATOMIC_VIEW_GRAPH_NODES)) {
+  if (graphExceeds(result, AGENT_CONTEXT_QUERY_MAX_ATOMIC_VIEW_GRAPH_NODES)) {
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation: 'get-form-context',
@@ -1510,7 +1573,7 @@ function executeNodeQuery(
             nodeIds: candidates.map(({ nodeId }) => nodeId),
           },
         };
-  if (graphExceeds(result, MAX_ATOMIC_VIEW_GRAPH_NODES)) {
+  if (graphExceeds(result, AGENT_CONTEXT_QUERY_MAX_ATOMIC_VIEW_GRAPH_NODES)) {
     return {
       schemaVersion: AGENT_CONTEXT_QUERY_SCHEMA_VERSION,
       operation: 'find-form-nodes',
@@ -1540,9 +1603,10 @@ export function executeAgentContextQuery(
     fail('agentContextQueryPagination', 'is prohibited for atomic operations.');
   }
   if (query.operation === 'get-e2e-slice') {
-    fail(
-      'executeAgentContextQuery.get-e2e-slice',
-      'is unsupported until CTX-1C.',
+    const result = executeSliceQuery(dataset, query, live);
+    return validateAgentContextQueryResultAgainstParsedDataset(
+      dataset,
+      result,
     );
   }
   if (query.operation === 'search-form-usages') {

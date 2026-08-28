@@ -219,9 +219,58 @@ and `effects` collections. Each
 prerequisite carries an exact closure node plus one resolved cause: a concrete
 trigger effect, selected-authority readiness record, or included wrapper
 precondition. Focus and prerequisite nodes must be exact subsets of the
-closure; closure nodes must belong to the named authority step. No nested
-collection uses a cursor or truncation marker. CTX-1C must source slice nodes,
-node details, and effect records from the selected resolved scenario artifact.
+closure; both endpoints of every slice effect must be in that closure, and
+closure nodes must belong to the named authority step. No nested collection
+uses a cursor or truncation marker. CTX-1C must source slice nodes, node
+details, and effect records from the selected resolved scenario artifact.
+
+Every complete or refused E2E-slice result echoes the exact canonical request
+as `request: { withinStepId, nodeIds, goal, includeOutgoingEffects }`. This is
+the dataset-aware recomputation boundary; `goal` is echoed and does not add
+CTX-2 planning or refusal policy. Complete slice nodes carry the full canonical
+include set (`constraints`, `domain`, `effects`, `interaction`, `locators`, and
+`unknowns`). Focus and closure nodes sort by node ID, effects by identity ID
+then version, and prerequisites by canonical JSON.
+
+Slice closure is normative:
+
+1. the named authority step must exist; every focus ID must exist in the
+   resolved scenario and belong to that step;
+2. only a resolved-scenario effect with `ordering: "source-before-target"`
+   creates the reverse prerequisite edge from its target to its trigger;
+   conditions are retained conservatively and never evaluated, while
+   `ordering: "none"` creates no prerequisite edge;
+3. incoming same-step prerequisite edges are followed to a fixed point;
+4. when `includeOutgoingEffects` is true, one outgoing phase adds every
+   explicit same-step target from the prerequisite closure snapshot, after
+   which incoming closure repeats to a fixed point without another outgoing
+   pass; cross-step outgoing effects are omitted;
+5. iterative strongly connected component detection refuses the canonical
+   first prerequisite cycle without recursion or fallback inference;
+6. an included asynchronous effect must join its timing readiness ID to
+   exactly one selected-authority readiness record for the exact target node;
+7. readiness for closure nodes and interaction-profile wrapper preconditions
+   are complete prerequisites; wrapper preconditions carry their exact
+   zero-based `preconditionIndex`, preserving declaration order and legal
+   duplicate records; and
+8. the authority projection contains only the exact entry, closure step(s),
+   operations, readiness, and referentially required action/outcome/transition
+   records.
+
+An incoming cross-step prerequisite refuses rather than fabricating a
+multi-step closure. `CrossStepWitness` carries the exact effect identity plus
+trigger `{ nodeId, stepId }` and target `{ nodeId, stepId }`. The canonical
+first witness is paired with zero, one, or multiple exact authority transitions
+whose endpoints equal the witness steps: zero yields
+`cross-step-transition-unavailable`, one yields
+`cross-step-prerequisite-required` with the full transition, and multiple
+yield `cross-step-transition-ambiguous` with the complete canonical transition
+set. The other slice refusals are `step-absent`,
+`slice-focus-node-absent`, `step-scope-mismatch`,
+`prerequisite-readiness-unavailable`, and `prerequisite-cycle`, followed by
+the size refusals. Step absence is evaluated before focus absence, which is
+evaluated before step-scope mismatch; cross-step evidence, cycles, and exact
+readiness are then evaluated in that order.
 
 `validateAgentContextQueryResult(dataset, result)` is the production result
 boundary. It revalidates the search scope or pinned selection, then proves
@@ -260,9 +309,10 @@ invoking caller code. Pagination is required for usage search, context summary
 or diagnostics, and node search; it is prohibited for the atomic journey and
 E2E-slice operations. Time and signing material are always caller-supplied.
 
-`get-e2e-slice` remains deliberately unsupported in CTX-1B and throws an input
-or unsupported-operation error after safe parsing. It does not fabricate a
-query-refusal result before CTX-1C implements and validates the closure.
+CTX-1C implements `get-e2e-slice` as the atomic closure above. It prohibits a
+pagination runtime, computes `e2e-slice` freshness from every pinned owner
+role, and runs the same dataset-aware result validator used for caller-supplied
+results before returning.
 
 Search filters are conjunctive. Identity, path/location, model path, scenario,
 semantic type, and capability values use exact equality; text and label use a
@@ -300,10 +350,10 @@ Failure/ambiguity reasons are closed data discriminants, not diagnostics:
 
 - usage ambiguity and authoritative versus non-authoritative usage absence;
 - node ambiguity and node absence;
-- step-scope mismatch;
+- absent step, absent focus node, or step-scope mismatch;
 - exact cross-step prerequisite required, transition unavailable, or
   transition ambiguity;
-- prerequisite cycle; and
+- unavailable exact target readiness or prerequisite cycle; and
 - atomic record or atomic view overflow.
 
 Reasons may carry only the bounded stable identities needed to understand or
@@ -384,7 +434,7 @@ authenticated before an output-size refusal can be returned.
 | Query/result collection entries | 10,000 |
 | Atomic secondary collection entries | 10,000 |
 | One atomic record data graph | 10,000 nodes/properties |
-| One complete atomic result data graph | 100,000 nodes/properties |
+| One atomic result data graph | 100,000 nodes/properties |
 | Page limit | 1–200 |
 | Identifier | 256 UTF-16 code units |
 | Search/presentation text | 4,096 UTF-16 code units |
@@ -397,11 +447,16 @@ authenticated before an output-size refusal can be returned.
 Data-graph counts include the root plus every enumerable data-property value;
 an array's non-enumerable `length` is excluded. Every individual collection
 is capped at 10,000 entries. An individual record is checked before its
-enclosing complete atomic result: a record above 10,000 yields
-`atomic-record-too-large`, while a complete atomic result above 100,000 yields
+enclosing atomic result: a record above 10,000 yields
+`atomic-record-too-large`, while an atomic result above 100,000 yields
 `atomic-view-too-large` where that result variant permits it. Implementations
 must not substitute summed collection lengths for this graph count. Counts are
-enforced before an output is returned. Numeric inputs must be finite safe
+enforced before an output is returned. The echoed slice request and a semantic
+refusal reason are individual records. Semantic refusals are classified before
+return, so a large transition-ambiguity reason is replaced by the exact
+record-before-view overflow reason. Dataset-aware validation recomputes the
+would-be complete or semantic-refusal result and accepts an overflow reason
+only when that same classification produces it. Numeric inputs must be finite safe
 integers; negative zero is normalized only where zero is legal.
 
 ## Non-goals
@@ -463,7 +518,21 @@ journey, nested/array node discovery, every node include and capability
 filter, page-specific authority, current/stale/unknown freshness, deterministic
 continuation and refreshed expiry, replay/out-of-range refusal, unsafe runtime
 objects, exact graph overflow, scenario-only facts, declared-only projection
-rejection, scenario node-set drift, and the CTX-1C slice fail-closed boundary.
+rejection, and scenario node-set drift.
+
+CTX-1C additionally retains the CTX-0D positive supplier/currency/total slice
+with supplier readiness; the negative product/case-type/other-details closure
+with both effects, effect-source prerequisites, and case-type readiness;
+outgoing phase and incoming fixed-point boundaries; every goal;
+step/focus/scope refusals;
+conditioned and unordered effects; deterministic cycles; zero/one/multiple
+cross-step transitions with exact witnesses; exact and mismatched async target
+readiness; duplicate indexed wrapper preconditions; canonical order
+invariance; resolved-scenario effect ownership and declared-owner substitution
+refusal; recomputation rejection for omitted/inflated projections; current,
+unknown, and stale freshness; getter/proxy and missing-endpoint fail-closed
+behavior; and exact record, semantic-refusal, collection, and view overflow
+boundaries.
 
 Required commands:
 
