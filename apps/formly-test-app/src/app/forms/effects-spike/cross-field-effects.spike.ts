@@ -700,7 +700,18 @@ export function observeControlledScenarioDelta(input: {
   const after = indexObservations(input.after);
   const duplicateIds = new Set([...before.duplicates, ...after.duplicates]);
   const allIds = new Set([...before.values.keys(), ...after.values.keys()]);
-  const properties = ['enabled', 'options', 'required', 'value', 'visible'] as const;
+  // `key` reads off ScenarioFieldObservation (which uses Formly's own
+  // 'visible' field name); `targetProperty` is what's emitted on
+  // EffectEdgeCandidate.target, which must line up with EffectTargetProperty
+  // ('visibility', not 'visible') so scenario-derived edges can be matched
+  // against declared effect target capabilities.
+  const properties = [
+    { key: 'enabled', targetProperty: 'enabled' },
+    { key: 'options', targetProperty: 'options' },
+    { key: 'required', targetProperty: 'required' },
+    { key: 'value', targetProperty: 'value' },
+    { key: 'visible', targetProperty: 'visibility' },
+  ] as const;
   const deltas: EffectEdgeCandidate[] = [];
   const unknowns: ScenarioDeltaUnknown[] = [];
 
@@ -717,12 +728,12 @@ export function observeControlledScenarioDelta(input: {
     }
 
     let nodeHasNonJson = false;
-    for (const property of properties) {
+    for (const { key, targetProperty } of properties) {
       const beforeHas = Object.prototype.hasOwnProperty.call(
         beforeValue,
-        property,
+        key,
       );
-      const afterHas = Object.prototype.hasOwnProperty.call(afterValue, property);
+      const afterHas = Object.prototype.hasOwnProperty.call(afterValue, key);
       if (!beforeHas && !afterHas) {
         continue;
       }
@@ -731,20 +742,20 @@ export function observeControlledScenarioDelta(input: {
         continue;
       }
       const beforeCanonical = canonicalObservation(
-        beforeValue[property],
+        beforeValue[key],
         new Set(),
       );
-      const afterCanonical = canonicalObservation(afterValue[property], new Set());
+      const afterCanonical = canonicalObservation(afterValue[key], new Set());
       if (beforeCanonical === undefined || afterCanonical === undefined) {
         nodeHasNonJson = true;
         continue;
       }
       if (beforeCanonical !== afterCanonical) {
-        const effectKind = targetEffectKind(property);
+        const effectKind = targetEffectKind(targetProperty);
         if (effectKind !== undefined) {
           deltas.push({
             source: input.changedSource,
-            target: { nodeId, property },
+            target: { nodeId, property: targetProperty },
             effectKind,
             evidence: 'controlled-scenario-delta',
             authority: 'candidate',

@@ -276,7 +276,8 @@ function angularReadPath(ast: AST): string | undefined {
     if (receiver == null || !(ast.key instanceof LiteralPrimitive)) {
       return undefined;
     }
-    return `${receiver}.${String(ast.key.value)}`;
+    const key = String(ast.key.value);
+    return receiver === '' ? key : `${receiver}.${key}`;
   }
   return undefined;
 }

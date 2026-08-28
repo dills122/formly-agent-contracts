@@ -116,7 +116,7 @@ describe('cross-field effects Formly scenario observation', () => {
       },
       {
         source: { scope: 'model', path: ['product'] },
-        target: { nodeId: 'caseType', property: 'visible' },
+        target: { nodeId: 'caseType', property: 'visibility' },
         effectKind: 'visibility-state',
         evidence: 'controlled-scenario-delta',
         authority: 'candidate',

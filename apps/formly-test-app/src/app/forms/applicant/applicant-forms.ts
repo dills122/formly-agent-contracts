@@ -1,6 +1,7 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 
 import type { TestFormDefinition } from '../../form-registry/form-definition.js';
+import { postalCodePattern } from '../../formly-types/postal-code.js';
 
 function createProfileFields(): FormlyFieldConfig[] {
   return [
@@ -52,7 +53,7 @@ function createProfileFields(): FormlyFieldConfig[] {
           props: {
             label: 'Postal code',
             required: true,
-            pattern: '^[A-Z][0-9][A-Z] [0-9][A-Z][0-9]$',
+            pattern: postalCodePattern.source,
           },
           validators: {
             validation: ['postalCode'],

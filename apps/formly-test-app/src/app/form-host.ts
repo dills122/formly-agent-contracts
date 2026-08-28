@@ -36,8 +36,7 @@ export class FormHost {
   select(id: string): void {
     const definition = this.definitions.find((candidate) => candidate.id === id);
     if (!definition) {
-      this.#source.create(id);
-      return;
+      throw new Error(`Unknown test form ID: ${id}`);
     }
 
     const instance = this.#source.create(id);
