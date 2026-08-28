@@ -335,7 +335,29 @@ exit with status `1` and omit stack traces and underlying callback errors.
 `check` to override diagnostic policy. `list` does not accept output or
 diagnostic overrides because it never generates contracts.
 
-## Project-owned custom-field profiles
+## Custom-field profile authoring
+
+[ADR 0011](decisions/0011-named-formly-environments-and-contracted-field-adapters.md)
+proposes the intended product model: the root workspace declares named Formly
+environments, reusable field libraries contribute compact reviewed adapters
+once through the same catalog/helper used by production registration, and each
+Formly-producing project selects one exact environment. Third-party types use
+an explicit reviewed binding adapter. The Angular authoring host inventories
+the real registrations/scopes, runs required controlled conformance, and
+deterministically emits the existing canonical `FieldTypeProfileRegistry` for
+the compiler. Missing or conflicting adapters, registrations, codecs, drivers,
+examples, or scopes remain non-actionable.
+
+The `fieldTypeProfiles` example below documents the currently implemented
+legacy input. It remains useful for migration and preserves the current v0.4
+registry bytes and compiler behavior, but it is not the intended normal
+authoring UX. Proposed workspace-config `0.3.0` retains it for one deprecated
+pre-1.0 transition; the next breaking schema, targeted as `1.0.0`, removes it
+unless `AUTH-MIG-1` records measured evidence and an explicit ADR amendment.
+When named environments land, a project will select an environment or provide
+this legacy registry, never both; no merge or precedence fallback is planned.
+
+### Legacy project-owned registry input
 
 A project may declare a versioned `fieldTypeProfiles` registry. The registry
 maps an exact Formly type string, such as `cool-radio-btn-grp`, to reviewed
@@ -473,12 +495,13 @@ mappings cannot authorize a generic driver. Declared function, string, async,
 or expression-backed collections remain dynamic without being executed; a
 trusted resolved collection is enumerated with scenario completeness.
 
-The Angular authoring lane is compatibility-first: schema-owned compatibility
-result, retained application-target gate, Node-safe workspace descriptor,
-isolated AOT browser inventory, source/template joins, and only then
-review-required scaffolds and a workplace value pilot. It is separate from the
-trusted JIT scenario compiler. Exact application-specific drivers remain
-available when a custom field cannot be made safely generic.
+The revised Angular authoring lane is compatibility-first: schema-owned
+compatibility result, retained application-target gate, Node-safe named
+environment, isolated AOT inventory, deterministic adapter lowering, required
+controlled conformance, and generated registry/environment-bundle publication.
+Source/template joins and scaffolds are optional migration aids. The lane is
+separate from the trusted JIT scenario compiler. Exact application-specific
+drivers remain available when a custom field cannot be made safely generic.
 
 ## Project-owned cross-field effects
 

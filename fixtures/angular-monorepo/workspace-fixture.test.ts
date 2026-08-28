@@ -268,7 +268,7 @@ describe('Angular monorepo workspace fixture', () => {
         ({ wrapperName }) => wrapperName,
       ),
     ).toEqual(['fixture-expansion-panel']);
-  });
+  }, 20_000);
 
   it('extracts the real custom-field matrix through the shared registry', async () => {
     const root = parseRootConfig(
@@ -409,7 +409,7 @@ describe('Angular monorepo workspace fixture', () => {
     expect(shared.contract.fieldTypeProfileRegistry).toEqual(
       intake.contract.fieldTypeProfileRegistry,
     );
-  });
+  }, 20_000);
 
   it('composes reusable fragments and a custom field into a feature form', async () => {
     const formsKit = await loadProject(

@@ -3,7 +3,7 @@
 ## Current implementation boundary
 
 The implemented generic pilot now includes schema v0.4, declared and trusted
-scenario compilation, project-owned custom-field profiles, repository-aware
+scenario compilation, legacy project-owned custom-field profiles, repository-aware
 root/project/source configuration, deterministic multi-project discovery and
 artifact generation, a workspace index, generic `formly-contracts list`,
 `generate`, and non-mutating `check` commands, strict project-owned cross-field
@@ -12,7 +12,8 @@ artifacts and workspace indexes. Canonical Angular-fixture goldens plus linked
 and packed consumers verify the generic pilot outside package-source imports.
 
 The long-term architecture below remains the intended direction. The remaining
-controlled Angular project host, Angular-assisted profile inventory, optional
+controlled Angular project host, named-environment adapter generation and
+conformance, optional
 Nx task integration, production MCP delivery, typed Playwright
 execution, browser observation, runtime parity, and change analysis remain
 later layers. They must consume or extend the same contracts rather than move
@@ -411,16 +412,26 @@ compiler, while application-specific IDs resolve through a trusted application
 allowlist. Angular reflection and source/render analysis belong to the trusted
 build-time authoring host and do not run in the schema or MCP query path.
 
-Reviewed profiles and Angular authoring evidence have different authority. A
-future Angular inventory can report configured registrations, effective
-components, source/template candidates, rendered roles and parts, coverage,
-and drift. It may generate review scaffolds, but it cannot approve a profile,
-choose a value codec, or register a driver. Only a reviewed project-owned
-profile authorizes interaction for an interactive custom type; exact
-application drivers remain the escape hatch for behavior that cannot be made
-safely generic. Display/assertion-only fields and components require an
+Reviewed declarations and Angular authoring evidence have different authority.
+[ADR 0011](decisions/0011-named-formly-environments-and-contracted-field-adapters.md)
+proposes that reusable field libraries author compact contracted adapters once
+through the same catalog/helper path used by production Formly registration,
+and that projects select one exact named Formly environment. Third-party types
+require an explicit reviewed binding adapter. The Angular host inventories that
+real environment, joins its reviewed adapter contributions, runs required
+controlled conformance, and deterministically lowers them to the existing
+canonical `FieldTypeProfileRegistry`.
+
+The generated registry remains the compiler and contract compatibility
+boundary; Angular metadata, source/template candidates, rendered roles and
+parts, coverage, drift, and migration scaffolds remain evidence. They cannot
+approve semantics, choose a codec, or register a driver. A profile is
+actionable only when its exact registration, declaration, driver capability,
+and required conformance agree. Display/assertion-only components require an
 explicit non-interactive disposition and remain non-executable or unknown until
-the schema defines a no-driver/non-interactive profile branch.
+the schema defines their no-driver/assertion surface. Until ADR 0011 is
+accepted and implemented, current project-owned raw registries are the explicit
+legacy authoring path rather than the intended final UX.
 
 One Formly field may map to multiple interactive controls. For example, a date range has start and end parts, while an address lookup may expose a search box, suggestions, and a confirmed structured value.
 

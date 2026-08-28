@@ -10,10 +10,10 @@ boundary; successor records and task readiness are governed by RH-06.
 [RH-06 reconciliation](../agent-context-hardening/rh-06-reconciliation.md),
 [execution index](../agent-context-hardening/execution-index.md), and
 [Agent Context and Deterministic E2E Delivery Plan](agent-context-delivery-plan.md).
-`RH06-DOC` and `CTX-0A` are verified complete. `CTX-0B` and `CTX-0C` are the
-next ready shared-contract lanes. The `LIN-0` harness is retained but its
-workplace decision is blocked/`inconclusive`; `BHV-0` awaits explicit approval
-of ADR 0010.
+`RH06-DOC` and `CTX-0A` through `CTX-0D` are verified complete. `CTX-1` and
+`DRV-0` are the next ready consumer/driver-contract lanes. The `LIN-0` harness
+is retained but its workplace decision is blocked/`inconclusive`; `BHV-0`
+awaits explicit approval of ADR 0010.
 
 `CTX-0A` is deliberately narrow: it owns only an open schema-addressed pinned
 artifact-set envelope, the set's own content hash, and a structured
@@ -265,13 +265,13 @@ execution.
    only. Angular-assisted
    inventory/scaffolding and rendered conformance remain under their separate
    execution-index tasks.
-9. **In progress after RH-06 documentation verification:** `CTX-0A` is
-   complete; dispatch the now-ready `CTX-0B` and `CTX-0C`, then follow the
-   execution-index order through `CTX-0D`, `CTX-1`, and `CTX-2`.
-   `CTX-0D` fixtures are explicitly synthetic, and `CTX-2` owns their
-   positive/negative proof. The real representative producer/workplace
-   `CTX-GATE` waits for `CTX-2`, `LIN-4`, `BHV-4`, `ANG-5`, and `DRV-0`; MCP and
-   Playwright wait for that gate.
+9. **In progress after the shared-contract checkpoint:** `CTX-0A` through
+   `CTX-0D` are complete; dispatch the now-ready `CTX-1` and `DRV-0`, then
+   follow the execution-index order through `CTX-2`. `CTX-0D` fixtures are
+   explicitly synthetic, and `CTX-2` owns their positive/negative proof. The
+   real representative producer/workplace `CTX-GATE` waits for `CTX-2`,
+   `LIN-4`, `BHV-4`, `ANG-5`, and `DRV-0`; MCP and Playwright wait for that
+   gate.
 
 `first-enabled` should be modeled as a test-intent selection policy rather
 than a claim about the form itself. The contract should expose that choices are
@@ -292,6 +292,6 @@ The research gate required maintainer approval of:
 Those choices are now represented in the approved v0.4 metadata specification,
 the implemented schema/compiler/workspace contracts, and the reconciled
 research artifacts. This closes the research gate. RH-06 is the current
-planning baseline: `CTX-0A` has passed review and checks, so `CTX-0B` and
-`CTX-0C` are ready; every producer or consumer still waits for the remaining
-dependencies in the execution index.
+planning baseline: `CTX-0A` through `CTX-0D` have passed review and focused
+checks, so `CTX-1` and `DRV-0` are ready; every other producer or consumer
+still waits for the remaining dependencies in the execution index.

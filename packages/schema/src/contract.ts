@@ -11,6 +11,7 @@ import type {
   FieldTypeEffectCapabilities,
 } from './cross-field-effect.js';
 
+export const FORM_CONTRACT_SCHEMA_ID = 'formly-contract.form-contract' as const;
 export const FORM_CONTRACT_SCHEMA_VERSION = '0.4.0' as const;
 
 export const FIELD_TYPE_PROFILE_RESOLUTION_DIAGNOSTIC_CODES = [
