@@ -19,6 +19,25 @@ export type {
   Sha256Digest,
 } from './agent-context-artifacts.js';
 export {
+  AGENT_CONTEXT_DRIVER_CAPABILITIES,
+  AGENT_CONTEXT_DRIVER_REGISTRY_SCHEMA_ID,
+  AGENT_CONTEXT_DRIVER_REGISTRY_SCHEMA_VERSION,
+  canonicalizeAgentContextDriverRegistryManifest,
+  computeAgentContextDriverRegistryManifestHash,
+  createAgentContextDriverRegistryManifest,
+  parseAgentContextDriverRegistryManifest,
+  validateAgentContextExecutionAuthorityDriverCompatibility,
+} from './agent-context-driver-registry.js';
+export type {
+  AgentContextDriverCapability,
+  AgentContextDriverKind,
+  AgentContextDriverRegistration,
+  AgentContextDriverRegistryManifest,
+  AgentContextDriverRegistryManifestDraft,
+  AgentContextExecutionAuthorityDriverCompatibilityIssue,
+  AgentContextExecutionAuthorityDriverCompatibilityResult,
+} from './agent-context-driver-registry.js';
+export {
   AGENT_CONTEXT_JOURNEY_SCHEMA_ID,
   AGENT_CONTEXT_JOURNEY_SCHEMA_VERSION,
   AGENT_CONTEXT_SOURCE_USAGE_SCHEMA_ID,
