@@ -1,5 +1,7 @@
 ---
 import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
+
+const base = `${import.meta.env.BASE_URL.replace(/\/+$/u, '')}/`;
 ---
 
 <StarlightPage
@@ -14,13 +16,13 @@ import StarlightPage from '@astrojs/starlight/components/StarlightPage.astro';
       actions: [
         {
           text: 'Open the documentation index',
-          link: '/',
+          link: base,
           icon: 'right-arrow',
           variant: 'primary',
         },
         {
           text: 'Search current capabilities',
-          link: '/start/product-status/',
+          link: `${base}start/product-status/`,
           variant: 'minimal',
         },
       ],

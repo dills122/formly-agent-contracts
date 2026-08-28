@@ -7,11 +7,11 @@ hero:
   tagline: Compile application-owned Formly configuration into versioned evidence that engineers, tests, and coding agents can inspect without inventing selectors.
   actions:
     - text: Run the end-to-end vertical
-      link: /start/end-to-end/
+      link: ./start/end-to-end/
       icon: right-arrow
       variant: primary
     - text: See what exists today
-      link: /start/product-status/
+      link: ./start/product-status/
       variant: minimal
 ---
 
@@ -22,27 +22,27 @@ hero:
 
 <section class="home-index" aria-labelledby="documentation-index">
   <p class="home-index__intro" id="documentation-index">Documentation index</p>
-  <a class="home-index__row" href="/start/">
+  <a class="home-index__row" href="./start/">
     <span class="home-index__number">01</span>
     <span class="home-index__title">Evaluate</span>
     <span class="home-index__description">Understand the product boundary, supported versions, and fastest honest proof.</span>
   </a>
-  <a class="home-index__row" href="/start/end-to-end/">
+  <a class="home-index__row" href="./start/end-to-end/">
     <span class="home-index__number">02</span>
     <span class="home-index__title">Integrate</span>
     <span class="home-index__description">Configure a workspace, expose a form, profile a custom field, generate artifacts, and consume one in Playwright.</span>
   </a>
-  <a class="home-index__row" href="/concepts/architecture/">
+  <a class="home-index__row" href="./concepts/architecture/">
     <span class="home-index__number">03</span>
     <span class="home-index__title">Understand</span>
     <span class="home-index__description">Follow declared, resolved, and observed evidence through the package boundaries.</span>
   </a>
-  <a class="home-index__row" href="/reference/workspace/">
+  <a class="home-index__row" href="./reference/workspace/">
     <span class="home-index__number">04</span>
     <span class="home-index__title">Reference</span>
     <span class="home-index__description">Look up workspace policy, source descriptors, profiles, artifacts, CLI commands, and APIs.</span>
   </a>
-  <a class="home-index__row" href="/resources/research-roadmap/">
+  <a class="home-index__row" href="./resources/research-roadmap/">
     <span class="home-index__number">05</span>
     <span class="home-index__title">Track</span>
     <span class="home-index__description">Separate validated current behavior from research, accepted design, and unapproved future work.</span>

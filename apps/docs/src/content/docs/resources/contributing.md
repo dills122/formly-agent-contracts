@@ -27,6 +27,20 @@ the Pagefind search index and fails on invalid content routes.
 
 Use `pnpm docs:preview` to inspect the production output locally.
 
+## Deployment workflow
+
+The [Docs Site workflow](https://github.com/dills122/formly-contract/actions/workflows/docs-site.yml)
+publishes the static build to
+[GitHub Pages](https://dills122.github.io/formly-contract/) after relevant
+changes reach `main`. It uses GitHub's `github-pages` environment and artifact
+deployment rather than committing generated output to a branch.
+
+The production build receives its canonical origin, repository subpath, edit
+repository, and default branch from GitHub context. Maintainers can run the
+workflow manually from the Actions page. See the
+[docs app README](https://github.com/dills122/formly-contract/blob/main/apps/docs/README.md)
+for local reproduction and custom-domain overrides.
+
 ## Where content belongs
 
 - `src/content/docs/start/` — evaluation, installation, adoption, status
@@ -61,6 +75,7 @@ site’s orientation page in the same change.
 - Planned capabilities are visually and verbally labelled.
 - No customer or workplace data appears in examples or screenshots.
 - Links resolve and `pnpm check:docs` passes.
+- Root-relative links do not bypass the configured GitHub Pages base path.
 - The page remains usable at 320, 375, 414, and 768 CSS pixels.
 
 :::note[Repository contribution policy]

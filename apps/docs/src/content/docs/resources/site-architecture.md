@@ -35,10 +35,19 @@ Astro Starlight is the selected framework.
 - Astro emits static assets that can be hosted on GitHub Pages, Netlify,
   Cloudflare Pages, or any ordinary static web server.
 
-The initial scaffold intentionally omits Astro’s canonical `site` URL because a
-hosting domain has not been selected. Builds therefore skip sitemap generation
-until deployment configuration is added; this avoids publishing invented
-canonical URLs.
+## Hosting model
+
+The site is deployed as a GitHub Pages project site at
+[dills122.github.io/formly-contract](https://dills122.github.io/formly-contract/).
+The Pages workflow supplies Astro with the canonical origin and repository base
+path, builds the pnpm workspace with its pinned Node version, uploads
+`apps/docs/dist` as an artifact, and deploys through the protected
+`github-pages` environment.
+
+Local builds omit `site` and `base`, so development stays at `/`. CI derives
+the standard values from GitHub context and accepts `DOCS_SITE_URL` and
+`DOCS_SITE_BASE` repository variables for a future custom domain. Internal
+links are relative or Starlight-managed so both hosting modes remain valid.
 
 This fits the pnpm TypeScript monorepo, follows the project owner’s Astro
 preference, and leaves product packages independent of the docs runtime.

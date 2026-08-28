@@ -1,9 +1,23 @@
 import { defineConfig } from 'astro/config';
 import starlight from '@astrojs/starlight';
 
-const repository = 'https://github.com/dills122/formly-contract';
+const site = process.env.DOCS_SITE_URL;
+const configuredBase = process.env.DOCS_SITE_BASE;
+const base =
+  configuredBase && configuredBase !== '/'
+    ? `/${configuredBase.replace(/^\/+|\/+$/gu, '')}`
+    : undefined;
+const repositorySlug =
+  process.env.DOCS_SITE_REPOSITORY ??
+  process.env.GITHUB_REPOSITORY ??
+  'dills122/formly-contract';
+const editBranch =
+  process.env.DOCS_SITE_EDIT_BRANCH ?? process.env.GITHUB_REF_NAME ?? 'main';
+const repository = `https://github.com/${repositorySlug}`;
 
 export default defineConfig({
+  ...(site ? { site } : {}),
+  ...(base ? { base } : {}),
   integrations: [
     starlight({
       disable404Route: true,
@@ -14,7 +28,7 @@ export default defineConfig({
       lastUpdated: true,
       customCss: ['./tokens.css', './src/styles/custom.css'],
       editLink: {
-        baseUrl: `${repository}/edit/main/apps/docs/`,
+        baseUrl: `${repository}/edit/${editBranch}/apps/docs/`,
       },
       social: [
         {

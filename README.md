@@ -55,17 +55,19 @@ for a fresh coding agent or maintainer.
 
 ## Documentation site
 
-The Astro Starlight site under `apps/docs/` provides the product-oriented path
-through installation, workspace discovery, custom-field profiles, generated
-artifacts, and reliable E2E context. Run it locally with:
+The [hosted Astro Starlight documentation](https://dills122.github.io/formly-contract/)
+provides the product-oriented path through installation, workspace discovery,
+custom-field profiles, generated artifacts, and reliable E2E context. Its
+source lives under `apps/docs/`. Run it locally with:
 
 ```sh
 pnpm docs:dev
 ```
 
-Build and validate it with `pnpm check:docs`. Root documents, specifications,
-and ADRs remain canonical; the site links and organizes that source material
-without replacing it.
+Build and validate it with `pnpm check:docs`. Pushes to `main` that change the
+site deploy the static output through GitHub Pages. Root documents,
+specifications, and ADRs remain canonical; the site links and organizes that
+source material without replacing it.
 
 ## Use it in your own Angular/Formly codebase
 
