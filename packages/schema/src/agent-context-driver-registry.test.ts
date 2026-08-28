@@ -443,6 +443,41 @@ describe('agent context driver-registry manifest identity', () => {
     expect(JSON.parse(canonical)).toEqual(created);
   });
 
+  it('matches the fixed canonical hash vector independently of mutation checks', () => {
+    const expectedCanonical =
+      '{"registrations":[{"capabilities":["fill","open-usage"],"id":"app.alpha","kind":"application","version":2},{"capabilities":["fill"],"id":"generic.fill","kind":"generic","version":1}],"schemaVersion":"0.1.0"}';
+    const expectedHash =
+      'sha256:00be52e47026a221770383005563de3c48efef3c6bb9e3d97aa83a53ce8a85a7';
+    const draft: AgentContextDriverRegistryManifestDraft = {
+      schemaVersion: AGENT_CONTEXT_DRIVER_REGISTRY_SCHEMA_VERSION,
+      registrations: [
+        registration({
+          kind: 'application',
+          id: 'app.alpha',
+          version: 2,
+          capabilities: ['fill', 'open-usage'],
+        }),
+        registration({
+          kind: 'generic',
+          id: 'generic.fill',
+          version: 1,
+          capabilities: ['fill'],
+        }),
+      ],
+    };
+
+    expect(canonicalStringify(draft)).toBe(expectedCanonical);
+    expect(
+      `sha256:${createHash('sha256').update(expectedCanonical).digest('hex')}`,
+    ).toBe(expectedHash);
+    expect(computeAgentContextDriverRegistryManifestHash(draft)).toBe(
+      expectedHash,
+    );
+    expect(createAgentContextDriverRegistryManifest(draft).contentHash).toBe(
+      expectedHash,
+    );
+  });
+
   it('accepts every capability, including the five reserved for CTX-2 bindings', () => {
     const manifest = createAgentContextDriverRegistryManifest(
       manifestDraft({
@@ -487,23 +522,55 @@ describe('agent context driver-registry manifest identity', () => {
     ]);
   });
 
-  it('changes the content hash when any registration fact changes', () => {
-    const baseline = createdManifest();
-    const mutatedDraft = structuredClone(
-      manifestDraft(),
-    ) as unknown as MutableManifestDraft;
-    mutatedDraft.registrations[1]?.capabilities.push('activate-wrapper');
-    const mutated = createAgentContextDriverRegistryManifest(
-      mutatedDraft as unknown as AgentContextDriverRegistryManifestDraft,
-    );
+  it('changes and invalidates the hash for every registration field', () => {
+    const baseline = createAgentContextDriverRegistryManifest({
+      schemaVersion: AGENT_CONTEXT_DRIVER_REGISTRY_SCHEMA_VERSION,
+      registrations: [
+        registration({
+          kind: 'application',
+          id: 'app.driver',
+          version: 1,
+          capabilities: ['fill'],
+        }),
+      ],
+    });
+    const mutations: readonly AgentContextDriverRegistryManifestDraft[] = [
+      {
+        schemaVersion: AGENT_CONTEXT_DRIVER_REGISTRY_SCHEMA_VERSION,
+        registrations: [
+          { ...baseline.registrations[0]!, kind: 'generic' },
+        ],
+      },
+      {
+        schemaVersion: AGENT_CONTEXT_DRIVER_REGISTRY_SCHEMA_VERSION,
+        registrations: [
+          { ...baseline.registrations[0]!, id: 'app.changed' },
+        ],
+      },
+      {
+        schemaVersion: AGENT_CONTEXT_DRIVER_REGISTRY_SCHEMA_VERSION,
+        registrations: [
+          { ...baseline.registrations[0]!, version: 2 },
+        ],
+      },
+      {
+        schemaVersion: AGENT_CONTEXT_DRIVER_REGISTRY_SCHEMA_VERSION,
+        registrations: [
+          { ...baseline.registrations[0]!, capabilities: ['check'] },
+        ],
+      },
+    ];
 
-    expect(mutated.contentHash).not.toBe(baseline.contentHash);
-    expect(() =>
-      parseAgentContextDriverRegistryManifest({
-        ...baseline,
-        registrations: mutated.registrations,
-      }),
-    ).toThrow(/driverRegistryManifest\.contentHash.*does not match/u);
+    for (const mutation of mutations) {
+      const mutated = createAgentContextDriverRegistryManifest(mutation);
+      expect(mutated.contentHash).not.toBe(baseline.contentHash);
+      expect(() =>
+        parseAgentContextDriverRegistryManifest({
+          ...baseline,
+          registrations: mutated.registrations,
+        }),
+      ).toThrow(/driverRegistryManifest\.contentHash.*does not match/u);
+    }
   });
 
   it('rejects stale hashes and non-canonical full artifacts', () => {
@@ -916,6 +983,178 @@ describe('execution-authority driver compatibility', () => {
 });
 
 describe('agent context driver-registry bounded data-only parsing', () => {
+  it.each(PUBLIC_MANIFEST_ENTRY_POINTS)(
+    '$name rejects dense and sparse over-limit registration arrays before visiting entries',
+    ({ input, invoke }) => {
+      for (const registrations of [
+        Array(1_000_000).fill(null),
+        new Array(1_000_000),
+      ]) {
+        let trapCalls = 0;
+        registrations[0] = new Proxy(
+          {},
+          {
+            getOwnPropertyDescriptor() {
+              trapCalls += 1;
+              throw new Error('descriptor trap must not run');
+            },
+            getPrototypeOf() {
+              trapCalls += 1;
+              throw new Error('prototype trap must not run');
+            },
+            ownKeys() {
+              trapCalls += 1;
+              throw new Error('ownKeys trap must not run');
+            },
+          },
+        );
+        const candidate = input() as object;
+        replaceOwnProperty(candidate, 'registrations', registrations);
+
+        expect(() => invoke(candidate)).toThrow(
+          /driverRegistryManifest\.registrations.*at most 10000/u,
+        );
+        expect(trapCalls).toBe(0);
+      }
+    },
+  );
+
+  it.each(PUBLIC_MANIFEST_ENTRY_POINTS)(
+    '$name rejects over-limit capability arrays before visiting entries',
+    ({ input, invoke }) => {
+      for (const capabilities of [
+        Array(19).fill('fill'),
+        new Array(1_000_000),
+      ]) {
+        let trapCalls = 0;
+        capabilities[0] = new Proxy(
+          {},
+          {
+            getOwnPropertyDescriptor() {
+              trapCalls += 1;
+              throw new Error('descriptor trap must not run');
+            },
+            getPrototypeOf() {
+              trapCalls += 1;
+              throw new Error('prototype trap must not run');
+            },
+            ownKeys() {
+              trapCalls += 1;
+              throw new Error('ownKeys trap must not run');
+            },
+          },
+        );
+        const candidate = input() as {
+          registrations: { capabilities: unknown }[];
+        };
+        replaceOwnProperty(
+          candidate.registrations[0]!,
+          'capabilities',
+          capabilities,
+        );
+
+        expect(() => invoke(candidate)).toThrow(
+          /driverRegistryManifest\.registrations\[0\]\.capabilities.*at most 18/u,
+        );
+        expect(trapCalls).toBe(0);
+      }
+    },
+  );
+
+  it.each(PUBLIC_MANIFEST_ENTRY_POINTS)(
+    '$name rejects an exotic root before visiting its properties',
+    ({ input, invoke }) => {
+      let trapCalls = 0;
+      const candidate = input() as Record<string, unknown>;
+      candidate.lateProxy = new Proxy(
+        {},
+        {
+          getOwnPropertyDescriptor() {
+            trapCalls += 1;
+            throw new Error('descriptor trap must not run');
+          },
+          getPrototypeOf() {
+            trapCalls += 1;
+            throw new Error('prototype trap must not run');
+          },
+          ownKeys() {
+            trapCalls += 1;
+            throw new Error('ownKeys trap must not run');
+          },
+        },
+      );
+      Object.setPrototypeOf(candidate, { exotic: true });
+
+      expect(() => invoke(candidate)).toThrow(
+        /driverRegistryManifest.*plain object or null-prototype object/u,
+      );
+      expect(trapCalls).toBe(0);
+    },
+  );
+
+  it('rejects a 10 MB driver ID before visiting later accessors or proxies', () => {
+    const candidate = structuredClone(
+      manifestDraft(),
+    ) as unknown as MutableManifestDraft;
+    const first = candidate.registrations[0]! as (typeof candidate.registrations)[number] &
+      Record<string, unknown>;
+    first.id = 'x'.repeat(10 * 1024 * 1024);
+    let getterCalls = 0;
+    let trapCalls = 0;
+    Object.defineProperty(first, 'lateAccessor', {
+      enumerable: true,
+      get() {
+        getterCalls += 1;
+        return 'must not run';
+      },
+    });
+    first.lateProxy = new Proxy(
+      {},
+      {
+        getOwnPropertyDescriptor() {
+          trapCalls += 1;
+          throw new Error('descriptor trap must not run');
+        },
+        getPrototypeOf() {
+          trapCalls += 1;
+          throw new Error('prototype trap must not run');
+        },
+        ownKeys() {
+          trapCalls += 1;
+          throw new Error('ownKeys trap must not run');
+        },
+      },
+    );
+
+    expect(() =>
+      createAgentContextDriverRegistryManifest(
+        candidate as unknown as AgentContextDriverRegistryManifestDraft,
+      ),
+    ).toThrow(/driverRegistryManifest\.registrations\[0\]\.id.*stable identifier/u);
+    expect(getterCalls).toBe(0);
+    expect(trapCalls).toBe(0);
+  });
+
+  it('rejects overlong primitive strings and property keys before canonicalization', () => {
+    const overlongString = manifestDraft() as unknown as Record<
+      string,
+      unknown
+    >;
+    overlongString.extra = 'x'.repeat(4_097);
+    expect(() =>
+      createAgentContextDriverRegistryManifest(overlongString as never),
+    ).toThrow(/driverRegistryManifest\.extra.*data string length of 4096/u);
+
+    const overlongKey = manifestDraft() as unknown as Record<string, unknown>;
+    Object.defineProperty(overlongKey, 'x'.repeat(1_025), {
+      enumerable: true,
+      value: 'bounded',
+    });
+    expect(() =>
+      createAgentContextDriverRegistryManifest(overlongKey as never),
+    ).toThrow(/driverRegistryManifest.*property key length of 1024/u);
+  });
+
   it.each(PUBLIC_MANIFEST_ENTRY_POINTS)(
     '$name rejects function values',
     ({ input, invoke }) => {

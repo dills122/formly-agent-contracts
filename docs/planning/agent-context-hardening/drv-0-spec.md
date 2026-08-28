@@ -173,11 +173,25 @@ manifest. A hash is content identity, not execution approval.
   symbol-keyed properties, sparse or exotic arrays, class/built-in instances,
   cycles, non-finite numbers, and non-enumerable or additional array data.
 - Getters and proxy traps are not invoked while rejecting unsafe inputs.
-- The preflight traversal is iterative, capped at depth 128 and 100,000 graph
-  nodes, and completes before recursive cloning or canonicalization.
-- A manifest contains at most 10,000 registrations. IDs are 1–256 characters
-  in the existing contract-stable identifier grammar; versions are positive
-  safe integers. The closed vocabulary bounds each capability set to 18.
+- Cheap shallow checks run before graph traversal, cloning, or
+  canonicalization. They reject a root or registration proxy/exotic prototype,
+  dense or sparse registration arrays longer than 10,000, IDs longer than 256
+  characters, and capability arrays longer than the closed 18-member
+  vocabulary without visiting later registration properties or array entries.
+- The subsequent iterative preflight rejects each reached proxy or exotic
+  prototype before enumerating its keys, rejects arrays longer than 100,000
+  slots and primitive strings longer than 4,096 characters, and caps traversal
+  at depth 128 and 100,000 graph nodes. Property keys longer than 1,024
+  characters are rejected immediately after that object's own keys are
+  enumerated and before cloning or canonicalization.
+- JavaScript provides no constant-time count of an arbitrary plain object's
+  own keys: validating such an object necessarily enumerates its key list.
+  Accordingly, the node cap bounds traversal work but not the temporary key
+  list for a single extremely wide object. A serialized-input boundary must
+  enforce its own byte limit before parsing and calling this in-memory API.
+- A manifest contains at most 10,000 registrations. IDs otherwise use the
+  existing 1–256 character contract-stable identifier grammar, and versions
+  are positive safe integers.
 - Compatibility output is bounded by the finite authority collections, groups
   repeated uses by exact driver identity, and returns no authority payload,
   implementation path, selector, callback, or option data.

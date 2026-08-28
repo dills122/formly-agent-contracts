@@ -106,6 +106,8 @@ const MAX_ID_LENGTH = 256;
 const MAX_REGISTRATIONS = 10_000;
 const MAX_DATA_GRAPH_DEPTH = 128;
 const MAX_DATA_GRAPH_NODES = 100_000;
+const MAX_DATA_STRING_LENGTH = 4_096;
+const MAX_PROPERTY_KEY_LENGTH = 1_024;
 
 const MANIFEST_KEYS = new Set([
   'schemaVersion',
@@ -124,6 +126,158 @@ const REGISTRATION_KEYS = new Set([
 
 function fail(path: string, message: string): never {
   throw new TypeError(`${path}: ${message}`);
+}
+
+function checkedOrdinaryArrayLength(
+  input: unknown,
+  path: string,
+): number | undefined {
+  const inputType = typeof input;
+  if (
+    ((inputType === 'object' && input !== null) || inputType === 'function') &&
+    utilTypes.isProxy(input)
+  ) {
+    fail(path, 'must not be a proxy.');
+  }
+  if (!Array.isArray(input)) {
+    return undefined;
+  }
+  if (Object.getPrototypeOf(input) !== Array.prototype) {
+    fail(path, 'must be an ordinary array.');
+  }
+  const lengthDescriptor = Object.getOwnPropertyDescriptor(input, 'length');
+  if (
+    lengthDescriptor === undefined ||
+    !('value' in lengthDescriptor) ||
+    typeof lengthDescriptor.value !== 'number'
+  ) {
+    fail(`${path}.length`, 'must be an array length data property.');
+  }
+  return lengthDescriptor.value;
+}
+
+function preflightManifestCheapBounds(input: unknown, path: string): void {
+  const inputType = typeof input;
+  if (
+    ((inputType === 'object' && input !== null) || inputType === 'function') &&
+    utilTypes.isProxy(input)
+  ) {
+    fail(path, 'must not be a proxy.');
+  }
+  if (inputType !== 'object' || input === null || Array.isArray(input)) {
+    return;
+  }
+  const prototype = Object.getPrototypeOf(input) as unknown;
+  if (prototype !== Object.prototype && prototype !== null) {
+    fail(path, 'must be a plain object or null-prototype object.');
+  }
+
+  const registrationsDescriptor = Object.getOwnPropertyDescriptor(
+    input,
+    'registrations',
+  );
+  if (registrationsDescriptor === undefined) {
+    return;
+  }
+  if (!('value' in registrationsDescriptor)) {
+    fail(`${path}.registrations`, 'must be a data property.');
+  }
+  const registrations = registrationsDescriptor.value as unknown;
+  const registrationCount = checkedOrdinaryArrayLength(
+    registrations,
+    `${path}.registrations`,
+  );
+  if (registrationCount === undefined) {
+    return;
+  }
+  if (registrationCount > MAX_REGISTRATIONS) {
+    fail(
+      `${path}.registrations`,
+      `must contain at most ${MAX_REGISTRATIONS} registrations.`,
+    );
+  }
+
+  for (let index = 0; index < registrationCount; index += 1) {
+    const registrationDescriptor = Object.getOwnPropertyDescriptor(
+      registrations,
+      String(index),
+    );
+    if (
+      registrationDescriptor === undefined ||
+      !('value' in registrationDescriptor)
+    ) {
+      continue;
+    }
+    const registration = registrationDescriptor.value as unknown;
+    const registrationPath = `${path}.registrations[${index}]`;
+    const registrationType = typeof registration;
+    if (
+      ((registrationType === 'object' && registration !== null) ||
+        registrationType === 'function') &&
+      utilTypes.isProxy(registration)
+    ) {
+      fail(registrationPath, 'must not be a proxy.');
+    }
+    if (
+      registrationType !== 'object' ||
+      registration === null ||
+      Array.isArray(registration)
+    ) {
+      continue;
+    }
+    const registrationPrototype = Object.getPrototypeOf(
+      registration,
+    ) as unknown;
+    if (
+      registrationPrototype !== Object.prototype &&
+      registrationPrototype !== null
+    ) {
+      fail(
+        registrationPath,
+        'must be a plain object or null-prototype object.',
+      );
+    }
+
+    const idDescriptor = Object.getOwnPropertyDescriptor(registration, 'id');
+    if (idDescriptor !== undefined) {
+      if (!('value' in idDescriptor)) {
+        fail(`${registrationPath}.id`, 'must be a data property.');
+      }
+      if (
+        typeof idDescriptor.value === 'string' &&
+        idDescriptor.value.length > MAX_ID_LENGTH
+      ) {
+        fail(
+          `${registrationPath}.id`,
+          'must be a 1-256 character contract stable identifier.',
+        );
+      }
+    }
+
+    const capabilitiesDescriptor = Object.getOwnPropertyDescriptor(
+      registration,
+      'capabilities',
+    );
+    if (capabilitiesDescriptor === undefined) {
+      continue;
+    }
+    if (!('value' in capabilitiesDescriptor)) {
+      fail(`${registrationPath}.capabilities`, 'must be a data property.');
+    }
+    const capabilityCount = checkedOrdinaryArrayLength(
+      capabilitiesDescriptor.value,
+      `${registrationPath}.capabilities`,
+    );
+    if (
+      capabilityCount !== undefined &&
+      capabilityCount > AGENT_CONTEXT_DRIVER_CAPABILITIES.length
+    ) {
+      fail(
+        `${registrationPath}.capabilities`,
+        `must contain at most ${AGENT_CONTEXT_DRIVER_CAPABILITIES.length} capabilities.`,
+      );
+    }
+  }
 }
 
 type DataGraphPreflightFrame =
@@ -160,31 +314,55 @@ function preflightDataGraph(input: unknown, path: string): void {
     ) {
       fail(frame.path, 'must not be a proxy.');
     }
+    if (
+      typeof frame.input === 'string' &&
+      frame.input.length > MAX_DATA_STRING_LENGTH
+    ) {
+      fail(
+        frame.path,
+        `must not exceed the maximum data string length of ${MAX_DATA_STRING_LENGTH}.`,
+      );
+    }
     if (inputType !== 'object' || frame.input === null) {
       continue;
     }
 
     const objectInput = frame.input as object;
+    const isArray = Array.isArray(objectInput);
+    const prototype = Object.getPrototypeOf(objectInput) as unknown;
+    if (isArray) {
+      if (prototype !== Array.prototype) {
+        fail(frame.path, 'must be an ordinary array.');
+      }
+      if (objectInput.length > MAX_DATA_GRAPH_NODES) {
+        fail(
+          frame.path,
+          `must not exceed the maximum data graph node count of ${MAX_DATA_GRAPH_NODES}.`,
+        );
+      }
+    } else if (prototype !== Object.prototype && prototype !== null) {
+      fail(frame.path, 'must be a plain object or null-prototype object.');
+    }
     if (ancestors.has(objectInput)) {
       fail(frame.path, 'must not contain a cycle.');
     }
     ancestors.add(objectInput);
     frames.push({ kind: 'leave', input: objectInput });
 
-    const isArray = Array.isArray(objectInput);
     const childFrames: DataGraphPreflightFrame[] = [];
     for (const key of Reflect.ownKeys(objectInput)) {
       if (typeof key === 'symbol') {
         fail(frame.path, 'must not contain symbol-keyed properties.');
       }
+      if (key.length > MAX_PROPERTY_KEY_LENGTH) {
+        fail(
+          frame.path,
+          `must not exceed the maximum property key length of ${MAX_PROPERTY_KEY_LENGTH}.`,
+        );
+      }
       if (isArray && key === 'length') {
         continue;
       }
-      const descriptor = Object.getOwnPropertyDescriptor(objectInput, key);
-      if (descriptor === undefined || !('value' in descriptor)) {
-        continue;
-      }
-
       const childPath = isArray
         ? `${frame.path}[${key}]`
         : `${frame.path}.${key}`;
@@ -201,6 +379,10 @@ function preflightDataGraph(input: unknown, path: string): void {
           childPath,
           `must not exceed the maximum data graph node count of ${MAX_DATA_GRAPH_NODES}.`,
         );
+      }
+      const descriptor = Object.getOwnPropertyDescriptor(objectInput, key);
+      if (descriptor === undefined || !('value' in descriptor)) {
+        continue;
       }
       childFrames.push({
         kind: 'visit',
@@ -557,6 +739,7 @@ function normalizeManifestInput(
   readonly contentHash?: Sha256Digest;
 } {
   const path = 'driverRegistryManifest';
+  preflightManifestCheapBounds(input, path);
   const detached = cloneValidatedDataOnly(input, path);
   const value = record(
     detached,
