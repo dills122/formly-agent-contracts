@@ -18,6 +18,8 @@ import {
   type RuntimeProvenance,
 } from '@formly-contract/schema';
 
+import { compareCodeUnits as compareCodeUnit } from './workspace-paths.js';
+
 import { WORKSPACE_CONFIG_SCHEMA_VERSION } from './config.js';
 
 export const WORKSPACE_INDEX_SCHEMA_VERSION = '0.2.0' as const;
@@ -396,10 +398,6 @@ function assertNoDuplicates(
     }
     seen.add(value);
   }
-}
-
-function compareCodeUnit(left: string, right: string): number {
-  return left < right ? -1 : left > right ? 1 : 0;
 }
 
 function parseProject(input: unknown, path: string): WorkspaceIndexProject {

@@ -23,7 +23,7 @@ import {
   writeFile,
 } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
-import { isAbsolute, relative, resolve, sep } from 'node:path';
+import { relative, resolve } from 'node:path';
 import { posix } from 'node:path';
 
 import {
@@ -34,6 +34,7 @@ import {
 } from './discover-projects.js';
 import {
   resolveWorkspaceProjectConfig,
+  toPluginIdentity,
   type ResolvedWorkspaceProjectConfig,
   type WorkspaceCliOverrides,
 } from './config.js';
@@ -46,6 +47,7 @@ import {
 import { WorkspaceConfigValidationError } from './validation-error.js';
 import { readRuntimeToolVersions } from './runtime-tool-versions.js';
 import {
+  WORKSPACE_INDEX_SCHEMA_VERSION,
   canonicalizeWorkspaceContractIndex,
   computeWorkspaceConfigurationHash,
   createWorkspaceContractIndex,
@@ -57,8 +59,12 @@ import {
   type WorkspaceIndexProject,
   type WorkspaceIndexedDiagnostic,
 } from './workspace-index.js';
-
-const DEFAULT_OUTPUT_DIRECTORY = 'dist/formly-contracts';
+import {
+  DEFAULT_OUTPUT_DIRECTORY,
+  compareCodeUnits,
+  errnoCode,
+  isWithinWorkspace,
+} from './workspace-paths.js';
 
 export type WorkspaceGenerationErrorCode =
   | 'WORKSPACE_DISCOVERY_FAILED'
@@ -189,12 +195,6 @@ interface PlannedWorkspaceRun extends WorkspaceRunResult {
   readonly artifacts: readonly PendingArtifact[];
 }
 
-function compareCodeUnits(left: string, right: string): number {
-  if (left === right) {
-    return 0;
-  }
-  return left < right ? -1 : 1;
-}
 
 async function findPnpmDependencySnapshot(
   workspaceRoot: string,
@@ -283,19 +283,6 @@ function normalizeRelativePath(path: string): string {
 
 function canonicalOutputDirectory(path: string): string {
   return posix.normalize(normalizeRelativePath(path)).replace(/\/+$/u, '');
-}
-
-function isWithinWorkspace(
-  workspaceRoot: string,
-  candidatePath: string,
-): boolean {
-  const relativePath = relative(workspaceRoot, candidatePath);
-  return (
-    relativePath === '' ||
-    (relativePath !== '..' &&
-      !relativePath.startsWith(`..${sep}`) &&
-      !isAbsolute(relativePath))
-  );
 }
 
 function workspaceRelativePath(
@@ -690,14 +677,7 @@ function projectConfigurationHash(
     outputDirectory: project.outputDirectory,
     testIdAttributes: project.testIdAttributes,
     failOn: project.failOn,
-    plugins: project.plugins.map(
-      ({ id, version, configSchemaVersion, options }) => ({
-        id,
-        version,
-        configSchemaVersion,
-        ...(options === undefined ? {} : { options }),
-      }),
-    ),
+    plugins: project.plugins.map((plugin) => toPluginIdentity(plugin)),
     sourceIds: project.sourceIds,
     ...(fieldTypeProfileRegistry === undefined
       ? {}
@@ -746,14 +726,9 @@ function buildIndex(
   );
   const configurationPlugins = [...(discovered.root.config.plugins ?? [])]
     .sort((left, right) => compareCodeUnits(left.id, right.id))
-    .map(({ id, version, configSchemaVersion, options }) => ({
-      id,
-      version,
-      configSchemaVersion,
-      ...(options === undefined ? {} : { options }),
-    }));
+    .map((plugin) => toPluginIdentity(plugin));
   return createWorkspaceContractIndex({
-    schemaVersion: '0.2.0',
+    schemaVersion: WORKSPACE_INDEX_SCHEMA_VERSION,
     workspaceConfigSchemaVersion: discovered.inventory.schemaVersion,
     rootConfigPath: discovered.inventory.rootConfigPath,
     configurationHash: computeWorkspaceConfigurationHash({
@@ -792,12 +767,6 @@ function buildIndex(
     projects: indexedProjects,
     forms,
   });
-}
-
-function errnoCode(error: unknown): unknown {
-  return typeof error === 'object' && error !== null && 'code' in error
-    ? error.code
-    : undefined;
 }
 
 async function inspectOutputPath(

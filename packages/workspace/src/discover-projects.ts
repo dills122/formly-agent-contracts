@@ -1,5 +1,5 @@
 import { lstat, readdir, realpath } from 'node:fs/promises';
-import { isAbsolute, posix, relative, resolve, sep } from 'node:path';
+import { posix, relative, resolve, sep } from 'node:path';
 
 import picomatch from 'picomatch';
 import { glob } from 'tinyglobby';
@@ -14,8 +14,13 @@ import {
   loadWorkspaceRootConfig,
 } from './load-config.js';
 import type { WorkspaceConfigLoaderOptions } from './config-loader.js';
+import {
+  DEFAULT_OUTPUT_DIRECTORY,
+  compareCodeUnits,
+  errnoCode,
+  isWithinWorkspace,
+} from './workspace-paths.js';
 
-const DEFAULT_ROOT_OUTPUT_DIRECTORY = 'dist/formly-contracts';
 const INTERNAL_PROJECT_TREE_IGNORES = [
   '.git',
   '.git/**',
@@ -97,13 +102,6 @@ export interface DiscoveredWorkspace {
   readonly inventory: WorkspaceDiscoveryInventory;
 }
 
-function compareCodeUnits(left: string, right: string): number {
-  if (left === right) {
-    return 0;
-  }
-  return left < right ? -1 : 1;
-}
-
 function normalizeWorkspacePath(path: string): string {
   return path.split(sep).join('/');
 }
@@ -118,7 +116,7 @@ function projectConfigIgnorePatterns(
   rootConfig: WorkspaceRootConfig,
 ): readonly string[] {
   const outputDirectory = normalizeWorkspacePath(
-    rootConfig.output?.directory ?? DEFAULT_ROOT_OUTPUT_DIRECTORY,
+    rootConfig.output?.directory ?? DEFAULT_OUTPUT_DIRECTORY,
   ).replace(/\/+$/u, '');
 
   return [
@@ -129,19 +127,6 @@ function projectConfigIgnorePatterns(
   ]
     .filter((pattern, index, patterns) => patterns.indexOf(pattern) === index)
     .sort(compareCodeUnits);
-}
-
-function isWithinWorkspace(
-  workspaceRoot: string,
-  candidatePath: string,
-): boolean {
-  const relativePath = relative(workspaceRoot, candidatePath);
-  return (
-    relativePath === '' ||
-    (relativePath !== '..' &&
-      !relativePath.startsWith(`..${sep}`) &&
-      !isAbsolute(relativePath))
-  );
 }
 
 async function assertPathWithinWorkspace(
@@ -161,10 +146,7 @@ async function assertPathWithinWorkspace(
   try {
     resolvedPath = await realpath(absolutePath);
   } catch (error) {
-    const code =
-      typeof error === 'object' && error !== null && 'code' in error
-        ? error.code
-        : undefined;
+    const code = errnoCode(error);
     if (code === 'ENOENT' || code === 'ENOTDIR') {
       return;
     }
