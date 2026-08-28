@@ -1080,29 +1080,34 @@ export function deriveGateChecks(input, measurements) {
     REQUIRED_BUNDLE_PROBE_KINDS.every((kind) => bundleKinds.has(kind));
 
   const performance = measurements.performance;
-  const performanceComplete =
+  const performanceMetricNames = [
+    'artifactBytes',
+    'coldMs',
+    'incrementalMs',
+    'peakRssMiB',
+  ];
+  const performanceMeasurementsComparable =
     performance !== undefined &&
     performance.protocol === 'lin-0-program-probe-v1' &&
     performance.budgetsApproved &&
-    performance.sampleCount >= 3 &&
-    ['artifactBytes', 'coldMs', 'incrementalMs', 'peakRssMiB'].every(
-      (metric) => {
-        const budget = performance.budgets?.[metric];
-        const maximum = performance.maxima?.[metric];
-        return (
-          typeof budget === 'number' &&
-          Number.isFinite(budget) &&
-          budget >= 0 &&
-          typeof maximum === 'number' &&
-          Number.isFinite(maximum) &&
-          maximum >= 0
-        );
-      },
-    );
+    performanceMetricNames.every((metric) => {
+      const budget = performance.budgets?.[metric];
+      const maximum = performance.maxima?.[metric];
+      return (
+        typeof budget === 'number' &&
+        Number.isFinite(budget) &&
+        budget >= 0 &&
+        typeof maximum === 'number' &&
+        Number.isFinite(maximum) &&
+        maximum >= 0
+      );
+    });
+  const performanceComplete =
+    performanceMeasurementsComparable && performance.sampleCount >= 3;
   const performanceExceeded =
-    performanceComplete &&
-    Object.entries(performance.maxima).some(
-      ([metric, maximum]) => maximum > performance.budgets[metric],
+    performanceMeasurementsComparable &&
+    performanceMetricNames.some(
+      (metric) => performance.maxima[metric] > performance.budgets[metric],
     );
 
   return [

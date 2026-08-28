@@ -841,6 +841,39 @@ describe('LIN-0 evidence matrix', () => {
     );
   });
 
+  it('fails fast on an observed budget overrun before the sampling protocol is complete', () => {
+    const packet = completeMeasuredPacket();
+    packet.measurements.performance.samples = [
+      {
+        ...packet.measurements.performance.samples[0],
+        coldMs: 2_001,
+      },
+    ];
+    packet.measurements.performance.sampleCount = 1;
+    packet.measurements.performance.maxima.coldMs = 2_001;
+
+    const derived = deriveGateChecks(packet.input, packet.measurements);
+
+    expect(derived.find((check) => check.id === 'scale-budgets')).toEqual(
+      expect.objectContaining({
+        status: 'fail',
+        reasons: ['PERFORMANCE_BUDGET_EXCEEDED'],
+      }),
+    );
+    expect(
+      decideGate({
+        slice: { kind: 'representative-workplace', sanitized: true },
+        checks: derived,
+      }),
+    ).toEqual(
+      expect.objectContaining({
+        status: 'no-go',
+        failedChecks: ['scale-budgets'],
+        reasons: ['PERFORMANCE_BUDGET_EXCEEDED'],
+      }),
+    );
+  });
+
   it('keeps unresolved probes and repeated leaf topology inconclusive', () => {
     const packet = completeMeasuredPacket();
     packet.measurements.symbolProbes.push({

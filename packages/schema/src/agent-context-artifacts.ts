@@ -67,6 +67,30 @@ function fail(path: string, message: string): never {
   throw new TypeError(`${path}: ${message}`);
 }
 
+function isRecognizedBuiltInObject(input: object): boolean {
+  return (
+    utilTypes.isAnyArrayBuffer(input) ||
+    utilTypes.isArrayBufferView(input) ||
+    utilTypes.isArgumentsObject(input) ||
+    utilTypes.isBoxedPrimitive(input) ||
+    utilTypes.isCryptoKey(input) ||
+    utilTypes.isDate(input) ||
+    utilTypes.isExternal(input) ||
+    utilTypes.isGeneratorObject(input) ||
+    utilTypes.isKeyObject(input) ||
+    utilTypes.isMap(input) ||
+    utilTypes.isMapIterator(input) ||
+    utilTypes.isModuleNamespaceObject(input) ||
+    utilTypes.isNativeError(input) ||
+    utilTypes.isPromise(input) ||
+    utilTypes.isRegExp(input) ||
+    utilTypes.isSet(input) ||
+    utilTypes.isSetIterator(input) ||
+    utilTypes.isWeakMap(input) ||
+    utilTypes.isWeakSet(input)
+  );
+}
+
 function cloneDataOnly(
   input: unknown,
   path: string,
@@ -99,6 +123,9 @@ function cloneDataOnly(
     fail(path, 'must be a JSON value.');
   }
   const objectInput = input as object;
+  if (isRecognizedBuiltInObject(objectInput)) {
+    fail(path, 'must not be a built-in object; use plain JSON data.');
+  }
   if (ancestors.has(objectInput)) {
     fail(path, 'must not contain a cycle.');
   }
