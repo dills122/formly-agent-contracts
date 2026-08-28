@@ -1,0 +1,228 @@
+{
+  "checks": [
+    {
+      "evidence": {
+        "scannedByteCount": 0,
+        "scannedFileCount": 0
+      },
+      "id": "bundle-source-isolation",
+      "reasons": [
+        "BUNDLE_AND_CYCLE_EVIDENCE_REQUIRED"
+      ],
+      "status": "missing"
+    },
+    {
+      "evidence": {
+        "caseCount": 0
+      },
+      "id": "cross-program-ordering-overlap",
+      "reasons": [
+        "DEDUPLICATION_AND_CONFLICT_CASES_REQUIRED"
+      ],
+      "status": "missing"
+    },
+    {
+      "evidence": {
+        "exactJoinCount": 0
+      },
+      "id": "declaration-source-redirects",
+      "reasons": [
+        "DECLARATION_OUTPUT_AND_SOURCE_REDIRECT_EVIDENCE_REQUIRED"
+      ],
+      "status": "missing"
+    },
+    {
+      "evidence": {
+        "complete": true,
+        "dynamicLazyRouteCount": 0,
+        "literalLazyRouteCount": 0,
+        "registrationExactCount": 0,
+        "registrationMismatchCount": 0,
+        "registrationUnresolvedCount": 0,
+        "scannedFileCount": 14,
+        "scannedProgramCount": 1
+      },
+      "id": "lazy-feature-topology",
+      "reasons": [
+        "REGISTERED_LITERAL_LAZY_FEATURE_EVIDENCE_REQUIRED"
+      ],
+      "status": "missing"
+    },
+    {
+      "evidence": {
+        "diagnosticCount": 0,
+        "leafProgramCount": 0
+      },
+      "id": "leaf-tsconfig-selection",
+      "reasons": [
+        "LEAF_TSCONFIG_INVENTORY_NOT_COMPLETE",
+        "THREE_DISTINCT_LEAF_CONFIGS_REQUIRED",
+        "THREE_DISTINCT_LEAF_PROJECTS_REQUIRED",
+        "THREE_LEAF_PROGRAMS_REQUIRED"
+      ],
+      "status": "missing"
+    },
+    {
+      "evidence": {
+        "disclosureMode": "module-only"
+      },
+      "id": "privacy-disclosure",
+      "reasons": [],
+      "status": "pass"
+    },
+    {
+      "evidence": {
+        "projectReferenceCount": 0
+      },
+      "id": "project-references",
+      "reasons": [
+        "PROJECT_REFERENCE_REQUIRED"
+      ],
+      "status": "missing"
+    },
+    {
+      "evidence": {
+        "configuredRootFileCount": 2,
+        "sampleCount": 0,
+        "semanticFileCount": 300,
+        "semanticInputBytes": 4043357
+      },
+      "id": "scale-budgets",
+      "reasons": [
+        "APPROVED_BUDGETS_AND_THREE_MEASURED_SAMPLES_REQUIRED"
+      ],
+      "status": "missing"
+    },
+    {
+      "evidence": {
+        "enumeratedRootCount": 6,
+        "exactProbeCount": 4
+      },
+      "id": "symbol-conventions",
+      "reasons": [
+        "REQUIRED_SYMBOL_AND_IMPORT_CONVENTIONS_NOT_ALL_MEASURED"
+      ],
+      "status": "missing"
+    }
+  ],
+  "decision": {
+    "failedChecks": [],
+    "missingChecks": [
+      "bundle-source-isolation",
+      "cross-program-ordering-overlap",
+      "declaration-source-redirects",
+      "lazy-feature-topology",
+      "leaf-tsconfig-selection",
+      "project-references",
+      "scale-budgets",
+      "symbol-conventions"
+    ],
+    "reasons": [
+      "REPRESENTATIVE_WORKPLACE_SLICE_REQUIRED"
+    ],
+    "status": "inconclusive"
+  },
+  "measurements": {
+    "conventionInventory": {
+      "complete": false,
+      "countedRootCount": 6,
+      "counts": {
+        "directExportCallableConst": 0,
+        "directExportClass": 0,
+        "directExportFunction": 4,
+        "exportListOnly": 0,
+        "inlineOrWrapper": 2,
+        "other": 0
+      },
+      "enumeratedRootCount": 6
+    },
+    "crossProgramJoins": [],
+    "lazyRoutes": {
+      "complete": true,
+      "dynamicLazyRouteCount": 0,
+      "literalLazyRouteCount": 0,
+      "registrationExactCount": 0,
+      "registrationMismatchCount": 0,
+      "registrationUnresolvedCount": 0,
+      "scannedFileCount": 14,
+      "scannedProgramCount": 1
+    },
+    "overlapCases": [],
+    "programTopology": {
+      "distinctLeafConfigCount": 0,
+      "distinctLeafProjectCount": 0
+    },
+    "programs": [
+      {
+        "configuredRootFileCount": 2,
+        "declarationFileCount": 286,
+        "diagnosticCount": 0,
+        "id": "anchor-angular-program",
+        "leaf": false,
+        "projectId": "public-angular-fixture",
+        "projectReferenceCount": 0,
+        "purpose": "anchor",
+        "semanticFileCount": 300,
+        "semanticInputBytes": 4043357,
+        "sourceRedirectEnabled": false
+      }
+    ],
+    "symbolProbes": [
+      {
+        "conventions": [
+          "relative-import"
+        ],
+        "declarationKind": "function",
+        "id": "claim-intake-relative-call",
+        "observationId": "claim-intake-callsite",
+        "outcome": "exact",
+        "reasons": [],
+        "resolutionMechanism": "source"
+      },
+      {
+        "conventions": [
+          "relative-import"
+        ],
+        "declarationKind": "function",
+        "id": "claims-assignment-relative-call",
+        "observationId": "claims-assignment-callsite",
+        "outcome": "exact",
+        "reasons": [],
+        "resolutionMechanism": "source"
+      },
+      {
+        "conventions": [
+          "relative-import"
+        ],
+        "declarationKind": "function",
+        "id": "customer-onboarding-relative-call",
+        "observationId": "customer-onboarding-callsite",
+        "outcome": "exact",
+        "reasons": [],
+        "resolutionMechanism": "source"
+      },
+      {
+        "conventions": [
+          "relative-import"
+        ],
+        "declarationKind": "function",
+        "id": "incident-relative-call",
+        "observationId": "incident-callsite",
+        "outcome": "exact",
+        "reasons": [],
+        "resolutionMechanism": "source"
+      }
+    ]
+  },
+  "schemaVersion": "1.0.0",
+  "slice": {
+    "id": "public-angular-anchor",
+    "kind": "public-anchor",
+    "sanitized": true,
+    "snapshotId": "bc0b7267afbda8c617c1137c481960fe8ae71454"
+  },
+  "toolchain": {
+    "nodeVersion": "v22.22.1",
+    "typescriptVersion": "5.9.3"
+  }
+}

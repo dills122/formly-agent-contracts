@@ -1,0 +1,131 @@
+{
+  "schemaVersion": "1.0.0",
+  "slice": {
+    "id": "public-angular-anchor",
+    "kind": "public-anchor",
+    "root": "../../../..",
+    "sanitized": true,
+    "snapshotId": "bc0b7267afbda8c617c1137c481960fe8ae71454"
+  },
+  "programSelection": {
+    "inventoryComplete": false
+  },
+  "programs": [
+    {
+      "id": "anchor-angular-program",
+      "leaf": false,
+      "projectId": "public-angular-fixture",
+      "purpose": "anchor",
+      "tsconfig": "scripts/research/form-lineage/lin-0/anchor.tsconfig.json"
+    }
+  ],
+  "symbolProbes": [
+    {
+      "id": "claim-intake-relative-call",
+      "invocation": {
+        "callee": "createClaimIntakeForm",
+        "file": "fixtures/angular-monorepo/libs/feature-lib/src/lib/claim-intake-page.component.ts",
+        "kind": "call",
+        "occurrence": 1
+      },
+      "observationId": "claim-intake-callsite",
+      "programId": "anchor-angular-program",
+      "expected": {
+        "conventions": ["relative-import"],
+        "declaration": {
+          "file": "fixtures/angular-monorepo/libs/feature-lib/src/lib/claim-intake.form.ts",
+          "kind": "function",
+          "name": "createClaimIntakeForm"
+        },
+        "resolution": "exact"
+      }
+    },
+    {
+      "id": "claims-assignment-relative-call",
+      "invocation": {
+        "callee": "createClaimsAssignmentForm",
+        "file": "fixtures/angular-monorepo/libs/feature-lib/src/lib/scenario-gallery-page.component.ts",
+        "kind": "call",
+        "occurrence": 1
+      },
+      "observationId": "claims-assignment-callsite",
+      "programId": "anchor-angular-program",
+      "expected": {
+        "conventions": ["relative-import"],
+        "declaration": {
+          "file": "fixtures/angular-monorepo/libs/feature-lib/src/lib/claims-assignment.form.ts",
+          "kind": "function",
+          "name": "createClaimsAssignmentForm"
+        },
+        "resolution": "exact"
+      }
+    },
+    {
+      "id": "customer-onboarding-relative-call",
+      "invocation": {
+        "callee": "createCustomerOnboardingForm",
+        "file": "fixtures/angular-monorepo/libs/feature-lib/src/lib/scenario-gallery-page.component.ts",
+        "kind": "call",
+        "occurrence": 1
+      },
+      "observationId": "customer-onboarding-callsite",
+      "programId": "anchor-angular-program",
+      "expected": {
+        "conventions": ["relative-import"],
+        "declaration": {
+          "file": "fixtures/angular-monorepo/libs/feature-lib/src/lib/customer-onboarding.form.ts",
+          "kind": "function",
+          "name": "createCustomerOnboardingForm"
+        },
+        "resolution": "exact"
+      }
+    },
+    {
+      "id": "incident-relative-call",
+      "invocation": {
+        "callee": "createIncidentForm",
+        "file": "fixtures/angular-monorepo/libs/feature-lib/src/lib/scenario-gallery-page.component.ts",
+        "kind": "call",
+        "occurrence": 1
+      },
+      "observationId": "incident-callsite",
+      "programId": "anchor-angular-program",
+      "expected": {
+        "conventions": ["relative-import"],
+        "declaration": {
+          "file": "fixtures/angular-monorepo/libs/feature-lib/src/lib/incident.form.ts",
+          "kind": "function",
+          "name": "createIncidentForm"
+        },
+        "resolution": "exact"
+      }
+    }
+  ],
+  "crossProgramJoins": [],
+  "overlapCases": [],
+  "routeScan": {
+    "complete": true,
+    "programIds": ["anchor-angular-program"],
+    "registrations": []
+  },
+  "conventionInventory": {
+    "complete": false,
+    "counts": {
+      "directExportCallableConst": 0,
+      "directExportClass": 0,
+      "directExportFunction": 4,
+      "exportListOnly": 0,
+      "inlineOrWrapper": 2,
+      "other": 0
+    },
+    "enumeratedRootCount": 6
+  },
+  "privacy": {
+    "disclosureMode": "module-only",
+    "retainCallArguments": false,
+    "retainEnvironment": false,
+    "retainObservedUrls": false,
+    "retainRouteTemplates": false,
+    "retainSourceText": false
+  }
+}

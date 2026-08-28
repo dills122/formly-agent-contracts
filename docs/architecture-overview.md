@@ -18,6 +18,15 @@ execution, browser observation, runtime parity, and change analysis remain
 later layers. They must consume or extend the same contracts rather than move
 trusted application execution into routine agent requests.
 
+Form Contract `0.4.0` remains the implemented semantic compatibility boundary.
+Source lineage, journeys, resolved scenario evidence, Angular authoring reports,
+driver registries, and agent-context manifests are planned as separately
+versioned sibling artifacts; this document does not imply that they already
+exist in the production packages or that they are fields of the v0.4 contract.
+The canonical ownership and delivery order are recorded in the
+[RH-06 reconciliation](planning/agent-context-hardening/rh-06-reconciliation.md)
+and [execution index](planning/agent-context-hardening/execution-index.md).
+
 See [the parser MVP specification](mvp-spec.md) for the original foundation,
 [the workspace implementation plan](planning/workspace-discovery/implementation-plan.md)
 for current sequencing, and the [workplace pilot guide](workplace-pilot.md) for
@@ -31,27 +40,39 @@ The end goal is not merely to list fields. An agent generating an E2E test must 
 
 ## Architectural decision
 
-Build a versioned **Form Contract** artifact outside the MCP request path.
+Build a versioned **Form Contract** and a hash-pinned graph of sibling evidence
+artifacts outside the MCP request path.
 
-The contract compiler may use the real Formly builder for scenario-specific normalization, partial TypeScript analysis for source discovery and provenance, and explicit semantic metadata for behavior that cannot be inferred. The MCP server exposes compact read and resolution APIs over the generated artifacts. Agents target stable node IDs and a typed E2E intent rather than raw selectors or Formly implementation details.
+The semantic compiler projects declared Formly configuration and explicit
+metadata. Separate build-time producers may use a controlled Formly builder for
+scenario-specific normalization, bounded TypeScript analysis for lineage and
+provenance, or an Angular application target for authoring observations. The
+future MCP server exposes compact read APIs over validated artifacts. Agents
+target stable semantic IDs and a typed E2E intent rather than raw selectors or
+Formly implementation details.
 
 ```text
-Form registry + Formly configs + fragments + semantic metadata
+project registry + Formly configs + reviewed semantic metadata
                               |
-                 build-time contract compiler
-                 /                         \
-        static source index          Formly scenario build
-                 \                         /
-                    normalized contract bundle
-                              |
-                   MCP resources and tools
-                              |
-                      typed test intent
-                              |
-             deterministic Playwright generation
-                              |
-                 live browser parity verification
+                 v0.4 semantic contract + workspace index
+
+root anchors + TS programs        journey catalog       scenario/Angular evidence
+             |                          |                          |
+             +--------------------------+--------------------------+
+                                        |
+                    schema-addressed artifact-set envelope
+                                        |
+                 pure context queries + live freshness status
+                                        |
+                         pure typed-intent validation
+                                        |
+               real producer/workplace gate -> MCP -> Playwright
 ```
+
+MCP and Playwright are adapters over proven pure semantics, not the place where
+source, Angular, or application factories are loaded. Live browser parity is a
+later verification input and cannot silently promote an observation into
+semantic or execution authority.
 
 ## Three views of a form
 
@@ -71,45 +92,100 @@ The controls, roles, accessible names, states, and locators seen in a running br
 
 These views must not be silently merged. Every fact records its evidence origin and unresolved behavior remains explicit.
 
+## Identity and artifact joins
+
+The architecture keeps four identities separate:
+
+| Identity | Meaning | Authority |
+| --- | --- | --- |
+| Form ID | One semantic form definition and generated contract | Project-owned form definition |
+| Root anchor ID | The exported function, callable `const`, or class that creates the form | Validated definition anchor plus TypeScript symbol identity |
+| Usage ID or callsite key | One invocation of an anchored form in application source | Explicit usage annotation when durability is required; otherwise checker-derived, build-scoped evidence |
+| Journey/step ID | Business navigation and step membership | Project-owned journey catalog or validated source annotation |
+
+These relations are many-to-many. One root may produce several semantic forms,
+and one form may be used at several callsites or journey steps. If an
+unannotated usage resolves to several form IDs, the result is ambiguous; names,
+labels, routes, and source order are not tie-breakers.
+
+The v0.4 Form Contract remains the semantic form record. A workspace index,
+source-lineage index, journey catalog, behavior/scenario evidence, Angular
+authoring report, driver-registry manifest, and agent-context manifest are
+sibling record families with independent schemas and canonical hashes.
+
+The first shared context schema is deliberately small: one artifact-set
+envelope has a structured workspace-index reference, an open collection of
+schema-addressed content references, and its own `contentHash`. It does not
+close a universal artifact-kind list or impose one generic artifact ID grammar.
+Artifact-owning schemas validate their own identities and contents. `CTX-0C`
+separately owns exact execution-authority records; `CTX-1` compares pinned
+inputs with a live workspace and reports freshness; `CTX-2` owns exhaustive
+stable consumer diagnostics and canonical intent validation.
+
+An executable context pins the selected usage, form contract hash, required
+journey and scenario hashes, driver-registry hash, and artifact-set hash.
+Assembly refuses incompatible sets, stale source evidence, scenarios based on
+a different contract, incomplete coverage where a negative answer is required,
+or a changed driver registry. The context manifest references artifact hashes;
+it does not participate in their hash inputs.
+
 ## Major components
 
 ### 1. Form registry
 
-The application or a fixture package explicitly registers supported form entry points.
+The application or a fixture package explicitly registers supported semantic
+form definitions. The implemented workspace source contract owns the form ID
+and a fresh declared field instance; it does not also own page, route, or
+journey meaning.
 
 ```ts
-registerForm({
-  id: 'claim.new',
-  route: '/claims/new',
-  createFields: createClaimFields,
-  contexts: ['adjuster-ca', 'customer-ca'],
+const claimsSource = defineFormContractSource({
+  sourceId: 'claims/forms',
+  list: () => [{
+    id: 'claim.new',
+    create: () => ({ fields: createClaimFields() }),
+  }],
 });
 ```
 
-Each factory accepts serializable, synthetic context and returns a fresh field configuration. Registration avoids guessing which exported values happen to be complete forms.
+Registration avoids guessing which exported values happen to be complete
+forms. A planned root-anchor record connects that semantic definition to the
+canonical exported function or class; the source-lineage index then records
+direct application usages. Page, route, action, and step membership live in a
+separate journey catalog.
+
+The example above is a trusted, project-authored declared source. It is not a
+general instruction to call arbitrary application factories with plausible
+synthetic services, streams, callbacks, or templates. Future parameterized
+factory support first classifies inert values and opaque capabilities; actual
+application-factory execution remains blocked behind the rootless OCI gate
+described below.
 
 ### 2. Contract compiler
 
-The compiler runs in a controlled build or CI environment. It:
+The current generic compiler projects declared field trees and reviewed
+metadata into Form Contract `0.4.0`. A future trusted Angular JIT scenario lane
+may run in a controlled build or CI environment. That lane would:
 
-1. Loads a registered form with the same Formly providers used by the application.
-2. Clones fields, model, options, and form state because Formly mutates them.
-3. Invokes `FormlyFormBuilder` for named scenarios.
-4. Waits for the initial synchronous expression pass to complete.
-5. Projects the resulting tree through an allowlist serializer.
-6. Retains expression callbacks as declared dynamic-rule metadata and records
+1. Load a registered form with the same Formly providers used by the application.
+2. Clone fields, model, options, and form state because Formly mutates them.
+3. Invoke `FormlyFormBuilder` for named scenarios.
+4. Wait for the initial synchronous expression pass to complete.
+5. Project the resulting tree through an allowlist serializer.
+6. Retain expression callbacks as declared dynamic-rule metadata and record
    their JSON-safe scenario outcome when the controlled build resolves it.
-7. Retains unresolved Observables, lifecycle hooks, remote data sources, and
+7. Retain unresolved Observables, lifecycle hooks, remote data sources, and
    other executable behavior outside the expression surface as diagnostics.
-8. Produces a deterministic, content-addressed bundle.
+8. Produce a deterministic, content-addressed bundle.
 
 The compiler must not serialize live field objects. Built fields contain circular parent references, Angular controls, injectors, functions, subscriptions, and other runtime-only state.
 
 #### Controlled project execution hosts
 
-Trusted project configuration and Formly/Angular execution must not run in the
-root orchestrator, Nx daemon, or MCP request process. The workspace package owns
-a versioned, serializable runtime-host protocol:
+Trusted project configuration and future Formly/Angular execution must not run
+in the root orchestrator, Nx daemon, or MCP request process. The workspace
+package owns the framework-neutral orchestration boundary and a versioned,
+serializable runtime-host protocol:
 
 1. The parent loads only a Node-safe root config, expands project config paths,
    and creates a validated request containing the project config path, project
@@ -136,14 +212,13 @@ and index. Finer-grained Nx sharding requires a separate protocol design that
 retains those invariants.
 
 `@formly-contract/workspace` is the publishable framework-neutral host and
-orchestrator. `@formly-contract/angular` is a compatible workspace peer and owns
-the dependency-light Angular JIT wrapper/worker; schema owns the portable host
-provenance DTO. Angular packages are resolved from the explicit project runtime
-base without TypeScript aliases. The initial JIT host supports peer-correct
-Angular graphs with one project-visible core/compiler pair. Because Jiti 2.7 and
-the supported Node 22.13 loader surface cannot observe every transitive
-resolution, anchor preflight must not be described as whole-graph singleton
-enforcement; private/bundled Angular copies remain unsupported.
+orchestrator. A future `@formly-contract/angular` peer will own Angular-specific
+JIT and AOT integration; schema owns portable compatibility and provenance
+DTOs. Angular packages must resolve from the explicit project runtime base
+without treating TypeScript aliases as runtime package authority. Any
+core/compiler anchor preflight is a bounded compatibility check, not proof of
+whole-graph singleton enforcement; private or bundled Angular copies remain
+unsupported until a retained compatibility gate proves otherwise.
 
 A project child contains compiler-facade/module-cache state, crashes, timeouts,
 and failed-import contamination, but it is not a hostile-code or network
@@ -177,27 +252,55 @@ silently interpreting provenance-free indexes. Form Contract schema `0.4.0`
 does not change, so this migration cannot change content-addressed form
 artifact bytes or paths.
 
+The execution modes remain deliberately distinct:
+
+| Mode | Purpose | Boundary |
+| --- | --- | --- |
+| Trusted config/JIT worker | Load trusted repository config and approved Angular/Formly scenario entries | Short-lived project process with policy, timeout, and output controls; not an untrusted-code sandbox |
+| AOT authoring browser worker | Build and observe real custom fields through a pinned Angular application target | Fresh browser contexts and deterministic interception where supported; not an OS sandbox |
+| Rootless OCI factory runner | Future execution of parameterized application factories | Required containment profile with a code-free sidecar, runner-owned violation ledger, structural identity gate, and retained negative controls |
+
+The first two modes execute trusted application code for different evidence
+purposes and must not share a protocol merely because both use Angular. The OCI
+mode remains blocked until `oci-rootless-v1` conformance passes; an ordinary
+child process is not a substitute.
+
 ### 3. Source indexer
 
-A TypeScript compiler-API pass is optional and deliberately partial. Its appropriate responsibilities are:
+A TypeScript compiler-API pass is optional and deliberately partial. Its
+output is a source-lineage sibling artifact, not fields silently added to the
+v0.4 form contract. Its appropriate responsibilities are:
 
-- Discover form and fragment symbols.
-- Record source locations and import relationships.
+- Resolve explicitly anchored form-root symbols and direct call or constructor
+  usages across aliases, barrels, and namespace imports.
+- Record build-scoped callsite identities, source locations, import
+  relationships, configured program coverage, privacy mode, and staleness
+  inputs.
 - Track shared-fragment usage and change impact.
 - Explain literal spreads and overrides.
 - Detect unsupported dynamic constructs.
 - Determine cache invalidation inputs.
 
-It is not an authoritative evaluator for arbitrary factories, dependency injection, mutations, hooks, or asynchronous behavior.
+It is not an authoritative evaluator for arbitrary factories, dependency
+injection, mutations, hooks, asynchronous behavior, or business journeys.
+Wrapper calls, dynamic routes, and cross-program joins that are not proven
+remain ambiguous or unknown. An explicit usage or journey annotation may add
+authority, but it must attach to a validated source location and preserve the
+underlying evidence.
 
 ### 4. Semantic contract model
 
-The contract bundle contains four related graphs:
+The semantic form artifact and its sibling records expose related graphs without
+collapsing their ownership:
 
 - **Model schema:** value types and ordinary constraints.
-- **UI graph:** steps, sections, controls, arrays, actions, ordering, and locators.
+- **UI graph:** sections, controls, arrays, ordering, and locators.
 - **Rule graph:** visibility, enabled, required, readonly, defaults, options, and cross-field validation.
-- **Journey contract:** route, authentication, fixtures, navigation, submit behavior, and expected application outcomes.
+- **Journey catalog (sibling):** route, authentication, fixtures, navigation,
+  submit behavior, step membership, and expected application outcomes.
+- **Behavior/scenario evidence (sibling):** normalized state conditions, exact
+  causal edges, access prerequisites, replay cases, scoped completeness, and
+  resolved scenario references.
 
 A representative control node is:
 
@@ -271,11 +374,22 @@ condition reference, and declared evidence.
 
 Conservative string-expression references, opaque handler/function signals,
 and controlled scenario deltas may help authors review missing declarations,
-but they never become operational verbs automatically. When opaque behavior
-makes analysis coverage incomplete, absence of an effect edge cannot prove
-independence or unreachability. Readiness capabilities remain serializable field
-profile data; trusted drivers implement validated capabilities rather than
-inventing cross-field relationships.
+but they never become operational verbs automatically. Existing v0.4 explicit
+effects remain authoritative for business verbs such as `loads`, `filters`,
+`clears`, `controls-state`, and `toggles`. A closed normalized rule witnessed
+against pinned evaluation semantics may authorize only the exact state edge it
+proves, such
+as visibility or required state under one condition. When opaque behavior makes
+analysis coverage incomplete, absence of an edge cannot prove independence or
+unreachability. Readiness capabilities remain serializable field-profile data;
+trusted drivers implement validated capabilities rather than inventing
+cross-field relationships.
+
+Portable condition, edge, access, replay, and completeness semantics are owned
+by the behavior/scenario schema. Trusted Angular scenario compilation produces
+resolved artifacts tied to one basis contract hash. Angular AOT observation may
+corroborate those artifacts, while the context/query layer only references and
+validates them; it is not a scenario producer.
 
 ### 6. Field-type adapter registry
 
@@ -297,11 +411,36 @@ compiler, while application-specific IDs resolve through a trusted application
 allowlist. Angular reflection and source/render analysis belong to the trusted
 build-time authoring host and do not run in the schema or MCP query path.
 
+Reviewed profiles and Angular authoring evidence have different authority. A
+future Angular inventory can report configured registrations, effective
+components, source/template candidates, rendered roles and parts, coverage,
+and drift. It may generate review scaffolds, but it cannot approve a profile,
+choose a value codec, or register a driver. Only a reviewed project-owned
+profile authorizes interaction for an interactive custom type; exact
+application drivers remain the escape hatch for behavior that cannot be made
+safely generic. Display/assertion-only fields and components require an
+explicit non-interactive disposition and remain non-executable or unknown until
+the schema defines a no-driver/non-interactive profile branch.
+
 One Formly field may map to multiple interactive controls. For example, a date range has start and end parts, while an address lookup may expose a search box, suggestions, and a confirmed structured value.
 
-### 7. MCP server
+### 7. Pure context and intent core, then MCP
 
-The MCP server reads versioned bundles; it does not import Angular or execute application form factories during routine queries.
+Before adding transport, `CTX-1` provides progressive usage, context, node, and
+E2E-slice queries plus live freshness comparison over strict synthetic fixtures
+and, later, real producer artifacts. `CTX-2` accepts only typed semantic IDs and
+policies, verifies all pinned references and execution authority, emits
+exhaustive stable diagnostics, and produces a canonical validated plan and
+hash. It imports neither Angular nor Playwright and performs no registry or
+browser lookup. Its exit proves the positive and negative synthetic
+walkthroughs only.
+
+Transport and browser execution remain blocked until the real representative
+producer/workplace `CTX-GATE` also has current outputs from `LIN-4`, `BHV-4`,
+`ANG-5`, and `DRV-0`. After that gate, the MCP server exposes the same pure
+semantics, and the first Playwright vertical schedules after MCP. The MCP server
+reads versioned bundles; it does not import Angular or execute application form
+factories during routine queries.
 
 In particular, the MCP server never invokes expression callbacks. Scenario
 resolution is a trusted build/CI operation whose output is an immutable bundle.
@@ -324,7 +463,6 @@ Candidate read-only tools:
 - `find_state_witness`
 - `generate_boundary_cases`
 - `validate_test_intent`
-- `compile_test_intent`
 
 Tools use strict input and output schemas and return explicit diagnostics such as `OPAQUE_RULE`, `UNKNOWN_FIELD_TYPE`, `AMBIGUOUS_NODE`, `UNSUPPORTED_ACTION`, and `STALE_CONTRACT`. Large forms are queried through summaries and node slices rather than placed wholesale into model context.
 
@@ -352,7 +490,8 @@ The agent converts a prompt into a typed intent referencing semantic nodes:
 }
 ```
 
-Before emitting Playwright, the compiler validates that:
+Before any Playwright package resolves a driver, the pure validator proves
+that:
 
 - Every node, rule, and action exists at the pinned contract hash.
 - Each step is reachable from the preceding state.
@@ -360,9 +499,15 @@ Before emitting Playwright, the compiler validates that:
 - Values are valid or intentionally invalid for the requested assertion.
 - Locators are unique and appropriately scoped.
 - Required behavior is not opaque.
-- The journey contract contains the expected navigation or submit outcome.
+- The journey catalog contains the expected navigation or submit outcome.
 
-The generated test calls stable form-driver APIs. The agent does not provide CSS, XPath, or widget-specific interaction code.
+The Playwright layer recompiles or revalidates the complete canonical plan,
+checks the pinned driver-registry hash, and then resolves only pre-registered
+driver IDs and node-local targets. The generated test calls stable form-driver
+APIs. The agent does not provide CSS, XPath, widget-specific interaction code,
+or a module path. Native-field execution is the first browser vertical; custom
+fields, dynamic behavior, repeaters, and parity follow only after their
+producer evidence and refusal tests exist.
 
 ## Formly integration constraints
 
@@ -378,18 +523,37 @@ The real browser therefore remains a parity oracle for representative states. St
 
 ## Versioning and change control
 
-Track three independent identities:
+Keep format compatibility, semantic form identity, and exact content identity
+separate:
 
 - `schemaVersion`: compatibility of the contract format.
-- `contractVersion`: intentional semantic version of a form.
+- `formId`: the project-owned semantic form identity. Adding an independent
+  `contractVersion` would require an explicit schema decision.
 - `contentHash`: exact reproducibility of a generated bundle.
 
-Bundles also record source commit, compiler version, Formly version, adapter-registry hash, locale, and scenario inputs. Generated tests pin a content hash and list their node/rule dependencies. Semantic diffs classify removed nodes, value-shape changes, action changes, rule changes, additive optional fields, and presentation-only changes.
+The current workspace index records configuration, registry, tool/runtime, and
+dependency-snapshot identities around v0.4 content-addressed artifacts. Planned
+sibling records add repository/build and scenario inputs where those facts are
+owned. Generated tests pin a content hash and list their node/rule dependencies.
+Semantic diffs classify removed nodes, value-shape changes, action changes,
+rule changes, additive optional fields, and presentation-only changes.
+
+Sibling artifact owners define their own schema, canonical content hash, causal
+inputs, coverage, and identity rules. The shared envelope pins them through
+open schema-addressed content references and a structured workspace-index
+anchor; it does not manufacture a universal build ID or input digest. An agent
+context pins the exact compatible set instead of asking for unqualified
+“latest” data. Staleness, a basis-hash mismatch, ambiguous usage, or incomplete
+authoritative coverage is a blocking result for compilation, not a warning
+followed by best-effort execution.
 
 ## Security and privacy
 
-- Build only explicitly registered forms in a fresh project process. Process
-  isolation contains runtime state but is not itself a network sandbox.
+- Build only explicitly registered forms in the execution profile authorized
+  for that evidence class. A trusted JIT child contains runtime state but is not
+  a network or hostile-code sandbox; an AOT browser host is not an OS sandbox;
+  arbitrary application-factory execution requires the separate rootless OCI
+  profile.
 - Require an externally enforced network-denying profile for reproducible CI
   generation; trusted local mode must state that network denial is not enforced.
   Use synthetic fixtures in both profiles.

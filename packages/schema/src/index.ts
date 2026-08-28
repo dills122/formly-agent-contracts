@@ -5,6 +5,20 @@ export {
   verifyContentHash,
 } from './canonical-json.js';
 export {
+  AGENT_CONTEXT_ARTIFACT_SET_SCHEMA_VERSION,
+  canonicalizeAgentContextArtifactSet,
+  computeAgentContextArtifactSetHash,
+  createAgentContextArtifactSet,
+  parseAgentContextArtifactSet,
+} from './agent-context-artifacts.js';
+export type {
+  AgentContextArtifactReference,
+  AgentContextArtifactSet,
+  AgentContextArtifactSetDraft,
+  AgentContextWorkspaceIndexReference,
+  Sha256Digest,
+} from './agent-context-artifacts.js';
+export {
   collectContractConditionIds,
   collectContractNodes,
   contractEffectCycleComponents,

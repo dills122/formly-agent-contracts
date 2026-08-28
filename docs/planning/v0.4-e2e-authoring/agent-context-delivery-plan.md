@@ -1,6 +1,8 @@
 # Agent Context and Deterministic E2E Delivery Plan
 
-**Status:** High-level planning ready; implementation tasks not yet dispatched
+**Status:** Reconciled with RH-06; `RH06-DOC` and `CTX-0A` are complete.
+`CTX-0B` and `CTX-0C` are ready. `LIN-0` is blocked on representative
+workplace evidence, and `BHV-0` awaits explicit approval of ADR 0010.
 
 **Decision:** Conditional go for a bounded contract/query/validator pilot
 
@@ -8,26 +10,35 @@
 
 ## Purpose
 
-This document turns the completed RH-05 research into a concise delivery plan.
-It is the planning entry point for moving from an imprecise request such as
+This document turns the completed RH-05 research into a concise consumer
+delivery plan under the approved
+[RH-06 reconciliation](../agent-context-hardening/rh-06-reconciliation.md).
+The
+[agent-context hardening execution index](../agent-context-hardening/execution-index.md)
+is the canonical cross-plan scheduler. This plan covers the path from an
+imprecise request such as
 “add positive and negative tests for order entry step one” to validated,
 deterministic Playwright execution without agent-invented selectors, values,
 navigation, readiness waits, or application behavior.
 
-This is not a production implementation authorization and does not assign work
-to individual agents. Detailed wire-shape proposals, evidence, walkthroughs,
-alternatives, diagnostics, and review reconciliations remain in
+RH-06 is an approved planning baseline, not a claim that the implementation or
+a workplace pilot is ready. Detailed wire-shape proposals, evidence,
+walkthroughs, alternatives, diagnostics, and review reconciliations remain in
 [RH-05: Agent-to-Contract-to-Playwright Context Flow](../../research/hardening/agent-to-e2e-context-flow.md).
 
 ## Planning decision
 
-Proceed incrementally with the contract and refusal path first:
+Proceed incrementally with the shared contracts and refusal path first:
 
-1. define the missing source-authority records and fixture evidence;
+1. land `CTX-0A` through `CTX-0D`: shared strict schemas followed by explicitly
+   synthetic walkthrough fixtures;
 2. prove progressive in-memory discovery over immutable artifacts;
 3. prove a strict typed-intent validator can produce a lossless plan or a
-   precise refusal; and
-4. measure that pilot before adding MCP transport or Playwright execution.
+   precise refusal, with the positive/negative synthetic proof as the `CTX-2`
+   exit gate; and
+4. run the real representative producer/workplace `CTX-GATE` only after the
+   canonical producer artifacts exist, before adding MCP transport or
+   Playwright execution.
 
 The pilot is successful only if it reduces guessing and review effort on a
 representative form. The simpler fallback—source reading plus ordinary
@@ -39,20 +50,36 @@ to claim production readiness. RH-05 estimates technical feasibility at
 `0.88` and near-term net value at `0.72`; the latter must be replaced with
 measured evidence from the pilot.
 
+## Compatibility boundary
+
+Form Contract `0.4.0` is the implemented compatibility boundary. The source,
+journey, behavior/scenario, context-manifest, and driver-registry capabilities
+in this plan begin as strict sibling record families; they are not new optional
+fields on the v0.4 contract. Folding a stable subset into a later Form Contract
+version requires a separate schema decision.
+
+The v0.4 form tree, domains, profiles, locators, explicit effects, unknowns,
+diagnostics, and canonical hashes remain authoritative within their existing
+scope. This plan joins them by exact ID and hash rather than copying them into a
+second aggregate contract.
+
 ## Evidence and review status
 
 The plan is based on the current v0.4 schema/compiler/workspace implementation,
 the Angular monorepo fixture and goldens, the approved E2E metadata
 specification, and the completed field-profile, cross-field-effect,
-source-lineage, locator, and RH-05 research.
+source-lineage, locator, RH-04, and RH-05 research. RH-06 reconciles those
+inputs and supersedes conflicting package, scenario, authority, and delivery
+ownership statements in the individual research reports.
 
 RH-05 underwent several independent-review cycles. The final retained
 correction addressed the last accepted findings about cross-step authority,
 typed ambiguity retries, and slice ownership. The final corrected artifact
 passed repository checks and a focused contract audit, but it did not receive
 another independent verdict after the configured review limit was exhausted.
-That is sufficient evidence to start a reversible experimental pilot; it is
-not evidence that the proposed contracts work in production.
+That is sufficient evidence for the reversible shared-schema and synthetic
+consumer work in `CTX-0A` through `CTX-2`; it is not evidence that the proposed
+contracts work in production or that real producer artifacts are available.
 
 ## What the repository already provides
 
@@ -60,9 +87,9 @@ not evidence that the proposed contracts work in production.
   identities, content hashes, project/source provenance, and diagnostics;
 - model paths, labels, constraints, options, value-domain completeness, and
   explicit unknowns;
-- application-owned field interaction profiles with driver identity,
-  operations, semantic parts, wrapper prerequisites, readiness capabilities,
-  and custom value projection;
+- reviewed application-owned field interaction profiles for interactive custom
+  controls, with driver identity, operations, semantic parts, wrapper
+  prerequisites, readiness capabilities, and custom value projection;
 - evidence-tagged node-local locators; and
 - explicit cross-field effects with ordering, timing, readiness, endpoint, and
   completeness information.
@@ -79,14 +106,16 @@ elsewhere or replace them with inferred browser behavior.
 
 | Area | Minimum required authority | Owner |
 | --- | --- | --- |
-| Usage and lineage | Stable usage ID; form/project/source join; source path/span and symbol; consuming page/component; route/catalog evidence | Workspace/compiler artifact producer |
-| Journey | Exact entry and landing step; ordered step membership; action/outcome IDs; exact from/action/outcome/to transitions | Usage/journey schema and producer |
-| Freshness | Schema version; build ID; repository revision; source-input digest; form, usage, scenario, and registry hashes | Shared schema and artifact envelope |
-| Scenario | Scenario ID/version; synthetic-input provenance; basis and resolved hashes; diagnostics; resolved node/domain/profile/effect state | Trusted generation boundary |
-| Interaction | Exact profile/driver/version; operation; semantic part and target; codec; wrapper/readiness prerequisites | Node/profile projection |
-| Commit and assertions | One commit authority; exact physical operation when explicit; post-commit value surface; validation activation and assertion surface; state assertion surface | Shared schema, then node/usage producer |
-| Repeater | Separate add and expand authority; exact item context for expand; exactly-one-created-item capture authority for add | Profile/node producer |
-| Unknowns and refusals | Stable code, phase, severity, blocking policy, typed location, and bounded remediation | Shared diagnostic policy |
+| Usage and lineage | Stable usage ID; form/project/source join; source path/span and symbol; consuming page/component; route/catalog evidence | `CTX-0B` schema; workspace/source-lineage producer |
+| Journey | Exact entry and landing step; ordered step membership; action/outcome IDs; exact from/action/outcome/to transitions | `CTX-0B` schema; project authoring and workspace validation |
+| Artifact pinning | Open schema-addressed inventory refs `{ schemaId, schemaVersion, contentHash }`; artifact-set `contentHash`; structured workspace-index anchor `{ schemaVersion, contentHash }` | `CTX-0A` schema-addressed envelope only |
+| Live freshness | Compare the pinned owner references and basis hashes required by a query; report current/stale/unknown without treating repository revision as integrity proof | `CTX-1` pure query core |
+| Scenario semantics | Portable JSON-safe conditions, causal edges, access prerequisites, replay cases, scoped completeness, and unknowns | RH-04; future sibling behavior/scenario schemas |
+| Resolved scenario | Scenario ID/version; synthetic-input provenance; basis and resolved hashes; diagnostics; resolved node/domain/profile/state evidence | `BHV-4` / workspace Task 8 trusted producer; `CTX-0C` reference schema |
+| Interaction | Exact reviewed profile/driver/version; operation; semantic part and target; codec; wrapper/readiness prerequisites; explicit disposition/unknown for display/assertion-only components until no-driver support is approved | Existing v0.4 profile authority plus reviewed producers |
+| Commit and assertions | One commit authority; exact physical operation when explicit; post-commit value surface; validation activation and assertion surface; state assertion surface | `CTX-0C` schema, then node/usage producers |
+| Repeater | Separate add and expand authority; exact item context for expand; exactly-one-created-item capture authority for add | `CTX-0C` schema, then profile/node producers |
+| Unknowns and refusals | Stable code, phase, severity, blocking policy, typed location, and bounded remediation | `CTX-2` exhaustive consumer policy |
 
 Useful later but not required for the pilot include ownership tags, change
 history, broad scenario matrices, generated witness suggestions, observed
@@ -94,6 +123,46 @@ parity history, and coverage dashboards. Raw AST dumps, arbitrary source
 snippets, callback source, customer values, inferred operational verbs,
 agent-selected package paths, and heuristic selectors are not execution
 authority.
+
+Every executable context must pin those identities together. The artifact-set
+envelope inventories open schema-addressed references rather than a closed
+artifact-kind union or generic `id` field, and owns its own canonical
+non-self-referential `contentHash`. The workspace index is a structured
+`{ schemaVersion, contentHash }` anchor. Repository revision is required,
+bounded, non-authoritative provenance; it is not freshness or mixed-context
+integrity evidence.
+`CTX-2` later fails closed when required owner references or basis hashes do
+not agree, authoritative source coverage is incomplete, live freshness from
+`CTX-1` is unknown where current evidence is required, or the driver registry
+changed.
+
+## Behavior and scenario ownership
+
+The consumer flow does not create portable behavior semantics or resolved
+scenarios:
+
+1. RH-04 owns portable JSON-safe condition, behavior, access-prerequisite,
+   replay-case, scoped-completeness, and unknown semantics in sibling record
+   families.
+2. `BHV-4` (workspace/Angular Task 8) owns trusted scenario compilation and
+   produces a resolved artifact pinned to its basis Form Contract hash. It
+   depends on guarded JIT-host capability `ANG-3`, the `ANG-2P`
+   provider/project descriptor, portable behavior schema `BHV-1`, and
+   publication of `CTX-0C` plus `CTX-0D`; `ANG-3` is capability, not a scenario
+   producer.
+3. Angular authoring and browser observations may corroborate a reviewed record
+   or report drift, but cannot invent business meaning.
+4. RH-05 and this plan own only references, projections, validation, planning,
+   and later execution over those producer artifacts.
+
+Effect authority is similarly narrow. Existing v0.4 explicit effects may
+authorize named application/business verbs such as `loads`, `filters`,
+`clears`, `toggles`, or `controls-state`. A closed normalized rule with a
+witness pinned to the same evaluation semantics may authorize only the exact
+derived state edge it proves, such as visibility or required state under one
+condition. Callback, helper, hook, and RxJS scaffolds remain non-executable
+evidence. No consumer may promote an observed delta or inferred dependency into
+a business verb.
 
 ## Target flow
 
@@ -140,6 +209,9 @@ closures are complete or refused, never silently truncated.
 - Dynamic values, hidden branches, async readiness, and incomplete effect
   coverage remain blocked unless a trusted declared or resolved capability
   supports them.
+- Explicit v0.4 effects authorize business verbs. A witnessed closed normalized
+  rule authorizes only its exact state edge; opaque code and observations never
+  acquire broader effect authority.
 - DOM value alone does not prove model commitment. Tests require the declared
   commit authority and a post-commit assertion surface.
 - Diagnostics use one exhaustive, versioned policy. Producer-chosen severity,
@@ -151,45 +223,64 @@ closures are complete or refused, never silently truncated.
 ## Delivery sequence
 
 ```text
-planning approval
-       |
-Slice 0: source-authority schemas and fixture records
-       |
-Slice 1: pure projection/query core
-       |
-Slice 2: typed intent and pure validator
-       |
-Pilot decision gate
-       |
-MCP transport adapter
-       |
-Slice 3: native positive/negative Playwright vertical
-       |
-Slice 4: resolved scenario and custom/dynamic vertical
-       |
-Slice 5: repeaters, rendered parity, and change analysis
+RH06-DOC
+   |
+CTX-0A schema-addressed artifact-set envelope/workspace-index anchor
+   |-----------------------|
+CTX-0B usage/journey       CTX-0C scenario refs/execution authority
+   |_______________________|
+              |
+CTX-0D explicitly synthetic walkthrough fixtures
+              |
+CTX-1 pure projection/query core
+              |
+CTX-2 typed intent and pure validator
+    (synthetic positive/negative proof) ----------------\
+                                                        +-> CTX-GATE real context
+LIN-4 + BHV-4 + ANG-5 + DRV-0 ------------------------/
+                                                                  |
+               MCP-1 -> PW-1 native -> PW-2 custom/dynamic -> PW-3 repeater/parity
 ```
 
-### Slice 0 — Source-authority foundation
+This is only a consumer-spine summary. The
+[execution index](../agent-context-hardening/execution-index.md) is normative
+for every producer dependency and readiness state.
 
-Define strict, versioned DTOs and runtime validation for the artifact envelope,
-usage/source join, journey entry and transitions, scenario references,
-freshness, driver-registry identity, commit operations, value/validation/state
-assertion surfaces, and repeater capture. Add only the minimum synthetic
-records needed by the two RH-05 walkthroughs.
+### `CTX-0A` through `CTX-0D` — Shared-contract checkpoint
 
-**Exit gate:** source path, component symbol, form ID, route/catalog, and step
-queries resolve the correct usage or an explicit ambiguity. Every executable
-commit, assertion, transition, and repeater capture resolves by exact ID. No
-validator or driver code is introduced.
+Land the checkpoint as four reviewable packets:
 
-### Slice 1 — Pure progressive query core
+1. `CTX-0A` defines only the open schema-addressed pinned artifact-set envelope,
+   its own set `contentHash`, and the structured workspace-index
+   `{ schemaVersion, contentHash }` anchor. Its references are
+   `{ schemaId, schemaVersion, contentHash }`; it also includes the required
+   schema package Changeset. It does not define execution authority, live
+   freshness status, diagnostic policy, or the query module boundary.
+2. `CTX-0B`, after `CTX-0A`, defines source-usage and journey records.
+3. `CTX-0C`, after `CTX-0A`, defines scenario references and exact execution
+   authority for commits, assertions, actions, transitions, and repeater
+   capture.
+4. `CTX-0D`, after both `CTX-0B` and `CTX-0C`, adds only the minimum positive
+   and negative RH-05 walkthrough records. Every such record is explicitly
+   marked synthetic.
+
+This checkpoint adds schemas and synthetic evidence, not a TypeScript indexer,
+Angular host, real usage/scenario producer, MCP server, validator, or
+Playwright driver.
+
+**Exit gate:** strict validation, canonical round-tripping, version and
+unknown-key refusal, hash-mutation rejection, exact referential integrity, and
+deterministic synthetic fixture identity pass. The fixtures must not be
+reported as source, runtime, or workplace evidence.
+
+### `CTX-1` — Pure progressive query core
 
 Implement in-memory projections for usage search, context summary, node search,
 and a single-step E2E slice over validated fixture JSON. The core owns strict
 input/output schemas, path confinement, bounded projections, collection-named
-cursors, and complete-or-refuse atomic closures. It has no MCP or application
-runtime dependency.
+cursors, complete-or-refuse atomic closures, the pure query module-boundary
+selection, and live freshness comparison/status over pinned owner references
+and basis hashes. It has no MCP or application runtime dependency.
 
 **Exit gate:** both walkthroughs obtain all required context without loading a
 whole contract. Pagination is deterministic and resumable for one named
@@ -197,7 +288,7 @@ collection at a time; secondary records are complete atomic metadata; oversized
 atomic records and closures refuse without partial payloads; cross-step focus,
 cycles, stale context, and ambiguity produce exact diagnostics.
 
-### Slice 2 — Typed intent and pure validator
+### `CTX-2` — Typed intent and pure validator
 
 Define the strict intent DTO, canonical validated-plan DTO, exhaustive
 diagnostic policy, and pure semantic validator. Valid intent produces a
@@ -210,40 +301,51 @@ runtime schemas and canonical serialization. All selected execution authority
 is present in the plan. Staleness, ordering, unknown values, missing scenarios,
 unsupported profiles/targets/commits/assertions/transitions, hidden fields,
 repeater ambiguity, and caller-rehashed mutations fail with their exact policy
-before any registry lookup.
+before any registry lookup. This is the synthetic positive/negative proof; it
+is not deferred to `CTX-GATE`.
 
-### Pilot decision gate
+### `CTX-GATE` — Real representative producer/workplace context gate
 
-Stop and review before transport or browser execution. Measure:
+Run only after `CTX-2`, `LIN-4`, `BHV-4`, `ANG-5`, and `DRV-0` have produced
+the required canonical artifacts and joined them into one current pinned
+representative context. Stop and review before transport or browser execution.
+Measure:
 
-- percentage of targeted nodes that validate without a new
-  application-specific driver;
-- metadata authoring and review time per usage and custom field;
 - ambiguity and refusal rates, including whether remediation is actionable;
 - query payload size and number of progressive requests;
-- first-run plan success on the two walkthroughs; and
-- expected effort compared with an ordinary hand-written Playwright test.
+- exact valid/refusal results and canonical-plan stability on the real
+  representative context;
+- metadata authoring and review time plus first-run success against a real
+  usage; and
+- comparison with an ordinary hand-written Playwright test and the provisional
+  70-percent target for nodes that validate without a new application-specific
+  driver.
 
-The provisional coverage threshold is about 70 percent, but this is an
-unmeasured planning hypothesis. Replace it with an observed threshold during
-the pilot review.
+Synthetic records prove consumer semantics at `CTX-2`; they cannot satisfy
+this gate. The 70-percent threshold remains an unmeasured hypothesis until this
+gate replaces it with observed data.
 
-### MCP transport adapter
+### `MCP-1` — MCP transport adapter
 
 Expose the already-proven Slice 1 query semantics and Slice 2 validation
 through read-only MCP tools. Transport does not change the schemas, select
-records, or execute trusted application code.
+records, or execute trusted application code. It begins only after a
+`CTX-GATE` go decision. `MCP-1` is a required scheduler predecessor for
+`PW-1`, even though both may share the same pure semantic core internally.
 
 **Exit gate:** tool results conform to the same runtime output schemas,
 pagination/cursor pinning remains deterministic, and transport adds no new
 authority or data exposure.
 
-### Slice 3 — Native Playwright vertical
+### `PW-1` — Native Playwright vertical
 
 Add one usage-entry driver and the smallest built-in fill/select/check,
 commit, value, validation, and state assertion implementations. Compile only a
 resubmitted plan that passes full semantic revalidation against the pinned
-context.
+context. Per the execution index, it schedules only after both a `CTX-GATE` go
+decision and `MCP-1`. Its implementation may consume the proven pure core
+internally, but that is not an alternate scheduler edge and MCP transport is
+not semantic execution authority.
 
 **Exit gate:** one positive and one negative native fixture test pass repeatedly
 without raw selectors in intent or generated source. Immediate, explicit-blur,
@@ -251,21 +353,25 @@ and usage-action commit modes are covered; assertions prove post-commit state;
 and a shared physical blur used for commit and validation activation executes
 exactly once.
 
-### Slice 4 — Resolved custom/dynamic vertical
+### `PW-2` — Resolved custom/dynamic vertical
 
-Generate and index trusted scenario artifacts, add exact custom-part targets,
-runtime value/readiness capabilities, wrapper prerequisites, and application
-drivers for the conditional custom-field walkthrough.
+Consume trusted resolved scenario and behavior artifacts produced by `BHV-4`
+(workspace/Angular Task 8) and the RH-04 behavior lane. Add exact custom-part
+targets, runtime value/readiness capabilities, wrapper prerequisites, and
+application drivers for the conditional custom-field walkthrough. This
+consumer slice does not generate scenario semantics or resolved artifacts.
+It begins only after `PW-1` and the required Angular/behavior producer evidence.
 
 **Exit gate:** the custom/dynamic negative walkthrough passes, and removal of
 each required metadata item produces the expected blocker. Unsafe or unsettled
 dynamic providers remain blocked.
 
-### Slice 5 — Repeaters, parity, and change analysis
+### `PW-3` — Repeaters, parity, and change analysis
 
 Implement browser conformance for already-versioned add/capture/expand
 contracts, then add observed role/locator/state parity, source-to-contract
 change impact, and privacy-safe failure artifacts.
+It begins only after `PW-2` and the browser-conformance prerequisite.
 
 **Exit gate:** a representative repeater remains deterministic as row count and
 DOM structure change; add captures exactly one created item, expand is scoped
@@ -276,11 +382,18 @@ contract/profile without exposing sensitive values.
 
 | Concern | Primary owner | Must not own |
 | --- | --- | --- |
-| Versioned DTOs, runtime schemas, canonical form, hashes, diagnostic policy | `packages/schema/` | Angular, MCP, or Playwright execution |
-| Trusted form/usage/scenario projection and registry resolution | `packages/compiler/` and `packages/workspace/` | Agent-facing selector generation or browser execution |
-| Progressive read-only transport | `apps/mcp-server/` | Config/scenario loading, semantic selection, or drivers |
-| Intent validation and plan construction | `packages/test-intent/` | Browser I/O or fallback guesses |
-| Exact trusted plan compilation and browser operations | `packages/playwright-driver/` | Query/discovery authority or agent-selected modules |
+| Versioned DTOs, runtime schemas, canonical serialization, hashes, intent types, and diagnostic policy | `@formly-contract/schema` | TypeScript, Angular, MCP, or Playwright dependencies |
+| Semantic extraction and trusted form projection | `@formly-contract/compiler` | Distributed discovery, agent transport, or browser execution |
+| Distributed discovery, source indexing, generation, and artifact assembly | `@formly-contract/workspace` | Business-journey inference or query-time application execution |
+| Angular-specific authoring and host integration | future `@formly-contract/angular` | Automatic semantic approval or whole-process sandbox claims |
+| Progressive read-only transport | future `@formly-contract/mcp` | Config/scenario loading, semantic selection, or drivers |
+| Exact validated-plan compilation and browser operations | future `@formly-contract/playwright` | Query/discovery authority or agent-selected modules |
+
+There is no separate `@formly-contract/test-intent` package and no
+`@formly-contract/playwright-driver` package. `CTX-1` selects the smallest
+schema-backed pure module boundary for query behavior without inventing another
+published package; `CTX-2` adds validation against that boundary. This follows
+[ADR 0008](../../decisions/0008-package-rename.md).
 
 When a slice spans owners, land the shared schema and failing contract tests
 before producer or consumer behavior. Each future task should leave the
@@ -297,7 +410,9 @@ workspace buildable and should avoid unrelated public-interface changes.
 | Cross-step ambiguity | Pin entry landing, current-step bindings, and exact from/action/outcome/to transitions; reject cross-step focus without declared authority. |
 | Repeater guessing | Split add from expand, require exact row context for expand, and make one capture record authoritative for a newly added item. |
 | No legal ambiguity retry | Carry optional exact assertion, capture, and transition IDs in typed intent; omission succeeds only for one compatible record. |
-| Slice ownership mismatch | Slice 0 owns all source-authority schemas/fixtures, Slice 1 owns pure queries, Slice 2 owns validation, and transport follows the pilot. |
+| Slice ownership mismatch | `CTX-0A` owns only the artifact-set envelope/workspace-index anchor; `CTX-0B`–`CTX-0C` own semantic schemas; `CTX-0D` owns explicitly synthetic fixtures; `CTX-1` owns pure queries and live freshness status; `CTX-2` owns validation and exhaustive consumer diagnostics. Real producers remain separate, and transport follows the real-context gate. |
+| Scenario ownership ambiguity | RH-04 owns portable semantics; workspace/Angular Task 8 owns resolved production; RH-05 consumes exact references and never produces scenarios. |
+| Over-broad derived-effect authority | v0.4 declarations retain business verbs; witnessed normalized rules authorize only exact state edges; opaque or observed evidence remains non-executable. |
 
 ## Stop or narrow conditions
 
@@ -315,9 +430,9 @@ appropriate if the pilot shows any of the following:
   screenshots, traces, or network bodies from entering model context or
   retained artifacts.
 
-The design is intentionally reversible. Slices 0–2 can still provide useful
-discovery and early refusal even if broad Playwright compilation does not earn
-its maintenance cost.
+The design is intentionally reversible. `CTX-0A` through `CTX-2` can still
+provide useful discovery and early refusal even if broad Playwright compilation
+does not earn its maintenance cost.
 
 ## Open pilot questions
 
@@ -334,13 +449,13 @@ its maintenance cost.
   large form to justify its query complexity?
 
 These are measurement questions for the pilot, not reasons for more paper
-contract expansion before Slice 0.
+contract expansion before `CTX-0A`.
 
 ## Task-dispatch readiness
 
-Do not send implementation tasks until the maintainer approves this conditional
-go and confirms the initial public synthetic usage. After approval, prepare
-task packets one slice at a time. Each packet must state:
+The approved RH-06 planning baseline first made `CTX-0A` eligible; that slice
+is now complete. `CTX-0B` and `CTX-0C` are independently ready and must not be
+collapsed into one shared implementation task. Each packet must state:
 
 - the exact contract and package owner;
 - dependencies and base commit;
@@ -350,18 +465,26 @@ task packets one slice at a time. Each packet must state:
 - migration and compatibility implications; and
 - evidence required at the next stop/go gate.
 
-The first task packet should cover only Slice 0 contract/source-authority work.
-Do not combine it with MCP transport, Playwright, or workplace integration.
+The completed first task packet covers only `CTX-0A`: the open
+schema-addressed pinned artifact-set envelope, its own content hash, the
+structured workspace-index anchor, and a schema package Changeset in
+`@formly-contract/schema`. The next packets preserve that boundary: `CTX-0B`
+owns source-usage/journey records and `CTX-0C` owns scenario/execution-authority
+records. Neither includes fixtures, producer runtime code, MCP, Playwright, or
+workplace integration.
 
 ## Planning acceptance
 
-High-level planning is ready when the maintainer agrees to:
+High-level planning is reconciled when the maintainer agrees to:
 
-- the conditional Slices 0–2 pilot rather than full implementation approval;
-- the package ownership and dependency order above;
+- the conditional `CTX-0A` through `CTX-2` pilot rather than full
+  implementation approval;
+- ADR 0008 package ownership and the execution-index dependency order above;
 - the no-selector, no-guess, complete-or-refuse, and privacy invariants;
 - one public synthetic positive/negative walkthrough as the first target; and
-- a measured pilot review before MCP transport or browser-driver expansion.
+- the real representative `CTX-GATE`, requiring `CTX-2`, `LIN-4`, `BHV-4`,
+  `ANG-5`, and `DRV-0`, before MCP transport or browser-driver expansion.
 
-Once those points are approved, Slice 0 can be decomposed into independently
-reviewable implementation tasks.
+Those points are now represented in RH-06. `CTX-0A` is complete; dispatch
+`CTX-0B` and `CTX-0C` independently, while all other tasks remain governed by
+the execution index.

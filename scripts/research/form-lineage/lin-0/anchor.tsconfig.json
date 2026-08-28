@@ -1,0 +1,15 @@
+{
+  "extends": "../../../../fixtures/angular-monorepo/tsconfig.json",
+  "compilerOptions": {
+    "baseUrl": "../../../../fixtures/angular-monorepo",
+    "paths": {
+      "@fixture/forms-kit/forms": ["libs/forms-kit/src/forms.ts"]
+    },
+    "types": []
+  },
+  "files": [
+    "../../../../fixtures/angular-monorepo/libs/feature-lib/src/lib/claim-intake-page.component.ts",
+    "../../../../fixtures/angular-monorepo/libs/feature-lib/src/lib/scenario-gallery-page.component.ts"
+  ],
+  "include": []
+}
