@@ -168,6 +168,39 @@ describe('workspace CLI', () => {
     expect(captured.stderr).toEqual([]);
   });
 
+  it('prints an opted-in source-usage catalog and its fail-closed diagnostics', async () => {
+    const captured = captureIo();
+    const check = vi.fn().mockResolvedValue({
+      indexPath: 'dist/contracts/workspace-index.json',
+      artifactPaths: ['dist/contracts/claims.json'],
+      sourceUsageCatalogPath: 'dist/contracts/source-usage-catalog.json',
+      sourceUsageDiagnostics: [
+        {
+          code: 'FORM_DEFINITION_MISSING',
+          projectId: 'claims',
+          formId: 'claims.legacy',
+        },
+      ],
+      differences: [],
+    });
+
+    await expect(
+      runWorkspaceCli(['check'], {
+        ...captured.io,
+        cwd: () => '/workspace',
+        check,
+      }),
+    ).resolves.toBe(0);
+
+    expect(captured.stdout.join('')).toBe(
+      '1 contract is current.\n' +
+        'Index: dist/contracts/workspace-index.json\n' +
+        'Source usage: dist/contracts/source-usage-catalog.json\n' +
+        'Source usage diagnostic [FORM_DEFINITION_MISSING] project=claims form=claims.legacy\n',
+    );
+    expect(captured.stderr).toEqual([]);
+  });
+
   it('reports missing and stale artifact paths from check', async () => {
     const captured = captureIo();
     const check = vi.fn().mockResolvedValue({
@@ -227,6 +260,30 @@ describe('workspace CLI', () => {
     });
     expect(captured.stdout.join('')).toBe(
       'Generated 1 contract.\nIndex: artifacts/workspace-index.json\n',
+    );
+    expect(captured.stderr).toEqual([]);
+  });
+
+  it('prints the generated source-usage catalog when configured', async () => {
+    const captured = captureIo();
+    const generate = vi.fn().mockResolvedValue({
+      indexPath: 'artifacts/workspace-index.json',
+      artifactPaths: ['artifacts/one.contract.json'],
+      sourceUsageCatalogPath: 'artifacts/source-usage-catalog.json',
+      sourceUsageDiagnostics: [],
+    });
+
+    await expect(
+      runWorkspaceCli(['generate'], {
+        ...captured.io,
+        generate,
+      }),
+    ).resolves.toBe(0);
+
+    expect(captured.stdout.join('')).toBe(
+      'Generated 1 contract.\n' +
+        'Index: artifacts/workspace-index.json\n' +
+        'Source usage: artifacts/source-usage-catalog.json\n',
     );
     expect(captured.stderr).toEqual([]);
   });

@@ -23,7 +23,9 @@ export class ClaimPageComponent {
   readonly model: Record<string, unknown>;
 
   constructor() {
-    const instance = createNxClaimForm();
+    const instance = createNxClaimForm({
+      initialReference: window.location.pathname,
+    });
     this.fields = instance.fields;
     this.model = instance.model;
   }

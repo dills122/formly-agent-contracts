@@ -41,7 +41,15 @@ interface CliWriter {
 
 type GenerateWorkspace = (
   options: RunWorkspaceOptions,
-) => Promise<Pick<WorkspaceRunResult, 'indexPath' | 'artifactPaths'>>;
+) => Promise<
+  Pick<
+    WorkspaceRunResult,
+    | 'indexPath'
+    | 'artifactPaths'
+    | 'sourceUsageCatalogPath'
+    | 'sourceUsageDiagnostics'
+  >
+>;
 type ListWorkspace = (
   options: DiscoverWorkspaceProjectsOptions,
 ) => Promise<Pick<DiscoveredWorkspace, 'inventory'>>;
@@ -226,6 +234,40 @@ function formatCheckDifferences(result: WorkspaceCheckResult): string {
   ].join('\n');
 }
 
+function formatSourceUsage(
+  result: Pick<
+    WorkspaceRunResult,
+    'sourceUsageCatalogPath' | 'sourceUsageDiagnostics'
+  >,
+): string {
+  if (result.sourceUsageCatalogPath === undefined) {
+    return '';
+  }
+  return [
+    `Source usage: ${result.sourceUsageCatalogPath}`,
+    ...(result.sourceUsageDiagnostics ?? []).map((diagnostic) => {
+      const provenance = [
+        ...(diagnostic.programId === undefined
+          ? []
+          : [`program=${diagnostic.programId}`]),
+        ...(diagnostic.projectId === undefined
+          ? []
+          : [`project=${diagnostic.projectId}`]),
+        ...(diagnostic.formId === undefined
+          ? []
+          : [`form=${diagnostic.formId}`]),
+        ...(diagnostic.location === undefined
+          ? []
+          : [`path=${JSON.stringify(diagnostic.location.path)}`]),
+      ];
+      return `Source usage diagnostic [${diagnostic.code}]${
+        provenance.length === 0 ? '' : ` ${provenance.join(' ')}`
+      }`;
+    }),
+    '',
+  ].join('\n');
+}
+
 export async function runWorkspaceCli(
   argv: readonly string[],
   dependencies: WorkspaceCliDependencies = {},
@@ -279,7 +321,7 @@ export async function runWorkspaceCli(
       }
       const count = result.artifactPaths.length;
       stdout.write(
-        `${count} ${count === 1 ? 'contract is' : 'contracts are'} current.\nIndex: ${result.indexPath}\n`,
+        `${count} ${count === 1 ? 'contract is' : 'contracts are'} current.\nIndex: ${result.indexPath}\n${formatSourceUsage(result)}`,
       );
       return 0;
     }
@@ -287,7 +329,7 @@ export async function runWorkspaceCli(
     const result = await generate(workspaceOptions(command));
     const count = result.artifactPaths.length;
     stdout.write(
-      `Generated ${count} ${count === 1 ? 'contract' : 'contracts'}.\nIndex: ${result.indexPath}\n`,
+      `Generated ${count} ${count === 1 ? 'contract' : 'contracts'}.\nIndex: ${result.indexPath}\n${formatSourceUsage(result)}`,
     );
     return 0;
   } catch (error) {

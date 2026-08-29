@@ -200,6 +200,10 @@ describe('workspace configuration', () => {
       ],
       excludeProjectConfigs: ['apps/legacy/**'],
       tsconfigPath: 'tsconfig.base.json',
+      sourceUsage: {
+        convention: 'direct-root-call-v1',
+        tsconfigPath: 'apps/test-app/tsconfig.app.json',
+      },
       output: { directory: 'dist/contracts' },
       locators: { testIdAttributes: ['data-testid', 'data-cy'] },
       diagnostics: { failOn: ['error', 'warning'] },
@@ -215,6 +219,43 @@ describe('workspace configuration', () => {
 
     expect(parseRootConfig(root)).toBe(root);
     expect(parseProjectConfig(project)).toBe(project);
+  });
+
+  it('resolves an explicit source-usage program without reusing the config-loader tsconfig', () => {
+    const resolved = resolveWorkspaceProjectConfig(
+      defineConfig({
+        projectConfigs: ['apps/**/config.ts'],
+        tsconfigPath: 'tsconfig.base.json',
+        sourceUsage: {
+          convention: 'direct-root-call-v1',
+          tsconfigPath: 'apps/test-app/tsconfig.app.json',
+        },
+      }),
+      defineFormContractProject({ projectId: 'claims' }),
+    );
+
+    expect(resolved.tsconfigPath).toBe('tsconfig.base.json');
+    expect(resolved.sourceUsage).toEqual({
+      convention: 'direct-root-call-v1',
+      tsconfigPath: 'apps/test-app/tsconfig.app.json',
+    });
+  });
+
+  it('requires a project-config resolver authority when source-usage indexing is enabled', () => {
+    expect(() =>
+      parseRootConfig({
+        projectConfigs: ['apps/**/config.ts'],
+        sourceUsage: {
+          convention: 'direct-root-call-v1',
+          tsconfigPath: 'apps/test-app/tsconfig.app.json',
+        },
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'CONFIG_INVALID',
+        path: 'root.tsconfigPath',
+      }),
+    );
   });
 
   it('resolves canonical cross-field effects and root cycle policy', () => {
@@ -399,6 +440,37 @@ describe('workspace configuration', () => {
     [
       {
         projectConfigs: ['apps/**/config.ts'],
+        sourceUsage: {
+          convention: 'guess-form-call-v1',
+          tsconfigPath: 'apps/test-app/tsconfig.app.json',
+        },
+      },
+      'root.sourceUsage.convention',
+    ],
+    [
+      {
+        projectConfigs: ['apps/**/config.ts'],
+        sourceUsage: {
+          convention: 'direct-root-call-v1',
+          tsconfigPath: 'apps/**/tsconfig.app.json',
+        },
+      },
+      'root.sourceUsage.tsconfigPath',
+    ],
+    [
+      {
+        projectConfigs: ['apps/**/config.ts'],
+        sourceUsage: {
+          convention: 'direct-root-call-v1',
+          tsconfigPath: 'apps/test-app/tsconfig.app.json',
+          unexpected: true,
+        },
+      },
+      'root.sourceUsage.unexpected',
+    ],
+    [
+      {
+        projectConfigs: ['apps/**/config.ts'],
         plugins: [createPlugin('duplicate'), createPlugin('duplicate')],
       },
       'root.plugins[1].id',
@@ -422,6 +494,56 @@ describe('workspace configuration', () => {
         path: expectedPath,
       }),
     );
+  });
+
+  it('rejects accessor-backed source-usage configuration without invoking it', () => {
+    let rootInvoked = false;
+    const root: Record<string, unknown> = {
+      projectConfigs: ['apps/**/config.ts'],
+    };
+    Object.defineProperty(root, 'sourceUsage', {
+      enumerable: true,
+      get: () => {
+        rootInvoked = true;
+        return {
+          convention: 'direct-root-call-v1',
+          tsconfigPath: 'apps/test-app/tsconfig.app.json',
+        };
+      },
+    });
+
+    expect(() => parseRootConfig(root)).toThrow(
+      expect.objectContaining({
+        code: 'CONFIG_INVALID',
+        path: 'root.sourceUsage',
+      }),
+    );
+    expect(rootInvoked).toBe(false);
+
+    let nestedInvoked = false;
+    const sourceUsage: Record<string, unknown> = {
+      convention: 'direct-root-call-v1',
+    };
+    Object.defineProperty(sourceUsage, 'tsconfigPath', {
+      enumerable: true,
+      get: () => {
+        nestedInvoked = true;
+        return 'apps/test-app/tsconfig.app.json';
+      },
+    });
+
+    expect(() =>
+      parseRootConfig({
+        projectConfigs: ['apps/**/config.ts'],
+        sourceUsage,
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'CONFIG_INVALID',
+        path: 'root.sourceUsage.tsconfigPath',
+      }),
+    );
+    expect(nestedInvoked).toBe(false);
   });
 
   it.each([

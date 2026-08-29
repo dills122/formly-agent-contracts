@@ -8,6 +8,47 @@ string alone. A field-type profile is serializable, reviewed metadata that
 describes what the control means and how a future validated driver may operate
 it.
 
+## Compact authoring for radio choices
+
+The current happy-path authoring API generates the canonical registry from one
+browser-safe contracted type definition:
+
+```ts
+import {
+  buildFieldTypeProfileRegistry,
+  defineContractedFormlyType,
+  radioChoice,
+  toFormlyTypeRegistration,
+} from '@formly-contract/schema/field-type-authoring';
+
+export const COOL_RADIO_TYPE = defineContractedFormlyType({
+  name: 'cool-radio-btn-grp',
+  profile: { id: 'claims.cool-radio', version: 1 },
+  behavior: radioChoice(),
+});
+
+export const CLAIM_FIELD_PROFILES = buildFieldTypeProfileRegistry({
+  id: 'claims.fields',
+  version: 1,
+  types: [COOL_RADIO_TYPE],
+});
+
+// Use the same definition in the production Formly registration.
+const formlyType = toFormlyTypeRegistration(
+  COOL_RADIO_TYPE,
+  CoolRadioComponent,
+);
+```
+
+The shared definition therefore owns both the production Formly type name and
+the generated canonical profile registration. It does not inspect the Angular
+component or infer behavior.
+
+`radioChoice()` is the only compact behavior preset currently shipped. Other
+custom controls still require the legacy reviewed registry or remain unmapped
+with explicit unknowns; do not model autocomplete, repeaters, or application
+drivers as radio choices merely to obtain metadata.
+
 ## Profile anatomy
 
 A profile declares:
@@ -78,6 +119,11 @@ If an aspect is not known, declare one of:
 
 An unknown may block generic-driver compatibility. That refusal prevents a
 profile from overpromising behavior.
+
+The verbose registry shape below the compact helper remains the canonical
+portable artifact and a legacy authoring surface. Consumers should prefer the
+contracted type helper for supported radio controls so schema details are
+generated consistently.
 
 :::note[Canonical sources]
 Use the [v0.4 metadata specification](https://github.com/dills122/formly-contract/blob/main/docs/v0.4-e2e-authoring-metadata-spec.md),

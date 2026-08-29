@@ -6,6 +6,10 @@ export default defineConfig({
     'libs/**/formly-contracts.project.ts',
   ],
   tsconfigPath: 'tsconfig.json',
+  sourceUsage: {
+    convention: 'direct-root-call-v1',
+    tsconfigPath: 'apps/test-app/tsconfig.app.json',
+  },
   output: { directory: 'dist/formly-contracts' },
   diagnostics: { failOn: ['error'] },
   plugins: [

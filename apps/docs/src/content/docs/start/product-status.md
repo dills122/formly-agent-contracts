@@ -16,9 +16,16 @@ mean “available in the package.”
 - Workspace configuration schema `0.2.0`, deterministic project discovery,
   trusted TypeScript config loading, content-addressed artifacts, and a
   workspace index.
+- Optional `direct-root-call-v1` source indexing for explicit form definitions,
+  direct factory calls/constructors, exact form ID/hash resolution, and a
+  portable `source-usage-catalog.json`.
+- Browser-safe compact authoring for contracted radio-choice Formly types,
+  shared by production registration and canonical profile generation.
 - `formly-contracts list`, `generate`, and non-mutating `check` commands.
 - Programmatic workspace discovery, generation, checking, index parsing, and
   contract parsing APIs.
+- Pure `executeAgentContextQuery` over caller-assembled agent-context
+  artifacts, including source-usage search by source path or form ID.
 - Angular CLI and Nx consumer-shaped fixtures plus a browser-rendered synthetic
   Formly test application.
 
@@ -29,16 +36,44 @@ mean “available in the package.”
   <span>MCP transport · Playwright compiler/drivers · browser parity</span>
 </div>
 
-- A production MCP server and read-only query surface.
+- A production MCP server and CLI-managed query surface.
 - Typed test-intent validation and automatic Playwright generation.
 - Generic and application-specific executable field drivers.
 - Browser observation and declared/resolved/observed parity reports.
-- Automatic Angular-assisted source discovery and symbol-level source lineage.
+- Broader interprocedural source discovery, route/render proof, and complete
+  runtime lineage.
+- Compact contracted-type presets beyond the current radio-choice happy path.
 - Journey contracts for routes, authentication, fixtures, submit behavior, and
   application outcomes.
 
 The existing research describes constraints and candidate delivery slices. It
 does not authorize consumers to import packages or call APIs that do not exist.
+
+The shipped source index is deliberately partial: it requires explicit
+`defineFormContractProject` registration that directly references the canonical
+source descriptor, an explicit `defineFormContractDefinition` directly listed
+by that descriptor, matching literal/runtime IDs, agreement between the
+project-config authority Program, the exact Jiti config runtime, and one
+configured leaf application Program,
+and supported direct calls or `new` expressions. A same-ID
+descriptor outside that chain is not authority. It never executes or serializes
+call arguments and reports incomplete coverage; some out-of-grammar calls may
+remain unindexed without a per-call diagnostic.
+
+Workspace-contained authority files and traversed aliases are
+Program-vs-final-byte snapshot validated, so a mismatch suppresses every
+dependent exact usage. Only the exact canonical helper package-export chain may
+be external to a nested consumer root; unrelated external aliases fail closed.
+Run against a quiescent workspace: both Programs are created before form factories
+execute, but the MVP does not claim complete runtime/Jiti module snapshots and
+retains a short config-loading-to-Program boundary. Contract generation separately calls
+each definition's `create()` with no arguments. Implicit root inference
+therefore requires a proven zero-argument-compatible signature; explicit
+`lineage.rootSymbol` may name a required-argument factory behind a Node-safe
+adapter.
+
+Reusable fragments and steps remain dependencies/lineage and are not promoted
+to standalone form roots unless explicitly registered.
 
 ## How pages declare status
 

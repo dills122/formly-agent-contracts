@@ -3,7 +3,13 @@ import {
   type NxFixtureFormInstance,
 } from '@nx-fixture/forms-kit/forms';
 
-export function createNxClaimForm(): NxFixtureFormInstance {
+export interface NxClaimFormOptions {
+  readonly initialReference?: string;
+}
+
+export function createNxClaimForm(
+  options: NxClaimFormOptions = {},
+): NxFixtureFormInstance {
   return {
     fields: [
       ...createNxContactFragment(),
@@ -14,6 +20,11 @@ export function createNxClaimForm(): NxFixtureFormInstance {
         props: { label: 'Claim reference', required: true },
       },
     ],
-    model: { claimant: { contactPreference: 'email' } },
+    model: {
+      claimant: { contactPreference: 'email' },
+      ...(options.initialReference === undefined
+        ? {}
+        : { claim: { reference: options.initialReference } }),
+    },
   };
 }

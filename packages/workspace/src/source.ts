@@ -16,10 +16,23 @@ export interface FormContractScenario<TScenario = unknown> {
   readonly create?: () => TScenario;
 }
 
+export type FormRootProduct =
+  | DeclaredFormContractInstance
+  | readonly object[];
+
+export type FormRootSymbol =
+  | ((...args: never[]) => FormRootProduct)
+  | (abstract new (...args: never[]) => DeclaredFormContractInstance);
+
+export interface FormContractLineage {
+  readonly rootSymbol: FormRootSymbol;
+}
+
 export interface FormContractDefinition<TScenario = unknown> {
   readonly id: string;
   readonly create: () => DeclaredFormContractInstance;
   readonly scenarios?: readonly FormContractScenario<TScenario>[];
+  readonly lineage?: FormContractLineage;
 }
 
 export interface FormContractSource<TScenario = unknown> {
@@ -35,8 +48,15 @@ export function defineFormContractSource<
   return source;
 }
 
+export function defineFormContractDefinition<
+  const TDefinition extends FormContractDefinition,
+>(definition: TDefinition): TDefinition {
+  return definition;
+}
+
 const SOURCE_KEYS = new Set(['sourceId', 'list']);
-const DEFINITION_KEYS = new Set(['id', 'create', 'scenarios']);
+const DEFINITION_KEYS = new Set(['id', 'create', 'lineage', 'scenarios']);
+const LINEAGE_KEYS = new Set(['rootSymbol']);
 const SCENARIO_KEYS = new Set(['id', 'description', 'create']);
 const INSTANCE_KEYS = new Set(['fields', 'model', 'formState']);
 const CONTRACT_STABLE_IDENTIFIER_PATTERN =
@@ -148,6 +168,22 @@ function parseFormContractScenario(
   return value as FormContractScenario;
 }
 
+function parseFormContractLineage(
+  value: unknown,
+  path: string,
+): FormContractLineage {
+  const properties = readExactOwnDataProperties(
+    value,
+    LINEAGE_KEYS,
+    LINEAGE_KEYS,
+    path,
+  );
+  if (typeof properties.values.get('rootSymbol') !== 'function') {
+    invalid(`${path}.rootSymbol`, 'must be a function or class.');
+  }
+  return value as FormContractLineage;
+}
+
 function requireContractStableIdentifier(
   value: unknown,
   path: string,
@@ -174,6 +210,13 @@ export function parseFormContractDefinition(
   requireContractStableIdentifier(properties.values.get('id'), `${path}.id`);
   if (typeof properties.values.get('create') !== 'function') {
     invalid(`${path}.create`, 'must be a function.');
+  }
+
+  if (properties.present.has('lineage')) {
+    parseFormContractLineage(
+      properties.values.get('lineage'),
+      `${path}.lineage`,
+    );
   }
 
   if (properties.present.has('scenarios')) {

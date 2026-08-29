@@ -55,6 +55,10 @@ of these codes:
 - `FORM_INSTANCE_INVALID` — a form contract factory returned an invalid
   instance.
 - `CONTRACT_EXTRACTION_FAILED` — form contract extraction failed.
+- `SOURCE_USAGE_PROJECT_CONFIG_UNSUPPORTED` — source indexing found a project
+  config outside the pilot's supported `.ts`, `.mts`, or `.cts` entry points.
+- `SOURCE_USAGE_INDEX_FAILED` — the configured TypeScript source-usage program
+  could not be built or indexed within the workspace boundary.
 - `DIAGNOSTIC_POLICY_FAILED` — a generated contract violates diagnostic
   policy (`diagnostics.failOn`).
 - `DEPENDENCY_SNAPSHOT_UNAVAILABLE` — a pnpm dependency snapshot could not
@@ -65,6 +69,36 @@ of these codes:
   workspace.
 - `OUTPUT_SYMLINK_UNSUPPORTED` — symlinked output paths are not supported.
 - `OUTPUT_WRITE_FAILED` — workspace contract output could not be written.
+
+Source-usage diagnostics do not use the Form Contract `diagnostics.failOn`
+policy. Important source diagnostics include:
+
+- `SOURCE_DESCRIPTOR_UNSUPPORTED` — a discovered project config or its source
+  registration is outside the direct canonical helper grammar, has IDs that do
+  not match runtime inventory, or contains unsupported wrapped/spread/dynamic
+  source elements. No same-ID fallback is attempted.
+- `SOURCE_DESCRIPTOR_CONFLICT` — more than one canonical registration claims
+  the same project/source authority. Remove the duplicate; neither claim is
+  selected by source order.
+- `SOURCE_FILE_SNAPSHOT_MISMATCH` — final file bytes do not match the
+  TypeScript `SourceFile.text` that established authority or a usage. Every
+  exact usage depending on that file is suppressed, not just usages physically
+  located in it.
+- `SOURCE_RUNTIME_RESOLUTION_MISMATCH` — TypeScript and the exact Jiti runtime
+  used for config evaluation selected different canonical files for a
+  traversed authority import or re-export. Align the root resolver settings or
+  use an import shape supported consistently by both.
+- `SOURCE_USAGE_UNSUPPORTED` — a recognized callsite is unsafe for exact
+  linkage, including unchecked JavaScript-family files and TypeScript files
+  containing `@ts-nocheck`, `@ts-ignore`, or `@ts-expect-error` directives.
+
+Run `generate` and `check` against a quiescent checkout and stop watchers that
+rewrite authority files during the pass. The authority and application
+TypeScript Programs are created before form factories execute, but the MVP does
+not snapshot every
+runtime/Jiti-loaded module and retains a short config-loading-to-Program
+boundary. Source coverage is intentionally incomplete, so an unsupported
+out-of-grammar call is not guaranteed to produce a per-call diagnostic.
 
 ## A custom field is unmapped
 

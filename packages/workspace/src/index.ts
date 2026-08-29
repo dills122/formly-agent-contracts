@@ -1,15 +1,15 @@
 export {
   loadWorkspaceConfigModule,
   WorkspaceConfigLoadError,
-} from './config-loader.js';
+} from "./config-loader.js";
 export type {
   WorkspaceConfigLoadErrorCode,
   WorkspaceConfigLoaderOptions,
-} from './config-loader.js';
+} from "./config-loader.js";
 export {
   discoverWorkspaceProjects,
   WorkspaceDiscoveryError,
-} from './discover-projects.js';
+} from "./discover-projects.js";
 export type {
   DiscoveredWorkspace,
   DiscoveredWorkspaceProject,
@@ -19,7 +19,7 @@ export type {
   WorkspaceDiscoveryInventory,
   WorkspacePluginInventoryEntry,
   WorkspaceProjectInventoryEntry,
-} from './discover-projects.js';
+} from "./discover-projects.js";
 export {
   defineConfig,
   defineFormContractProject,
@@ -27,7 +27,8 @@ export {
   parseRootConfig,
   resolveWorkspaceProjectConfig,
   WORKSPACE_CONFIG_SCHEMA_VERSION,
-} from './config.js';
+  WORKSPACE_SOURCE_USAGE_CONVENTION,
+} from "./config.js";
 export type {
   FormContractProjectConfig,
   ResolvedFieldTypeProfileRegistry,
@@ -41,26 +42,36 @@ export type {
   WorkspaceOutputConfig,
   WorkspacePlugin,
   WorkspaceRootConfig,
-} from './config.js';
+  WorkspaceSourceUsageConfig,
+} from "./config.js";
 export {
   loadWorkspaceProjectConfig,
   loadWorkspaceRootConfig,
-} from './load-config.js';
+} from "./load-config.js";
 export {
+  defineFormContractDefinition,
   defineFormContractSource,
   parseFormContractSource,
-} from './source.js';
+} from "./source.js";
 export type {
   DeclaredFormContractInstance,
   FormContractDefinition,
+  FormContractLineage,
   FormContractScenario,
   FormContractSource,
-} from './source.js';
+  FormRootProduct,
+  FormRootSymbol,
+} from "./source.js";
+export { SOURCE_USAGE_PILOT_COVERAGE_REASON } from "./source-usage.js";
+export type {
+  WorkspaceSourceUsageDiagnostic,
+  WorkspaceSourceUsageDiagnosticCode,
+} from "./source-usage.js";
 export {
   checkWorkspace,
   runWorkspace,
   WorkspaceGenerationError,
-} from './run-workspace.js';
+} from "./run-workspace.js";
 export type {
   RunWorkspaceOptions,
   WorkspaceCheckDifference,
@@ -68,11 +79,11 @@ export type {
   WorkspaceGenerationErrorCode,
   WorkspaceGenerationPhase,
   WorkspaceRunResult,
-} from './run-workspace.js';
+} from "./run-workspace.js";
 export {
   parseWorkspaceContractIndex,
   WORKSPACE_INDEX_SCHEMA_VERSION,
-} from './workspace-index.js';
+} from "./workspace-index.js";
 export type {
   WorkspaceContractIndex,
   WorkspaceIndexCrossFieldEffectRegistryIdentity,
@@ -81,5 +92,5 @@ export type {
   WorkspaceIndexedDiagnostic,
   WorkspaceIndexPluginIdentity,
   WorkspaceIndexProject,
-} from './workspace-index.js';
-export { WorkspaceConfigValidationError } from './validation-error.js';
+} from "./workspace-index.js";
+export { WorkspaceConfigValidationError } from "./validation-error.js";

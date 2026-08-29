@@ -18,6 +18,7 @@ Playwright package and executable drivers are not shipped.
 
 ```text
 formly-contracts.config.ts
+apps/claims/formly-contracts.project.ts
 libs/claims/
 ├── formly-contracts.project.ts
 └── src/
@@ -26,6 +27,7 @@ libs/claims/
     └── field-type-profiles.ts
 dist/formly-contracts/
 ├── workspace-index.json
+├── source-usage-catalog.json
 └── projects/.../sha256-….contract.json
 ```
 
@@ -46,6 +48,10 @@ export default defineConfig({
     'libs/**/formly-contracts.project.ts',
   ],
   tsconfigPath: 'tsconfig.base.json',
+  sourceUsage: {
+    convention: 'direct-root-call-v1',
+    tsconfigPath: 'apps/claims/tsconfig.app.json',
+  },
   output: { directory: 'dist/formly-contracts' },
   locators: { testIdAttributes: ['data-testid', 'data-cy'] },
   diagnostics: { failOn: ['error'] },
@@ -57,113 +63,98 @@ Nx workspace when that is the file that owns the aliases imported by your
 Node-safe contracts entry points. Paths are workspace-relative. Project config
 globs do not follow symlinks.
 
+The MVP source pass accepts TypeScript project configs (`.ts`, `.mts`, or
+`.cts`) only. JavaScript project configs remain supported for generation when
+the pass is off; with `sourceUsage` enabled they fail as
+`SOURCE_USAGE_PROJECT_CONFIG_UNSUPPORTED` so the runner never broadens the
+leaf application program with `allowJs`.
+
 ## 2. Expose an application-owned form
 
 Keep the existing Formly factory in application code. Add a small Node-safe
 source descriptor that gives the form a stable ID:
 
 ```ts title="libs/claims/src/contracts.ts"
-import { defineFormContractSource } from '@formly-contract/workspace';
+import {
+  defineFormContractDefinition,
+  defineFormContractSource,
+} from '@formly-contract/workspace';
 import { createClaimFields } from './forms/claim.fields.js';
+
+export const CLAIM_FORM = defineFormContractDefinition({
+  id: 'claims.create',
+  create: () => ({ fields: createClaimFields() }),
+  lineage: { rootSymbol: createClaimFields },
+});
 
 export const CLAIMS_SOURCE = defineFormContractSource({
   sourceId: 'claims/forms',
-  list: () => [
-    {
-      id: 'claims.create',
-      create: () => ({
-        fields: createClaimFields(),
-        model: {},
-        formState: { mode: 'create' },
-      }),
-    },
-  ],
+  list: () => [CLAIM_FORM],
 });
 ```
 
-Every `list()` call and `create()` call must return fresh data. Use synthetic
-model and form-state values; never load customer data, credentials, or remote
-options during discovery.
+Every `list()` call and `create()` call must return fresh data. Prefer the
+factory's inherent safe defaults. Do not invent service, model, form-state, or
+business values merely to make discovery run, and never load customer data,
+credentials, or remote options during discovery.
 
-This is explicit registration, not source-code guessing. Automatic discovery
-of arbitrary form exports is planned rather than implemented.
+This is explicit registration, not guessing arbitrary form exports.
+`lineage.rootSymbol` anchors the definition to the real application factory.
+The no-argument `create()` callback still runs during generation, so factories
+with required runtime inputs need safe defaults or a deliberate Node-safe
+adapter.
+
+The optional source-usage pass only reads TypeScript syntax. It never executes
+or serializes arguments passed by application code.
 
 ## 3. Describe one custom Formly field
 
 Assume `createClaimFields()` includes an application type named
-`cool-radio-btn-grp`. A serializable field profile tells the compiler what the
-widget means and which generic interaction it supports:
+`cool-radio-btn-grp`. Define its supported radio behavior once and use that
+same definition for production Formly registration and canonical metadata:
 
 ```ts title="libs/claims/src/field-type-profiles.ts"
-import type { FormContractProjectConfig } from '@formly-contract/workspace';
+import {
+  buildFieldTypeProfileRegistry,
+  defineContractedFormlyType,
+  radioChoice,
+} from '@formly-contract/schema/field-type-authoring';
 
-export const CLAIM_FIELD_PROFILES: NonNullable<
-  FormContractProjectConfig['fieldTypeProfiles']
-> = {
-  schemaVersion: '0.4.0',
+export const COOL_RADIO_TYPE = defineContractedFormlyType({
+  name: 'cool-radio-btn-grp',
+  profile: { id: 'claims.cool-radio', version: 1 },
+  behavior: radioChoice(),
+});
+
+export const CLAIM_FIELD_PROFILES = buildFieldTypeProfileRegistry({
   id: 'claims.fields',
   version: 1,
-  profiles: [
-    {
-      identity: { id: 'claims.cool-radio', version: 1 },
-      semanticType: 'single-choice',
-      valueShape: 'scalar',
-      evidence: 'declared',
-      parts: [
-        {
-          name: 'group',
-          role: 'radiogroup',
-          cardinality: 'one',
-          evidence: 'declared',
-        },
-        {
-          name: 'option',
-          role: 'radio',
-          cardinality: 'many',
-          evidence: 'declared',
-        },
-      ],
-      interaction: {
-        kind: 'choice',
-        operation: 'check',
-        optionPart: 'option',
-      },
-      valueDomain: {
-        kind: 'projected',
-        source: 'adapter',
-        completeness: 'complete',
-        collectionPath: 'props.options',
-        labelPath: 'label',
-        valuePath: 'value',
-        evidence: 'declared',
-      },
-      driver: {
-        kind: 'generic',
-        id: 'generic.choice',
-        version: 1,
-        capabilities: ['check'],
-      },
-      effectCapabilities: {
-        targetProperties: ['options'],
-        readiness: [],
-      },
-      unknowns: [],
-    },
-  ],
-  registrations: [
-    {
-      formlyType: 'cool-radio-btn-grp',
-      defaultProfile: { id: 'claims.cool-radio', version: 1 },
-      variants: [],
-    },
-  ],
-  wrappers: [],
-};
+  types: [COOL_RADIO_TYPE],
+});
 ```
 
-Profiles are reviewed data, not executable Playwright code. If the component’s
-model codec, locator scope, or interaction sequence is unknown, record that in
-`unknowns` instead of claiming generic-driver compatibility.
+```ts title="libs/claims/src/claims-formly.module.ts"
+import { NgModule } from '@angular/core';
+import { FormlyModule } from '@ngx-formly/core';
+import { toFormlyTypeRegistration } from '@formly-contract/schema/field-type-authoring';
+import { CoolRadioComponent } from './cool-radio.component.js';
+import { COOL_RADIO_TYPE } from './field-type-profiles.js';
+
+@NgModule({
+  imports: [
+    FormlyModule.forChild({
+      types: [
+        toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponent),
+      ],
+    }),
+  ],
+})
+export class ClaimsFormlyModule {}
+```
+
+The compact API currently supports radio choices only. Other custom types use
+the legacy reviewed registry or remain explicitly unmapped/unknown. Profiles
+are metadata, not executable Playwright code.
 
 ## 4. Attach the source and profile to the project
 
@@ -180,7 +171,27 @@ export default defineFormContractProject({
 ```
 
 The project config is the ownership boundary. Infrastructure or base Formly
-libraries may declare a project with no sources.
+libraries may declare a project with no sources. The application or feature
+library containing the consuming component also needs a discovered project
+config, even when it owns no form source:
+
+```ts title="apps/claims/formly-contracts.project.ts"
+import { defineFormContractProject } from '@formly-contract/workspace';
+
+export default defineFormContractProject({
+  projectId: 'claims/feature',
+  sources: [],
+});
+```
+
+The real component continues to call the ordinary factory with runtime data:
+
+```ts title="apps/claims/src/app/claim-page.component.ts"
+const fields = createClaimFields({ initialStep: this.route.snapshot.url });
+```
+
+The source index records the invocation shape and location, not the argument or
+its value.
 
 ## 5. Discover before executing factories
 
@@ -195,7 +206,8 @@ before trusted application code executes.
 Expected shape:
 
 ```text
-Discovered 1 project and 1 source.
+Discovered 2 projects and 1 source.
+Project: claims/feature config="apps/claims/formly-contracts.project.ts" sources=-
 Project: claims/forms config="libs/claims/formly-contracts.project.ts" sources=claims/forms
 ```
 
@@ -211,62 +223,108 @@ content-addressed contracts, and publishes `workspace-index.json` last.
 `check` repeats trusted extraction and exact-compares canonical bytes without
 modifying the output directory.
 
+`source-usage-catalog.json` has an explicit opt-in lifecycle. If `sourceUsage`
+is later removed from the root config, `check` reports an existing catalog as
+`stale` without modifying it. The next successful `generate` removes that
+obsolete fixed-name catalog before publishing the new workspace index. This
+prevents consumers from accidentally trusting linkage generated under a
+disabled configuration.
+
 Treat diagnostics as contract output. A warning such as
 `UNMAPPED_FIELD_TYPE` means the field stays visible in the contract but does
 not gain invented operational semantics.
 
-## 7. Find the contract from application code
+## 7. Resolve application usage to the exact contract
 
-Application code knows the stable project and form IDs because it declared them
-in the project config and `contracts.ts`. Use those IDs to resolve the current
-content-addressed artifact through the index:
+When `sourceUsage` is enabled, generation also writes
+`source-usage-catalog.json`. A consumer can start from a source file, require
+one exact resolution, and join its form identity and hash to the workspace
+index:
 
 ```ts title="e2e/support/load-form-contract.ts"
+import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { parseFormContract } from '@formly-contract/schema';
+import {
+  parseAgentContextSourceUsageCatalog,
+  parseFormContract,
+} from '@formly-contract/schema';
 import { parseWorkspaceContractIndex } from '@formly-contract/workspace';
 
 const workspaceRoot = resolve(import.meta.dirname, '../..');
 
-export async function loadFormContract(projectId: string, formId: string) {
-  const indexPath = resolve(
-    workspaceRoot,
-    'dist/formly-contracts/workspace-index.json',
-  );
+function sha256(bytes: Uint8Array): string {
+  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
+}
+
+export async function loadFormContractForSource(sourcePath: string) {
+  const output = resolve(workspaceRoot, 'dist/formly-contracts');
+  const indexPath = resolve(output, 'workspace-index.json');
+  const usagePath = resolve(output, 'source-usage-catalog.json');
   const index = parseWorkspaceContractIndex(
     JSON.parse(await readFile(indexPath, 'utf8')),
   );
+  const catalog = parseAgentContextSourceUsageCatalog(
+    JSON.parse(await readFile(usagePath, 'utf8')),
+  );
+  if (
+    catalog.workspaceIndex.schemaVersion !== index.schemaVersion ||
+    catalog.workspaceIndex.contentHash !== index.contentHash
+  ) {
+    throw new Error('Source-usage catalog targets a different workspace index.');
+  }
 
-  const matches = index.forms.filter(
-    (entry) => entry.projectId === projectId && entry.formId === formId,
+  const matches = catalog.usages.filter(
+    (usage) =>
+      usage.invocation.location.kind === 'path' &&
+      usage.invocation.location.path === sourcePath &&
+      usage.resolution.status === 'exact',
   );
   if (matches.length !== 1) {
     throw new Error(
-      `Expected one workspace contract for ${projectId}/${formId}; ` +
-        `found ${matches.length}.`,
+      `Expected one exact form usage for ${sourcePath}; found ${matches.length}.`,
     );
   }
 
-  const [entry] = matches;
-  if (!entry) {
-    throw new Error(
-      `Workspace index entry disappeared for ${projectId}/${formId}.`,
-    );
+  const usage = matches[0];
+  if (!usage || usage.resolution.status !== 'exact') {
+    throw new Error('Exact source usage disappeared.');
   }
+  const sourceBytes = await readFile(resolve(workspaceRoot, sourcePath));
+  if (sha256(sourceBytes) !== usage.invocation.sourceFileHash) {
+    throw new Error('Application source changed after source-usage generation.');
+  }
+
+  const form = usage.resolution.candidate.form;
+  const entry = index.forms.find(
+    (candidate) =>
+      candidate.projectId === form.projectId &&
+      candidate.formId === form.formId &&
+      candidate.contentHash === form.contractHash,
+  );
+  if (!entry) throw new Error('Resolved contract is absent from the index.');
 
   const artifactPath = resolve(workspaceRoot, entry.artifactPath);
-  return parseFormContract(
+  const contract = parseFormContract(
     JSON.parse(await readFile(artifactPath, 'utf8')),
   );
+  if (
+    contract.contentHash !== entry.contentHash ||
+    contract.contentHash !== form.contractHash
+  ) {
+    throw new Error('Resolved contract hash does not match its pinned lineage.');
+  }
+  return contract;
 }
 ```
 
-The current index links the artifact to `projectId`, `sourceId`, `formId`, and
-the owning project config. It does **not** yet record a TypeScript symbol and
-line number for the factory. Symbol-level source indexing is planned. Keep the
-stable form ID beside the application-owned factory so the identity join stays
-reviewable today.
+This is a static convention, not runtime tracing. It supports direct calls and
+constructor uses of the registered symbol (including aliases and re-export
+barrels) and reports incomplete coverage. Recognized unsafe optional or computed
+rooted calls may emit a diagnostic; wrappers and dynamic aliases or dispatch can
+remain unindexed. All are fail-closed because they produce no exact actionable
+link. Angular component context is lexical evidence only; the catalog does not
+prove a route, rendered page, or executed invocation.
 
 ## 8. Use the contract as Playwright context
 
@@ -280,7 +338,7 @@ import type {
   ContractNode,
   ModelPathSegment,
 } from '@formly-contract/schema';
-import { loadFormContract } from './support/load-form-contract.js';
+import { loadFormContractForSource } from './support/load-form-contract.js';
 
 function findNodeByPath(
   nodes: readonly ContractNode[],
@@ -303,7 +361,9 @@ function findNodeByPath(
 }
 
 test('creates a claim using contract evidence', async ({ page }) => {
-  const contract = await loadFormContract('claims/forms', 'claims.create');
+  const contract = await loadFormContractForSource(
+    'apps/claims/src/app/claim-page.component.ts',
+  );
   const claimantName = findNodeByPath(
     contract.nodes,
     ['claimant', 'name'],
@@ -337,15 +397,17 @@ aspects are missing evidence—not invitations to fall back to CSS selectors.
   <span>Agent query → typed intent → validated driver → Playwright execution</span>
 </div>
 
-The repository contains research for a read-only MCP query surface, typed E2E
-intent, deterministic drivers, and browser parity. Those layers are not
-available to import. Today, an agent or test author can use the validated JSON
-as trustworthy context and write a strict consumer helper like the one above.
+The pure `executeAgentContextQuery` API can search an assembled, validated
+agent-context dataset by source path or form ID. The CLI does not yet assemble
+that dataset or expose a query/MCP command, and executable Playwright drivers,
+typed intent compilation, and browser parity remain planned. Today, an agent or
+test author can use the generated JSON as trustworthy context and write a
+strict consumer helper like the one above.
 
 :::note[Maintained examples]
 The [Nx fixture root config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/formly-contracts.config.ts),
-[project config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/forms-kit/formly-contracts.project.ts),
-[source descriptor](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/forms-kit/src/lib/shared.source.ts),
+[project config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/formly-contracts.project.ts),
+[source descriptor](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/src/lib/claims.source.ts),
 and [field profiles](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/forms-kit/src/lib/field-type-profiles.ts)
 are executable, test-covered references for this vertical.
 :::

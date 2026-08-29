@@ -1,8 +1,8 @@
 import { defineFormContractSource } from '@formly-contract/workspace';
 
-import { createNxClaimForm } from './claim.form.js';
+import { NX_CLAIM_FORM_CONTRACT } from './claim.contract.js';
 
 export const NX_CLAIMS_SOURCE = defineFormContractSource({
   sourceId: 'fixture/nx-claims',
-  list: () => [{ id: 'nx.claims.intake', create: createNxClaimForm }],
+  list: () => [NX_CLAIM_FORM_CONTRACT],
 });

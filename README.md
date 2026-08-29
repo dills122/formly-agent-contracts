@@ -24,11 +24,11 @@ is not a dump of Formly's live runtime objects.
 
 This repository currently provides schema v0.4 and three packages:
 
-| Package | Purpose |
-| --- | --- |
-| `@formly-contract/schema` | Contract DTOs, runtime validation, canonical JSON, and SHA-256 content hashing |
-| `@formly-contract/compiler` | Safe declared extraction and trusted scenario compilation for Formly 6.x |
-| `@formly-contract/workspace` | Experimental trusted config loading, strict root/project/source descriptors, policy resolution, and deterministic multi-project artifact generation |
+| Package                      | Purpose                                                                                                                                                                                 |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `@formly-contract/schema`    | Contract DTOs, runtime validation, canonical JSON, and SHA-256 content hashing                                                                                                          |
+| `@formly-contract/compiler`  | Safe declared extraction and trusted scenario compilation for Formly 6.x                                                                                                                |
+| `@formly-contract/workspace` | Experimental trusted config loading, strict root/project/source descriptors, policy resolution, deterministic multi-project artifact generation, and opt-in static direct-call indexing |
 
 It also includes:
 
@@ -38,15 +38,20 @@ It also includes:
 - two consumer-shaped monorepo anchors: a deep Angular CLI behavior corpus and
   a real Nx workspace with an app, base Formly setup, reusable custom-field
   library, consuming feature library, project graph, and cached build;
+- an opt-in `direct-root-call-v1` source-usage catalog that links one supported
+  Angular component call to a stable form ID and exact generated contract hash;
+- a browser-safe compact `radioChoice()` authoring helper that drives both the
+  real Formly type name and generated canonical field-type profile;
 - a supported usage target of Angular 20 or newer with Formly 6.x; and
 - deep compatibility coverage for the pinned Angular `20.3.29` and Formly
   `6.1.8` reference combination.
 
-The parser, contract, programmatic workspace runner, and generic pilot CLI with
-`list`, `generate`, and non-mutating `check` commands are the current product.
-A production MCP server, automatic Playwright generation, browser observation,
-and Angular-assisted application-source discovery are future layers and are
-not shipped by this MVP.
+The parser, contract, programmatic workspace runner, opt-in static source-usage
+producer, pure agent-context query API, and generic pilot CLI with `list`,
+`generate`, and non-mutating `check` commands are the current product. A
+production MCP server, automatic Playwright generation, browser observation,
+and broader Angular application/route discovery are future layers and are not
+shipped by this MVP.
 
 Evaluating the current product in a private application repository? Start with
 the [workplace pilot guide](docs/workplace-pilot.md). It provides one complete
@@ -71,9 +76,10 @@ source material without replacing it.
 
 ## Use it in your own Angular/Formly codebase
 
-The package runs as build/test tooling beside your Angular application. It does
-not need to be added to the application's browser bundle. A typical adoption
-flow is:
+The compiler and workspace packages run as build/test tooling beside your
+Angular application and do not enter its browser bundle. Production custom-field
+registration may import the schema package's dedicated browser-safe
+`field-type-authoring` subpath. A typical adoption flow is:
 
 ```text
 application-owned Formly factories
@@ -104,13 +110,21 @@ relative path for your checkout):
 
 ```json
 {
+  "dependencies": {
+    "@formly-contract/schema": "link:../formly-contract/packages/schema"
+  },
   "devDependencies": {
-    "@formly-contract/schema": "link:../formly-contract/packages/schema",
     "@formly-contract/compiler": "link:../formly-contract/packages/compiler",
     "@formly-contract/workspace": "link:../formly-contract/packages/workspace"
   }
 }
 ```
+
+`schema` is a regular dependency when production Angular code imports the
+browser-safe `@formly-contract/schema/field-type-authoring` subpath. Keep the
+compiler and workspace packages in `devDependencies`; their roots are Node-side
+build tooling. A consumer that never imports schema from production code may
+keep it dev-only.
 
 Run `pnpm install` in the consuming application. The supported usage target is
 Angular 20 or newer with Formly 6.x. The compatibility suite is pinned to
@@ -118,19 +132,21 @@ Angular `20.3.29` with Formly `6.1.8`, so that exact pairing has the strongest
 test evidence. Other Angular major and Formly minor or patch combinations may
 work, but validate them in the consuming application because they are not
 covered to the same depth. Once the packages are published, normal versioned
-`pnpm add --save-dev` dependencies will replace these local links.
+dependencies will replace these local links: install `schema` as a regular
+dependency when production Angular code imports its authoring subpath, and
+install `compiler` and `workspace` as development dependencies.
 
 ### 2. Select the forms to expose
 
-Application-source discovery is deliberately not automatic. Create a small,
-application-owned registry that imports only the form factories you want the
-contract generator to inspect:
+Form-root discovery is deliberately explicit. For a one-off extraction, create
+a small application-owned registry that imports only the factories you want
+the contract generator to inspect:
 
 ```ts
 // tools/contract-forms.ts
-import type { FormlyFieldConfig } from '@ngx-formly/core';
-import { createClaimFields } from '../src/app/claims/claim.fields';
-import { createCustomerFields } from '../src/app/customers/customer.fields';
+import type { FormlyFieldConfig } from "@ngx-formly/core";
+import { createClaimFields } from "../src/app/claims/claim.fields";
+import { createCustomerFields } from "../src/app/customers/customer.fields";
 
 export interface ContractFormTarget {
   id: string;
@@ -138,19 +154,98 @@ export interface ContractFormTarget {
 }
 
 export const contractForms: ContractFormTarget[] = [
-  { id: 'claims.create', createFields: () => createClaimFields() },
-  { id: 'customers.edit', createFields: () => createCustomerFields() },
+  { id: "claims.create", createFields: () => createClaimFields() },
+  { id: "customers.edit", createFields: () => createCustomerFields() },
 ];
 ```
 
-Each factory should return a fresh field tree. If a factory needs application
-inputs, wrap it in a closure with synthetic values that are safe to use in
-local development and CI.
+Each factory should return a fresh field tree. Do not invent service, stream,
+callback, template, or business values merely to make a required-input factory
+run; declared generation remains a trusted no-argument boundary.
 
 For a repository-aware pilot, follow the
 [workplace pilot guide](docs/workplace-pilot.md), using the
 [workspace configuration reference](docs/workspace-configuration.md) when you
-need the full configuration semantics, then run:
+need the full configuration semantics. Define each complete form root with an
+explicit ID and symbol, then group many definitions in one domain source:
+
+```ts
+import {
+  defineFormContractDefinition,
+  defineFormContractProject,
+  defineFormContractSource,
+} from "@formly-contract/workspace";
+
+export const CLAIM_FORM_CONTRACT = defineFormContractDefinition({
+  id: "claims.create",
+  create: createClaimForm,
+  lineage: { rootSymbol: createClaimForm },
+});
+
+export const CLAIMS_SOURCE = defineFormContractSource({
+  sourceId: "claims/forms",
+  list: () => [CLAIM_FORM_CONTRACT, CUSTOMER_FORM_CONTRACT],
+});
+
+export default defineFormContractProject({
+  projectId: "claims/forms",
+  sources: [CLAIMS_SOURCE],
+});
+```
+
+The MVP source index treats this exact project-to-source-to-definition chain as
+authority. The discovered project config must directly export
+`defineFormContractProject(...)`, its `sources` array must directly reference
+the canonical `defineFormContractSource(...)` descriptor, and the
+helper-created definition (or a direct reference to its helper-created
+`const`) must be a direct element of the descriptor's expression-bodied list.
+The literal project/source IDs must match the runtime inventory. A separate
+descriptor with the same `sourceId` is not authority; wrapped, dynamic, spread,
+or unreturned flows fail closed.
+
+Register complete form roots, not every reusable piece. Shared fragments and
+steps remain dependencies/lineage of a root unless they are deliberately
+registered as independently generated forms.
+
+With root `sourceUsage` configured for one leaf Angular tsconfig, a supported
+direct component call to `createClaimForm(...)` resolves statically to the
+stable form ID and exact generated hash. The root `tsconfigPath` is required for
+this opt-in pass: a narrow authority Program uses its module-resolution options
+and roots only discovered project configs, while the application Program uses
+`sourceUsage.tsconfigPath`. Each authority import or re-export used by the
+registered chain must also resolve to the same canonical file through the exact
+Jiti runtime used to load project configs. Program disagreement or runtime
+resolution mismatch fails closed. Source indexing never executes or serializes
+call arguments, and unchecked, suppressed, or TypeScript-invalid invocations
+are non-actionable. Contract generation still executes the
+definition's no-argument `create`. Without explicit lineage, implicit root
+inference accepts `create` only when TypeScript proves it has a
+zero-argument-compatible call signature. With explicit
+`lineage.rootSymbol`, the real root may require arguments while a deliberate
+Node-safe `create` adapter supplies the generated declared form without
+inventing runtime data.
+
+Every workspace-contained project config, source descriptor, form definition,
+root declaration, and authority alias traversed between them is checked against
+the final file bytes used for catalog materialization. A changed or unreadable
+authority file suppresses every exact usage that depends on it. In a nested
+workspace, only the exact canonical `@formly-contract/workspace` package-export
+chain may resolve outside that root; it establishes helper identity but is not
+part of the consumer-source byte evidence. Unrelated external aliases fail
+closed. Run `generate` and `check` against a quiescent checkout: the TypeScript
+Programs are created before any form factory executes, but this MVP does not
+capture every runtime/Jiti-loaded module and has a short
+config-loading-to-Program boundary.
+
+For this pilot, every discovered project config must use `.ts`, `.mts`, or
+`.cts` when `sourceUsage` is enabled. JavaScript project configs remain valid
+for ordinary workspace generation, but the opt-in source pass rejects them
+with `SOURCE_USAGE_PROJECT_CONFIG_UNSUPPORTED` instead of silently changing
+the configured application program.
+
+Every indexed consuming feature/view library needs a discovered project config,
+even when it owns no sources. Otherwise the call emits
+`SOURCE_PROJECT_UNRESOLVED` and no exact link. Then run:
 
 ```sh
 pnpm exec formly-contracts list
@@ -159,10 +254,11 @@ pnpm exec formly-contracts check
 ```
 
 `list` reports configured project/source inventory without invoking source
-lists or form factories. `generate` writes content-addressed contracts and
-publishes `workspace-index.json` last. `check` reruns trusted extraction and
-exact-compares the expected canonical bytes without modifying output. The
-manual script below remains useful for a single-package or one-off extraction.
+lists or form factories. `generate` writes content-addressed contracts, an
+opt-in `source-usage-catalog.json`, and publishes `workspace-index.json` last.
+`check` reruns trusted extraction and source indexing, then exact-compares the
+expected canonical bytes without modifying output. The manual script below
+remains useful for a single-package or one-off extraction.
 
 ### 3. Generate contract artifacts
 
@@ -170,13 +266,13 @@ Add a build-time script in the application repository:
 
 ```ts
 // tools/generate-form-contracts.ts
-import { mkdir, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { canonicalStringify } from '@formly-contract/schema';
-import { extractFormContract } from '@formly-contract/compiler';
-import { contractForms } from './contract-forms';
+import { mkdir, writeFile } from "node:fs/promises";
+import { resolve } from "node:path";
+import { canonicalStringify } from "@formly-contract/schema";
+import { extractFormContract } from "@formly-contract/compiler";
+import { contractForms } from "./contract-forms";
 
-const outputDirectory = resolve('artifacts/form-contracts');
+const outputDirectory = resolve("artifacts/form-contracts");
 await mkdir(outputDirectory, { recursive: true });
 
 for (const target of contractForms) {
@@ -187,11 +283,11 @@ for (const target of contractForms) {
 
   await writeFile(
     resolve(outputDirectory, `${target.id}.json`),
-    `${canonicalStringify(contract)}\n`,
+    `${canonicalStringify(contract)}\n`
   );
 
   console.log(
-    `${target.id}: ${contract.nodes.length} root nodes, ${diagnostics.length} diagnostics`,
+    `${target.id}: ${contract.nodes.length} root nodes, ${diagnostics.length} diagnostics`
   );
 }
 ```
@@ -212,16 +308,16 @@ Validate stored JSON before trusting it, find the semantic node you need, and
 use one of its exact locator candidates. For a standard `data-testid` locator:
 
 ```ts
-import { readFile } from 'node:fs/promises';
+import { readFile } from "node:fs/promises";
 import {
   parseFormContract,
   type ContractNode,
   type ModelPathSegment,
-} from '@formly-contract/schema';
+} from "@formly-contract/schema";
 
 function findNodeByPath(
   nodes: readonly ContractNode[],
-  modelPath: readonly ModelPathSegment[],
+  modelPath: readonly ModelPathSegment[]
 ): ContractNode | undefined {
   for (const node of nodes) {
     if (
@@ -232,33 +328,28 @@ function findNodeByPath(
     }
 
     const nested = findNodeByPath(
-      node.arrayTemplate
-        ? [...node.children, node.arrayTemplate]
-        : node.children,
-      modelPath,
+      node.arrayTemplate ? [...node.children, node.arrayTemplate] : node.children,
+      modelPath
     );
     if (nested) return nested;
   }
 }
 
 const contract = parseFormContract(
-  JSON.parse(
-    await readFile('artifacts/form-contracts/claims.create.json', 'utf8'),
-  ),
+  JSON.parse(await readFile("artifacts/form-contracts/claims.create.json", "utf8"))
 );
 
-const claimantName = findNodeByPath(contract.nodes, ['claimant', 'name']);
+const claimantName = findNodeByPath(contract.nodes, ["claimant", "name"]);
 
 const testId = claimantName?.locators.find(
-  (locator) =>
-    locator.strategy === 'testId' && locator.attribute === 'data-testid',
+  (locator) => locator.strategy === "testId" && locator.attribute === "data-testid"
 );
 
 if (!claimantName || !testId) {
-  throw new Error('claimant.name has no exact data-testid locator');
+  throw new Error("claimant.name has no exact data-testid locator");
 }
 
-await page.getByTestId(testId.value).fill('Ada Lovelace');
+await page.getByTestId(testId.value).fill("Ada Lovelace");
 ```
 
 Real consumers will normally put recursive node lookup and locator selection in
@@ -339,23 +430,23 @@ Use `extractFormContract` when you have Formly configuration and want to inspect
 it without running callbacks:
 
 ```ts
-import { extractFormContract } from '@formly-contract/compiler';
-import type { FormlyFieldConfig } from '@ngx-formly/core';
+import { extractFormContract } from "@formly-contract/compiler";
+import type { FormlyFieldConfig } from "@ngx-formly/core";
 
 const fields: FormlyFieldConfig[] = [
   {
-    key: 'profile.name',
-    type: 'input',
+    key: "profile.name",
+    type: "input",
     props: {
-      label: 'Name',
+      label: "Name",
       required: true,
-      attributes: { 'data-testid': 'profile-name' },
+      attributes: { "data-testid": "profile-name" },
     },
   },
 ];
 
 const { contract, diagnostics } = extractFormContract({
-  formId: 'example.profile',
+  formId: "example.profile",
   fields,
 });
 ```
@@ -367,14 +458,39 @@ an explicit diagnostic. The returned node has the stable ID
 `example.profile::path:s_profile.s_name`, model path `['profile', 'name']`, its
 required constraint, and an exact `data-testid` locator.
 
-For application-owned custom fields, pass the canonical
-`fieldTypeProfiles` bundle from resolved project configuration. Mapped nodes
-then include reviewed roles, parts, interaction operations, driver identity,
-possible values when safely enumerable, and provenance. A custom type or
-wrapper that is not registered remains visible but non-operable and produces a
-stable diagnostic. Named variants use the data-only root field metadata
-`formlyContract: { profileVariant: 'variant-name' }`; fields cannot embed
-arbitrary interaction overrides.
+For an application-owned custom radio, author one compact declaration through
+the browser-safe `@formly-contract/schema/field-type-authoring` subpath:
+
+```ts
+import {
+  buildFieldTypeProfileRegistry,
+  defineContractedFormlyType,
+  radioChoice,
+  toFormlyTypeRegistration,
+} from "@formly-contract/schema/field-type-authoring";
+
+const COOL_RADIO_TYPE = defineContractedFormlyType({
+  name: "cool-radio-btn-grp",
+  profile: { id: "claims.cool-radio", version: 1 },
+  behavior: radioChoice(),
+});
+
+const fieldTypeProfiles = buildFieldTypeProfileRegistry({
+  id: "claims.field-types",
+  version: 1,
+  types: [COOL_RADIO_TYPE],
+});
+
+// Bind the component only in the Angular module.
+const registration = toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponent);
+```
+
+The same reviewed declaration supplies the real registration name and the
+canonical profile DTO. The helper does not inspect an Angular template or
+infer behavior from a type name. `radioChoice()` is the only compact MVP preset;
+other custom types still need the lower-level registry or remain visible but
+non-operable with a stable diagnostic. Named variants use the data-only root
+field metadata `formlyContract: { profileVariant: 'variant-name' }`.
 
 Static radio/select options and boolean controls expose complete value domains.
 Unresolved option functions, expressions, and asynchronous sources remain
@@ -387,16 +503,16 @@ Use `compileFormContractScenario` when required, readonly, disabled, hidden,
 options, or locator attributes depend on Formly expression callbacks:
 
 ```ts
-import { inject } from '@angular/core';
-import { FormlyFormBuilder } from '@ngx-formly/core';
-import { compileFormContractScenario } from '@formly-contract/compiler';
+import { inject } from "@angular/core";
+import { FormlyFormBuilder } from "@ngx-formly/core";
+import { compileFormContractScenario } from "@formly-contract/compiler";
 
 const builder = inject(FormlyFormBuilder);
 const { contract, diagnostics } = compileFormContractScenario({
-  formId: 'example.profile',
+  formId: "example.profile",
   builder,
   createFields: () => createProfileFields(),
-  model: { contactMethod: 'email' },
+  model: { contactMethod: "email" },
   formState: { readonly: false },
 });
 ```
@@ -444,11 +560,11 @@ contract and example.
 
 The contract keeps three evidence levels separate:
 
-| Evidence | Meaning | Available now? |
-| --- | --- | --- |
-| `declared` | Read safely from supplied Formly configuration | Yes |
-| `resolved` | Read from a controlled Formly build for one synthetic scenario | Yes |
-| `observed` | Seen in a real rendered browser DOM | Schema-ready; capture layer not implemented |
+| Evidence   | Meaning                                                        | Available now?                              |
+| ---------- | -------------------------------------------------------------- | ------------------------------------------- |
+| `declared` | Read safely from supplied Formly configuration                 | Yes                                         |
+| `resolved` | Read from a controlled Formly build for one synthetic scenario | Yes                                         |
+| `observed` | Seen in a real rendered browser DOM                            | Schema-ready; capture layer not implemented |
 
 A resolved locator is not silently presented as browser-observed. Likewise,
 opaque or asynchronous behavior is reported rather than guessed.
@@ -472,15 +588,24 @@ Schema v0.4 can represent:
 
 ## Intentional limitations
 
-- Forms must be supplied explicitly; the adapter does not discover arbitrary
-  TypeScript exports or application routes.
+- Forms must be supplied explicitly. The opt-in source index recognizes one
+  leaf TypeScript program, explicit exported root symbols, and direct function
+  or constructor calls (including resolved import aliases and barrels). It does
+  not follow wrapped calls, callbacks, dynamic dispatch, routes, or runtime
+  render reachability.
+- Each indexed definition must be returned directly by the canonical source
+  descriptor that the discovered canonical project config directly registers.
+  Literal IDs must match runtime inventory; a same-ID descriptor elsewhere is
+  not authority.
+- Indexed callsites must be under a discovered project-config root. A consuming
+  feature library may need a source-empty config to establish MVP ownership.
 - Declared extraction never evaluates functions or function source.
 - The scenario compiler performs the initial controlled Formly build but does
   not wait for remote options or lifecycle-driven browser behavior.
 - Formly `RegExp` patterns are diagnosed; v0.4 represents string patterns only.
-- Custom widget interaction metadata requires an application-supplied,
-  serializable field-type profile registry. Profile-aware extraction is
-  implemented; executable application drivers remain a later integration.
+- Compact custom-widget authoring currently covers only reviewed radio-choice
+  behavior. Other widgets require an application-supplied serializable
+  registry; executable application drivers remain a later integration.
 - The project does not currently generate or execute Cypress/Playwright tests.
 - No production MCP server or browser-observation layer is included.
 - The supported usage target is Angular 20 or newer with Formly 6.x, but

@@ -31,6 +31,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./field-type-authoring": {
+      "types": "./dist/field-type-authoring.d.ts",
+      "default": "./dist/field-type-authoring.js"
     }
   },
   "files": [
