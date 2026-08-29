@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 
-import { verifyPackedPackage } from './pack-release.mjs';
+import {
+  getPackedPackageSmokeImports,
+  verifyPackedPackage,
+} from './pack-release.mjs';
 
 const releasePackage = {
   directory: 'packages/compiler',
@@ -49,6 +52,42 @@ const packedFiles = [
   { path: 'dist/index.d.ts' },
   { path: 'dist/index.js' },
   { path: 'package.json' },
+];
+
+const schemaReleasePackage = {
+  directory: 'packages/schema',
+  name: '@formly-contract/schema',
+  version: '0.4.0',
+};
+
+const schemaAuthoringExport = {
+  types: './dist/field-type-authoring.d.ts',
+  default: './dist/field-type-authoring.js',
+};
+
+function createSchemaPackedManifest(overrides = {}) {
+  return createPackedManifest({
+    name: schemaReleasePackage.name,
+    repository: {
+      type: 'git',
+      url: 'git+https://github.com/dills122/formly-contract.git',
+      directory: schemaReleasePackage.directory,
+    },
+    exports: {
+      '.': {
+        types: './dist/index.d.ts',
+        default: './dist/index.js',
+      },
+      './field-type-authoring': schemaAuthoringExport,
+    },
+    ...overrides,
+  });
+}
+
+const schemaPackedFiles = [
+  ...packedFiles,
+  { path: 'dist/field-type-authoring.d.ts' },
+  { path: 'dist/field-type-authoring.js' },
 ];
 
 describe('verifyPackedPackage', () => {
@@ -138,5 +177,75 @@ describe('verifyPackedPackage', () => {
         releasePackage,
       }),
     ).toThrow('has invalid repository or npm publish metadata');
+  });
+
+  it('pins the schema authoring subpath and both packed targets', () => {
+    expect(() =>
+      verifyPackedPackage({
+        packedFiles: schemaPackedFiles,
+        packedManifest: createSchemaPackedManifest(),
+        releasePackage: schemaReleasePackage,
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      verifyPackedPackage({
+        packedFiles: schemaPackedFiles,
+        packedManifest: createSchemaPackedManifest({
+          exports: {
+            '.': {
+              types: './dist/index.d.ts',
+              default: './dist/index.js',
+            },
+          },
+        }),
+        releasePackage: schemaReleasePackage,
+      }),
+    ).toThrow('must expose ./field-type-authoring');
+
+    expect(() =>
+      verifyPackedPackage({
+        packedFiles: schemaPackedFiles.filter(
+          ({ path }) => path !== 'dist/field-type-authoring.d.ts',
+        ),
+        packedManifest: createSchemaPackedManifest(),
+        releasePackage: schemaReleasePackage,
+      }),
+    ).toThrow('is missing dist/field-type-authoring.d.ts');
+  });
+});
+
+describe('getPackedPackageSmokeImports', () => {
+  it('checks the schema root and compact authoring public subpath', () => {
+    expect(getPackedPackageSmokeImports('@formly-contract/schema')).toEqual([
+      {
+        specifier: '@formly-contract/schema',
+        requiredExports: ['parseFormContract'],
+        forbiddenExports: [
+          'buildFieldTypeProfileRegistry',
+          'defineContractedFormlyType',
+          'radioChoice',
+          'toFormlyTypeRegistration',
+        ],
+      },
+      {
+        specifier: '@formly-contract/schema/field-type-authoring',
+        requiredExports: [
+          'buildFieldTypeProfileRegistry',
+          'defineContractedFormlyType',
+          'radioChoice',
+          'toFormlyTypeRegistration',
+        ],
+      },
+    ]);
+  });
+
+  it('keeps a generic root import for packages without a pinned export', () => {
+    expect(getPackedPackageSmokeImports('@formly-contract/workspace')).toEqual([
+      {
+        specifier: '@formly-contract/workspace',
+        requiredExports: [],
+      },
+    ]);
   });
 });

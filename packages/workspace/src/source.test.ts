@@ -1,6 +1,7 @@
 import { describe, expect, expectTypeOf, it } from 'vitest';
 
 import {
+  defineFormContractDefinition,
   defineFormContractSource,
   parseDeclaredFormContractInstance,
   parseFormContractDefinition,
@@ -8,6 +9,7 @@ import {
   parseFormContractSource,
   type DeclaredFormContractInstance,
   type FormContractDefinition,
+  type FormRootSymbol,
 } from './source.js';
 
 describe('FormContractSource', () => {
@@ -89,6 +91,30 @@ describe('FormContractSource', () => {
 });
 
 describe('source result validation', () => {
+  it('preserves a typed definition and explicit root symbol without executing either', () => {
+    let calls = 0;
+    const createClaimForm = ((input: never) => {
+      calls += 1;
+      return [{ key: input }];
+    }) satisfies FormRootSymbol;
+    const create = () => {
+      calls += 1;
+      return { fields: [] };
+    };
+    const definition = defineFormContractDefinition({
+      id: 'claims.create',
+      create,
+      lineage: { rootSymbol: createClaimForm },
+    });
+
+    expect(parseFormContractDefinition(definition)).toBe(definition);
+    expect(definition.lineage.rootSymbol).toBe(createClaimForm);
+    expect(calls).toBe(0);
+    expectTypeOf(definition.create).returns.toEqualTypeOf<{
+      fields: never[];
+    }>();
+  });
+
   it('preserves valid definition and scenario identity and order', () => {
     const firstCreate = () => ({ fields: [{ key: 'first' }] });
     const scenarioCreate = () => ({ product: 'auto' });
@@ -166,6 +192,34 @@ describe('source result validation', () => {
     [
       [{ id: 'claims.create', create: () => ({ fields: [] }), extra: true }],
       'source.list()[0].extra',
+    ],
+    [
+      [{ id: 'claims.create', create: () => ({ fields: [] }), lineage: undefined }],
+      'source.list()[0].lineage',
+    ],
+    [
+      [{ id: 'claims.create', create: () => ({ fields: [] }), lineage: {} }],
+      'source.list()[0].lineage.rootSymbol',
+    ],
+    [
+      [
+        {
+          id: 'claims.create',
+          create: () => ({ fields: [] }),
+          lineage: { rootSymbol: true },
+        },
+      ],
+      'source.list()[0].lineage.rootSymbol',
+    ],
+    [
+      [
+        {
+          id: 'claims.create',
+          create: () => ({ fields: [] }),
+          lineage: { rootSymbol: () => [], unexpected: true },
+        },
+      ],
+      'source.list()[0].lineage.unexpected',
     ],
     [
       [{ id: 'claims.create', create: () => ({ fields: [] }), scenarios: undefined }],
@@ -274,6 +328,26 @@ describe('source result validation', () => {
     expect(() =>
       parseFormContractDefinitions(definitions, 'source.list()'),
     ).toThrow(expect.objectContaining({ path: 'source.list()[0]' }));
+    expect(reads).toBe(0);
+  });
+
+  it('rejects lineage accessors without invoking them', () => {
+    let reads = 0;
+    const lineage = Object.defineProperty({}, 'rootSymbol', {
+      enumerable: true,
+      get: () => {
+        reads += 1;
+        return () => [];
+      },
+    });
+
+    expect(() =>
+      parseFormContractDefinition({
+        id: 'claims.create',
+        create: () => ({ fields: [] }),
+        lineage,
+      }),
+    ).toThrow(expect.objectContaining({ path: 'definition.lineage.rootSymbol' }));
     expect(reads).toBe(0);
   });
 });

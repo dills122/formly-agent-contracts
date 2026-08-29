@@ -2,14 +2,15 @@
 
 Status: experimental; deterministic project discovery, project-owned field-type
 profile and cross-field effect registries, resolved effect projection,
-programmatic workspace artifact generation, and the generic `list`, `generate`,
-and non-mutating `check` CLI commands are implemented.
+programmatic workspace artifact generation, opt-in static direct-root usage
+indexing, and the generic `list`, `generate`, and non-mutating `check` CLI
+commands are implemented.
 
 Form Contract `0.4.0` and workspace index `0.2.0` remain the implemented output
-boundary. Source lineage, journeys, behavior/scenario evidence, Angular
-authoring reports, driver registries, and agent-context manifests described
-below are planned sibling artifacts, not current output fields. Their canonical
-ownership and dependency order are defined by the
+boundary. The source-usage catalog and pure agent-context artifact/query schemas
+are implemented sibling records; journeys, behavior/scenario evidence, Angular
+authoring reports, and driver registries described below remain planned. Their
+canonical ownership and dependency order are defined by the
 [RH-06 reconciliation](planning/agent-context-hardening/rh-06-reconciliation.md)
 and [execution index](planning/agent-context-hardening/execution-index.md).
 
@@ -69,11 +70,11 @@ contain project-owned source; exclude them explicitly when appropriate.
 
 Trusted execution is split by purpose:
 
-| Mode | Workspace responsibility | Status and limit |
-| --- | --- | --- |
-| Config/JIT worker | Resolve the project runtime base, validate a parent-selected host, and carry JSON-safe results/provenance | Generic trusted config loading exists; Angular scenario compilation remains a separate planned host and is not an untrusted-code sandbox |
-| AOT authoring browser worker | Point a future Angular integration at an application-owned build target and configured authoring scopes | Planned; browser isolation and interception improve determinism but are not OS containment |
-| Rootless OCI factory runner | Stage a code-free registration sidecar and receive only allowlisted, structurally bound output | Blocked until `oci-rootless-v1` conformance, a runner-owned violation ledger, structural identity checks, and retained negative controls pass |
+| Mode                         | Workspace responsibility                                                                                  | Status and limit                                                                                                                              |
+| ---------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
+| Config/JIT worker            | Resolve the project runtime base, validate a parent-selected host, and carry JSON-safe results/provenance | Generic trusted config loading exists; Angular scenario compilation remains a separate planned host and is not an untrusted-code sandbox      |
+| AOT authoring browser worker | Point a future Angular integration at an application-owned build target and configured authoring scopes   | Planned; browser isolation and interception improve determinism but are not OS containment                                                    |
+| Rootless OCI factory runner  | Stage a code-free registration sidecar and receive only allowlisted, structurally bound output            | Blocked until `oci-rootless-v1` conformance, a runner-owned violation ledger, structural identity checks, and retained negative controls pass |
 
 These modes must not be collapsed into “load whatever the project imports.”
 The generic loader evaluates trusted workspace configuration; it does not
@@ -86,47 +87,84 @@ not the containment boundary required by the factory runner.
 The root config owns repository-wide discovery and policy:
 
 ```ts
-import { defineConfig } from '@formly-contract/workspace';
+import { defineConfig } from "@formly-contract/workspace";
 
 export default defineConfig({
-  projectConfigs: [
-    'apps/**/formly-contracts.project.ts',
-    'libs/**/formly-contracts.project.ts',
-  ],
-  excludeProjectConfigs: ['apps/legacy/**'],
-  tsconfigPath: 'tsconfig.base.json',
-  output: { directory: 'dist/formly-contracts' },
-  locators: { testIdAttributes: ['data-testid', 'data-cy'] },
-  diagnostics: { failOn: ['error'] },
-  effects: { cyclePolicy: 'error' },
+  projectConfigs: ["apps/**/formly-contracts.project.ts", "libs/**/formly-contracts.project.ts"],
+  excludeProjectConfigs: ["apps/legacy/**"],
+  tsconfigPath: "tsconfig.base.json",
+  sourceUsage: {
+    convention: "direct-root-call-v1",
+    tsconfigPath: "apps/claims/tsconfig.app.json",
+  },
+  output: { directory: "dist/formly-contracts" },
+  locators: { testIdAttributes: ["data-testid", "data-cy"] },
+  diagnostics: { failOn: ["error"] },
+  effects: { cyclePolicy: "error" },
 });
 ```
+
+`sourceUsage` is optional and does not change Form Contract or workspace-index
+schema versions. When enabled, the root `tsconfigPath` is required and remains
+the resolver configuration used to load project configs. The runner creates a
+narrow authority Program from that config's compiler/module-resolution options
+and roots it only at discovered project configs. It also resolves every
+authority import or re-export used by the registered chain through the same
+Jiti runtime and options as config evaluation. `direct-root-call-v1` accepts
+one separate literal, workspace-relative leaf TypeScript config for the
+application Program. An exact usage exists only when both Programs resolve the
+same project/source/definition/root chain and the authority Program agrees with
+Jiti on the canonical runtime module paths. This lets a Node-safe definition
+and its Angular consumer share symbol identity without importing tooling
+descriptors into the browser graph while divergent aliases or resolver-only
+features fail closed. Missing, invalid, empty, or outside-workspace configs fail closed with
+`SOURCE_USAGE_INDEX_FAILED`; omitting root `tsconfigPath` is `CONFIG_INVALID` at
+`root.tsconfigPath`.
+
+The current source-usage pilot requires every discovered project config to be
+TypeScript (`.ts`, `.mts`, or `.cts`). JavaScript project configs remain a
+supported workspace-loader surface when `sourceUsage` is disabled. When it is
+enabled, `.mjs` and `.cjs` configs fail deterministically with
+`SOURCE_USAGE_PROJECT_CONFIG_UNSUPPORTED`; the runner does not override the
+leaf program's `allowJs` boundary.
 
 A project config owns its local source catalogs and may override supported
 generation policy:
 
 ```ts
 import {
+  defineFormContractDefinition,
   defineFormContractProject,
   defineFormContractSource,
-} from '@formly-contract/workspace';
+} from "@formly-contract/workspace";
+
+const CLAIM_FORM_CONTRACT = defineFormContractDefinition({
+  id: "claims.create",
+  create: () => ({ fields: createClaimFields() }),
+  lineage: { rootSymbol: createClaimFields },
+});
 
 const claimsSource = defineFormContractSource({
-  sourceId: 'claims/forms',
-  list: () => [
-    {
-      id: 'claims.create',
-      create: () => ({ fields: createClaimFields() }),
-    },
-  ],
+  sourceId: "claims/forms",
+  list: () => [CLAIM_FORM_CONTRACT],
 });
 
 export default defineFormContractProject({
-  projectId: 'claims/forms',
+  projectId: "claims/forms",
   sources: [claimsSource],
-  diagnostics: { failOn: ['error', 'warning'] },
+  diagnostics: { failOn: ["error", "warning"] },
 });
 ```
+
+For source indexing, authority begins in the discovered project config. Its
+default export must be a direct canonical `defineFormContractProject(...)`
+registration whose literal `projectId` matches discovery and whose `sources`
+array directly references the canonical `defineFormContractSource(...)`
+descriptor. The helper-created definition—or a direct reference to its
+helper-created `const`—must then be a direct element of the source's
+expression-bodied `list: () => [...]`. Literal source and runtime inventory IDs
+must agree. A same-ID descriptor elsewhere is not authority; wrapped, dynamic,
+spread, or unreturned flows fail closed with no exact link.
 
 Each definition factory returns a fresh, framework-neutral declared instance:
 `fields` is an array of configuration objects, with optional `model` and
@@ -143,14 +181,20 @@ synthetic objects. Planned factory-input support classifies inert values and
 opaque capability bindings first; executing the application factory is a
 separate, currently blocked OCI mode.
 
+When `lineage` is omitted, source indexing treats `create` as an implicit root
+only when TypeScript proves a zero-argument-compatible call signature. An
+explicit `lineage.rootSymbol` may instead anchor a real required-argument
+factory while `create` remains a deliberate Node-safe no-argument adapter for
+declared generation.
+
 The root and project descriptors can be loaded as one deterministic inventory:
 
 ```ts
-import { discoverWorkspaceProjects } from '@formly-contract/workspace';
+import { discoverWorkspaceProjects } from "@formly-contract/workspace";
 
 const discovered = await discoverWorkspaceProjects({
   workspaceRoot: process.cwd(),
-  rootConfigPath: 'formly-contracts.config.ts',
+  rootConfigPath: "formly-contracts.config.ts",
 });
 ```
 
@@ -166,7 +210,7 @@ integration configuration without pretending to own form roots:
 
 ```ts
 export default defineFormContractProject({
-  projectId: 'claims/formly-kit',
+  projectId: "claims/formly-kit",
 });
 ```
 
@@ -175,34 +219,80 @@ integrations can produce source descriptors around application-specific
 factories while the workspace runner continues to operate on stable source and
 form identities.
 
+Register one definition for each complete form root. Reusable fragments, field
+groups, and wizard steps are dependencies/lineage of that root; they do not
+become standalone form contracts unless a project deliberately registers them
+as independently generated forms.
+
+For source indexing, every callsite must be under exactly one discovered
+project-config directory. A consuming feature/view library that owns no form
+sources may therefore need a source-empty project config as an explicit MVP
+ownership anchor. Direct calls and constructor calls through resolved import
+aliases, namespaces, and re-export barrels are supported. Wrapped, optional,
+callback, dynamic-dispatch, and cross-program flows remain unsupported and do
+not produce an exact actionable link. Some out-of-grammar callsites remain
+unindexed without a per-call diagnostic; reported coverage is intentionally
+incomplete.
+
+Configured paths and workspace-owned program roots and sources, including
+declaration files, must resolve inside the workspace. TypeScript-classified
+external-library declarations remain allowed.
+
+Workspace-contained project configs, source descriptors, definitions, root
+declarations, and authority aliases traversed between them are validated by
+comparing each TypeScript Program snapshot with the final file bytes read for
+catalog
+materialization. A mismatch or unreadable authority file suppresses every exact
+usage that depends on it. In a nested consumer root, only the exact canonical
+`@formly-contract/workspace` package-export chain may be external to establish
+helper identity; unrelated external aliases fail closed. This is a static
+source-integrity check, not a complete runtime module snapshot.
+
+Descriptor authority diagnostics are fail-closed:
+
+- `SOURCE_DESCRIPTOR_UNSUPPORTED` means the discovered project config, direct
+  source registration, source descriptor, or definition list is outside the
+  canonical direct grammar or disagrees with runtime identity. No same-ID
+  fallback is attempted.
+- `SOURCE_DESCRIPTOR_CONFLICT` means multiple canonical registrations claim the
+  same project/source authority. None is selected by path or declaration order.
+- `SOURCE_FILE_SNAPSHOT_MISMATCH` means final bytes differ from the Program
+  snapshot. Every exact usage depending on that file is suppressed, not only
+  callsites physically located in it.
+- `SOURCE_RUNTIME_RESOLUTION_MISMATCH` means TypeScript and the actual Jiti
+  config runtime selected different canonical files for a traversed authority
+  import or re-export. The registered chain is non-actionable until the
+  resolver configuration agrees.
+
+Coverage is deliberately incomplete. An unsupported out-of-grammar callsite is
+not guaranteed to produce a per-call diagnostic.
+
 ### Form, root, usage, and journey authority
 
 Project-aware configuration provides the discovery path, but it does not merge
 four distinct identities:
 
-| Record | What it identifies | Where authority comes from |
-| --- | --- | --- |
-| Form definition | The semantic form and its Form Contract ID | Current typed project source |
-| Root anchor | The exported function, callable `const`, or class that creates the form | Planned validated symbol anchor, preferably declared beside or re-exported with the form definition |
-| Usage | One direct call or constructor site | Planned TypeScript lineage index; an explicit source annotation is required for durable or ambiguous usages |
-| Journey/step | Page entry, business step, actions, transitions, and outcomes | Planned project-owned journey catalog or validated attached annotation |
+| Record          | What it identifies                                                      | Where authority comes from                                                                                    |
+| --------------- | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| Form definition | The semantic form and its Form Contract ID                              | Current typed project source                                                                                  |
+| Root anchor     | The exported function, callable `const`, or class that creates the form | Implemented optional `lineage.rootSymbol`, preferably declared beside or re-exported with the form definition |
+| Usage           | One supported direct call or constructor site                           | Implemented opt-in TypeScript source-usage index with `static-convention` evidence                            |
+| Journey/step    | Page entry, business step, actions, transitions, and outcomes           | Planned project-owned journey catalog or validated attached annotation                                        |
 
 Co-location is encouraged without coupling browser code to the tooling loader.
 A form library can keep the application factory and its declarative contract
 descriptor in the same source area and re-export the descriptor from a
-Node-safe `contracts` entry point. The future root anchor refers to the
-canonical TypeScript symbol, so a source index can connect calls such as
+Node-safe `contracts` entry point. The root anchor refers to the canonical
+TypeScript symbol, so the opt-in source index can connect calls such as
 `IndexingFormConfig(...)` or `new OrderEntryStepperForm(...)` to generated
-contracts without executing those application callsites. The exact public DTO
-is deferred to the shared schema checkpoint; the identity and authority split
-is not.
+contracts without executing or serializing those application callsites or their
+arguments.
 
-One root may map to several form IDs and one form may have several roots or
-usages. The lineage result must preserve all exact candidates. If an
-unannotated usage has several candidates, generation or context assembly
-reports ambiguity rather than selecting by name, route, label, or source order.
-Journey membership is never inferred merely because a call occurs in a page
-component.
+One root may map to several form IDs and one form may have several usages. The
+source catalog preserves all exact candidates. If one root maps to several
+forms, the usage remains ambiguous rather than selecting by name, route, label,
+or source order. Journey membership is never inferred merely because a call
+occurs in a page component.
 
 ## Generate a workspace artifact set
 
@@ -211,15 +301,17 @@ all source definitions, validates globally unique form IDs, extracts each form,
 and writes a deterministic workspace index after its form artifacts succeed:
 
 ```ts
-import { runWorkspace } from '@formly-contract/workspace';
+import { runWorkspace } from "@formly-contract/workspace";
 
 const result = await runWorkspace({
   workspaceRoot: process.cwd(),
-  rootConfigPath: 'formly-contracts.config.ts',
+  rootConfigPath: "formly-contracts.config.ts",
 });
 
 console.log(result.indexPath);
 console.log(result.artifactPaths);
+console.log(result.sourceUsageCatalogPath);
+console.log(result.sourceUsageDiagnostics);
 ```
 
 Generation and checking select `pnpm-lock.yaml` at the canonical
@@ -256,11 +348,20 @@ place. The Form Contract schema remains `0.4.0`; form artifact bytes and
 content-addressed paths remain unchanged by this migration.
 
 The runner performs discovery, source inventory, extraction, diagnostic-policy
-checks, and output-path preflight before publishing. Form artifacts are written
+checks, optional source indexing, and output-path preflight before publishing.
+Form artifacts and the optional `source-usage-catalog.json` are written
 atomically and the aggregate index is written last, so a failed run never
 advertises a partially generated artifact set. Existing content-addressed
 artifacts must already contain identical canonical bytes; the runner does not
 silently overwrite a hash-addressed contract with different content.
+
+Run generation and checking against a quiescent checkout. Discovery must load
+trusted root/project configuration before the source-usage Programs can be
+created; the authority and application Programs are then created before source
+lists or form factories execute. The final-byte checks detect changes after
+those snapshots and suppress dependent exact usages, but the MVP does not claim
+complete Jiti/runtime module snapshotting and retains that short
+config-loading-to-Program boundary.
 
 Failures are reported as `WorkspaceGenerationError` with a stable `code`,
 `phase`, and safe project/source/form/output provenance. The original error is
@@ -269,12 +370,13 @@ workspace index. When discovery wraps a configuration import failure, the CLI
 prints a generic hint to check `tsconfigPath` and Node-safe contract entry
 points without exposing private paths, package names, or stack traces.
 
-### Planned sibling records and pinned assembly
+### Sibling records and pinned assembly
 
-Later workspace contributors publish independent source-lineage, journey,
-behavior/scenario, Angular-authoring, and driver-registry record families. They
-do not mutate Form Contract `0.4.0` or turn the current workspace index into one
-monolithic document. Each family owns its strict schema, canonical
+The opt-in runner now publishes an independent source-usage catalog. Later
+workspace contributors publish journey, behavior/scenario, Angular-authoring,
+and driver-registry record families. They do not mutate Form Contract `0.4.0`
+or turn the current workspace index into one monolithic document. Each family
+owns its strict schema, canonical
 non-self-referential hash, identity rules, coverage and unknowns, and safe
 path/privacy policy.
 
@@ -300,9 +402,11 @@ resolved artifact tied to one form-contract hash; AOT authoring contributes
 observations; the future context/query layer references and validates those
 artifacts but does not produce them.
 
-The current `runWorkspace`, `generate`, and `check` commands do not yet publish
-or verify this sibling graph. The shared schema/reference checkpoint in the
-execution index must land before producer-specific configuration is added.
+The current `runWorkspace`, `generate`, and `check` commands publish and verify
+the source-usage sibling only when `sourceUsage` is configured. They do not yet
+assemble the complete sibling graph. Callers can assemble a hash-pinned
+artifact set and use the pure agent-context query API; no CLI query command or
+production MCP transport is included.
 
 ### Use the generic pilot CLI
 
@@ -324,10 +428,11 @@ pnpm exec formly-contracts check \
 
 `list` prints the deterministic configured project/source inventory without
 executing source lists or form factories. Successful generation prints the
-contract count and workspace-relative index path. `check` executes the same
-trusted source inventory, factories, extraction, and hashing as generation,
-but only reads and exact-compares the expected artifact/index bytes; it never
-repairs or rewrites output. Missing or stale output returns status `1`.
+contract count, workspace-relative index path, and optional source-usage path
+and diagnostics. `check` executes the same trusted source inventory, factories,
+extraction, hashing, and optional source indexing as generation, but only reads
+and exact-compares expected bytes; it never repairs or rewrites output. Missing
+or stale output returns status `1`.
 
 Usage failures exit with status `2`; discovery, generation, and check failures
 exit with status `1` and omit stack traces and underlying callback errors.
@@ -348,6 +453,12 @@ deterministically emits the existing canonical `FieldTypeProfileRegistry` for
 the compiler. Missing or conflicting adapters, registrations, codecs, drivers,
 examples, or scopes remain non-actionable.
 
+The MVP implements the first narrow authoring slice: one browser-safe
+`radioChoice()` declaration can supply the exact Formly type name to production
+registration and lower to the existing canonical registry DTO. It does not
+inspect Angular templates, infer behavior from a type/component name, or cover
+other widget families.
+
 The `fieldTypeProfiles` example below documents the currently implemented
 legacy input. It remains useful for migration and preserves the current v0.4
 registry bytes and compiler behavior, but it is not the intended normal
@@ -356,6 +467,50 @@ pre-1.0 transition; the next breaking schema, targeted as `1.0.0`, removes it
 unless `AUTH-MIG-1` records measured evidence and an explicit ADR amendment.
 When named environments land, a project will select an environment or provide
 this legacy registry, never both; no merge or precedence fallback is planned.
+
+### Compact radio-choice authoring
+
+Keep the contracted descriptor data-only beside the custom field library:
+
+```ts
+import {
+  buildFieldTypeProfileRegistry,
+  defineContractedFormlyType,
+  radioChoice,
+} from "@formly-contract/schema/field-type-authoring";
+
+export const COOL_RADIO_TYPE = defineContractedFormlyType({
+  name: "cool-radio-btn-grp",
+  profile: { id: "claims.cool-radio", version: 1 },
+  behavior: radioChoice(),
+});
+
+export const CLAIMS_FIELD_TYPE_PROFILES = buildFieldTypeProfileRegistry({
+  id: "claims.field-types",
+  version: 1,
+  types: [COOL_RADIO_TYPE],
+});
+```
+
+Bind the Angular component only in the runtime module:
+
+```ts
+import { toFormlyTypeRegistration } from "@formly-contract/schema/field-type-authoring";
+
+FormlyModule.forChild({
+  types: [toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponent)],
+});
+```
+
+`radioChoice()` defaults to `props.options` with `label` and `value` paths. Its
+optional collection, label, value, disabled, and completeness settings accept
+only validated data paths and closed values. Lowering is deterministic and
+rejects duplicate type names or profile identities. The definition helper
+snapshots and runtime-freezes validated data, so later caller-side mutation
+cannot drift the registration name from the generated profile. Projects still attach the
+generated registry through `fieldTypeProfiles`; that repeated attachment is a
+transitional MVP constraint until named environments aggregate shared field
+libraries once.
 
 ### Legacy project-owned registry input
 
@@ -382,54 +537,54 @@ a diagnostic rather than an automatic registry rewrite.
 import {
   FIELD_TYPE_PROFILE_SCHEMA_VERSION,
   type FieldTypeProfileRegistry,
-} from '@formly-contract/schema';
-import { defineFormContractProject } from '@formly-contract/workspace';
+} from "@formly-contract/schema";
+import { defineFormContractProject } from "@formly-contract/workspace";
 
 const fieldTypeProfiles: FieldTypeProfileRegistry = {
   schemaVersion: FIELD_TYPE_PROFILE_SCHEMA_VERSION,
-  id: 'claims.field-types',
+  id: "claims.field-types",
   version: 1,
   profiles: [
     {
-      identity: { id: 'claims.radio-group', version: 1 },
-      semanticType: 'single-choice',
-      valueShape: 'scalar',
-      evidence: 'declared',
+      identity: { id: "claims.radio-group", version: 1 },
+      semanticType: "single-choice",
+      valueShape: "scalar",
+      evidence: "declared",
       parts: [
         {
-          name: 'option',
-          role: 'radio',
-          cardinality: 'many',
-          evidence: 'declared',
+          name: "option",
+          role: "radio",
+          cardinality: "many",
+          evidence: "declared",
         },
       ],
       interaction: {
-        kind: 'choice',
-        operation: 'check',
-        optionPart: 'option',
+        kind: "choice",
+        operation: "check",
+        optionPart: "option",
       },
       valueDomain: {
-        kind: 'projected',
-        source: 'adapter',
-        completeness: 'complete',
-        collectionPath: 'props.options',
-        labelPath: 'label',
-        valuePath: 'value',
-        evidence: 'declared',
+        kind: "projected",
+        source: "adapter",
+        completeness: "complete",
+        collectionPath: "props.options",
+        labelPath: "label",
+        valuePath: "value",
+        evidence: "declared",
       },
       driver: {
-        kind: 'generic',
-        id: 'generic.choice',
+        kind: "generic",
+        id: "generic.choice",
         version: 1,
-        capabilities: ['check'],
+        capabilities: ["check"],
       },
       effectCapabilities: {
-        targetProperties: ['options'],
+        targetProperties: ["options"],
         readiness: [
           {
-            id: 'claims.case-type-options-ready',
-            targetProperty: 'options',
-            evidence: 'declared',
+            id: "claims.case-type-options-ready",
+            targetProperty: "options",
+            evidence: "declared",
           },
         ],
       },
@@ -438,8 +593,8 @@ const fieldTypeProfiles: FieldTypeProfileRegistry = {
   ],
   registrations: [
     {
-      formlyType: 'cool-radio-btn-grp',
-      defaultProfile: { id: 'claims.radio-group', version: 1 },
+      formlyType: "cool-radio-btn-grp",
+      defaultProfile: { id: "claims.radio-group", version: 1 },
       variants: [],
     },
   ],
@@ -447,7 +602,7 @@ const fieldTypeProfiles: FieldTypeProfileRegistry = {
 };
 
 export default defineFormContractProject({
-  projectId: 'claims/forms',
+  projectId: "claims/forms",
   fieldTypeProfiles,
 });
 ```
@@ -514,39 +669,39 @@ executors, observed deltas, or candidate authority.
 import {
   CROSS_FIELD_EFFECT_SCHEMA_VERSION,
   type CrossFieldEffectRegistry,
-} from '@formly-contract/schema';
-import { defineFormContractProject } from '@formly-contract/workspace';
+} from "@formly-contract/schema";
+import { defineFormContractProject } from "@formly-contract/workspace";
 
 const crossFieldEffects: CrossFieldEffectRegistry = {
   schemaVersion: CROSS_FIELD_EFFECT_SCHEMA_VERSION,
-  id: 'claims.cross-field-effects',
+  id: "claims.cross-field-effects",
   version: 1,
   forms: [
     {
-      formId: 'claims.intake',
-      coverage: 'complete',
+      formId: "claims.intake",
+      coverage: "complete",
       effects: [
         {
           identity: {
-            id: 'claims.product-filters-case-type',
+            id: "claims.product-filters-case-type",
             version: 1,
           },
           trigger: {
-            nodeId: 'claims.intake::path:s_product',
-            event: 'selectionChanged',
+            nodeId: "claims.intake::path:s_product",
+            event: "selectionChanged",
           },
           target: {
-            nodeId: 'claims.intake::path:s_caseType',
-            property: 'options',
+            nodeId: "claims.intake::path:s_caseType",
+            property: "options",
           },
-          kind: 'filters',
+          kind: "filters",
           timing: {
-            mode: 'async',
-            readinessId: 'claims.case-type-options-ready',
+            mode: "async",
+            readinessId: "claims.case-type-options-ready",
           },
-          ordering: 'source-before-target',
-          evidence: 'declared',
-          opacity: 'transparent',
+          ordering: "source-before-target",
+          evidence: "declared",
+          opacity: "transparent",
         },
       ],
     },
@@ -554,7 +709,7 @@ const crossFieldEffects: CrossFieldEffectRegistry = {
 };
 
 export default defineFormContractProject({
-  projectId: 'claims/forms',
+  projectId: "claims/forms",
   sources: [claimsSource],
   crossFieldEffects,
 });
@@ -658,20 +813,17 @@ configuration.
 
 The programmatic runner and `generate`/`check` commands execute trusted source
 catalogs and declared form factories, resolve project field-type profiles and
-explicit cross-field effects, and derive the deterministic artifact set.
-`generate` publishes it; `check` compares it without writes. Application driver
-identities remain data and do not execute code. Angular-assisted inventory and
-observed runtime capture remain later increments on the same configuration
-bedrock.
+explicit cross-field effects, and derive deterministic contracts and the
+workspace index. With `sourceUsage` configured, they also resolve supported
+direct root calls into a privacy-safe, hash-pinned source-usage catalog.
+`generate` publishes these bytes; `check` compares them without writes.
 
-The next shared checkpoint is schema and fixture work, not MCP or Playwright: a
-schema-addressed artifact-set envelope with a structured workspace-index
-anchor, source-usage and journey records, scenario and exact
-execution-authority records, and minimal clearly marked synthetic walkthroughs.
-Pure progressive queries then add live freshness status, and the pure
-typed-intent validator owns canonical plans and exhaustive stable diagnostics.
-Passing those synthetic walkthroughs is only the `CTX-2` exit; it does not
-authorize transport or browser execution.
+The pure schema package can assemble an agent-context artifact set and query
+the catalog by source path or form ID. The runner does not yet publish that
+assembled envelope, and the CLI has no query command. Application driver
+identities remain data and do not execute code. Journeys, Angular-assisted
+inventory, observed runtime capture, MCP transport, and Playwright execution
+remain later increments on the same configuration bedrock.
 
 The real representative producer/workplace `CTX-GATE` additionally requires
 current `LIN-4`, `BHV-4`, `ANG-5`, and `DRV-0` artifacts. It blocks MCP and

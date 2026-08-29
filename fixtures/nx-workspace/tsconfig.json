@@ -19,6 +19,9 @@
       "@formly-contract/schema": [
         "../../packages/schema/src/index.ts"
       ],
+      "@formly-contract/schema/field-type-authoring": [
+        "../../packages/schema/src/field-type-authoring.ts"
+      ],
       "@formly-contract/compiler": [
         "../../packages/compiler/src/index.ts"
       ],

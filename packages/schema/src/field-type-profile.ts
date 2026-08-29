@@ -29,6 +29,7 @@ import type {
 import {
   validateGenericDriverSemantics,
 } from './field-type-interaction-validation.js';
+import { FIELD_TYPE_PROFILE_SCHEMA_VERSION } from './field-type-profile-version.js';
 
 export type { ContractValueDomain } from './contract.js';
 export type {
@@ -45,8 +46,7 @@ export type {
 export {
   GENERIC_DRIVER_BLOCKING_UNKNOWN_ASPECTS,
 } from './field-type-interaction-validation.js';
-
-export const FIELD_TYPE_PROFILE_SCHEMA_VERSION = '0.4.0' as const;
+export { FIELD_TYPE_PROFILE_SCHEMA_VERSION } from './field-type-profile-version.js';
 
 export type FieldTypeProfileValueDomain =
   | {

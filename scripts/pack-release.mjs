@@ -12,6 +12,7 @@ import {
   mkdir,
   mkdtemp,
   rm,
+  writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, relative, resolve } from 'node:path';
@@ -38,6 +39,10 @@ const REQUIRED_FILES = [
   'dist/index.js',
   'package.json',
 ];
+const SCHEMA_AUTHORING_EXPORT = {
+  types: './dist/field-type-authoring.d.ts',
+  default: './dist/field-type-authoring.js',
+};
 
 export function verifyPackedPackage({
   packedFiles,
@@ -90,6 +95,29 @@ export function verifyPackedPackage({
     }
   }
 
+  if (releasePackage.directory === 'packages/schema') {
+    const authoringExport = packedManifest.exports?.['./field-type-authoring'];
+    if (
+      typeof authoringExport !== 'object' ||
+      authoringExport === null ||
+      Array.isArray(authoringExport) ||
+      Object.keys(authoringExport).sort().join(',') !== 'default,types' ||
+      authoringExport.types !== SCHEMA_AUTHORING_EXPORT.types ||
+      authoringExport.default !== SCHEMA_AUTHORING_EXPORT.default
+    ) {
+      throw new Error(
+        `${releasePackage.directory} tarball must expose ./field-type-authoring with its exact declaration and runtime targets`,
+      );
+    }
+    for (const requiredFile of Object.values(SCHEMA_AUTHORING_EXPORT)) {
+      if (!filePaths.includes(requiredFile.slice(2))) {
+        throw new Error(
+          `${releasePackage.directory} tarball is missing ${requiredFile.slice(2)}`,
+        );
+      }
+    }
+  }
+
   for (const filePath of filePaths) {
     if (
       !filePath.startsWith('dist/') &&
@@ -107,10 +135,49 @@ export function verifyPackedPackage({
 // imports" smoke test below, so adding a new published package never needs
 // this map to grow before it can release — only packages with a load-bearing
 // entry point worth pinning do.
-const REQUIRED_EXPORT_BY_PACKAGE_NAME = {
-  '@formly-contract/schema': 'parseFormContract',
-  '@formly-contract/compiler': 'extractFormContract',
+const REQUIRED_EXPORTS_BY_PACKAGE_NAME = {
+  '@formly-contract/schema': ['parseFormContract'],
+  '@formly-contract/compiler': ['extractFormContract'],
 };
+
+const FORBIDDEN_ROOT_EXPORTS_BY_PACKAGE_NAME = {
+  '@formly-contract/schema': [
+    'buildFieldTypeProfileRegistry',
+    'defineContractedFormlyType',
+    'radioChoice',
+    'toFormlyTypeRegistration',
+  ],
+};
+
+const REQUIRED_SUBPATH_EXPORTS_BY_PACKAGE_NAME = {
+  '@formly-contract/schema': [
+    {
+      specifier: '@formly-contract/schema/field-type-authoring',
+      requiredExports: [
+        'buildFieldTypeProfileRegistry',
+        'defineContractedFormlyType',
+        'radioChoice',
+        'toFormlyTypeRegistration',
+      ],
+    },
+  ],
+};
+
+export function getPackedPackageSmokeImports(packageName) {
+  return [
+    {
+      specifier: packageName,
+      requiredExports: REQUIRED_EXPORTS_BY_PACKAGE_NAME[packageName] ?? [],
+      ...(FORBIDDEN_ROOT_EXPORTS_BY_PACKAGE_NAME[packageName] === undefined
+        ? {}
+        : {
+            forbiddenExports:
+              FORBIDDEN_ROOT_EXPORTS_BY_PACKAGE_NAME[packageName],
+          }),
+    },
+    ...(REQUIRED_SUBPATH_EXPORTS_BY_PACKAGE_NAME[packageName] ?? []),
+  ];
+}
 
 async function smokeTestTarballs(packages, temporaryDirectory) {
   const installRoot = join(temporaryDirectory, 'packed-install');
@@ -130,26 +197,36 @@ async function smokeTestTarballs(packages, temporaryDirectory) {
     ]);
   }
 
-  for (const packedPackage of packages) {
-    const module_ = await import(
-      pathToFileURL(
-        join(
-          installRoot,
-          'node_modules',
-          ...packedPackage.name.split('/'),
-          'dist/index.js',
-        ),
-      ).href
-    );
+  const smokeImports = packages.flatMap(({ name }) =>
+    getPackedPackageSmokeImports(name),
+  );
+  const smokeModulePath = join(installRoot, 'smoke.mjs');
+  await writeFile(
+    smokeModulePath,
+    `export default await Promise.all(${JSON.stringify(
+      smokeImports.map(({ specifier }) => specifier),
+    )}.map((specifier) => import(specifier)));\n`,
+  );
+  const { default: importedModules } = await import(
+    pathToFileURL(smokeModulePath).href
+  );
 
-    const requiredExport = REQUIRED_EXPORT_BY_PACKAGE_NAME[packedPackage.name];
-    if (
-      requiredExport !== undefined &&
-      typeof module_[requiredExport] !== 'function'
-    ) {
-      throw new Error(
-        `${packedPackage.name} does not export ${requiredExport}`,
-      );
+  for (const [index, { forbiddenExports = [], requiredExports, specifier }] of
+    smokeImports.entries()) {
+    const module_ = importedModules[index];
+    for (const requiredExport of requiredExports) {
+      if (typeof module_[requiredExport] !== 'function') {
+        throw new Error(
+          `${specifier} does not export ${requiredExport}`,
+        );
+      }
+    }
+    for (const forbiddenExport of forbiddenExports) {
+      if (forbiddenExport in module_) {
+        throw new Error(
+          `${specifier} must not export browser-only ${forbiddenExport}`,
+        );
+      }
     }
   }
 }

@@ -6,9 +6,10 @@ model data into this public project.
 
 The pilot is intentionally configuration-first. It proves that a consuming
 repository can identify its form-owning project boundaries, expose trusted form
-factories in bulk, describe custom Formly field types, and generate deterministic
-contract artifacts. It does not yet generate Playwright tests or inspect a live
-browser DOM.
+factories in bulk, link one supported Angular component call to the exact
+generated contract, describe one custom radio through a compact reviewed
+declaration, and generate deterministic artifacts. It does not generate
+Playwright tests, prove route reachability, or inspect a live browser DOM.
 
 ## What this pilot can answer
 
@@ -22,9 +23,12 @@ The current `main` branch can show:
   wrapper, or value mapping is unknown;
 - the possible values of static choice controls and safely projected custom
   controls;
-- project, source, configuration, plugin, and field-profile provenance; and
+- project, source, configuration, plugin, and field-profile provenance;
 - declared cross-field effects whose configured endpoints and capabilities can
-  be resolved safely; and
+  be resolved safely;
+- a static, symbol-resolved link from one supported direct factory call to a
+  stable form ID and exact generated contract hash;
+- source-usage lookup by workspace-relative source path or stable form ID; and
 - whether generated artifacts are current at byte level.
 
 The pilot cannot yet prove:
@@ -34,7 +38,11 @@ The pilot cannot yet prove:
   compiler did not resolve;
 - the real DOM/ARIA output of an undeclared custom Angular component;
 - executable application-specific Playwright driver behavior;
-- automatic discovery of arbitrary form exports or routes.
+- automatic discovery of arbitrary form exports or routes;
+- indirect, wrapped, callback, dynamic-dispatch, or multi-program form usages;
+  or
+- that a statically linked component is reachable, rendered, or part of a
+  particular business journey.
 
 Record those as findings rather than filling the gaps with guessed selectors or
 interaction verbs.
@@ -69,36 +77,39 @@ runs lint, unit tests, package builds, both Angular fixture builds, linked and
 packed workspace-consumer smokes, package and release checks, the demo smoke
 test, and documentation validation.
 
-For a fast known-good generation smoke from the Formly Contract root:
+For fast known-good fixture verification from the Formly Contract root:
 
 ```sh
-pnpm --dir fixtures/angular-monorepo exec formly-contracts generate \
-  --workspace-root . \
-  --config formly-contracts.config.ts \
-  --output dist/formly-contracts-pilot
-
-pnpm --dir fixtures/nx-workspace exec formly-contracts generate \
-  --workspace-root . \
-  --config formly-contracts.config.ts \
-  --output dist/formly-contracts-pilot
+pnpm exec vitest run \
+  fixtures/angular-monorepo/workspace-fixture.test.ts \
+  fixtures/nx-workspace/workspace-fixture.test.ts
 ```
 
-The Angular fixture generates six contracts; the Nx fixture generates two.
+These retained tests inject explicit deterministic fixture provenance. The
+fixture directories deliberately do not pretend to be independent dependency
+workspaces with their own lockfiles. Run the CLI against the real workplace
+workspace root, where its canonical `pnpm-lock.yaml` is present.
 
 ## 2. Link the three pilot packages
 
-Until the first npm release, add sibling links to the workplace repository's
-`devDependencies`. Adjust the relative path to match the two checkouts:
+Until the first npm release, add sibling links to the workplace repository.
+Adjust the relative path to match the two checkouts:
 
 ```json
 {
+  "dependencies": {
+    "@formly-contract/schema": "link:../formly-contract/packages/schema"
+  },
   "devDependencies": {
-    "@formly-contract/schema": "link:../formly-contract/packages/schema",
     "@formly-contract/compiler": "link:../formly-contract/packages/compiler",
     "@formly-contract/workspace": "link:../formly-contract/packages/workspace"
   }
 }
 ```
+
+`schema` must be a regular dependency when the Angular application imports the
+browser-safe field-type-authoring subpath. Compiler and workspace remain
+Node-side dev dependencies.
 
 Install with the workplace repository's normal pnpm workflow, then verify the
 linked binary:
@@ -121,17 +132,21 @@ release-readiness work adds package documentation and publication metadata.
 Create `formly-contracts.config.ts` at the workplace root:
 
 ```ts
-import { defineConfig } from '@formly-contract/workspace';
+import { defineConfig } from "@formly-contract/workspace";
 
 export default defineConfig({
   projectConfigs: [
-    'apps/**/formly-contracts.project.ts',
-    'libs/**/formly-contracts.project.ts',
-    'packages/**/formly-contracts.project.ts',
+    "apps/**/formly-contracts.project.ts",
+    "libs/**/formly-contracts.project.ts",
+    "packages/**/formly-contracts.project.ts",
   ],
-  tsconfigPath: 'tsconfig.base.json',
-  output: { directory: 'dist/formly-contracts-pilot' },
-  diagnostics: { failOn: ['error'] },
+  tsconfigPath: "tsconfig.base.json",
+  sourceUsage: {
+    convention: "direct-root-call-v1",
+    tsconfigPath: "apps/claims/tsconfig.app.json",
+  },
+  output: { directory: "dist/formly-contracts-pilot" },
+  diagnostics: { failOn: ["error"] },
 });
 ```
 
@@ -142,6 +157,25 @@ scoped mappings such as `@work/forms-kit` and wildcard mappings such as
 `@work/*` are both supported. The loader evaluates each config relative to the
 consuming workspace rather than the linked Formly Contract checkout.
 
+`sourceUsage.tsconfigPath` is a separate opt-in boundary. Point it at one leaf
+Angular application config containing the component/page calls to link. Keep
+the root `tsconfigPath` explicit as well: the runner uses its resolution options
+for a narrow authority Program rooted only at discovered project configs,
+compares traversed authority imports and re-exports with the exact Jiti config
+runtime, then uses the leaf config for the application Program. Exact linkage
+requires both Programs and Jiti to resolve the same
+project/source/definition/root chain. This avoids
+adding tooling imports to the browser application while preventing divergent
+path aliases from attaching a call to the wrong runtime contract. The path must
+be a literal workspace-relative file, not a glob. Invalid, empty, missing, or
+outside-workspace inputs fail closed with `SOURCE_USAGE_INDEX_FAILED`; omitting
+the root resolver config is `CONFIG_INVALID` at `root.tsconfigPath`.
+While this MVP source pass is enabled, all discovered project configs must use
+`.ts`, `.mts`, or `.cts`. Existing `.mjs` and `.cjs` configs still work when
+the pass is disabled; with it enabled they fail early as
+`SOURCE_USAGE_PROJECT_CONFIG_UNSUPPORTED` rather than broadening the leaf
+application program with `allowJs`.
+
 Project patterns and output paths are relative to the workplace root. Keep the
 output directory inside the repository and do not point it through a symlink.
 
@@ -151,54 +185,98 @@ Add `formly-contracts.project.ts` only to meaningful project boundaries. A
 base Formly library or application shell may declare a project without sources:
 
 ```ts
-import { defineFormContractProject } from '@formly-contract/workspace';
+import { defineFormContractProject } from "@formly-contract/workspace";
 
 export default defineFormContractProject({
-  projectId: 'claims/formly-kit',
+  projectId: "claims/formly-kit",
 });
 ```
 
-A form-owning library should expose a Node-oriented contracts entry point that
-adapts existing factories or registries in bulk:
+A form-owning library should define a stable contract beside each complete form
+root. The definition gives it a durable ID and anchors lineage to the same
+exported factory used by application code:
+
+```ts
+// libs/forms-kit/src/forms/claim.contract.ts
+import { defineFormContractDefinition } from "@formly-contract/workspace";
+import { createClaimForm } from "./claim.form.js";
+
+export const CLAIM_FORM_CONTRACT = defineFormContractDefinition({
+  id: "claims.create",
+  create: createClaimForm, // This factory has a safe no-argument/default path.
+  lineage: { rootSymbol: createClaimForm },
+});
+```
+
+Do not register every fragment or step as a form. Shared fragments, field
+groups, and wizard steps remain dependencies/lineage of the complete root
+unless they are intentionally useful as independently generated contracts.
+
+One Node-oriented source can expose many definitions from the domain:
 
 ```ts
 // libs/forms-kit/src/contracts.ts
-import { defineFormContractSource } from '@formly-contract/workspace';
-import { createClaimFields, createCustomerFields } from './forms.js';
+import { defineFormContractSource } from "@formly-contract/workspace";
+import { CLAIM_FORM_CONTRACT } from "./forms/claim.contract.js";
+import { CUSTOMER_FORM_CONTRACT } from "./forms/customer.contract.js";
 
 export const FORMS_KIT_SOURCE = defineFormContractSource({
-  sourceId: 'claims/forms-kit',
-  list: () => [
-    {
-      id: 'claims.create',
-      create: () => ({ fields: createClaimFields() }),
-    },
-    {
-      id: 'customers.edit',
-      create: () => ({ fields: createCustomerFields() }),
-    },
-  ],
+  sourceId: "claims/forms-kit",
+  list: () => [CLAIM_FORM_CONTRACT, CUSTOMER_FORM_CONTRACT],
 });
 ```
+
+For the MVP source index, the helper-created definition—or a direct reference
+to that helper-created `const`—must be a direct element of this
+expression-bodied list. Its literal `sourceId` must match the runtime source
+that lists the form. Wrapped, dynamic, spread, or unreturned descriptor flows
+are not linked by name.
 
 Reference that source from the local project config:
 
 ```ts
 // libs/forms-kit/formly-contracts.project.ts
-import {
-  defineFormContractProject,
-} from '@formly-contract/workspace';
-import { FORMS_KIT_SOURCE } from './src/contracts.js';
+import { defineFormContractProject } from "@formly-contract/workspace";
+import { FORMS_KIT_SOURCE } from "./src/contracts.js";
 
 export default defineFormContractProject({
-  projectId: 'claims/forms-kit',
+  projectId: "claims/forms-kit",
   sources: [FORMS_KIT_SOURCE],
 });
 ```
 
-Every `list` call and form factory must return fresh data. Use synthetic inputs
-for required context. Do not perform network requests or use production model
-values, credentials, or customer data.
+This project config is part of the authority chain, not merely discovery
+metadata. It must directly default-export canonical
+`defineFormContractProject(...)` syntax and directly reference the canonical
+source descriptor in `sources`. Its literal `projectId` must match discovery.
+A different descriptor with the same `sourceId` does not authorize the form.
+Unsupported or conflicting chains fail closed rather than choosing by name or
+source order.
+
+Source indexing assigns callsites only under discovered project-config roots.
+If a feature/view library calls a factory owned by a separate forms library,
+give the consuming library a config even when it owns no sources:
+
+```ts
+// libs/claims-feature/formly-contracts.project.ts
+export default defineFormContractProject({
+  projectId: "claims/feature",
+});
+```
+
+Without that manual MVP ownership anchor, the call emits
+`SOURCE_PROJECT_UNRESOLVED` and no exact usage. Application code still calls the
+original factory normally; the indexer resolves its TypeScript symbol without
+executing or serializing arguments such as `window.location.pathname`.
+
+Generation still executes each definition's `create` with no arguments. When
+`lineage` is omitted, implicit root inference accepts that `create` symbol only
+when TypeScript proves a zero-argument-compatible signature. With explicit
+`lineage.rootSymbol`, the real factory may require arguments while a truthful
+Node-safe `create` adapter supplies declared generation. The helper/adapter call
+is excluded from application usage. Do not invent services, streams, templates,
+callbacks, or business data to make generation pass. Never perform network
+requests or use production model values, credentials, or customer data.
 
 Keep trusted discovery exports separate from Angular browser barrels:
 
@@ -227,8 +305,8 @@ implementation files directly rather than re-exporting the Angular barrel:
 
 ```ts
 // tools/formly-contract/forms-kit-shim.ts
-export { createClaimFields } from '../../libs/forms-kit/src/forms/claim.js';
-export type { ClaimFormModel } from '../../libs/forms-kit/src/models/claim.js';
+export { createClaimFields } from "../../libs/forms-kit/src/forms/claim.js";
+export type { ClaimFormModel } from "../../libs/forms-kit/src/models/claim.js";
 ```
 
 ```json
@@ -264,98 +342,62 @@ The pilot workspace CLI currently generates declared artifacts only; it does
 not yet execute named Angular scenarios. Record required scenario artifacts as
 a follow-up rather than adding private runtime values to a declared source.
 
-## 5. Describe custom field types once per project
+## 5. Contract one custom radio type once
 
-An unknown Formly type remains in the generated contract, but Formly Contract
-will not guess its DOM role or operation. Add a reviewed field-type profile for
-each custom widget you want an E2E author to operate.
-
-The following profile states that `cool-radio-btn-grp` renders a radio group,
-is operated by checking one radio, and exposes values through
-`props.options`:
+Unknown Formly types remain visible, but Formly Contract will not guess their
+DOM role or operation. For the MVP radio path, define one compact reviewed type
+beside the custom component using the browser-safe authoring subpath:
 
 ```ts
-// libs/forms-kit/src/field-type-profiles.ts
+// libs/forms-kit/src/lib/field-type-profiles.ts (data only)
 import {
-  FIELD_TYPE_PROFILE_SCHEMA_VERSION,
-  type FieldTypeProfileRegistry,
-} from '@formly-contract/schema';
+  buildFieldTypeProfileRegistry,
+  defineContractedFormlyType,
+  radioChoice,
+} from "@formly-contract/schema/field-type-authoring";
 
-export const WORKPLACE_FIELD_TYPE_PROFILES: FieldTypeProfileRegistry = {
-  schemaVersion: FIELD_TYPE_PROFILE_SCHEMA_VERSION,
-  id: 'claims.field-types',
+export const COOL_RADIO_TYPE = defineContractedFormlyType({
+  name: "cool-radio-btn-grp",
+  profile: { id: "claims.cool-radio", version: 1 },
+  behavior: radioChoice({ disabledPath: "disabled" }),
+});
+
+export const WORKPLACE_FIELD_TYPE_PROFILES = buildFieldTypeProfileRegistry({
+  id: "claims.field-types",
   version: 1,
-  profiles: [
-    {
-      identity: { id: 'claims.cool-radio', version: 1 },
-      semanticType: 'single-choice',
-      valueShape: 'scalar',
-      evidence: 'declared',
-      parts: [
-        {
-          name: 'group',
-          role: 'radiogroup',
-          cardinality: 'one',
-          evidence: 'declared',
-        },
-        {
-          name: 'option',
-          role: 'radio',
-          cardinality: 'many',
-          evidence: 'declared',
-        },
-      ],
-      interaction: {
-        kind: 'choice',
-        operation: 'check',
-        optionPart: 'option',
-      },
-      valueDomain: {
-        kind: 'projected',
-        source: 'adapter',
-        completeness: 'complete',
-        collectionPath: 'props.options',
-        labelPath: 'label',
-        valuePath: 'value',
-        disabledPath: 'disabled',
-        evidence: 'declared',
-      },
-      driver: {
-        kind: 'generic',
-        id: 'generic.choice',
-        version: 1,
-        capabilities: ['check'],
-      },
-      unknowns: [],
-    },
-  ],
-  registrations: [
-    {
-      formlyType: 'cool-radio-btn-grp',
-      defaultProfile: { id: 'claims.cool-radio', version: 1 },
-      variants: [],
-    },
-  ],
-  wrappers: [],
-};
+  types: [COOL_RADIO_TYPE],
+});
 ```
 
-Attach the same registry to every project that consumes those custom types:
+The real Angular module imports that data-only descriptor and binds the
+component without exposing it through the Node-oriented contracts entry point:
+
+```ts
+import { toFormlyTypeRegistration } from "@formly-contract/schema/field-type-authoring";
+
+FormlyModule.forChild({
+  types: [toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponent)],
+});
+```
+
+Attach the generated registry to each current project consuming the type:
 
 ```ts
 export default defineFormContractProject({
-  projectId: 'claims/forms-kit',
+  projectId: "claims/forms-kit",
   sources: [FORMS_KIT_SOURCE],
   fieldTypeProfiles: WORKPLACE_FIELD_TYPE_PROFILES,
 });
 ```
 
-Start with one representative custom radio/select widget. Expand only after its
-rendered roles, parts, operation, option mapping, wrappers, and unknowns have
-been reviewed. The
-[full Angular profile fixture](../fixtures/angular-monorepo/libs/forms-kit/src/lib/field-type-profiles.ts)
-covers radios, overlays, autocomplete, row selection, repeaters, and composite
-controls.
+The generated profile declares `radiogroup`/`radio` parts, `check`, a generic
+choice driver, and possible values projected from reviewed property paths.
+Static options are exact; function-, expression-, or async-backed options stay
+dynamic unless a trusted scenario resolves them. The helper never inspects a
+template or infers behavior from the type name. `radioChoice()` is the only
+compact MVP preset; other widgets still need the verbose legacy registry or
+remain non-actionable. Repeated project attachment is transitional until named
+global Formly environments exist.
 
 ## 6. Generate and inspect artifacts
 
@@ -377,11 +419,14 @@ pnpm exec formly-contracts check \
   --output dist/formly-contracts-pilot
 ```
 
-Success prints the number of contracts and the index path. The output contains:
+Success prints the contract count, index path, and, when opted in,
+`Source usage: dist/formly-contracts-pilot/source-usage-catalog.json` followed
+by any fail-closed source diagnostics. The output contains:
 
 ```text
 dist/formly-contracts-pilot/
   workspace-index.json
+  source-usage-catalog.json
   projects/<encoded-project-id>/
     forms/<encoded-form-id>/
       sha256-<content-hash>.contract.json
@@ -404,6 +449,49 @@ Then inspect one representative artifact for each custom field family. Check
 `formlyType`, `semanticType`, `options`, `valueDomain`, `interactionProfile`,
 `locators`, `dynamicRules`, and `diagnostics`.
 
+Inspect `source-usage-catalog.json` next. A happy-path component call has a
+workspace-relative path/span, direct call symbol, optional component context,
+and `resolution.status: 'exact'` with the expected project, form ID, and exact
+contract hash. It must not contain source text, arguments, absolute paths, or
+browser-only expressions. Coverage remains incomplete with
+`bounded-programs-mvp`: this is `static-convention` evidence, not proof of route
+reachability or rendering.
+
+`invocation.sourceFileHash` hashes the byte snapshot accepted only after it
+decodes exactly to the TypeScript `SourceFile.text` analyzed by the program.
+That validation covers every workspace-contained project config, source
+descriptor, definition, root declaration, callsite, and traversed authority
+alias. A concurrent edit to an authority file suppresses every exact usage that
+depends on it, not only usages located in that file. For a nested workspace,
+the exact canonical `@formly-contract/workspace` package-export chain may be
+external solely to establish helper identity; an unrelated external alias fails
+closed.
+
+Run `generate` and `check` against a quiescent workspace and pause formatters or
+generators that rewrite these files. The runner loads trusted configuration,
+then creates the authority and application TypeScript Programs before it
+invokes any source list or form factory. This MVP does not capture a complete
+snapshot of all runtime/Jiti
+modules, so a short config-loading-to-Program boundary remains.
+
+The CLI does not yet expose a query command or MCP server. A caller can assemble
+a hash-pinned agent-context dataset and use `executeAgentContextQuery` with
+`operation: 'search-form-usages'`, filtering by either:
+
+```ts
+{
+  sourcePath: "libs/feature/src/lib/claim-page.component.ts";
+}
+{
+  formId: "claims.create";
+}
+```
+
+The retained
+[Nx acceptance test](../fixtures/nx-workspace/workspace-fixture.test.ts)
+contains the complete artifact-set/scope assembly and proves both filters
+return the same exact candidate hash.
+
 Treat `domId` entries as lower-confidence hints. Formly field types may render
 the configured ID on a wrapper rather than the interactive control. IDs inside
 `fieldArray` templates are omitted and reported as `UNRELIABLE_DOM_ID` because
@@ -417,8 +505,8 @@ possible; for Formly controls, declare them under
 `props.attributes['data-testid']` so the contract can emit an exact locator.
 
 After generation, `check` recomputes the same trusted source/factory output and
-exact-compares the canonical artifacts and index without rewriting them. Run it
-again after any form/config/profile/effect change; missing output and a stale
+source catalog, then exact-compares canonical bytes without rewriting them. Run
+it again after any form/config/profile/effect change; missing output and a stale
 index can be refreshed by an intentional `generate` run. A stale
 content-addressed contract is an integrity failure and generation will not
 overwrite it: inspect the mismatch, remove the corrupt artifact only after
@@ -430,21 +518,30 @@ The pilot CLI reports stable workspace-generation codes and deliberately hides
 underlying stack traces and callback details. The lower-level config loader APIs
 use the more specific `CONFIG_*` classifications named below.
 
-| Symptom or code | What to check |
-| --- | --- |
-| `formly-contracts: command not found` | Build `@formly-contract/workspace`, confirm `packages/workspace/dist/cli-main.js` exists, then reinstall the workplace links. |
-| An existing checkout tries to load `@formly-agent-contracts/workspace` | A pre-rename pnpm bin shim is stale. From the Formly Contract root, run `pnpm install --force --frozen-lockfile` once, then rebuild the three packages. Fresh clones do not need this recovery step. |
-| `WORKSPACE_DISCOVERY_FAILED` | Confirm `--workspace-root`, `--config`, filename casing, project globs, exclusions, duplicate project/source IDs, and project-config symlinks. The config path is relative to the supplied workspace root. |
-| Underlying `CONFIG_NOT_FOUND` | Confirm the root/project config exists and its casing matches. |
-| Underlying `CONFIG_LOAD_FAILED` | Check imported aliases, Node-safe entry points, and `tsconfigPath`. The CLI prints the same safe guidance without exposing private import details. If an Angular browser barrel triggers JIT compilation, use a secondary contracts entry point or the tool-only shim pattern above. |
-| `UNRELIABLE_DOM_ID` | A field inside `fieldArray` declares an ID that may be omitted or rewritten for runtime rows. Add an exact test ID or accessible locator convention instead of treating the configured ID as a selector. |
-| Underlying `CONFIG_EXPORT_INVALID` or `CONFIG_INVALID` | Export one default object created by `defineConfig` or `defineFormContractProject`; remove unknown keys and non-JSON plugin options. |
-| `FORM_FACTORY_FAILED` | Run the named factory with the same synthetic inputs in isolation. Remove network, service, or environment dependencies from the pilot source. |
-| `UNMAPPED_FIELD_TYPE` | Add a reviewed field profile for that exact Formly type, or accept that it remains visible but non-operable. |
-| `UNMAPPED_PROFILE_VARIANT` | Correct `formlyContract.profileVariant` or declare the named variant in the registry. |
-| `UNMAPPED_WRAPPER_PROFILE` | Register the wrapper and its preconditions, or remove it from the pilot field. Unknown wrappers intentionally block interaction projection. |
-| `DIAGNOSTIC_POLICY_FAILED` | Inspect the indexed diagnostic and adjust the form/profile. Relax `failOn` only when the warning is explicitly accepted for the pilot. |
-| `OUTPUT_PATH_OUTSIDE_WORKSPACE` or `OUTPUT_SYMLINK_UNSUPPORTED` | Use a normal workspace-relative output directory without `..`, an absolute path, or a symlink. |
+| Symptom or code                                                        | What to check                                                                                                                                                                                                                                                                                                                                          |
+| ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `formly-contracts: command not found`                                  | Build `@formly-contract/workspace`, confirm `packages/workspace/dist/cli-main.js` exists, then reinstall the workplace links.                                                                                                                                                                                                                          |
+| An existing checkout tries to load `@formly-agent-contracts/workspace` | A pre-rename pnpm bin shim is stale. From the Formly Contract root, run `pnpm install --force --frozen-lockfile` once, then rebuild the three packages. Fresh clones do not need this recovery step.                                                                                                                                                   |
+| `WORKSPACE_DISCOVERY_FAILED`                                           | Confirm `--workspace-root`, `--config`, filename casing, project globs, exclusions, duplicate project/source IDs, and project-config symlinks. The config path is relative to the supplied workspace root.                                                                                                                                             |
+| Underlying `CONFIG_NOT_FOUND`                                          | Confirm the root/project config exists and its casing matches.                                                                                                                                                                                                                                                                                         |
+| Underlying `CONFIG_LOAD_FAILED`                                        | Check imported aliases, Node-safe entry points, and `tsconfigPath`. The CLI prints the same safe guidance without exposing private import details. If an Angular browser barrel triggers JIT compilation, use a secondary contracts entry point or the tool-only shim pattern above.                                                                   |
+| `SOURCE_USAGE_INDEX_FAILED`                                            | Check the literal leaf `sourceUsage.tsconfigPath`, its include/files set, and discovered project configs. Configured paths and workspace-owned program roots and sources, including declaration files, must resolve inside the workspace. TypeScript-classified external-library declarations remain allowed.                                          |
+| `SOURCE_USAGE_PROJECT_CONFIG_UNSUPPORTED`                              | Rename or add a TypeScript (`.ts`, `.mts`, or `.cts`) project-config entry point for this source-usage pilot.                                                                                                                                                                                                                                          |
+| `SOURCE_RUNTIME_RESOLUTION_MISMATCH`                                   | Align the root TypeScript resolver options with the Jiti-supported runtime path for the registered authority import or re-export. Exact linkage is withheld when the two select different files.                                                                                                                                                       |
+| `SOURCE_DESCRIPTOR_UNSUPPORTED`                                        | Make the discovered project config a direct canonical `defineFormContractProject(...)` default export; put only direct canonical source references in `sources`; and keep the canonical source's list dense, expression-bodied, and direct. Verify literal project/source IDs match runtime discovery. Same-ID descriptors are not fallback authority. |
+| `SOURCE_DESCRIPTOR_CONFLICT`                                           | More than one canonical registration claims the same project/source authority. Remove the duplicate or make ownership explicit; the indexer will not select by file or source order.                                                                                                                                                                   |
+| `SOURCE_PROJECT_UNRESOLVED`                                            | Add a source-empty `formly-contracts.project.ts` to the consuming feature/view library so the callsite has a stable owner.                                                                                                                                                                                                                             |
+| `FORM_DEFINITION_MISSING`                                              | Add a colocated `defineFormContractDefinition` with explicit `lineage.rootSymbol`, then return that exact helper-created definition directly from the matching canonical source's expression-bodied list. The indexer will not infer provenance by name.                                                                                               |
+| `SOURCE_FILE_SNAPSHOT_MISMATCH`                                        | Final file bytes no longer match the TypeScript snapshot used for authority or usage analysis. Every exact usage depending on that file is suppressed. Stop concurrent writes or fix the host reader, then rerun from a quiescent workspace.                                                                                                           |
+| Other `Source usage diagnostic [...]` output                           | Treat recognized unsupported or unresolved usages as non-actionable. Ambiguity is represented as a non-actionable catalog resolution. These diagnostics are separate from Form Contract `diagnostics.failOn`. Because coverage is incomplete, unsupported out-of-grammar calls are not guaranteed to emit a per-call diagnostic.                       |
+| `UNRELIABLE_DOM_ID`                                                    | A field inside `fieldArray` declares an ID that may be omitted or rewritten for runtime rows. Add an exact test ID or accessible locator convention instead of treating the configured ID as a selector.                                                                                                                                               |
+| Underlying `CONFIG_EXPORT_INVALID` or `CONFIG_INVALID`                 | Export one default object created by `defineConfig` or `defineFormContractProject`; remove unknown keys and non-JSON plugin options.                                                                                                                                                                                                                   |
+| `FORM_FACTORY_FAILED`                                                  | Run the definition factory with its safe defaults or deliberate Node-safe adapter in isolation. Remove network, service, or environment dependencies.                                                                                                                                                                                                  |
+| `UNMAPPED_FIELD_TYPE`                                                  | Add a reviewed field profile for that exact Formly type, or accept that it remains visible but non-operable.                                                                                                                                                                                                                                           |
+| `UNMAPPED_PROFILE_VARIANT`                                             | Correct `formlyContract.profileVariant` or declare the named variant in the registry.                                                                                                                                                                                                                                                                  |
+| `UNMAPPED_WRAPPER_PROFILE`                                             | Register the wrapper and its preconditions, or remove it from the pilot field. Unknown wrappers intentionally block interaction projection.                                                                                                                                                                                                            |
+| `DIAGNOSTIC_POLICY_FAILED`                                             | Inspect the indexed diagnostic and adjust the form/profile. Relax `failOn` only when the warning is explicitly accepted for the pilot.                                                                                                                                                                                                                 |
+| `OUTPUT_PATH_OUTSIDE_WORKSPACE` or `OUTPUT_SYMLINK_UNSUPPORTED`        | Use a normal workspace-relative output directory without `..`, an absolute path, or a symlink.                                                                                                                                                                                                                                                         |
 
 Discovery, generation, stale-check, and check failures exit with code `1`;
 command-usage failures exit with code `2`. The CLI intentionally omits stack
@@ -459,24 +556,37 @@ sanitized conclusions with this public project.
 # Formly Contract workplace pilot
 
 ## Environment
+
 - Formly Contract commit:
 - Node / pnpm:
 - Angular / Formly / Nx:
 - Workspace shape:
 
 ## Configuration effort
+
 - Root config location:
 - Project configs added:
 - Existing registries/factory maps reused:
 - New adapters required:
 
 ## Generation result
+
 - Command:
 - Projects / sources / forms discovered:
 - Expected forms missing or duplicated:
 - Repeat run byte-identical: yes/no
 
+## Source linkage
+
+- Leaf Angular tsconfig:
+- Consuming project ownership config:
+- Component call path and root symbol:
+- Stable form ID and exact contract hash:
+- Query by source path / form ID:
+- Fail-closed source diagnostics:
+
 ## Custom-field coverage
+
 - Formly type:
 - Angular component or registration source:
 - Rendered roles and interactive parts:
@@ -487,12 +597,14 @@ sanitized conclusions with this public project.
 - Remaining unknowns:
 
 ## Diagnostics and gaps
+
 - Unexpected diagnostics:
 - Cross-field effects the contract could not configure or resolve:
 - Runtime-only behavior:
 - Information that would have helped Playwright authoring:
 
 ## Usability
+
 - Setup friction:
 - Documentation gaps:
 - Recommended next change:
@@ -515,11 +627,12 @@ copy private source, labels, IDs, option catalogs, credentials, URLs, or model
 values outside this repository. Inspect the workspace structure and existing
 form registries/factory maps, then propose the smallest root config, project
 configs, and Node-safe contracts entry points. Start with one representative
-form and one custom field profile. Do not infer DOM roles or interactions from
-the Formly type name; record unknowns. Run `formly-contracts generate`, inspect
-the workspace index and artifacts, rerun for determinism, and summarize setup
-effort, diagnostics, missing forms, custom-field coverage, and remaining
-Playwright-authoring gaps using the pilot report template.
+form and one custom field profile. Use the compact radio helper only when it
+matches reviewed behavior; record other types as unknown. Add one colocated form
+definition with an explicit root symbol, one direct component call under a
+discovered project root, and the leaf Angular source-usage tsconfig. Generate,
+inspect the index/catalog/contracts, query by source path and form ID, rerun for
+determinism, and report remaining Playwright-authoring gaps.
 ```
 
 ## Pilot completion checklist
@@ -527,7 +640,12 @@ Playwright-authoring gaps using the pilot report template.
 - [ ] The linked CLI prints help.
 - [ ] One root config discovers the intended project configs.
 - [ ] At least one bulk source generates more than one form.
-- [ ] One representative custom field has a reviewed profile.
+- [ ] One complete form has a colocated definition and explicit root symbol.
+- [ ] One direct component call resolves to the exact form ID and contract hash.
+- [ ] Every indexed consuming library has a discovered project ownership root.
+- [ ] The source catalog contains no source text, arguments, or absolute paths.
+- [ ] Source-path and form-ID queries return the same exact candidate.
+- [ ] One custom radio drives both real registration and generated profile data.
 - [ ] Static values are enumerated and dynamic values remain explicitly dynamic.
 - [ ] The workspace index and every referenced artifact validate by generation.
 - [ ] Two unchanged runs produce identical paths and hashes.

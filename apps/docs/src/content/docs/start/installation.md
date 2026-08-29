@@ -3,8 +3,10 @@ title: Installation
 description: Install and verify Formly Contract as build-time tooling beside an Angular application.
 ---
 
-Formly Contract is build/test tooling. Do not add it to the Angular browser
-bundle.
+The compiler and workspace packages are Node-side build/test tooling and must
+not enter the Angular browser bundle. The schema package has one explicit
+browser-safe entry point, `@formly-contract/schema/field-type-authoring`, for
+production custom-field registration.
 
 ## Supported baseline
 
@@ -38,13 +40,20 @@ layout:
 
 ```json
 {
+  "dependencies": {
+    "@formly-contract/schema": "link:../formly-contract/packages/schema"
+  },
   "devDependencies": {
-    "@formly-contract/schema": "link:../formly-contract/packages/schema",
     "@formly-contract/compiler": "link:../formly-contract/packages/compiler",
     "@formly-contract/workspace": "link:../formly-contract/packages/workspace"
   }
 }
 ```
+
+Keep schema in regular `dependencies` when production Angular code imports its
+field-type-authoring subpath. If schema is used only from Node tooling, it may
+remain dev-only. The schema root is Node-oriented; browser code must import the
+dedicated subpath.
 
 Install through the consumer’s normal pnpm workflow, then verify the binary:
 

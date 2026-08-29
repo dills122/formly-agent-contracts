@@ -3,21 +3,39 @@
 ## Current implementation boundary
 
 The implemented generic pilot now includes schema v0.4, declared and trusted
-scenario compilation, legacy project-owned custom-field profiles, repository-aware
-root/project/source configuration, deterministic multi-project discovery and
-artifact generation, a workspace index, generic `formly-contracts list`,
-`generate`, and non-mutating `check` commands, strict project-owned cross-field
-effect registries, and deterministic resolution of validated effects into form
-artifacts and workspace indexes. Canonical Angular-fixture goldens plus linked
-and packed consumers verify the generic pilot outside package-source imports.
+scenario compilation, legacy project-owned custom-field profiles,
+repository-aware root/project/source configuration, deterministic multi-project
+discovery and artifact generation, a workspace index, generic
+`formly-contracts list`, `generate`, and non-mutating `check` commands, strict
+project-owned cross-field effect registries, and deterministic resolution of
+validated effects into form artifacts and workspace indexes. It also includes
+two opt-in workplace MVP slices: typed form definitions with explicit
+`lineage.rootSymbol` anchors plus a `direct-root-call-v1` TypeScript producer,
+and compact `radioChoice()` custom-type authoring that lowers reviewed semantics
+to the canonical field-profile registry while sharing the Formly registration
+name. Canonical Angular-fixture goldens plus linked and packed consumers verify
+the generic pilot outside package-source imports.
 
-The long-term architecture below remains the intended direction. The remaining
-controlled Angular project host, named-environment adapter generation and
-conformance, optional
-Nx task integration, production MCP delivery, typed Playwright
-execution, browser observation, runtime parity, and change analysis remain
-later layers. They must consume or extend the same contracts rather than move
-trusted application execution into routine agent requests.
+The source-usage slice recognizes only the configured
+project-to-source-to-definition convention and supported direct calls or
+constructor expressions in one explicit leaf application Program. A separate
+project-config-only authority Program uses the configured resolver options,
+its traversed authority imports and re-exports are compared with the exact Jiti
+config runtime, and all three views must agree before a link is exact. The producer emits
+`static-convention` evidence that joins an exact form ID and generated contract
+hash; it does not execute call arguments or prove that Angular renders the
+component, that a route reaches it, or that a business journey traverses it.
+The compact custom-type helper currently covers one reviewed radio-choice happy
+path and performs no Angular template or DOM inference.
+
+The long-term architecture below remains the intended direction. Broader
+source lineage and fragment/change-impact analysis, journey and route
+reachability, the controlled Angular project host, named-environment adapter
+generation and conformance, optional Nx task integration, production MCP
+delivery, typed Playwright execution, browser observation, runtime parity, and
+change analysis remain later layers. They must consume or extend the same
+contracts rather than move trusted application execution into routine agent
+requests.
 
 Form Contract `0.4.0` remains the implemented semantic compatibility boundary.
 Separately versioned sibling schema families now exist for the artifact-set
@@ -25,10 +43,11 @@ envelope, source usage and journeys, scenario references and execution
 authority, the driver-registry manifest, and progressive agent-context query
 DTOs. The schema package publishes the pure query API, and the private
 experimental Playwright package contains the trusted-local driver
-implementation inventory. These are not fields of the v0.4 contract and do not
-imply that real source-lineage/scenario/Angular producers, production MCP
-transport, or browser execution exist yet. The canonical ownership and delivery
-order are recorded in the
+implementation inventory. These are not fields of the v0.4 contract. A real
+producer now exists only for the narrow source-usage convention described
+above; broader lineage, journey, scenario, Angular-observation, production MCP,
+and browser-execution producers do not yet exist. The canonical ownership and
+delivery order are recorded in the
 [RH-06 reconciliation](planning/agent-context-hardening/rh-06-reconciliation.md)
 and [execution index](planning/agent-context-hardening/execution-index.md).
 
@@ -101,12 +120,12 @@ These views must not be silently merged. Every fact records its evidence origin 
 
 The architecture keeps four identities separate:
 
-| Identity | Meaning | Authority |
-| --- | --- | --- |
-| Form ID | One semantic form definition and generated contract | Project-owned form definition |
-| Root anchor ID | The exported function, callable `const`, or class that creates the form | Validated definition anchor plus TypeScript symbol identity |
-| Usage ID or callsite key | One invocation of an anchored form in application source | Explicit usage annotation when durability is required; otherwise checker-derived, build-scoped evidence |
-| Journey/step ID | Business navigation and step membership | Project-owned journey catalog or validated source annotation |
+| Identity                 | Meaning                                                                 | Authority                                                                                               |
+| ------------------------ | ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| Form ID                  | One semantic form definition and generated contract                     | Project-owned form definition                                                                           |
+| Root anchor ID           | The exported function, callable `const`, or class that creates the form | Validated definition anchor plus TypeScript symbol identity                                             |
+| Usage ID or callsite key | One invocation of an anchored form in application source                | Explicit usage annotation when durability is required; otherwise checker-derived, build-scoped evidence |
+| Journey/step ID          | Business navigation and step membership                                 | Project-owned journey catalog or validated source annotation                                            |
 
 These relations are many-to-many. One root may produce several semantic forms,
 and one form may be used at several callsites or journey steps. If an
@@ -139,25 +158,30 @@ it does not participate in their hash inputs.
 ### 1. Form registry
 
 The application or a fixture package explicitly registers supported semantic
-form definitions. The implemented workspace source contract owns the form ID
-and a fresh declared field instance; it does not also own page, route, or
-journey meaning.
+form definitions. The implemented workspace source contract owns the form ID,
+a fresh declared field instance, and an optional typed root-symbol anchor; it
+does not also own page, route, or journey meaning.
 
 ```ts
+const claimForm = defineFormContractDefinition({
+  id: "claim.new",
+  create: () => ({ fields: createClaimFields() }),
+  lineage: { rootSymbol: createClaimFields },
+});
+
 const claimsSource = defineFormContractSource({
-  sourceId: 'claims/forms',
-  list: () => [{
-    id: 'claim.new',
-    create: () => ({ fields: createClaimFields() }),
-  }],
+  sourceId: "claims/forms",
+  list: () => [claimForm],
 });
 ```
 
 Registration avoids guessing which exported values happen to be complete
-forms. A planned root-anchor record connects that semantic definition to the
-canonical exported function or class; the source-lineage index then records
-direct application usages. Page, route, action, and step membership live in a
-separate journey catalog.
+forms. For the opt-in MVP, `lineage.rootSymbol` connects the semantic definition
+to a canonical exported function or class. The `direct-root-call-v1` producer
+can then record supported direct application usages in a portable source-usage
+catalog with `static-convention` evidence. This is not complete source lineage:
+fragments and indirect flows remain unindexed, while page, route, action, and
+step membership remain planned for a separate journey catalog.
 
 The example above is a trusted, project-authored declared source. It is not a
 general instruction to call arbitrary application factories with plausible
@@ -268,11 +292,11 @@ artifact bytes or paths.
 
 The execution modes remain deliberately distinct:
 
-| Mode | Purpose | Boundary |
-| --- | --- | --- |
-| Trusted config/JIT worker | Load trusted repository config and approved Angular/Formly scenario entries | Short-lived project process with policy, timeout, and output controls; not an untrusted-code sandbox |
-| AOT authoring browser worker | Build and observe real custom fields through a pinned Angular application target | Fresh browser contexts and deterministic interception where supported; not an OS sandbox |
-| Rootless OCI factory runner | Future execution of parameterized application factories | Required containment profile with a code-free sidecar, runner-owned violation ledger, structural identity gate, and retained negative controls |
+| Mode                         | Purpose                                                                          | Boundary                                                                                                                                       |
+| ---------------------------- | -------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Trusted config/JIT worker    | Load trusted repository config and approved Angular/Formly scenario entries      | Short-lived project process with policy, timeout, and output controls; not an untrusted-code sandbox                                           |
+| AOT authoring browser worker | Build and observe real custom fields through a pinned Angular application target | Fresh browser contexts and deterministic interception where supported; not an OS sandbox                                                       |
+| Rootless OCI factory runner  | Future execution of parameterized application factories                          | Required containment profile with a code-free sidecar, runner-owned violation ledger, structural identity gate, and retained negative controls |
 
 The first two modes execute trusted application code for different evidence
 purposes and must not share a protocol merely because both use Angular. The OCI
@@ -281,19 +305,26 @@ child process is not a substitute.
 
 ### 3. Source indexer
 
-A TypeScript compiler-API pass is optional and deliberately partial. Its
-output is a source-lineage sibling artifact, not fields silently added to the
-v0.4 form contract. Its appropriate responsibilities are:
+The current optional TypeScript compiler-API pass implements one deliberately
+partial source-usage producer. Its portable catalog is a sibling artifact, not
+fields silently added to the v0.4 form contract. Within an explicitly
+configured leaf application Program, a project-config-only authority Program
+that agrees with the exact Jiti config runtime,
+and the validated static project/source/definition convention, it can:
 
-- Resolve explicitly anchored form-root symbols and direct call or constructor
-  usages across aliases, barrels, and namespace imports.
-- Record build-scoped callsite identities, source locations, import
-  relationships, configured program coverage, privacy mode, and staleness
-  inputs.
-- Track shared-fragment usage and change impact.
-- Explain literal spreads and overrides.
-- Detect unsupported dynamic constructs.
-- Determine cache invalidation inputs.
+- resolve explicitly anchored form-root symbols and supported direct call or
+  constructor usages across validated aliases, barrels, and namespace imports;
+- record build-scoped source locations and lexical component context with
+  `static-convention` evidence, exact form IDs and contract hashes, and
+  explicitly incomplete coverage; and
+- fail closed for recognized invalid or ambiguous authority without executing
+  or serializing application call arguments.
+
+Broader source-lineage responsibilities remain planned, including shared
+fragment dependency/change-impact analysis, literal spread and override
+explanation, comprehensive dynamic-construct diagnostics, and complete cache
+invalidation inputs. Route rendering, page reachability, and journey membership
+belong to separate future evidence producers.
 
 It is not an authoritative evaluator for arbitrary factories, dependency
 injection, mutations, hooks, asynchronous behavior, or business journeys.
@@ -372,10 +403,7 @@ Rules are evaluated with three-valued logic: `true`, `false`, or `unknown`. Miss
 For new code, a typed rule builder should emit both a serializable rule AST and the evaluator used by Formly:
 
 ```ts
-const emailSelected = eq(
-  modelRef('contactMethod'),
-  value('email'),
-);
+const emailSelected = eq(modelRef("contactMethod"), value("email"));
 ```
 
 Legacy string and function expressions can be recognized only when safe. Otherwise the contract records a rule ID, declared dependencies, source provenance, known scenario outcomes, and an opacity diagnostic. Arbitrary expression source is never evaluated by the MCP server.
@@ -426,25 +454,36 @@ allowlist. Angular reflection and source/render analysis belong to the trusted
 build-time authoring host and do not run in the schema or MCP query path.
 
 Reviewed declarations and Angular authoring evidence have different authority.
+The current MVP implements one narrow authoring slice: a browser-safe
+`radioChoice()` contracted-type declaration supplies the same exact Formly type
+name to production registration and to deterministic lowering into the
+canonical `FieldTypeProfileRegistry`. It does not inspect a component or infer
+semantics from Angular metadata, templates, or rendered DOM. Other custom-field
+families still require a legacy reviewed registry or remain explicitly
+unmapped.
+
 [ADR 0011](decisions/0011-named-formly-environments-and-contracted-field-adapters.md)
-proposes that reusable field libraries author compact contracted adapters once
-through the same catalog/helper path used by production Formly registration,
-and that projects select one exact named Formly environment. Third-party types
-require an explicit reviewed binding adapter. The Angular host inventories that
-real environment, joins its reviewed adapter contributions, runs required
-controlled conformance, and deterministically lowers them to the existing
-canonical `FieldTypeProfileRegistry`.
+proposes the broader end state: reusable field libraries author compact
+contracted adapters once through the same catalog/helper path used by
+production Formly registration, and projects select one exact named Formly
+environment. Third-party types require an explicit reviewed binding adapter.
+A future Angular host inventories that real environment, joins its reviewed
+adapter contributions, runs required controlled conformance, and
+deterministically lowers them to the existing canonical
+`FieldTypeProfileRegistry`.
 
 The generated registry remains the compiler and contract compatibility
 boundary; Angular metadata, source/template candidates, rendered roles and
 parts, coverage, drift, and migration scaffolds remain evidence. They cannot
-approve semantics, choose a codec, or register a driver. A profile is
-actionable only when its exact registration, declaration, driver capability,
-and required conformance agree. Display/assertion-only components require an
-explicit non-interactive disposition and remain non-executable or unknown until
-the schema defines their no-driver/assertion surface. Until ADR 0011 is
-accepted and implemented, current project-owned raw registries are the explicit
-legacy authoring path rather than the intended final UX.
+approve semantics, choose a codec, or register a driver. The MVP radio-choice
+path is declared semantic metadata, not Angular conformance. The broader model
+will require a profile's exact registration, declaration, driver capability,
+and required conformance to agree before it is actionable. Display/assertion-only
+components require an explicit non-interactive disposition and remain
+non-executable or unknown until the schema defines their no-driver/assertion
+surface. Current project-owned raw registries remain the explicit legacy
+authoring path for controls outside the compact radio-choice slice rather than
+the intended final UX.
 
 One Formly field may map to multiple interactive controls. For example, a date range has start and end parts, while an address lookup may expose a search box, suggestions, and a confirmed structured value.
 

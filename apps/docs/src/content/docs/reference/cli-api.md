@@ -43,8 +43,11 @@ const generated = await runWorkspace(options);
 const checked = await checkWorkspace(options);
 ```
 
-The runner returns `indexPath` and `artifactPaths`. The checker returns current
-state plus exact missing/stale differences.
+The runner returns `indexPath` and contract-only `artifactPaths`. When optional
+root `sourceUsage` is enabled, it also returns `sourceUsageCatalogPath` and
+typed `sourceUsageDiagnostics`; the CLI prints both the path and stable
+diagnostic codes. The checker returns current state plus exact missing/stale
+differences for the catalog as well as contract artifacts.
 
 ## Parse generated data
 
@@ -57,6 +60,13 @@ const contract = parseFormContract(contractJson);
 ```
 
 Always parse untrusted or stored JSON before using it as test context.
+
+## Agent-context query core
+
+`executeAgentContextQuery` is a pure schema API that can query a caller-
+assembled artifact set, including searching source usages by source path or
+form ID. No CLI query command or MCP transport currently loads and assembles
+those artifacts for you; generation and query execution remain separate steps.
 
 ## Direct compiler API
 

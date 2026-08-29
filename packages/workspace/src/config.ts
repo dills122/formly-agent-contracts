@@ -21,6 +21,8 @@ import {
 } from './validation-error.js';
 
 export const WORKSPACE_CONFIG_SCHEMA_VERSION = '0.2.0' as const;
+export const WORKSPACE_SOURCE_USAGE_CONVENTION =
+  'direct-root-call-v1' as const;
 
 const DEFAULT_OUTPUT_DIRECTORY = 'dist/formly-contracts';
 const DEFAULT_TEST_ID_ATTRIBUTES = [
@@ -56,10 +58,16 @@ export interface WorkspaceEffectConfig {
   readonly cyclePolicy: ContractDiagnosticSeverity;
 }
 
+export interface WorkspaceSourceUsageConfig {
+  readonly convention: typeof WORKSPACE_SOURCE_USAGE_CONVENTION;
+  readonly tsconfigPath: string;
+}
+
 export interface WorkspaceRootConfig {
   readonly projectConfigs: readonly string[];
   readonly excludeProjectConfigs?: readonly string[];
   readonly tsconfigPath?: string;
+  readonly sourceUsage?: WorkspaceSourceUsageConfig;
   readonly output?: WorkspaceOutputConfig;
   readonly locators?: WorkspaceLocatorConfig;
   readonly diagnostics?: WorkspaceDiagnosticConfig;
@@ -137,6 +145,7 @@ export interface ResolvedWorkspaceProjectConfig {
   readonly fieldTypeProfiles?: ResolvedFieldTypeProfileRegistry;
   readonly crossFieldEffects?: ResolvedCrossFieldEffectRegistry;
   readonly tsconfigPath?: string;
+  readonly sourceUsage?: WorkspaceSourceUsageConfig;
 }
 
 export function defineConfig<const TConfig extends WorkspaceRootConfig>(
@@ -155,6 +164,7 @@ const ROOT_KEYS = new Set([
   'projectConfigs',
   'excludeProjectConfigs',
   'tsconfigPath',
+  'sourceUsage',
   'output',
   'locators',
   'diagnostics',
@@ -174,6 +184,7 @@ const OUTPUT_KEYS = new Set(['directory']);
 const LOCATOR_KEYS = new Set(['testIdAttributes']);
 const DIAGNOSTIC_KEYS = new Set(['failOn']);
 const EFFECT_KEYS = new Set(['cyclePolicy']);
+const SOURCE_USAGE_KEYS = new Set(['convention', 'tsconfigPath']);
 const PLUGIN_KEYS = new Set([
   'id',
   'version',
@@ -322,6 +333,30 @@ function validateEffects(value: unknown, path: string): void {
   );
 }
 
+function validateSourceUsage(value: unknown, path: string): void {
+  const sourceUsage = requireRecord(value, path);
+  rejectUnknownKeys(sourceUsage, SOURCE_USAGE_KEYS, path);
+  const convention = readOptionalOwnDataProperty(
+    sourceUsage,
+    'convention',
+    `${path}.convention`,
+  );
+  if (convention !== WORKSPACE_SOURCE_USAGE_CONVENTION) {
+    invalid(
+      `${path}.convention`,
+      `must be "${WORKSPACE_SOURCE_USAGE_CONVENTION}".`,
+    );
+  }
+  requireLiteralRelativePath(
+    readOptionalOwnDataProperty(
+      sourceUsage,
+      'tsconfigPath',
+      `${path}.tsconfigPath`,
+    ),
+    `${path}.tsconfigPath`,
+  );
+}
+
 function requireVersion(value: unknown, path: string): string {
   if (
     typeof value !== 'string' ||
@@ -378,6 +413,20 @@ export function parseRootConfig(value: unknown): WorkspaceRootConfig {
   }
   if (root.tsconfigPath !== undefined) {
     requireLiteralRelativePath(root.tsconfigPath, 'root.tsconfigPath');
+  }
+  const sourceUsage = readOptionalOwnDataProperty(
+    root,
+    'sourceUsage',
+    'root.sourceUsage',
+  );
+  if (sourceUsage !== undefined) {
+    validateSourceUsage(sourceUsage, 'root.sourceUsage');
+    if (root.tsconfigPath === undefined) {
+      invalid(
+        'root.tsconfigPath',
+        'is required when root.sourceUsage is configured.',
+      );
+    }
   }
   if (root.output !== undefined) {
     validateOutput(root.output, 'root.output');
@@ -536,6 +585,11 @@ export function resolveWorkspaceProjectConfig(
     'crossFieldEffects',
     'project.crossFieldEffects',
   ) as CrossFieldEffectRegistry | undefined;
+  const sourceUsage = readOptionalOwnDataProperty(
+    root as unknown as Readonly<Record<string, unknown>>,
+    'sourceUsage',
+    'root.sourceUsage',
+  ) as WorkspaceSourceUsageConfig | undefined;
 
   const outputDirectory =
     cliOverrides.outputDirectory ??
@@ -585,5 +639,13 @@ export function resolveWorkspaceProjectConfig(
     ...(root.tsconfigPath === undefined
       ? {}
       : { tsconfigPath: root.tsconfigPath }),
+    ...(sourceUsage === undefined
+      ? {}
+      : {
+          sourceUsage: {
+            convention: sourceUsage.convention,
+            tsconfigPath: sourceUsage.tsconfigPath,
+          },
+        }),
   };
 }

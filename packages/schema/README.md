@@ -8,8 +8,12 @@ workspace indexes. Its parser rejects unknown or machine-local observations;
 its canonicalizer sorts identity collections before hashing.
 
 ```sh
-pnpm add --save-dev @formly-contract/schema
+pnpm add @formly-contract/schema
 ```
+
+Use a regular dependency when production Angular code imports the browser-safe
+`@formly-contract/schema/field-type-authoring` subpath. Tooling-only consumers
+that use only the Node-oriented root may install the package with `--save-dev`.
 
 ```ts
 import {
@@ -20,6 +24,18 @@ import {
 const contract = parseFormContract(JSON.parse(serializedContract));
 const canonicalJson = canonicalStringify(contract);
 ```
+
+Compact custom-field authoring must use its dedicated browser-safe entry point:
+
+```ts
+import {
+  defineContractedFormlyType,
+  radioChoice,
+} from '@formly-contract/schema/field-type-authoring';
+```
+
+The Node-oriented package root is not a browser entry point and does not
+re-export these helpers.
 
 The package also exposes strict, versioned application metadata registries for
 custom field profiles and explicit cross-field effects. Effect registries are
