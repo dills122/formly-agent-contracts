@@ -81,14 +81,28 @@ export function createPackedConsumerManifest(packages) {
       "@angular/compiler-cli": "20.3.29",
       typescript: "5.9.3",
     },
-    pnpm: {
-      overrides: {
-        [`@formly-contract/schema@${schema.version}`]: fileReference(schema),
-        [`@formly-contract/compiler@${compiler.version}`]:
-          fileReference(compiler),
-      },
-    },
   };
+}
+
+export function createPackedConsumerWorkspace(packages) {
+  const byName = new Map(packages.map((package_) => [package_.name, package_]));
+  const schema = byName.get("@formly-contract/schema");
+  const compiler = byName.get("@formly-contract/compiler");
+  if (schema === undefined || compiler === undefined) {
+    throw new Error("Packed smoke requires schema and compiler overrides");
+  }
+  const override = (package_) =>
+    `  ${JSON.stringify(
+      `${package_.name}@${package_.version}`
+    )}: ${JSON.stringify(`file:${package_.tarballPath}`)}`;
+  return [
+    "packages:",
+    "  - .",
+    "overrides:",
+    override(schema),
+    override(compiler),
+    "",
+  ].join("\n");
 }
 
 async function writeText(path, contents) {
@@ -354,6 +368,10 @@ async function seedPackedConsumer(consumerRoot, packages) {
   await writeJson(
     join(consumerRoot, "package.json"),
     createPackedConsumerManifest(packages)
+  );
+  await writeText(
+    join(consumerRoot, "pnpm-workspace.yaml"),
+    createPackedConsumerWorkspace(packages)
   );
   await writeText(
     join(consumerRoot, "formly-contracts.config.ts"),

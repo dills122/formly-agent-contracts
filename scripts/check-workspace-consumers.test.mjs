@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   createConsumerInstallArguments,
   createPackedConsumerManifest,
+  createPackedConsumerWorkspace,
   verifyGeneratedContractArtifacts,
   verifyGeneratedSourceUsageCatalog,
   verifyPackedWorkspaceManifest,
@@ -63,26 +64,26 @@ describe("workspace consumer smoke helpers", () => {
     expect(arguments_).not.toContain("--offline");
   });
 
-  it("creates a consumer manifest with local package overrides", () => {
-    expect(
-      createPackedConsumerManifest([
-        {
-          name: "@formly-contract/schema",
-          version: "0.4.0",
-          tarballPath: "/tmp/schema.tgz",
-        },
-        {
-          name: "@formly-contract/compiler",
-          version: "0.4.0",
-          tarballPath: "/tmp/compiler.tgz",
-        },
-        {
-          name: "@formly-contract/workspace",
-          version: "0.1.0",
-          tarballPath: "/tmp/workspace.tgz",
-        },
-      ])
-    ).toMatchObject({
+  it("creates a consumer manifest and root workspace overrides for local packages", () => {
+    const packages = [
+      {
+        name: "@formly-contract/schema",
+        version: "0.4.0",
+        tarballPath: "/tmp/schema.tgz",
+      },
+      {
+        name: "@formly-contract/compiler",
+        version: "0.4.0",
+        tarballPath: "/tmp/compiler.tgz",
+      },
+      {
+        name: "@formly-contract/workspace",
+        version: "0.1.0",
+        tarballPath: "/tmp/workspace.tgz",
+      },
+    ];
+
+    expect(createPackedConsumerManifest(packages)).toMatchObject({
       private: true,
       dependencies: {
         "@angular/compiler": "20.3.29",
@@ -99,13 +100,14 @@ describe("workspace consumer smoke helpers", () => {
         "@angular/compiler-cli": "20.3.29",
         typescript: "5.9.3",
       },
-      pnpm: {
-        overrides: {
-          "@formly-contract/schema@0.4.0": "file:/tmp/schema.tgz",
-          "@formly-contract/compiler@0.4.0": "file:/tmp/compiler.tgz",
-        },
-      },
     });
+    expect(createPackedConsumerManifest(packages)).not.toHaveProperty("pnpm");
+    expect(createPackedConsumerWorkspace(packages)).toBe(`packages:
+  - .
+overrides:
+  "@formly-contract/schema@0.4.0": "file:/tmp/schema.tgz"
+  "@formly-contract/compiler@0.4.0": "file:/tmp/compiler.tgz"
+`);
   });
 
   it("accepts a packed workspace manifest with a runnable CLI and rewritten dependencies", () => {
