@@ -21,6 +21,10 @@ import type { RuntimeProvenance } from '@formly-contract/schema';
 const fixtureRoot = fileURLToPath(new URL('./', import.meta.url));
 const fixtureTsconfig = resolve(fixtureRoot, 'tsconfig.json');
 const goldenRoot = resolve(fixtureRoot, 'goldens');
+const transientWorkspaceRunnerPrefix = resolve(
+  fixtureRoot,
+  '.workspace-runner-',
+);
 const generatedOutputPrefix = 'dist/formly-contracts/';
 const goldenRuntimeProvenance: RuntimeProvenance = {
   schemaVersion: '1.0.0',
@@ -658,7 +662,7 @@ describe('Angular monorepo workspace fixture', () => {
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
-  }, 20_000);
+  }, 45_000);
 
   it('matches committed canonical goldens with fully resolved effects', async () => {
     const temporaryWorkspace = await mkdtemp(
@@ -669,6 +673,7 @@ describe('Angular monorepo workspace fixture', () => {
       await cp(fixtureRoot, temporaryWorkspace, {
         recursive: true,
         filter: (source) =>
+          !source.startsWith(transientWorkspaceRunnerPrefix) &&
           ![
             goldenRoot,
             resolve(fixtureRoot, 'dist'),

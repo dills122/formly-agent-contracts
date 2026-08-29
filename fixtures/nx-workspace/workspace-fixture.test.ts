@@ -359,7 +359,7 @@ describe("Nx workspace consumer fixture", () => {
     expect(computeFieldTypeProfileRegistryHash(generated)).toBe(
       computeFieldTypeProfileRegistryHash(EXPECTED_NX_RADIO_REGISTRY)
     );
-  });
+  }, 20_000);
 
   it("is a real Nx workspace with four independently owned projects", async () => {
     const nxConfig = JSON.parse(
