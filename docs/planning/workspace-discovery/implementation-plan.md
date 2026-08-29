@@ -806,6 +806,18 @@ sidecar remains separate. A future persisted or cross-package type artifact
 requires a separate versioned schema decision; the MVP does not silently create
 one.
 
+`TFI-MVP-2` adds only ephemeral workspace analysis beside that descriptor. It
+classifies the bounded direct-use grammar in the declared factory body and
+combines use evidence with the corresponding normalized property type. The
+result distinguishes captured callbacks, inert Observables, unavailable
+Angular view handles, explicit construction values, explicit capability
+bindings, and unsupported inputs. Destructuring, aliases, computed access,
+getters, unknown higher-order consumers, and unreviewed storage fail closed.
+It still emits no scaffold, invokes no factory or callback, subscribes to no
+stream, imports no application runtime, and changes no schema or portable
+artifact. `TFI-MVP-3` is the first slice allowed to render this private plan as
+an authoring scaffold.
+
 The trusted JIT/config worker and the `isolated-ci-v1` CI provider are not
 factory containment. No future task may extend the current `create()` path with
 application factory execution as a shortcut around FAC-3.

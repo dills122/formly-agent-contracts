@@ -110,3 +110,41 @@
   files and 1,020 tests, every package/application/fixture build, linked and
   packed workspace consumers, release/pack/demo checks, documentation checks,
   and the docs-site build.
+
+### `TFI-MVP-2` implementation start
+
+- Accepted `TFI2-AC-01` through `TFI2-AC-06` before production changes.
+- The slice remains workspace-private and static. It classifies uses inside the
+  declared factory body and combines them with `TFI-MVP-1` type evidence; it
+  does not invoke a factory, inspect live services, subscribe, generate a
+  scaffold, or alter portable artifacts.
+
+### `TFI-MVP-2` implementation evidence
+
+- Added a workspace-private use analyzer for function bodies and class
+  constructors with one identifier options parameter. It reuses the exact
+  Program/declaration boundary already enforced by `TFI-MVP-1`.
+- Direct construction reads/calls, direct returned escapes, reviewed Formly
+  callback storage, immediate IIFEs, synchronous array callbacks, and
+  ambiguous nested flow receive deterministic classifications.
+- Materialization combines use and type evidence. Supported callables in
+  reviewed deferred storage become `captured-callback`; canonical property
+  Observables that escape directly become `inert-observable`; recognized
+  Angular view handles become `unavailable-view`; construction data remains
+  explicit; hazards and unsupported capabilities fail closed.
+- Adversarial coverage refuses destructuring, parameter/property aliases,
+  mutable aliases, computed access, getters, unknown callback consumers,
+  unreviewed custom callback slots, same-spelled non-RxJS streams, shadowed
+  parameter names, and foreign Program declarations.
+- Focused evidence: 7 usage-classifier tests pass; all 14 workspace test files
+  and 264 workspace tests pass; workspace type-check, focused ESLint, Prettier,
+  and `git diff --check` pass.
+- The first full gate exposed a reproducible pnpm 10 smoke-fixture defect:
+  transitive local tarball overrides were still generated under
+  `package.json#pnpm`, so the packed consumer tried the public registry. A
+  focused regression moved those temporary-project overrides to the root
+  `pnpm-workspace.yaml`; the real linked/packed consumer smoke then passed.
+- `TFI-MVP-2` is complete. Final verification: `pnpm check` passes with 57 test
+  files and 1,027 tests, every package/application/fixture build, linked and
+  packed workspace consumers, release/pack/demo checks, documentation checks,
+  and the docs-site build.

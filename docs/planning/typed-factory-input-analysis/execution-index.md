@@ -32,8 +32,9 @@ TFI-2 --> REV-1 --> reconcile --> REV-2 (Claude) --> reconcile --> REV-3
 
 ## Planned implementation handoff IDs
 
-These IDs describe the likely post-research implementation sequence. They are
-not authorized production tasks until `TFI-2` and the reviews accept them.
+These IDs describe the accepted post-research implementation sequence. `TFI-2`
+and all three reviews accepted the sequence; each slice still preserves its own
+acceptance boundary and verification gate.
 
 | ID          | Candidate implementation outcome                                                                                       | Expected dependency                                                 |
 | ----------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------- |
@@ -48,7 +49,7 @@ not authorized production tasks until `TFI-2` and the reviews accept them.
 | ID          | Status      | Current acceptance boundary                                                                                                                                                                    |
 | ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `TFI-MVP-1` | complete    | Workspace-private analysis reuses an existing `WorkspaceSourceUsageProgramDescriptor`, normalizes one supported factory input shape, resolves canonical RxJS emission types, and fails closed. |
-| `TFI-MVP-2` | not started | No use-site or materialization classification is added by `TFI-MVP-1`.                                                                                                                         |
+| `TFI-MVP-2` | complete    | Workspace-private analysis classifies the factory body's bounded direct-use grammar and combines each use with the `TFI-MVP-1` type result; no scaffold or runtime execution is added.         |
 | `TFI-MVP-3` | not started | No scaffold or authoring output is added by `TFI-MVP-1`.                                                                                                                                       |
 | `TFI-MVP-4` | deferred    | No finite runtime values are inferred from Observable types.                                                                                                                                   |
 | `TFI-MVP-5` | not started | The production analyzer must pass its focused compatibility fixtures before the workplace-shaped pilot begins.                                                                                 |
@@ -63,3 +64,14 @@ not authorized production tasks until `TFI-2` and the reviews accept them.
 | `TFI1-AC-04`  | Normalize type structure within explicit depth, node, string, union, property, parameter, and signature limits.            | Repeated-equality, deep graph, property cap, and display cap tests                                 |
 | `TFI1-AC-05`  | Expose `any`, `unknown`, unresolved generic, recursive, truncated, and unsupported hazards without inventing values.       | Fail-closed hazard, semantic-error, and suppression matrix                                         |
 | `TFI1-AC-06`  | Keep the descriptor ephemeral and workspace-private; change no portable schema or artifact.                                | No barrel export, persistence, cache, schema, compiler, bundle, report, or scaffold change         |
+
+### `TFI-MVP-2` traceability
+
+| Acceptance ID | Requirement                                                                                                                                                          | Verification                                                                                                         |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
+| `TFI2-AC-01`  | Reuse the exact `TFI-MVP-1` Program/declaration boundary and support only a function or class constructor with one identifier options parameter.                     | Function/class positives plus foreign-Program, destructured-parameter, and unsupported-signature refusals            |
+| `TFI2-AC-02`  | Classify direct construction reads/calls, direct returned escapes, reviewed stored functions, immediate IIFEs/synchronous collection callbacks, and ambiguous flow.  | Indexing-shaped positive matrix plus unknown higher-order consumer, getter, alias, destructuring, and computed cases |
+| `TFI2-AC-03`  | Combine use evidence with the property type: only supported callables in reviewed deferred storage become captured callbacks.                                        | Callable and scalar values in identical storage positions produce different dispositions                             |
+| `TFI2-AC-04`  | Classify canonical property Observables as inert streams and recognized Angular view handles as unavailable views only when they escape directly into returned data. | Canonical Observable, same-spelling negative, Angular `TemplateRef`, and non-view object cases                       |
+| `TFI2-AC-05`  | Require explicit values/bindings or mark unsupported whenever construction, ambiguity, hazards, or an unreviewed capability prevents safe automation.                | Mixed-use, immediate capability, `any`/`unknown`, unused, and unreviewed storage cases                               |
+| `TFI2-AC-06`  | Keep the plan bounded, deterministic, ephemeral, workspace-private, and free of factory calls, subscriptions, application imports, persistence, and portable output. | Repeated-equality assertion, source inspection, no barrel/schema/compiler/artifact changes, and full repository gate |
