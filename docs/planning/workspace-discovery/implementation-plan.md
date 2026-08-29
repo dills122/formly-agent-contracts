@@ -784,6 +784,27 @@ program produces `incomplete`, not an authoritative empty usage list.
 | `FAC-1`–`FAC-2` | Schema/compiler own inert binding/value DTOs and pure projection; workspace owns the code-free sidecar and structural-identity gate | `FAC-1` ready; `FAC-2` pending `FAC-1`                                                                                        |
 | `FAC-3`–`FAC-4` | An external rootless OCI provider owns conformance; workspace may orchestrate only after it passes                                  | **Blocked** until `oci-rootless-v1`, the catch-resistant runner ledger, structural controls, and retained negative cases pass |
 
+The focused
+[typed factory input and Observable analysis](../../research/hardening/typed-factory-input-analysis.md)
+refines this branch without changing its authority. Type descriptors, bounded
+usage classification, inert binding plans, diagnostics, and generated reviewed
+scaffolds map to `FAC-1`. A code-free identity/registration sidecar remains
+`FAC-2`. Automatic application factory execution remains `FAC-3`/`FAC-4`, and
+subscribed/resolved Observable emissions remain Task 8 evidence. Type-derived
+emission shapes or literal-union candidates never satisfy those later gates.
+
+For the first `FAC-1` slice, workspace reuses the exact leaf TypeScript Program
+and checker that already power source linkage. The full normalized descriptor
+is ephemeral workspace analysis state and does not cross into compiler, cache,
+schema, or portable contract artifacts. Workspace emits only a bounded,
+canonically ordered, privacy-filtered authoring report and typed application
+scaffold. That scaffold references compiler-owned RH-02 authoring helpers;
+compiler continues to validate/materialize inert bindings without importing
+TypeScript or receiving Program objects. The existing code-free
+identity/registration sidecar remains separate. A future persisted or
+cross-package type artifact requires a separate versioned schema decision; the
+MVP does not silently create one.
+
 The trusted JIT/config worker and the `isolated-ci-v1` CI provider are not
 factory containment. No future task may extend the current `create()` path with
 application factory execution as a shortcut around FAC-3.
