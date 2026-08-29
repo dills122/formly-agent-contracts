@@ -182,3 +182,50 @@
 - Next: `TFI-MVP-5` adds sanitized Indexing- and NIGO-shaped fixtures and the
   explicit checkout workflow, then measures generated, explicit, ambiguous,
   and unsupported authoring burden before making workplace-value claims.
+
+### `TFI-MVP-5` implementation start
+
+- Accepted `TFI5-AC-01` through `TFI5-AC-06` before fixture or production
+  changes. The pilot must exercise the real Nx checkout and existing
+  definition/lineage relationship rather than accept a second authoring target
+  registry.
+- The only planned user input is the existing workspace/config pair plus an
+  optional stable form-ID filter. The workflow is read-only and local: no
+  application factory invocation, source listing, Observable subscription,
+  Angular view access, scaffold write, or portable artifact publication is in
+  scope.
+
+### `TFI-MVP-5` implementation evidence
+
+- Added sanitized Indexing- and NIGO-shaped factory roots to the retained Nx
+  workspace. Each has a colocated stable definition, both definitions share one
+  domain source, and an Angular feature component calls the real factories.
+- Added `inspectWorkspaceFactoryInputs` plus the read-only
+  `author-factory-inputs` command. The only target inputs are the existing
+  workspace/config pair and optional stable form IDs; target discovery reuses
+  the exact project/source/definition/`lineage.rootSymbol` relationship from
+  source usage and introduces no second path or symbol registry.
+- The accepted authoring-burden measurements are:
+
+  | Form shape | Total | Generated | Explicit | Ambiguous | Unsupported |
+  | ---------- | ----: | --------: | -------: | --------: | ----------: |
+  | Indexing   |    12 |         6 |        5 |         0 |           1 |
+  | NIGO       |     8 |         2 |        6 |         0 |           0 |
+
+- Generated values are limited to typed captured callbacks, canonical inert
+  Observables, and unavailable Angular view handles. Construction data and
+  service bindings remain explicit. The Indexing fixture's `any` input remains
+  unsupported, proving that the workflow does not trade lower authoring burden
+  for invented values.
+- Repeated inspection is deterministic, produces only relative suggested
+  paths, excludes an embedded privacy sentinel and absolute workspace paths,
+  and leaves every suggested path absent. Factory execution sentinels stay
+  armed during the complete inspection call without firing.
+- Missing roots and tooling-only or overlapping application Programs fail
+  closed. The workflow statically evaluates neither the source `list()` body nor
+  the registered factory and performs no Observable subscription, Angular view
+  access, or filesystem write.
+- Final repository verification: `pnpm check` passes with 59 test files and
+  1,052 tests, every package/application/fixture build, linked and packed
+  workspace consumers, release/pack/demo checks, documentation validation, and
+  the production docs-site build.

@@ -4,7 +4,10 @@ Status: experimental; deterministic project discovery, project-owned field-type
 profile and cross-field effect registries, resolved effect projection,
 programmatic workspace artifact generation, opt-in static direct-root usage
 indexing, and the generic `list`, `generate`, and non-mutating `check` CLI
-commands are implemented.
+commands are implemented. A read-only `author-factory-inputs` command and
+`inspectWorkspaceFactoryInputs` API also reuse exact source lineage to print
+local typed factory-input drafts without running the registered factory or
+writing artifacts.
 
 Form Contract `0.4.0` and workspace index `0.2.0` remain the implemented output
 boundary. The source-usage catalog and pure agent-context artifact/query schemas

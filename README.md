@@ -245,6 +245,14 @@ zero-argument-compatible call signature. With explicit
 Node-safe `create` adapter supplies the generated declared form without
 inventing runtime data.
 
+For that explicit-lineage case, the read-only
+`formly-contracts author-factory-inputs --form-id <stable-id>` command can
+recover the real exported options type and supported direct-use patterns from
+the same TypeScript Program. It prints a typed partial draft and review counts;
+it does not call the source `list()`, factory, callbacks, Observables, or Angular
+views and does not create the suggested file. Construction values and unsafe or
+ambiguous inputs remain explicit.
+
 Every workspace-contained project config, source descriptor, form definition,
 root declaration, and authority alias traversed between them is checked against
 the final file bytes used for catalog materialization. A changed or unreadable

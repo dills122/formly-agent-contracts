@@ -7,6 +7,11 @@ import {
   type DiscoverWorkspaceProjectsOptions,
 } from './discover-projects.js';
 import {
+  inspectWorkspaceFactoryInputs,
+  type InspectWorkspaceFactoryInputsOptions,
+  type InspectWorkspaceFactoryInputsResult,
+} from './factory-input-authoring.js';
+import {
   checkWorkspace,
   runWorkspace,
   WorkspaceGenerationError,
@@ -23,12 +28,14 @@ Commands:
   generate  Write deterministic Form Contract artifacts
   list      List configured projects and sources without running form factories
   check     Verify generated artifacts are current without writing them
+  author-factory-inputs  Print read-only typed factory-input drafts for review
 
 Options:
   --workspace-root <path>  Workspace root (default: current directory)
   --config <path>          Root config path (default: ${DEFAULT_ROOT_CONFIG_PATH})
   --output <path>          Override output for generate or check
   --fail-on <severity>     Fail on warning or error; generate or check only
+  --form-id <id>           Select a stable form ID; author-factory-inputs only
   -h, --help               Show this help
 `;
 const CONFIG_LOAD_HINT =
@@ -56,6 +63,9 @@ type ListWorkspace = (
 type CheckWorkspace = (
   options: RunWorkspaceOptions,
 ) => Promise<WorkspaceCheckResult>;
+type AuthorFactoryInputs = (
+  options: InspectWorkspaceFactoryInputsOptions,
+) => Promise<InspectWorkspaceFactoryInputsResult>;
 
 export interface WorkspaceCliDependencies {
   readonly cwd?: () => string;
@@ -64,9 +74,14 @@ export interface WorkspaceCliDependencies {
   readonly generate?: GenerateWorkspace;
   readonly list?: ListWorkspace;
   readonly check?: CheckWorkspace;
+  readonly authorFactoryInputs?: AuthorFactoryInputs;
 }
 
-type WorkspaceCliCommandName = 'generate' | 'list' | 'check';
+type WorkspaceCliCommandName =
+  | 'author-factory-inputs'
+  | 'generate'
+  | 'list'
+  | 'check';
 
 interface ParsedWorkspaceCommand {
   readonly name: WorkspaceCliCommandName;
@@ -74,6 +89,7 @@ interface ParsedWorkspaceCommand {
   readonly rootConfigPath: string;
   readonly outputDirectory?: string;
   readonly failOn?: readonly ('warning' | 'error')[];
+  readonly formIds?: readonly string[];
 }
 
 class CliUsageError extends Error {
@@ -115,6 +131,7 @@ function parseWorkspaceCommand(
         config: { type: 'string' },
         output: { type: 'string' },
         'fail-on': { type: 'string', multiple: true },
+        'form-id': { type: 'string', multiple: true },
         help: { type: 'boolean', short: 'h' },
       },
     });
@@ -129,16 +146,29 @@ function parseWorkspaceCommand(
     throw new CliUsageError('Exactly one command is required.');
   }
   const name = parsed.positionals[0];
-  if (name !== 'generate' && name !== 'list' && name !== 'check') {
+  if (
+    name !== 'author-factory-inputs' &&
+    name !== 'generate' &&
+    name !== 'list' &&
+    name !== 'check'
+  ) {
     throw new CliUsageError(`Unsupported command: ${name}`);
   }
   if (
-    name === 'list' &&
+    (name === 'list' || name === 'author-factory-inputs') &&
     (parsed.values.output !== undefined ||
       parsed.values['fail-on'] !== undefined)
   ) {
     throw new CliUsageError(
-      'The list command does not accept --output or --fail-on.',
+      `The ${name} command does not accept --output or --fail-on.`,
+    );
+  }
+  if (
+    name !== 'author-factory-inputs' &&
+    parsed.values['form-id'] !== undefined
+  ) {
+    throw new CliUsageError(
+      '--form-id is accepted only by author-factory-inputs.',
     );
   }
   const failOn = parseFailOn(parsed.values['fail-on']);
@@ -151,11 +181,14 @@ function parseWorkspaceCommand(
       ? {}
       : { outputDirectory: parsed.values.output }),
     ...(failOn === undefined ? {} : { failOn }),
+    ...(parsed.values['form-id'] === undefined
+      ? {}
+      : { formIds: parsed.values['form-id'] }),
   };
 }
 
 function formatWorkspaceError(
-  operation: 'Generation' | 'Check',
+  operation: 'Authoring' | 'Generation' | 'Check',
   error: WorkspaceGenerationError,
 ): string {
   const provenance = [
@@ -268,6 +301,33 @@ function formatSourceUsage(
   ].join('\n');
 }
 
+function formatFactoryInputDrafts(
+  result: InspectWorkspaceFactoryInputsResult,
+): string {
+  return result.drafts
+    .map(
+      (draft) =>
+        `Factory input draft: project=${draft.projectId} source=${draft.sourceId} form=${draft.formId} factory=${draft.factorySymbol}\n` +
+        `Suggested path: ${draft.suggestedPath}\n` +
+        `Review: generated=${draft.metrics.generated} explicit=${draft.metrics.explicit} ambiguous=${draft.metrics.ambiguous} unsupported=${draft.metrics.unsupported}\n` +
+        draft.code,
+    )
+    .join('');
+}
+
+function formatFactoryInputDiagnostics(
+  result: InspectWorkspaceFactoryInputsResult,
+): string {
+  return result.diagnostics
+    .map(
+      (diagnostic) =>
+        `Factory input authoring diagnostic [${diagnostic.code}]${
+          diagnostic.formId === undefined ? '' : ` form=${diagnostic.formId}`
+        }\n`,
+    )
+    .join('');
+}
+
 export async function runWorkspaceCli(
   argv: readonly string[],
   dependencies: WorkspaceCliDependencies = {},
@@ -277,6 +337,8 @@ export async function runWorkspaceCli(
   const generate = dependencies.generate ?? runWorkspace;
   const list = dependencies.list ?? discoverWorkspaceProjects;
   const check = dependencies.check ?? checkWorkspace;
+  const authorFactoryInputs =
+    dependencies.authorFactoryInputs ?? inspectWorkspaceFactoryInputs;
   const cwd = dependencies.cwd ?? (() => process.cwd());
 
   let command: ParsedWorkspaceCommand | 'help';
@@ -307,6 +369,35 @@ export async function runWorkspaceCli(
     } catch (error) {
       stderr.write(
         `List failed [WORKSPACE_DISCOVERY_FAILED]\nWorkspace discovery failed.\n${configLoadHint(error)}`,
+      );
+      return 1;
+    }
+  }
+
+  if (command.name === 'author-factory-inputs') {
+    try {
+      const result = await authorFactoryInputs({
+        workspaceRoot: command.workspaceRoot,
+        rootConfigPath: command.rootConfigPath,
+        ...(command.formIds === undefined ? {} : { formIds: command.formIds }),
+      });
+      const output = formatFactoryInputDrafts(result);
+      if (output.length > 0) stdout.write(output);
+      if (result.diagnostics.length > 0) {
+        stderr.write(formatFactoryInputDiagnostics(result));
+        return 1;
+      }
+      return 0;
+    } catch (error) {
+      if (error instanceof WorkspaceGenerationError) {
+        stderr.write(formatWorkspaceError('Authoring', error));
+        return 1;
+      }
+      const hint = configLoadHint(error);
+      stderr.write(
+        hint.length > 0
+          ? `Authoring failed [WORKSPACE_DISCOVERY_FAILED]\nWorkspace factory input inspection failed.\n${hint}`
+          : 'Factory input authoring failed [UNEXPECTED]\nWorkspace factory input inspection failed.\n',
       );
       return 1;
     }

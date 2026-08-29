@@ -797,7 +797,7 @@ For `TFI-MVP-1`, workspace reuses the exact leaf TypeScript Program and checker
 that already power source linkage. The full normalized descriptor is ephemeral
 workspace analysis state and does not cross into compiler, cache, schema, or
 portable contract artifacts. This first slice emits no report or scaffold.
-`TFI-MVP-3` may later render a bounded, canonically ordered,
+`TFI-MVP-3` renders a bounded, canonically ordered,
 privacy-filtered local authoring report and typed application scaffold. That
 scaffold references compiler-owned RH-02 authoring helpers; compiler continues
 to validate/materialize inert bindings without importing TypeScript or
@@ -805,6 +805,14 @@ receiving Program objects. The existing code-free identity/registration
 sidecar remains separate. A future persisted or cross-package type artifact
 requires a separate versioned schema decision; the MVP does not silently create
 one.
+
+`TFI-MVP-5` exposes the renderer through a read-only workspace API and CLI. It
+discovers only exact application-Program roots from the existing project,
+source, definition, and `lineage.rootSymbol` chain and accepts optional stable
+form-ID filters; there is no second target registry. Sanitized Indexing- and
+NIGO-shaped Nx fixtures measure generated, explicit, ambiguous, and unsupported
+inputs separately. The command neither calls source `list()` nor application
+factories, writes no scaffold, and publishes nothing into portable artifacts.
 
 `TFI-MVP-2` adds only ephemeral workspace analysis beside that descriptor. It
 classifies the bounded direct-use grammar in the declared factory body and
@@ -1957,10 +1965,11 @@ project sources.
 architecture overview for generic config discovery and bulk source adapters.
 
 **Current status:** the root README, workspace configuration reference, and
-workplace pilot guide cover `list`, `generate`, and `check`; linked and packed
-temporary consumers exercise the CLI. A standalone workspace package README
-and polished empty-directory release walkthrough remain before this release
-task is complete.
+workplace pilot guide cover `list`, `generate`, `check`, and read-only
+factory-input authoring; linked and packed temporary consumers exercise the
+artifact CLI. A standalone workspace package README and polished
+empty-directory release walkthrough remain before this release task is
+complete.
 
 **Acceptance criteria:**
 

@@ -1,6 +1,6 @@
 ---
 title: CLI and API
-description: Discover, generate, and check Formly Contract workspaces from the command line or programmatically.
+description: Discover, author, generate, and check Formly Contract workspaces from the command line or programmatically.
 ---
 
 ## CLI
@@ -12,17 +12,43 @@ Commands:
   generate  Write deterministic Form Contract artifacts
   list      List configured projects and sources without running form factories
   check     Verify generated artifacts are current without writing them
+  author-factory-inputs  Print read-only typed factory-input drafts for review
 
 Options:
   --workspace-root <path>  Workspace root (default: current directory)
   --config <path>          Root config path (default: formly-contracts.config.ts)
   --output <path>          Override output for generate or check
   --fail-on <severity>     Fail on warning or error; generate or check only
+  --form-id <id>           Select a stable form ID; author-factory-inputs only
   -h, --help               Show this help
 ```
 
 Use repeatable `--fail-on` flags to select both severities. `list` rejects
 `--output` and `--fail-on` because it does not generate contracts.
+`author-factory-inputs` also rejects those write-oriented options and accepts a
+repeatable `--form-id` filter instead.
+
+## Review factory inputs locally
+
+```sh
+pnpm exec formly-contracts author-factory-inputs \
+  --workspace-root . \
+  --config formly-contracts.config.ts \
+  --form-id claims.indexing
+```
+
+The command follows the existing project, source, definition, and
+`lineage.rootSymbol` chain to the real factory declaration. It does not require
+a second file/symbol registry. For supported direct-use patterns it prints a
+typed `Partial<Options>` draft, a workspace-relative suggested path, and
+separate generated, explicit, ambiguous, and unsupported counts.
+
+This is a local, read-only authoring aid. It does not call source `list()`
+functions or application factories, subscribe to Observables, access Angular
+views, write the suggested file, or add the draft to portable contracts. Copy
+and review the output beside the definition if it is useful. Explicit business
+values and bindings still require an author; unsupported or ambiguous inputs
+remain visible instead of receiving invented values.
 
 ## Programmatic workspace API
 
@@ -30,15 +56,20 @@ Use repeatable `--fail-on` flags to select both severities. `list` rejects
 import {
   checkWorkspace,
   discoverWorkspaceProjects,
+  inspectWorkspaceFactoryInputs,
   runWorkspace,
-} from '@formly-contract/workspace';
+} from "@formly-contract/workspace";
 
 const options = {
   workspaceRoot: process.cwd(),
-  rootConfigPath: 'formly-contracts.config.ts',
+  rootConfigPath: "formly-contracts.config.ts",
 };
 
 const discovered = await discoverWorkspaceProjects(options);
+const authoring = await inspectWorkspaceFactoryInputs({
+  ...options,
+  formIds: ["claims.indexing"],
+});
 const generated = await runWorkspace(options);
 const checked = await checkWorkspace(options);
 ```
@@ -49,11 +80,17 @@ typed `sourceUsageDiagnostics`; the CLI prints both the path and stable
 diagnostic codes. The checker returns current state plus exact missing/stale
 differences for the catalog as well as contract artifacts.
 
+`inspectWorkspaceFactoryInputs` requires the same opt-in `sourceUsage`
+configuration as exact source linkage. Its result is intentionally local and
+ephemeral: drafts contain authoring code and review metadata, while diagnostics
+identify missing, ambiguous, unsupported, or disabled roots without exposing
+absolute paths or source initializers.
+
 ## Parse generated data
 
 ```ts
-import { parseFormContract } from '@formly-contract/schema';
-import { parseWorkspaceContractIndex } from '@formly-contract/workspace';
+import { parseFormContract } from "@formly-contract/schema";
+import { parseWorkspaceContractIndex } from "@formly-contract/workspace";
 
 const index = parseWorkspaceContractIndex(indexJson);
 const contract = parseFormContract(contractJson);

@@ -1,8 +1,8 @@
 # Typed Factory Input Analysis Execution Index
 
-- Status: Research and independent review complete
+- Status: Research, independent review, and MVP implementation through TFI-MVP-5 complete
 - Scope: research, retained experiments, technical design, and review
-- Production behavior changes: none authorized by this index
+- Production behavior changes: bounded typed factory-input analysis and read-only local authoring workflow
 
 ## Work graph
 
@@ -46,13 +46,13 @@ acceptance boundary and verification gate.
 
 ## Production implementation status
 
-| ID          | Status      | Current acceptance boundary                                                                                                                                                                    |
-| ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `TFI-MVP-1` | complete    | Workspace-private analysis reuses an existing `WorkspaceSourceUsageProgramDescriptor`, normalizes one supported factory input shape, resolves canonical RxJS emission types, and fails closed. |
-| `TFI-MVP-2` | complete    | Workspace-private analysis classifies the factory body's bounded direct-use grammar and combines each use with the `TFI-MVP-1` type result; no scaffold or runtime execution is added.         |
-| `TFI-MVP-3` | complete    | A workspace-private renderer produces a deterministic local typed authoring draft; it has no runtime harness implementation, writes nothing, and never enters a portable artifact.             |
-| `TFI-MVP-4` | deferred    | No finite runtime values are inferred from Observable types.                                                                                                                                   |
-| `TFI-MVP-5` | not started | The production analyzer must pass its focused compatibility fixtures before the workplace-shaped pilot begins.                                                                                 |
+| ID          | Status   | Current acceptance boundary                                                                                                                                                                    |
+| ----------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TFI-MVP-1` | complete | Workspace-private analysis reuses an existing `WorkspaceSourceUsageProgramDescriptor`, normalizes one supported factory input shape, resolves canonical RxJS emission types, and fails closed. |
+| `TFI-MVP-2` | complete | Workspace-private analysis classifies the factory body's bounded direct-use grammar and combines each use with the `TFI-MVP-1` type result; no scaffold or runtime execution is added.         |
+| `TFI-MVP-3` | complete | A workspace-private renderer produces a deterministic local typed authoring draft; it has no runtime harness implementation, writes nothing, and never enters a portable artifact.             |
+| `TFI-MVP-4` | deferred | No finite runtime values are inferred from Observable types.                                                                                                                                   |
+| `TFI-MVP-5` | complete | Sanitized Nx Indexing/NIGO roots prove existing definition/lineage discovery, a read-only local authoring command, measured review burden, and containment checks.                             |
 
 ### `TFI-MVP-1` traceability
 
@@ -86,3 +86,14 @@ acceptance boundary and verification gate.
 | `TFI3-AC-04`  | Accept only bounded identifiers plus privacy-safe relative or package module specifiers; emit no absolute paths, source snippets, comments, initializers, credentials, or customer values.        | Invalid identifier/specifier matrix and leak-sentinel assertions over the rendered bytes                               |
 | `TFI3-AC-05`  | Keep the result workspace-private and ephemeral. Do not write files, alter the portable schema, bundle it with contracts, or add it to canonical hashes.                                          | Renderer remains outside the package barrel and all artifact/schema/golden tests remain unchanged                      |
 | `TFI3-AC-06`  | Add only the compiler-owned type contract needed by the generated draft; neither the compiler nor workspace creates runtime capability values or invokes factories, callbacks, streams, or views. | Generated-module semantic check against the real compiler export, source inspection, and focused/full repository gates |
+
+### `TFI-MVP-5` traceability
+
+| Acceptance ID | Requirement                                                                                                                                                                                                          | Verification                                                                                                                             |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
+| `TFI5-AC-01`  | Retain sanitized Indexing- and NIGO-shaped factories in the real Nx fixture, register each root through one colocated definition/source, and consume both from an Angular feature component.                         | Nx build plus exact definition, root-symbol, source-membership, and feature-callsite assertions                                          |
+| `TFI5-AC-02`  | Discover authoring targets from the existing workspace config, source registration, definition, and `lineage.rootSymbol`; require no second file path, symbol name, synthetic invocation, or handwritten target map. | End-to-end authoring inspection receives only workspace/config plus optional stable form IDs and resolves both real factory declarations |
+| `TFI5-AC-03`  | Produce deterministic read-only local drafts with relative suggested paths, review counts, generated code, and stable diagnostics; write no scaffold or portable artifact.                                           | Repeated byte equality, absent-path assertions, and unchanged contract/schema/hash fixtures                                              |
+| `TFI5-AC-04`  | Measure generated, explicit, ambiguous, and unsupported authoring burden separately for both workplace shapes before making an improvement claim.                                                                    | Accepted fixture expectations and retained count table in `progress.md`                                                                  |
+| `TFI5-AC-05`  | Fail closed for missing, duplicate, unsupported, or non-application targets and expose stable local diagnostics without leaking absolute paths, source text, initializers, or runtime values.                        | Negative target-selection/unsupported-root tests and leak-sentinel assertions                                                            |
+| `TFI5-AC-06`  | The authoring workflow must not list or invoke form sources/factories, call generated callbacks, subscribe to Observables, touch Angular views, or write files.                                                      | Execution sentinels around the complete workflow plus focused and full repository gates                                                  |

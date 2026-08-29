@@ -40,12 +40,17 @@ Use for repository-aware adoption:
 - `defineConfig`, `defineFormContractProject`, and
   `defineFormContractSource`
 - `discoverWorkspaceProjects`
+- `inspectWorkspaceFactoryInputs` for read-only, definition-linked authoring
+  drafts
 - `runWorkspace` and `checkWorkspace`
 - `parseWorkspaceContractIndex`
 - the `formly-contracts` CLI
 
 Configuration and source factories are trusted executable code. Generated
-indexes and contracts are portable validated data.
+indexes and contracts are portable validated data. Factory-input drafts are a
+separate local authoring result: the inspector reads the existing TypeScript
+Program and lineage but does not call the registered form factory or write the
+suggested file.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/workspace/README.md)
 maps configuration, discovery, generation, source indexing, and CLI ownership.
 

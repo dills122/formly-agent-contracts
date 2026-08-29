@@ -48,6 +48,15 @@ export {
   loadWorkspaceProjectConfig,
   loadWorkspaceRootConfig,
 } from "./load-config.js";
+export { inspectWorkspaceFactoryInputs } from "./factory-input-authoring.js";
+export type {
+  InspectWorkspaceFactoryInputsOptions,
+  InspectWorkspaceFactoryInputsResult,
+  WorkspaceFactoryInputAuthoringDiagnostic,
+  WorkspaceFactoryInputAuthoringDiagnosticCode,
+  WorkspaceFactoryInputAuthoringDraft,
+  WorkspaceFactoryInputAuthoringMetrics,
+} from "./factory-input-authoring.js";
 export {
   defineFormContractDefinition,
   defineFormContractSource,

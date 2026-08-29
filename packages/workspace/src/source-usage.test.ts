@@ -639,6 +639,66 @@ describe("runtimeResolutionMatchesTypeScript", () => {
 });
 
 describe("indexWorkspaceSourceUsages", () => {
+  it("reports one application-program factory target through the existing definition lineage", () => {
+    const targets: Parameters<
+      NonNullable<IndexWorkspaceSourceUsagesInput["onFactoryInputAuthoringTarget"]>
+    >[0][] = [];
+    const configured = input();
+
+    indexWorkspaceSourceUsages({
+      ...configured,
+      onFactoryInputAuthoringTarget: (target) => void targets.push(target),
+    });
+
+    const claim = targets.find(({ formId }) => formId === "claims.intake");
+    expect(claim).toMatchObject({
+      projectId: "forms-lib",
+      sourceId: "forms",
+      formId: "claims.intake",
+      definitionFilePath: "libs/forms/src/catalog.ts",
+      factorySymbol: "createClaimIntakeForm",
+    });
+    expect(claim?.descriptor).toBe(configured.programs[0]);
+    expect(claim?.factoryDeclaration.getSourceFile().fileName).toBe(
+      `${WORKSPACE_ROOT}/libs/forms/src/forms.ts`,
+    );
+  });
+
+  it("does not choose a tooling-only or overlapping application Program for authoring", () => {
+    const program = createVirtualProgram();
+    const toolingTargets: unknown[] = [];
+    const overlappingTargets: unknown[] = [];
+
+    indexWorkspaceSourceUsages(
+      input({
+        programs: [{ programId: "claims.tooling", purpose: "tooling", program }],
+        onFactoryInputAuthoringTarget: (target) =>
+          void toolingTargets.push(target),
+      }),
+    );
+    indexWorkspaceSourceUsages(
+      input({
+        programs: [
+          {
+            programId: "claims.application.a",
+            purpose: "application",
+            program,
+          },
+          {
+            programId: "claims.application.b",
+            purpose: "application",
+            program,
+          },
+        ],
+        onFactoryInputAuthoringTarget: (target) =>
+          void overlappingTargets.push(target),
+      }),
+    );
+
+    expect(toolingTargets).toEqual([]);
+    expect(overlappingTargets).toEqual([]);
+  });
+
   it("links direct aliases, barrels, namespace calls, and constructors to exact indexed contract hashes", () => {
     const result = indexWorkspaceSourceUsages(input());
     const usages = pageUsages(result);
