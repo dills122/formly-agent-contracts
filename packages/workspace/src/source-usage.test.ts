@@ -669,14 +669,14 @@ describe("indexWorkspaceSourceUsages", () => {
     const toolingTargets: unknown[] = [];
     const overlappingTargets: unknown[] = [];
 
-    indexWorkspaceSourceUsages(
+    const tooling = indexWorkspaceSourceUsages(
       input({
         programs: [{ programId: "claims.tooling", purpose: "tooling", program }],
         onFactoryInputAuthoringTarget: (target) =>
           void toolingTargets.push(target),
       }),
     );
-    indexWorkspaceSourceUsages(
+    const overlapping = indexWorkspaceSourceUsages(
       input({
         programs: [
           {
@@ -697,6 +697,16 @@ describe("indexWorkspaceSourceUsages", () => {
 
     expect(toolingTargets).toEqual([]);
     expect(overlappingTargets).toEqual([]);
+    expect(tooling.factoryInputAuthoringDiagnostics).toContainEqual({
+      code: "APPLICATION_PROGRAM_UNAVAILABLE",
+      formId: "claims.intake",
+      projectId: "forms-lib",
+    });
+    expect(overlapping.factoryInputAuthoringDiagnostics).toContainEqual({
+      code: "APPLICATION_PROGRAM_AMBIGUOUS",
+      formId: "claims.intake",
+      projectId: "forms-lib",
+    });
   });
 
   it("links direct aliases, barrels, namespace calls, and constructors to exact indexed contract hashes", () => {
@@ -2141,6 +2151,11 @@ describe("indexWorkspaceSourceUsages", () => {
         formId: "claims.intake",
       })
     );
+    expect(result.factoryInputAuthoringDiagnostics).toContainEqual({
+      code: "FORM_DEFINITION_DUPLICATE",
+      formId: "claims.intake",
+      projectId: "forms-lib",
+    });
     expect(
       pageUsages(result).some(
         ({ resolution }) =>

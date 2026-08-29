@@ -76,6 +76,8 @@ describe('Nx workplace factory-input authoring', () => {
         explicit: 5,
         ambiguous: 0,
         unsupported: 1,
+        coverage: 'incomplete',
+        unattributedAmbiguity: false,
       },
       {
         formId: 'nx.workplace.nigo-add',
@@ -83,6 +85,8 @@ describe('Nx workplace factory-input authoring', () => {
         explicit: 6,
         ambiguous: 0,
         unsupported: 0,
+        coverage: 'complete-supported-grammar',
+        unattributedAmbiguity: false,
       },
     ]);
   }, 30_000);

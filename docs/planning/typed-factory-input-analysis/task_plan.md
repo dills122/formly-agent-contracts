@@ -1,6 +1,6 @@
 # Typed Factory Input Analysis Research Plan
 
-- Status: Research and three-round independent review complete
+- Status: Research and its three-round independent review complete; production implementation review is tracked separately
 - Branch: `codex/typed-factory-input-research`
 - Base: `origin/main` at `fd5e77c`
 - Decision owner: maintainer

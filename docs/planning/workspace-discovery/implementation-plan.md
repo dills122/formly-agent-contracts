@@ -799,19 +799,21 @@ workspace analysis state and does not cross into compiler, cache, schema, or
 portable contract artifacts. This first slice emits no report or scaffold.
 `TFI-MVP-3` renders a bounded, canonically ordered,
 privacy-filtered local authoring report and typed application scaffold. That
-scaffold references compiler-owned RH-02 authoring helpers; compiler continues
-to validate/materialize inert bindings without importing TypeScript or
-receiving Program objects. The existing code-free identity/registration
-sidecar remains separate. A future persisted or cross-package type artifact
-requires a separate versioned schema decision; the MVP does not silently create
-one.
+scaffold references a compiler-owned RH-02 type-only authoring contract.
+Compiler supplies no runtime harness and does not currently validate or
+materialize the bindings; that work remains behind the deferred FAC-3/FAC-4
+runner. Compiler still does not import TypeScript or receive Program objects.
+The existing code-free identity/registration sidecar remains separate. A future
+persisted or cross-package type artifact requires a separate versioned schema
+decision; the MVP does not silently create one.
 
 `TFI-MVP-5` exposes the renderer through a read-only workspace API and CLI. It
 discovers only exact application-Program roots from the existing project,
 source, definition, and `lineage.rootSymbol` chain and accepts optional stable
 form-ID filters; there is no second target registry. Sanitized Indexing- and
-NIGO-shaped Nx fixtures measure generated, explicit, ambiguous, and unsupported
-inputs separately. The command neither calls source `list()` nor application
+NIGO-shaped Nx fixtures measure mutually exclusive generated, explicit,
+ambiguous, and unsupported property counts, and separately report coverage plus
+unattributed ambiguity. The command neither calls source `list()` nor application
 factories, writes no scaffold, and publishes nothing into portable artifacts.
 
 `TFI-MVP-2` adds only ephemeral workspace analysis beside that descriptor. It

@@ -309,7 +309,7 @@ function formatFactoryInputDrafts(
       (draft) =>
         `Factory input draft: project=${draft.projectId} source=${draft.sourceId} form=${draft.formId} factory=${draft.factorySymbol}\n` +
         `Suggested path: ${draft.suggestedPath}\n` +
-        `Review: generated=${draft.metrics.generated} explicit=${draft.metrics.explicit} ambiguous=${draft.metrics.ambiguous} unsupported=${draft.metrics.unsupported}\n` +
+        `Review: generated=${draft.metrics.generated} explicit=${draft.metrics.explicit} ambiguous=${draft.metrics.ambiguous} unsupported=${draft.metrics.unsupported} coverage=${draft.metrics.coverage} unattributedAmbiguity=${draft.metrics.unattributedAmbiguity}\n` +
         draft.code,
     )
     .join('');

@@ -1,6 +1,6 @@
 # Typed Factory Input Analysis Execution Index
 
-- Status: Research, independent review, and MVP implementation through TFI-MVP-5 complete
+- Status: Research review and MVP implementation through TFI-MVP-5 complete; production implementation review 1 of 3 reconciled
 - Scope: research, retained experiments, technical design, and review
 - Production behavior changes: bounded typed factory-input analysis and read-only local authoring workflow
 
@@ -54,6 +54,10 @@ acceptance boundary and verification gate.
 | `TFI-MVP-4` | deferred | No finite runtime values are inferred from Observable types.                                                                                                                                   |
 | `TFI-MVP-5` | complete | Sanitized Nx Indexing/NIGO roots prove existing definition/lineage discovery, a read-only local authoring command, measured review burden, and containment checks.                             |
 
+The separate production implementation review cycle is tracked in
+[`reviews/README.md`](./reviews/README.md). Instance 1 is reconciled; instances
+2 and 3 remain pending.
+
 ### `TFI-MVP-1` traceability
 
 | Acceptance ID | Requirement                                                                                                                | Evidence                                                                                           |
@@ -89,11 +93,11 @@ acceptance boundary and verification gate.
 
 ### `TFI-MVP-5` traceability
 
-| Acceptance ID | Requirement                                                                                                                                                                                                          | Verification                                                                                                                             |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- |
-| `TFI5-AC-01`  | Retain sanitized Indexing- and NIGO-shaped factories in the real Nx fixture, register each root through one colocated definition/source, and consume both from an Angular feature component.                         | Nx build plus exact definition, root-symbol, source-membership, and feature-callsite assertions                                          |
-| `TFI5-AC-02`  | Discover authoring targets from the existing workspace config, source registration, definition, and `lineage.rootSymbol`; require no second file path, symbol name, synthetic invocation, or handwritten target map. | End-to-end authoring inspection receives only workspace/config plus optional stable form IDs and resolves both real factory declarations |
-| `TFI5-AC-03`  | Produce deterministic read-only local drafts with relative suggested paths, review counts, generated code, and stable diagnostics; write no scaffold or portable artifact.                                           | Repeated byte equality, absent-path assertions, and unchanged contract/schema/hash fixtures                                              |
-| `TFI5-AC-04`  | Measure generated, explicit, ambiguous, and unsupported authoring burden separately for both workplace shapes before making an improvement claim.                                                                    | Accepted fixture expectations and retained count table in `progress.md`                                                                  |
-| `TFI5-AC-05`  | Fail closed for missing, duplicate, unsupported, or non-application targets and expose stable local diagnostics without leaking absolute paths, source text, initializers, or runtime values.                        | Negative target-selection/unsupported-root tests and leak-sentinel assertions                                                            |
-| `TFI5-AC-06`  | The authoring workflow must not list or invoke form sources/factories, call generated callbacks, subscribe to Observables, touch Angular views, or write files.                                                      | Execution sentinels around the complete workflow plus focused and full repository gates                                                  |
+| Acceptance ID | Requirement                                                                                                                                                                                                          | Verification                                                                                                                                                |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TFI5-AC-01`  | Retain sanitized Indexing- and NIGO-shaped factories in the real Nx fixture, register each root through one colocated definition/source, and consume both from an Angular feature component.                         | Nx build plus exact definition, root-symbol, source-membership, and feature-callsite assertions                                                             |
+| `TFI5-AC-02`  | Discover authoring targets from the existing workspace config, source registration, definition, and `lineage.rootSymbol`; require no second file path, symbol name, synthetic invocation, or handwritten target map. | End-to-end authoring inspection receives only workspace/config plus optional stable form IDs and resolves both real factory declarations                    |
+| `TFI5-AC-03`  | Produce deterministic read-only local drafts with relative suggested paths, review counts, generated code, and stable diagnostics; write no scaffold or portable artifact.                                           | Repeated byte equality, absent-path assertions, and unchanged contract/schema/hash fixtures                                                                 |
+| `TFI5-AC-04`  | Measure generated, explicit, ambiguous, and unsupported authoring burden separately for both workplace shapes before making an improvement claim.                                                                    | Mutually exclusive property counts plus coverage/unattributed-ambiguity metadata in fixture and CLI expectations                                            |
+| `TFI5-AC-05`  | Fail closed for missing, duplicate, unsupported, or non-application targets and expose stable local diagnostics without leaking absolute paths, source text, initializers, or runtime values.                        | Source-index target diagnostics, public-inspector translation tests, negative target selection, and leak-sentinel assertions                                |
+| `TFI5-AC-06`  | The authoring workflow must not list or invoke form sources/factories, call generated callbacks, subscribe to Observables, touch Angular views, or write files.                                                      | Registered-adapter and root-factory sentinels; static literal-list grammar and source inspection; absent suggested paths; focused and full repository gates |

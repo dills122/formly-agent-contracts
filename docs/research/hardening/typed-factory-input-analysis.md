@@ -285,10 +285,12 @@ package dependency direction:
    directory inside the consumer workspace. It is excluded from portable
    bundles and is committed only by explicit author choice.
 3. The generated application scaffold references the compiler-owned RH-02
-   authoring/binding helpers. `packages/compiler` continues to validate and
-   materialize inert Formly bindings; it does not import TypeScript or consume
-   workspace compiler objects. No new runtime DTO or reverse dependency is
-   introduced between workspace and compiler.
+   type-only authoring contract. `packages/compiler` does not currently validate
+   or materialize those bindings and supplies no runtime harness implementation;
+   the deferred FAC-3/FAC-4 runner remains responsible for any future reviewed
+   materialization. Compiler does not import TypeScript or consume workspace
+   compiler objects. No new runtime DTO or reverse dependency is introduced
+   between workspace and compiler.
 
 The MVP intentionally has no cache, so there is no stale descriptor to
 invalidate. Each run reuses the workspace-created leaf Program for both source

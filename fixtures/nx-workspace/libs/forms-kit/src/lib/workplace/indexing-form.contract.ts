@@ -6,8 +6,10 @@ import {
   IndexingFormConfig,
   type IndexingFormOptions,
 } from './indexing-form.js';
+import { rejectUnexpectedWorkplaceExecution } from './execution-sentinel.js';
 
 function createReviewedIndexingContractAdapter() {
+  rejectUnexpectedWorkplaceExecution('createReviewedIndexingContractAdapter');
   const options: IndexingFormOptions = {
     mode: 'create',
     staticOptions: [{ label: 'Fixture product', value: 'fixture' }],

@@ -52,6 +52,18 @@ export interface WorkspaceFactoryInputAuthoringTarget {
   readonly factoryDeclaration: ts.FunctionDeclaration | ts.ClassDeclaration;
 }
 
+export type WorkspaceFactoryInputAuthoringTargetDiagnosticCode =
+  | "APPLICATION_PROGRAM_AMBIGUOUS"
+  | "APPLICATION_PROGRAM_UNAVAILABLE"
+  | "FORM_DEFINITION_DUPLICATE"
+  | "FORM_ROOT_UNAVAILABLE";
+
+export interface WorkspaceFactoryInputAuthoringTargetDiagnostic {
+  readonly code: WorkspaceFactoryInputAuthoringTargetDiagnosticCode;
+  readonly projectId: string;
+  readonly formId: string;
+}
+
 export type WorkspaceSourceUsageDiagnosticCode =
   | "DEFINITION_HELPER_NOT_FOUND"
   | "FORM_DEFINITION_DUPLICATE"
@@ -99,6 +111,7 @@ export interface IndexWorkspaceSourceUsagesInput {
 export interface IndexWorkspaceSourceUsagesResult {
   readonly catalog: AgentContextSourceUsageCatalog;
   readonly diagnostics: readonly WorkspaceSourceUsageDiagnostic[];
+  readonly factoryInputAuthoringDiagnostics: readonly WorkspaceFactoryInputAuthoringTargetDiagnostic[];
 }
 
 interface ResolvedProjectDescriptor {
@@ -2207,32 +2220,58 @@ export function indexWorkspaceSourceUsages(
       });
     }
   }
-  if (input.onFactoryInputAuthoringTarget !== undefined) {
-    for (const [formKey, definitions] of [...definitionsByForm.entries()].sort(
-      ([left], [right]) => compareText(left, right)
-    )) {
-      if (
-        definitions.length !== 1 ||
-        (registrationsByForm.get(formKey)?.siteKeys.size ?? 0) !== 1
-      ) {
-        continue;
-      }
-      const definition = definitions[0]!;
-      const candidates = authoringCandidatesBySite.get(
-        definition.definitionSiteKey
-      );
-      if (candidates?.length !== 1) continue;
-      const candidate = candidates[0]!;
-      input.onFactoryInputAuthoringTarget({
-        projectId: definition.projectId,
-        sourceId: definition.sourceId,
-        formId: definition.formId,
-        definitionFilePath: candidate.definitionFilePath,
-        factorySymbol: candidate.factorySymbol,
-        descriptor: candidate.descriptor,
-        factoryDeclaration: candidate.factoryDeclaration,
+  const factoryInputAuthoringDiagnostics: WorkspaceFactoryInputAuthoringTargetDiagnostic[] =
+    [];
+  for (const [formKey, registration] of [...registrationsByForm.entries()].sort(
+    ([left], [right]) => compareText(left, right)
+  )) {
+    const definitions = definitionsByForm.get(formKey) ?? [];
+    if (registration.siteKeys.size !== 1) {
+      factoryInputAuthoringDiagnostics.push({
+        code: "FORM_DEFINITION_DUPLICATE",
+        projectId: registration.projectId,
+        formId: registration.formId,
       });
+      continue;
     }
+    if (definitions.length !== 1) {
+      factoryInputAuthoringDiagnostics.push({
+        code: "FORM_ROOT_UNAVAILABLE",
+        projectId: registration.projectId,
+        formId: registration.formId,
+      });
+      continue;
+    }
+    const definition = definitions[0]!;
+    const candidates =
+      authoringCandidatesBySite.get(definition.definitionSiteKey) ?? [];
+    if (candidates.length === 0) {
+      factoryInputAuthoringDiagnostics.push({
+        code: "APPLICATION_PROGRAM_UNAVAILABLE",
+        projectId: registration.projectId,
+        formId: registration.formId,
+      });
+      continue;
+    }
+    if (candidates.length !== 1) {
+      factoryInputAuthoringDiagnostics.push({
+        code: "APPLICATION_PROGRAM_AMBIGUOUS",
+        projectId: registration.projectId,
+        formId: registration.formId,
+      });
+      continue;
+    }
+    if (input.onFactoryInputAuthoringTarget === undefined) continue;
+    const candidate = candidates[0]!;
+    input.onFactoryInputAuthoringTarget({
+      projectId: definition.projectId,
+      sourceId: definition.sourceId,
+      formId: definition.formId,
+      definitionFilePath: candidate.definitionFilePath,
+      factorySymbol: candidate.factorySymbol,
+      descriptor: candidate.descriptor,
+      factoryDeclaration: candidate.factoryDeclaration,
+    });
   }
   for (const [formKey, indexedForm] of [...indexedForms.entries()].sort(
     ([left], [right]) => compareText(left, right)
@@ -2497,5 +2536,15 @@ export function indexWorkspaceSourceUsages(
       )
       .map(({ usage }) => usage),
   });
-  return { catalog, diagnostics: normalizeDiagnostics(diagnostics) };
+  return {
+    catalog,
+    diagnostics: normalizeDiagnostics(diagnostics),
+    factoryInputAuthoringDiagnostics: factoryInputAuthoringDiagnostics.sort(
+      (left, right) =>
+        compareText(
+          `${left.projectId}\0${left.formId}\0${left.code}`,
+          `${right.projectId}\0${right.formId}\0${right.code}`
+        )
+    ),
+  };
 }

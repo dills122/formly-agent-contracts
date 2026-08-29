@@ -1,4 +1,6 @@
-# Review Cycle
+# Review Cycles
+
+## Research and design cycle — complete
 
 The review target uses a blind-first sequence: reviewers read
 [the neutral bootstrap](../review-bootstrap.md), inspect the change, and only
@@ -20,3 +22,15 @@ and current verification evidence.
   gaps accepted and reconciled.
 - [Round 3 — Codex](./round-3-codex.md): two localized research/design blockers
   and two hygiene findings accepted and reconciled.
+
+## Production implementation cycle — in progress
+
+The implemented `TFI-MVP-1`, `TFI-MVP-2`, `TFI-MVP-3`, and `TFI-MVP-5`
+workflow is undergoing a separate three-instance fresh-context review cycle.
+Each instance reviews the complete implementation branch and the implementation
+plan, not only the previous review's remediation patch.
+
+1. [Implementation round 1 — Codex](./implementation-round-1-codex.md): two P1
+   and three P2 findings accepted and reconciled.
+2. Implementation round 2 — pending.
+3. Implementation round 3 — pending.

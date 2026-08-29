@@ -291,7 +291,8 @@ exported options type and supported direct uses in the factory, then prints:
 - a typed `satisfies Partial<Options>` draft;
 - generated placeholders for supported captured callbacks, canonical inert
   Observables, and unavailable Angular view handles; and
-- separate counts for generated, explicit, ambiguous, and unsupported inputs.
+- mutually exclusive generated, explicit, ambiguous, and unsupported property
+  counts, plus overall coverage and an unattributed-ambiguity flag.
 
 The output is a review aid, not a runtime harness. The command does not invoke
 the source `list()`, the real factory, callbacks, streams, or Angular views and

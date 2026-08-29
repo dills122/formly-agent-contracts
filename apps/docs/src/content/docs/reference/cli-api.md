@@ -41,7 +41,10 @@ The command follows the existing project, source, definition, and
 `lineage.rootSymbol` chain to the real factory declaration. It does not require
 a second file/symbol registry. For supported direct-use patterns it prints a
 typed `Partial<Options>` draft, a workspace-relative suggested path, and
-separate generated, explicit, ambiguous, and unsupported counts.
+mutually exclusive generated, explicit, ambiguous, and unsupported property
+counts. It also prints overall grammar coverage and an
+`unattributedAmbiguity` flag because some unsupported flows cannot safely be
+assigned to one input property.
 
 This is a local, read-only authoring aid. It does not call source `list()`
 functions or application factories, subscribe to Observables, access Angular
@@ -49,6 +52,11 @@ views, write the suggested file, or add the draft to portable contracts. Copy
 and review the output beside the definition if it is useful. Explicit business
 values and bindings still require an author; unsupported or ambiguous inputs
 remain visible instead of receiving invented values.
+
+Missing IDs, duplicate registrations, unsupported roots, tooling-only roots,
+overlapping application Programs, and a workspace with no actionable targets
+produce stable non-zero diagnostics. They never degrade to a successful empty
+authoring run.
 
 ## Programmatic workspace API
 

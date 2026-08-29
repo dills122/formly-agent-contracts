@@ -207,10 +207,10 @@
   source usage and introduces no second path or symbol registry.
 - The accepted authoring-burden measurements are:
 
-  | Form shape | Total | Generated | Explicit | Ambiguous | Unsupported |
-  | ---------- | ----: | --------: | -------: | --------: | ----------: |
-  | Indexing   |    12 |         6 |        5 |         0 |           1 |
-  | NIGO       |     8 |         2 |        6 |         0 |           0 |
+  | Form shape | Total | Generated | Explicit | Ambiguous | Unsupported | Coverage                   | Unattributed ambiguity |
+  | ---------- | ----: | --------: | -------: | --------: | ----------: | -------------------------- | ---------------------- |
+  | Indexing   |    12 |         6 |        5 |         0 |           1 | incomplete                 | false                  |
+  | NIGO       |     8 |         2 |        6 |         0 |           0 | complete-supported-grammar | false                  |
 
 - Generated values are limited to typed captured callbacks, canonical inert
   Observables, and unavailable Angular view handles. Construction data and
@@ -219,13 +219,42 @@
   for invented values.
 - Repeated inspection is deterministic, produces only relative suggested
   paths, excludes an embedded privacy sentinel and absolute workspace paths,
-  and leaves every suggested path absent. Factory execution sentinels stay
-  armed during the complete inspection call without firing.
-- Missing roots and tooling-only or overlapping application Programs fail
-  closed. The workflow statically evaluates neither the source `list()` body nor
-  the registered factory and performs no Observable subscription, Angular view
-  access, or filesystem write.
+  and leaves every suggested path absent. Registered-adapter and root-factory
+  execution sentinels stay armed during the complete inspection call without
+  firing. The source descriptor retains the statically required literal-array
+  `list` body; its non-execution is established by that grammar and source
+  inspection rather than an executable sentinel inside the function.
+- Missing, duplicate, unsupported, tooling-only, and overlapping application
+  roots fail closed through dedicated authoring-target diagnostics. The
+  workflow performs no Observable subscription, Angular view access, or
+  scaffold write.
 - Final repository verification: `pnpm check` passes with 59 test files and
   1,052 tests, every package/application/fixture build, linked and packed
   workspace consumers, release/pack/demo checks, documentation validation, and
   the production docs-site build.
+
+### Production independent review instance 1 reconciliation
+
+- A fresh Codex reviewer inspected the complete production implementation and
+  plan. Its initial verdict was not ready, with two P1 and three P2 findings;
+  all five were accepted.
+- Authoring-target discovery now preserves stable refusal causes for duplicate
+  definitions, unavailable roots, missing application Programs, and ambiguous
+  application Programs. Public inspection translates those causes without
+  leaking paths or source text, and an empty unsafe run cannot report success.
+- Whole-options escapes create global unattributed ambiguity and block all
+  otherwise generated capability helpers. Direct callable storage now uses the
+  same reviewed-slot allowlist as wrapped storage.
+- Review metrics are mutually exclusive property counts and expose both
+  coverage and unattributed ambiguity. Documentation now consistently states
+  that the compiler surface is type-only; runtime capability materialization
+  remains deferred.
+- TDD evidence began with five failing focused regressions and now covers all
+  accepted cases, including the new public inspector refusal matrix and Nx
+  adapter execution sentinels.
+- Final reconciled verification: `pnpm check` passes with 60 test files and
+  1,060 tests, every package/application/fixture build, linked and packed
+  workspace consumers, release/pack/demo checks, documentation validation, and
+  the production docs-site build. A sandboxed run reached only the packed
+  consumer install before DNS refusal; the authorized network-enabled rerun of
+  the exact command passed.

@@ -248,10 +248,13 @@ inventing runtime data.
 For that explicit-lineage case, the read-only
 `formly-contracts author-factory-inputs --form-id <stable-id>` command can
 recover the real exported options type and supported direct-use patterns from
-the same TypeScript Program. It prints a typed partial draft and review counts;
-it does not call the source `list()`, factory, callbacks, Observables, or Angular
-views and does not create the suggested file. Construction values and unsafe or
-ambiguous inputs remain explicit.
+the same TypeScript Program. It prints a typed partial draft, mutually exclusive
+property counts, coverage, and whether any ambiguity could not be attributed to
+one property. It does not call the source `list()`, factory, callbacks,
+Observables, or Angular views and does not create the suggested file.
+Construction values and unsafe or ambiguous inputs remain explicit. Duplicate,
+unsupported, tooling-only, or overlapping roots produce stable diagnostics
+instead of an empty successful result.
 
 Every workspace-contained project config, source descriptor, form definition,
 root declaration, and authority alias traversed between them is checked against

@@ -16,6 +16,7 @@ import { prepareSourceUsagePrograms } from "./run-workspace.js";
 import {
   indexWorkspaceSourceUsages,
   type WorkspaceFactoryInputAuthoringTarget,
+  type WorkspaceFactoryInputAuthoringTargetDiagnostic,
 } from "./source-usage.js";
 import { WORKSPACE_INDEX_SCHEMA_VERSION } from "./workspace-index.js";
 import { compareCodeUnits } from "./workspace-paths.js";
@@ -26,8 +27,12 @@ const EMPTY_WORKSPACE_HASH: Sha256Digest = `sha256:${"0".repeat(64)}`;
 
 export type WorkspaceFactoryInputAuthoringDiagnosticCode =
   | "FACTORY_INPUT_AUTHORING_FORM_AMBIGUOUS"
+  | "FACTORY_INPUT_AUTHORING_FORM_DUPLICATE"
   | "FACTORY_INPUT_AUTHORING_FORM_ID_INVALID"
   | "FACTORY_INPUT_AUTHORING_FORM_NOT_FOUND"
+  | "FACTORY_INPUT_AUTHORING_FORM_UNSUPPORTED"
+  | "FACTORY_INPUT_AUTHORING_NO_TARGETS"
+  | "FACTORY_INPUT_AUTHORING_PROGRAM_UNAVAILABLE"
   | "FACTORY_INPUT_AUTHORING_SCAFFOLD_UNAVAILABLE"
   | "FACTORY_INPUT_AUTHORING_SOURCE_USAGE_DISABLED";
 
@@ -41,6 +46,8 @@ export interface WorkspaceFactoryInputAuthoringMetrics {
   readonly explicit: number;
   readonly ambiguous: number;
   readonly unsupported: number;
+  readonly coverage: FactoryInputScaffoldResult["review"]["coverage"];
+  readonly unattributedAmbiguity: boolean;
 }
 
 export interface WorkspaceFactoryInputAuthoringDraft
@@ -112,29 +119,64 @@ function metrics(
         propertyKey === undefined ? [] : [propertyKey]
       )
   );
+  const unattributedAmbiguity = result.review.diagnostics.some(
+    ({ code, propertyKey }) =>
+      code === "FACTORY_INPUT_USE_AMBIGUOUS" && propertyKey === undefined
+  );
   return {
     generated: result.review.generated.length,
-    explicit: result.review.explicit.length,
+    explicit: result.review.explicit.filter(({ key }) => !ambiguous.has(key))
+      .length,
     ambiguous: ambiguous.size,
     unsupported: result.review.unsupported.filter(
       (propertyKey) => !ambiguous.has(propertyKey)
     ).length,
+    coverage: result.review.coverage,
+    unattributedAmbiguity,
   };
+}
+
+function targetDiagnostic(
+  diagnostic: WorkspaceFactoryInputAuthoringTargetDiagnostic
+): WorkspaceFactoryInputAuthoringDiagnostic {
+  const code =
+    diagnostic.code === "FORM_DEFINITION_DUPLICATE"
+      ? "FACTORY_INPUT_AUTHORING_FORM_DUPLICATE"
+      : diagnostic.code === "FORM_ROOT_UNAVAILABLE"
+      ? "FACTORY_INPUT_AUTHORING_FORM_UNSUPPORTED"
+      : diagnostic.code === "APPLICATION_PROGRAM_AMBIGUOUS"
+      ? "FACTORY_INPUT_AUTHORING_FORM_AMBIGUOUS"
+      : "FACTORY_INPUT_AUTHORING_PROGRAM_UNAVAILABLE";
+  return { code, formId: diagnostic.formId };
 }
 
 function requestedTargets(
   targets: readonly WorkspaceFactoryInputAuthoringTarget[],
+  targetDiagnostics: readonly WorkspaceFactoryInputAuthoringDiagnostic[],
   formIds: readonly string[] | undefined
 ): {
   readonly targets: readonly WorkspaceFactoryInputAuthoringTarget[];
   readonly diagnostics: readonly WorkspaceFactoryInputAuthoringDiagnostic[];
 } {
-  if (formIds === undefined) return { targets, diagnostics: [] };
+  if (formIds === undefined) {
+    if (targets.length === 0 && targetDiagnostics.length === 0) {
+      return {
+        targets,
+        diagnostics: [{ code: "FACTORY_INPUT_AUTHORING_NO_TARGETS" }],
+      };
+    }
+    return { targets, diagnostics: targetDiagnostics };
+  }
   const selected: WorkspaceFactoryInputAuthoringTarget[] = [];
   const diagnostics: WorkspaceFactoryInputAuthoringDiagnostic[] = [];
   for (const formId of formIds) {
     const matches = targets.filter((target) => target.formId === formId);
-    if (matches.length === 0) {
+    const refusals = targetDiagnostics.filter(
+      (diagnostic) => diagnostic.formId === formId
+    );
+    if (refusals.length > 0) {
+      diagnostics.push(...refusals);
+    } else if (matches.length === 0) {
       diagnostics.push({
         code: "FACTORY_INPUT_AUTHORING_FORM_NOT_FOUND",
         formId,
@@ -180,7 +222,7 @@ export async function inspectWorkspaceFactoryInputs(
     };
   }
   const targets: WorkspaceFactoryInputAuthoringTarget[] = [];
-  indexWorkspaceSourceUsages({
+  const indexed = indexWorkspaceSourceUsages({
     workspaceRoot,
     workspaceIndex: {
       schemaVersion: WORKSPACE_INDEX_SCHEMA_VERSION,
@@ -198,7 +240,13 @@ export async function inspectWorkspaceFactoryInputs(
   targets.sort((left, right) =>
     compareCodeUnits(targetKey(left), targetKey(right))
   );
-  const requested = requestedTargets(targets, selection.formIds);
+  const targetDiagnostics =
+    indexed.factoryInputAuthoringDiagnostics.map(targetDiagnostic);
+  const requested = requestedTargets(
+    targets,
+    targetDiagnostics,
+    selection.formIds
+  );
   const diagnostics: WorkspaceFactoryInputAuthoringDiagnostic[] = [
     ...requested.diagnostics,
   ];

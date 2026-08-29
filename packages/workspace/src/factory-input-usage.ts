@@ -52,6 +52,7 @@ export type FactoryInputUseAmbiguityReason =
   | "destructured-parameter"
   | "getter"
   | "mutable-parameter-alias"
+  | "parameter-escape"
   | "parameter-alias"
   | "property-alias"
   | "unknown-callback-consumer"
@@ -421,7 +422,7 @@ function classifyImmediateUse(
       ? { kind: "ambiguous", reason: "unsupported-storage" }
       : {
           kind: "direct-escape",
-          reviewedStorage: true,
+          reviewedStorage: reviewedCallbackStorage(path),
           storagePath: path,
         };
   }
@@ -464,6 +465,29 @@ function analyzeBodyUses(
 ): MutableUsageState {
   const state: MutableUsageState = { diagnostics: [], uses: new Map() };
   const visit = (node: ts.Node): void => {
+    if (
+      ts.isIdentifier(node) &&
+      node !== body.parameter.name &&
+      sameSymbol(checker, node, parameterSymbol)
+    ) {
+      const boundary = unwrapOutward(node);
+      const parent = boundary.parent;
+      const attributedPropertyBase =
+        (ts.isPropertyAccessExpression(parent) &&
+          parent.expression === boundary) ||
+        (ts.isElementAccessExpression(parent) &&
+          parent.expression === boundary);
+      const attributedAlias =
+        ts.isVariableDeclaration(parent) &&
+        parent.initializer !== undefined &&
+        unwrapExpression(parent.initializer) === node;
+      if (!attributedPropertyBase && !attributedAlias) {
+        addDiagnostic(state, {
+          code: "FACTORY_INPUT_USE_AMBIGUOUS",
+          reason: "parameter-escape",
+        });
+      }
+    }
     if (
       ts.isVariableDeclaration(node) &&
       node.initializer !== undefined &&
@@ -572,17 +596,22 @@ function angularViewType(type: NormalizedTypeDescriptor): boolean {
 
 function propertyMaterialization(
   property: FactoryInputPropertyTypeAnalysis,
-  uses: readonly FactoryInputUse[]
+  uses: readonly FactoryInputUse[],
+  unattributedAmbiguity: boolean
 ): FactoryInputMaterialization {
+  const recognizedAngularView = angularViewType(property.expectedType);
+  if (property.expectedType.hazards.length > 0 && !recognizedAngularView) {
+    return "unsupported";
+  }
+  if (unattributedAmbiguity) {
+    return simpleValueType(property.expectedType)
+      ? "explicit-value-required"
+      : "explicit-binding-required";
+  }
   const onlyDirectEscapes = uses.every(({ kind }) => kind === "direct-escape");
-  if (
-    uses.length > 0 &&
-    onlyDirectEscapes &&
-    angularViewType(property.expectedType)
-  ) {
+  if (uses.length > 0 && onlyDirectEscapes && recognizedAngularView) {
     return "unavailable-view";
   }
-  if (property.expectedType.hazards.length > 0) return "unsupported";
   if (uses.some(({ kind }) => kind === "ambiguous")) {
     return "explicit-binding-required";
   }
@@ -715,14 +744,44 @@ export function analyzeFactoryInputUsages(
     );
   }
   const state = analyzeBodyUses(checker, body, parameterSymbol);
+  const unattributedAmbiguity = state.diagnostics.some(
+    ({ code, propertyKey }) =>
+      code === "FACTORY_INPUT_USE_AMBIGUOUS" && propertyKey === undefined
+  );
   const properties = typeAnalysis.properties.map((property) => {
     const uses = state.uses.get(property.key) ?? [];
     return {
       ...property,
       uses,
-      materialization: propertyMaterialization(property, uses),
+      materialization: propertyMaterialization(
+        property,
+        uses,
+        unattributedAmbiguity
+      ),
     };
   });
+  for (const property of properties) {
+    if (
+      (property.expectedType.callSignatures?.length ?? 0) > 0 &&
+      property.uses.some(
+        ({ kind, reviewedStorage }) =>
+          kind === "direct-escape" && reviewedStorage === false
+      )
+    ) {
+      for (const use of property.uses) {
+        if (use.kind !== "direct-escape" || use.reviewedStorage !== false) {
+          continue;
+        }
+        addDiagnostic(state, {
+          code: "FACTORY_INPUT_STORAGE_UNREVIEWED",
+          propertyKey: property.key,
+          ...(use.storagePath === undefined
+            ? {}
+            : { storagePath: use.storagePath }),
+        });
+      }
+    }
+  }
   for (const property of properties) {
     if (property.materialization === "explicit-value-required") {
       addDiagnostic(state, {

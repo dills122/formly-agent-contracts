@@ -121,6 +121,8 @@ describe('workspace CLI', () => {
             explicit: 2,
             ambiguous: 0,
             unsupported: 1,
+            coverage: 'incomplete',
+            unattributedAmbiguity: true,
           },
           code: 'export const draft = {} as const;\n',
           review: {
@@ -159,7 +161,7 @@ describe('workspace CLI', () => {
     expect(captured.stdout.join('')).toBe(
       'Factory input draft: project=claims source=claims/forms form=claims.indexing factory=IndexingFormConfig\n' +
         'Suggested path: libs/forms/indexing-form.contract.factory-input.generated.ts\n' +
-        'Review: generated=3 explicit=2 ambiguous=0 unsupported=1\n' +
+        'Review: generated=3 explicit=2 ambiguous=0 unsupported=1 coverage=incomplete unattributedAmbiguity=true\n' +
         'export const draft = {} as const;\n',
     );
     expect(captured.stderr).toEqual([]);

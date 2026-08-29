@@ -2,8 +2,10 @@ import { defineFormContractDefinition } from '@formly-contract/workspace';
 import { of } from 'rxjs';
 
 import { NigoAddFormConfig, type NigoAddFormOptions } from './nigo-add-form.js';
+import { rejectUnexpectedWorkplaceExecution } from './execution-sentinel.js';
 
 function createReviewedNigoContractAdapter() {
+  rejectUnexpectedWorkplaceExecution('createReviewedNigoContractAdapter');
   const options: NigoAddFormOptions = {
     caseTypeName: 'Fixture case type',
     className: 'fixture-layout',

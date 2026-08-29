@@ -238,7 +238,7 @@ describe("analyzeFactoryInputUsages", () => {
       uses: [
         {
           kind: "direct-escape",
-          reviewedStorage: true,
+          reviewedStorage: false,
           storagePath: "props.loading$",
         },
       ],
@@ -354,6 +354,88 @@ describe("analyzeFactoryInputUsages", () => {
     expect(search).toMatchObject({
       materialization: "explicit-binding-required",
       uses: [expect.objectContaining({ kind: "ambiguous" })],
+    });
+  });
+
+  it("blocks every generated helper when the complete options object escapes", () => {
+    const program = createProgram(`
+      import type { Observable } from 'rxjs';
+      interface Options {
+        readonly change: (value: string) => void;
+        readonly values$: Observable<readonly string[]>;
+      }
+      declare function consume(value: unknown): void;
+
+      export function EscapingForm(options: Options): readonly object[] {
+        consume(options);
+        return [{
+          props: {
+            change: options.change,
+            values$: options.values$,
+          },
+        }];
+      }
+    `);
+
+    const analysis = analyzeFactoryInputUsages({
+      workspaceRoot: WORKSPACE_ROOT,
+      descriptor: descriptor(program),
+      factoryDeclaration: factoryDeclaration(program, "EscapingForm"),
+    });
+
+    expect(analysis.coverage).toBe("incomplete");
+    expect(analysis.diagnostics).toContainEqual({
+      code: "FACTORY_INPUT_USE_AMBIGUOUS",
+      reason: "parameter-escape",
+    });
+    expect(
+      analysis.properties.map(({ key, materialization }) => ({
+        key,
+        materialization,
+      }))
+    ).toEqual([
+      { key: "change", materialization: "explicit-binding-required" },
+      { key: "values$", materialization: "explicit-binding-required" },
+    ]);
+  });
+
+  it("applies the reviewed callback-slot allowlist to direct callable storage", () => {
+    const program = createProgram(`
+      interface Options {
+        readonly accepted: (value: string) => void;
+        readonly custom: (value: string) => void;
+      }
+
+      export function DirectStorageForm(options: Options): readonly object[] {
+        return [{
+          props: {
+            change: options.accepted,
+            customDriver: options.custom,
+          },
+        }];
+      }
+    `);
+
+    const analysis = analyzeFactoryInputUsages({
+      workspaceRoot: WORKSPACE_ROOT,
+      descriptor: descriptor(program),
+      factoryDeclaration: factoryDeclaration(program, "DirectStorageForm"),
+    });
+
+    expect(analysis.properties).toEqual([
+      expect.objectContaining({
+        key: "accepted",
+        materialization: "captured-callback",
+      }),
+      expect.objectContaining({
+        key: "custom",
+        materialization: "explicit-binding-required",
+      }),
+    ]);
+    expect(analysis.diagnostics).toContainEqual({
+      code: "FACTORY_INPUT_STORAGE_UNREVIEWED",
+      propertyKey: "custom",
+      storagePath: "props.customDriver",
     });
   });
 
