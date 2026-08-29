@@ -487,7 +487,9 @@ const registration = toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponen
 
 The same reviewed declaration supplies the real registration name and the
 canonical profile DTO. The helper does not inspect an Angular template or
-infer behavior from a type name. `radioChoice()` is the only compact MVP preset;
+infer behavior from a type name. The helper snapshots and runtime-freezes its
+validated data so later mutation of caller-owned input cannot desynchronize
+registration and profile generation. `radioChoice()` is the only compact MVP preset;
 other custom types still need the lower-level registry or remain visible but
 non-operable with a stable diagnostic. Named variants use the data-only root
 field metadata `formlyContract: { profileVariant: 'variant-name' }`.

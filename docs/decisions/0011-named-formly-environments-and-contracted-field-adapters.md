@@ -1,7 +1,8 @@
 # ADR 0011: Use Named Formly Environments and Contracted Field Adapters
 
-- Status: Proposed
+- Status: Proposed for the full architecture; bounded MVP slice accepted
 - Date: 2026-08-27
+- MVP decision date: 2026-08-29
 
 ## Context
 
@@ -33,6 +34,31 @@ Two authority boundaries must remain intact:
    semantic forms. Explicit `FormContractDefinition` records remain the form
    inventory authority; fragments remain lineage dependencies unless separately
    registered as semantic forms.
+
+## Accepted bounded MVP decision
+
+The maintainer has accepted `AUTH-PILOT`, a deliberately smaller public MVP
+slice, so workplace testing can begin without waiting for the full
+named-environment and Angular-conformance architecture:
+
+- `@formly-contract/schema/field-type-authoring` may expose the data-only
+  `defineContractedFormlyType`, `radioChoice`,
+  `toFormlyTypeRegistration`, and deterministic registry-lowering helpers;
+- one reviewed radio-choice declaration may own the exact Formly registration
+  name and canonical profile reference;
+- the definition helper must snapshot and runtime-freeze its validated data so
+  registration and profile generation cannot drift through later mutation;
+- the generated canonical registry may be attached through the existing
+  project `fieldTypeProfiles` input for the MVP; and
+- the narrow helper is a stable `0.x` product surface, not a generated scaffold
+  or inferred semantic claim.
+
+This acceptance does **not** approve named environments, registration/scope
+inventory, other behavior presets, browser conformance, environment bundles,
+legacy-input removal, or whole-workspace actionability. Those remain governed
+by `AUTH-0` and the approval gates below. The bounded form-definition and
+source-usage pilot is recorded separately as `LIN-PILOT`; it does not make the
+broader custom-field architecture part of this ADR's accepted slice.
 
 ## Proposed decision
 
@@ -210,7 +236,7 @@ legacy registry.
 
 ## Approval and implementation gates
 
-This ADR becomes Accepted when maintainers approve:
+The full architecture in this ADR becomes Accepted when maintainers approve:
 
 1. named workspace environments and one-environment-per-project selection;
 2. reviewed compact adapters as semantic authoring authority;
@@ -219,8 +245,9 @@ This ADR becomes Accepted when maintainers approve:
 5. legacy-registry/environment mutual exclusion and migration policy; and
 6. the `0.3.0` to `1.0.0` legacy migration/removal gate above.
 
-Implementation is then split into schema identity, workspace environment
-selection, compact adapter lowering, Angular inventory/catalog aggregation,
-controlled conformance, and environment-bundle publication. Runtime-host,
-Angular-authoring, factory-binding, context-gate, and custom Playwright tasks
-must reference the settled identities rather than inventing parallel models.
+The remaining implementation is then split into schema identity, workspace
+environment selection, additional compact adapter lowering, Angular
+inventory/catalog aggregation, controlled conformance, and environment-bundle
+publication. Runtime-host, Angular-authoring, factory-binding, context-gate,
+and custom Playwright tasks must reference the settled identities rather than
+inventing parallel models.

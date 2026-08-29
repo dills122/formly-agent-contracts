@@ -505,7 +505,9 @@ FormlyModule.forChild({
 `radioChoice()` defaults to `props.options` with `label` and `value` paths. Its
 optional collection, label, value, disabled, and completeness settings accept
 only validated data paths and closed values. Lowering is deterministic and
-rejects duplicate type names or profile identities. Projects still attach the
+rejects duplicate type names or profile identities. The definition helper
+snapshots and runtime-freezes validated data, so later caller-side mutation
+cannot drift the registration name from the generated profile. Projects still attach the
 generated registry through `fieldTypeProfiles`; that repeated attachment is a
 transitional MVP constraint until named environments aggregate shared field
 libraries once.

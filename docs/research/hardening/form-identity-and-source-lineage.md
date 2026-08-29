@@ -972,8 +972,12 @@ rebuilds, but the artifact hashes remain the correctness mechanism.
 
 ## Feasibility and stop gates
 
-Production work may start only after maintainers approve the API direction and
-the following gates pass on a sanitized representative workplace slice:
+The bounded `LIN-PILOT` workplace MVP is an explicit maintainer-approved
+exception for local adoption and evidence gathering. It implements only the
+documented direct exported-root grammar, retains incomplete coverage, and does
+not satisfy or waive the broader gates below. General production expansion may
+start only after maintainers approve the API direction and the following gates
+pass on a sanitized representative workplace slice:
 
 | Gate | Pass condition | Stop condition |
 | --- | --- | --- |
@@ -997,7 +1001,10 @@ analysis, Angular application bootstrapping, or journey inference.
 
 ## Implementation consequences and ordered tasks
 
-These are proposed follow-up units, not changes authorized by RH-01:
+These remain the proposed general follow-up units. The accepted `LIN-PILOT`
+implements a bounded, fail-closed subset of `RH01-T3` through `RH01-T6` for MVP
+testing; it does not mark those broader units or their workplace gates
+complete:
 
 1. **`RH01-T1` — Approve source-lineage contract.** Decide artifact ownership,
    evidence vocabulary, portable anchor identity, path modes, strict usage

@@ -1,8 +1,12 @@
 # Workplace MVP Pilot Execution Index
 
-- Status: Ready for PR
+- Status: Ready for MVP testing
 - Branch: `codex/mvp-form-linkage-generated-profiles`
 - Integration destination: `main`
+- Maintainer authorization: the documented MVP outcomes are the minimum
+  required scope; additional bounded public functionality is accepted when it
+  is correct, fail-closed, tested, and does not claim completion of deferred
+  roadmap gates.
 - Canonical background:
   - [Architecture overview](../../architecture-overview.md)
   - [Form identity and source lineage](../../research/hardening/form-identity-and-source-lineage.md)
@@ -58,6 +62,7 @@ names, templates, and DOM observations never infer or promote behavior.
 | `PILOT-3` | Build the strict TypeScript-symbol source-usage producer and emit existing canonical source-usage artifacts                                | Lineage lane      | `PILOT-1`            | complete | Authority/application/Jiti disagreement, invalid or suppressed TypeScript, unchecked JavaScript-family calls, snapshot drift, and ambiguous roots all fail closed; focused workspace/Nx verification passes |
 | `PILOT-4` | Convert the Nx fixture into one integrated real registration, generated profile, direct component usage, and exact query walkthrough       | Integration owner | `PILOT-2`, `PILOT-3` | complete | Query by form ID and source path reaches the exact contract hash; canonical generated profile and production Angular build pass                                                                             |
 | `PILOT-5` | Package, document, review, and prepare the workplace checkout                                                                              | Lead              | `PILOT-4`            | complete | `pnpm check` passes with 995 tests, all package/application/Angular/Nx builds, linked and packed consumers, release/pack/demo gates, 104 documentation checks, and the 18-page docs build                   |
+| `PILOT-6` | Reconcile maintainer authorization and independent-review hardening                                                                         | Lead              | `PILOT-5`            | complete | Canonical scheduler/ADR agree on bounded pilot authority; contracted declarations are immutable snapshots; resolution-parity branches and TypeScript Program test stability are covered; final `pnpm check` passes with 1,000 tests, every package/application/fixture build, linked and packed consumers, release/pack/demo gates, 104 documentation checks, and the 18-page docs build |
 
 ## Acceptance demo
 

@@ -42,7 +42,9 @@ const formlyType = toFormlyTypeRegistration(
 
 The shared definition therefore owns both the production Formly type name and
 the generated canonical profile registration. It does not inspect the Angular
-component or infer behavior.
+component or infer behavior. The helper snapshots and runtime-freezes the
+validated declaration so later mutation of caller-owned input cannot make the
+registration and generated profile disagree.
 
 `radioChoice()` is the only compact behavior preset currently shipped. Other
 custom controls still require the legacy reviewed registry or remain unmapped

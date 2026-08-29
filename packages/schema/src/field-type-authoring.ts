@@ -339,8 +339,26 @@ export function radioChoice(
 export function defineContractedFormlyType<
   const TDefinition extends ContractedFormlyTypeDefinition,
 >(definition: TDefinition): TDefinition {
-  validateContractedType(definition);
-  return definition;
+  const validated = validateContractedType(definition);
+  const profile = Object.freeze({
+    id: validated.profile.id,
+    version: validated.profile.version,
+  });
+  const behavior = Object.freeze({
+    kind: validated.behavior.kind,
+    collectionPath: validated.behavior.collectionPath,
+    labelPath: validated.behavior.labelPath,
+    valuePath: validated.behavior.valuePath,
+    ...(validated.behavior.disabledPath === undefined
+      ? {}
+      : { disabledPath: validated.behavior.disabledPath }),
+    completeness: validated.behavior.completeness,
+  });
+  return Object.freeze({
+    name: validated.name,
+    profile,
+    behavior,
+  }) as TDefinition;
 }
 
 export function toFormlyTypeRegistration<

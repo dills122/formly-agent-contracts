@@ -32,12 +32,16 @@ that dependency order. They add no runtime execution.
 
 ## Form and custom-field authoring authority
 
-| ID           | Scope                                                                                                                                                               | Primary owner                         | Depends on           | Status  | Exit gate                                                                                                                              |
-| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------------------- | ------- | -------------------------------------------------------------------------------------------------------------------------------------- |
-| `AUTH-0`     | Approve named Formly environments, compact contracted field adapters, generated canonical profile registries, conformance-based actionability, and legacy migration | Schema/workspace/Angular architecture | `RH06-DOC`           | ready   | [ADR 0011](../../decisions/0011-named-formly-environments-and-contracted-field-adapters.md) is accepted and the supporting plans agree |
-| `AUTH-MIG-1` | Confirm removal of legacy project `fieldTypeProfiles` at workspace-config `1.0.0`, or amend ADR 0011 with measured extension evidence                               | Architecture/maintainer               | `AUTH-0`, `ANG-GATE` | pending | Default removal stands, or one explicit evidence-backed ADR amendment names a replacement deadline                                     |
+| ID           | Scope                                                                                                                                                               | Primary owner                         | Depends on           | Status   | Exit gate                                                                                                                              |
+| ------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------- | -------------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH-PILOT` | Bounded public radio-choice contracted adapter, real-registration binding, immutable declaration snapshot, and canonical registry lowering                         | `packages/schema`                     | `CTX-0A`             | complete | [ADR 0011 bounded MVP decision](../../decisions/0011-named-formly-environments-and-contracted-field-adapters.md#accepted-bounded-mvp-decision) plus `PILOT-2`/`PILOT-4` verification pass |
+| `AUTH-0`     | Approve named Formly environments, broader contracted field adapters, generated canonical profile registries, conformance-based actionability, and legacy migration | Schema/workspace/Angular architecture | `RH06-DOC`           | ready    | [ADR 0011](../../decisions/0011-named-formly-environments-and-contracted-field-adapters.md) is fully accepted and the supporting plans agree |
+| `AUTH-MIG-1` | Confirm removal of legacy project `fieldTypeProfiles` at workspace-config `1.0.0`, or amend ADR 0011 with measured extension evidence                               | Architecture/maintainer               | `AUTH-0`, `ANG-GATE` | pending  | Default removal stands, or one explicit evidence-backed ADR amendment names a replacement deadline                                     |
 
-`AUTH-0` changes the future custom-field authoring source of truth, not the
+`AUTH-PILOT` is an explicit maintainer-approved exception for the narrow,
+tested `radioChoice()` authoring surface. It does not authorize named
+environments, additional behavior families, or conformance claims. `AUTH-0`
+changes the future custom-field authoring source of truth, not the
 implemented Form Contract `0.4.0` registry/compiler boundary or the already
 settled semantic-form/source/root-symbol/fragment distinction. `CTX-0B`,
 `CTX-0C`, and the lineage lane do not depend on this decision. Angular
@@ -65,13 +69,18 @@ implemented packets are usable while preserving that remaining dependency.
 
 ## Source lineage producer
 
-| ID      | Scope                                                                    | Primary owner                                         | Depends on                            | Status  | Exit gate                                                                                                                                                                                            |
-| ------- | ------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------- | ------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `LIN-0` | Representative workplace topology, scale, privacy, and convention gate   | `packages/workspace` fixtures/research                | `RH06-DOC`                            | blocked | [Harness and public rehearsal pass](../../research/hardening/lin-0-workplace-gate.md), but the retained decision is `inconclusive` until the sanitized representative workplace evidence is measured |
-| `LIN-1` | Typed form definition/root anchor                                        | `packages/workspace`                                  | `CTX-0A`, `LIN-0` go                  | pending | Direct function/class/callable-const anchors and negative grammar fixtures                                                                                                                           |
-| `LIN-2` | Per-leaf TypeScript index and aggregate source-lineage artifact          | `packages/workspace`                                  | `CTX-0B`, `LIN-1`                     | pending | Exact/ambiguous/unresolved, overlap, coverage, staleness, privacy tests                                                                                                                              |
-| `LIN-3` | Compact artifact-only lineage queries                                    | pure query layer                                      | `LIN-2`, `CTX-1`                      | pending | Exact, stale, incomplete, ambiguous, paged outcomes; no source execution at request time                                                                                                             |
-| `LIN-4` | Bounded component/route enrichment and reviewed usage/journey attachment | workspace/Angular contributors plus project authoring | `LIN-2`, journey schema from `CTX-0B` | pending | One exact real usage/journey can be selected; dynamic cases remain unknown; attachments pass strict integrity tests                                                                                  |
+| ID          | Scope                                                                    | Primary owner                                         | Depends on                            | Status   | Exit gate                                                                                                                                                                                            |
+| ----------- | ------------------------------------------------------------------------ | ----------------------------------------------------- | ------------------------------------- | -------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `LIN-PILOT` | Bounded direct exported root anchor, dual-Program source-usage index, exact contract/hash query, and fail-closed diagnostics | `packages/workspace`                                  | `CTX-0B`, maintainer MVP authorization | complete | [Workplace MVP pilot](../workplace-mvp-pilot/execution-index.md) acceptance demo, focused adversarial tests, Nx AOT, and packed-consumer checks pass |
+| `LIN-0`     | Representative workplace topology, scale, privacy, and convention gate   | `packages/workspace` fixtures/research                | `RH06-DOC`                            | blocked  | [Harness and public rehearsal pass](../../research/hardening/lin-0-workplace-gate.md), but the retained decision is `inconclusive` until the sanitized representative workplace evidence is measured |
+| `LIN-1`     | General typed form definition/root anchor beyond the bounded pilot grammar | `packages/workspace`                                 | `CTX-0A`, `LIN-0` go                  | pending  | Direct function/class/callable-const anchors and negative grammar fixtures across representative workplace topology                                                                                  |
+| `LIN-2`     | General per-leaf TypeScript index and aggregate source-lineage artifact  | `packages/workspace`                                  | `CTX-0B`, `LIN-1`                     | pending  | Exact/ambiguous/unresolved, overlap, coverage, staleness, privacy tests across the approved general scope                                                                                            |
+| `LIN-3`     | Compact artifact-only lineage queries                                    | pure query layer                                      | `LIN-2`, `CTX-1`                      | pending  | Exact, stale, incomplete, ambiguous, paged outcomes; no source execution at request time                                                                                                             |
+| `LIN-4`     | Bounded component/route enrichment and reviewed usage/journey attachment | workspace/Angular contributors plus project authoring | `LIN-2`, journey schema from `CTX-0B` | pending  | One exact real usage/journey can be selected; dynamic cases remain unknown; attachments pass strict integrity tests                                                                                  |
+
+`LIN-PILOT` authorizes the current direct-call workplace MVP only. It neither
+satisfies the representative `LIN-0` scale/topology gate nor promotes the
+general `LIN-1` through `LIN-4` roadmap.
 
 ## Framework-neutral workspace runtime host
 
@@ -136,7 +145,8 @@ topology evidence before a public Nx package is necessary.
 dispatch; it also supplies the validated plan/call ABI required by the
 remaining `DRV-0C2` packet. `HOST-1`, `ANG-0`, and `FAC-1` are also
 dependency-ready, but they remain separate producer task packets and must not
-freeze named-environment or adapter-authority APIs before `AUTH-0` is accepted.
-`LIN-0` is blocked on its representative workplace run. `BHV-0` and `AUTH-0`
-remain ready for explicit maintainer approval of ADRs 0010 and 0011. MCP and
-Playwright remain pending their named context and producer gates.
+freeze named-environment or adapter-authority APIs beyond the accepted
+`AUTH-PILOT` surface before `AUTH-0` is accepted. `LIN-PILOT` is complete;
+`LIN-0` remains blocked on its representative workplace run. `BHV-0` and the
+full `AUTH-0` remain ready for explicit maintainer approval of ADRs 0010 and
+0011. MCP and Playwright remain pending their named context and producer gates.

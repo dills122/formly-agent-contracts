@@ -1,10 +1,19 @@
 import { createHash } from "node:crypto";
+import {
+  mkdtempSync,
+  realpathSync,
+  rmSync,
+  writeFileSync,
+} from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import ts from "typescript";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 
 import {
   indexWorkspaceSourceUsages,
+  runtimeResolutionMatchesTypeScript,
   type IndexWorkspaceSourceUsagesInput,
   type WorkspaceSourceUsageProgramDescriptor,
 } from "./source-usage.js";
@@ -21,6 +30,58 @@ const DEFAULT_INITIALIZER_HASH = `sha256:${"1".repeat(64)}` as const;
 const IMPLICIT_REQUIRED_HASH = `sha256:${"2".repeat(64)}` as const;
 const IMPLICIT_TUPLE_REST_HASH = `sha256:${"3".repeat(64)}` as const;
 const IMPLICIT_GENERIC_TUPLE_REST_HASH = `sha256:${"4".repeat(64)}` as const;
+const runtimeResolutionRoots: string[] = [];
+
+afterEach(() => {
+  for (const root of runtimeResolutionRoots.splice(0)) {
+    rmSync(root, { force: true, recursive: true });
+  }
+});
+
+function createRuntimeResolutionFixture(
+  specifier: string,
+  targetSource?: string,
+) {
+  const root = mkdtempSync(join(tmpdir(), "formly-source-resolution-"));
+  runtimeResolutionRoots.push(root);
+  const importerPath = join(root, "importer.ts");
+  const targetPath = join(root, "target.ts");
+  const importerSource =
+    `import { target } from ${JSON.stringify(specifier)};\nexport { target };\n`;
+  writeFileSync(
+    importerPath,
+    importerSource,
+  );
+  if (targetSource !== undefined) {
+    writeFileSync(targetPath, targetSource);
+  }
+  const program = ts.createProgram({
+    rootNames: [importerPath, ...(targetSource === undefined ? [] : [targetPath])],
+    options: {
+      module: ts.ModuleKind.ESNext,
+      moduleResolution: ts.ModuleResolutionKind.Bundler,
+      noEmit: true,
+      strict: true,
+      target: ts.ScriptTarget.ES2022,
+    },
+  });
+  const sourceFile = ts.createSourceFile(
+    importerPath,
+    importerSource,
+    ts.ScriptTarget.ES2022,
+    true,
+  );
+  const importDeclaration = sourceFile.statements.find(ts.isImportDeclaration);
+  const namedBindings = importDeclaration?.importClause?.namedBindings;
+  const declaration =
+    namedBindings !== undefined && ts.isNamedImports(namedBindings)
+      ? namedBindings.elements[0]
+      : undefined;
+  if (declaration === undefined) {
+    throw new Error("Expected an import declaration fixture.");
+  }
+  return { declaration, importerPath, program, root, targetPath };
+}
 
 const sourceEntries = {
   [`${WORKSPACE_ROOT}/node_modules/@formly-contract/workspace/index.d.ts`]: `
@@ -469,6 +530,113 @@ function pageUsages(result: ReturnType<typeof indexWorkspaceSourceUsages>) {
       invocation.location.path === "apps/claims/src/page.ts"
   );
 }
+
+describe("runtimeResolutionMatchesTypeScript", () => {
+  it("accepts an exact runtime and TypeScript module-resolution match", () => {
+    const fixture = createRuntimeResolutionFixture(
+      "./target",
+      "export const target = true;\n",
+    );
+    const calls: [string, string][] = [];
+
+    expect(
+      runtimeResolutionMatchesTypeScript(
+        {
+          programId: "runtime-parity",
+          purpose: "tooling",
+          program: fixture.program,
+          resolveRuntimeModule: (specifier, importerPath) => {
+            calls.push([specifier, importerPath]);
+            return realpathSync(fixture.targetPath);
+          },
+        },
+        fixture.declaration,
+      ),
+    ).toBe(true);
+    expect(calls).toEqual([["./target", fixture.importerPath]]);
+  });
+
+  it("rejects a runtime resolver that points at a different module", () => {
+    const fixture = createRuntimeResolutionFixture(
+      "./target",
+      "export const target = true;\n",
+    );
+
+    expect(
+      runtimeResolutionMatchesTypeScript(
+        {
+          programId: "runtime-mismatch",
+          purpose: "tooling",
+          program: fixture.program,
+          resolveRuntimeModule: () => realpathSync(fixture.importerPath),
+        },
+        fixture.declaration,
+      ),
+    ).toBe(false);
+  });
+
+  it("fails closed before consulting runtime resolution when TypeScript cannot resolve the import", () => {
+    const fixture = createRuntimeResolutionFixture("./missing");
+    let resolverCalls = 0;
+
+    expect(
+      runtimeResolutionMatchesTypeScript(
+        {
+          programId: "runtime-unresolved",
+          purpose: "tooling",
+          program: fixture.program,
+          resolveRuntimeModule: () => {
+            resolverCalls += 1;
+            return fixture.importerPath;
+          },
+        },
+        fixture.declaration,
+      ),
+    ).toBe(false);
+    expect(resolverCalls).toBe(0);
+  });
+
+  it("fails closed when the runtime resolver throws", () => {
+    const fixture = createRuntimeResolutionFixture(
+      "./target",
+      "export const target = true;\n",
+    );
+
+    expect(
+      runtimeResolutionMatchesTypeScript(
+        {
+          programId: "runtime-error",
+          purpose: "tooling",
+          program: fixture.program,
+          resolveRuntimeModule: () => {
+            throw new Error("runtime resolution failed");
+          },
+        },
+        fixture.declaration,
+      ),
+    ).toBe(false);
+  });
+
+  it("does not ask the runtime loader to resolve the workspace helper package", () => {
+    const fixture = createRuntimeResolutionFixture(
+      "@formly-contract/workspace",
+    );
+
+    expect(
+      runtimeResolutionMatchesTypeScript(
+        {
+          programId: "workspace-helper",
+          purpose: "tooling",
+          program: fixture.program,
+          resolveRuntimeModule: () => {
+            throw new Error("workspace helper resolution must be bypassed");
+          },
+        },
+        fixture.declaration,
+      ),
+    ).toBe(true);
+  });
+});
 
 describe("indexWorkspaceSourceUsages", () => {
   it("links direct aliases, barrels, namespace calls, and constructors to exact indexed contract hashes", () => {

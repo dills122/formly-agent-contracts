@@ -359,7 +359,8 @@ function aliasModuleReference(
   return undefined;
 }
 
-function runtimeResolutionMatchesTypeScript(
+/** @internal Exported only for focused resolution-parity verification. */
+export function runtimeResolutionMatchesTypeScript(
   descriptor: WorkspaceSourceUsageProgramDescriptor,
   declaration: ts.Declaration
 ): boolean {

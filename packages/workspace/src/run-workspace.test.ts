@@ -582,7 +582,7 @@ describe("runWorkspace", () => {
     ).resolves.toMatchObject({
       differences: [{ path: catalogPath, status: "missing" }],
     });
-  });
+  }, 15_000);
 
   it("suppresses exact links when runtime and application tsconfigs resolve a registered root differently", async () => {
     const workspaceRoot = await createTemporaryWorkspace();

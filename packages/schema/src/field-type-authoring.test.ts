@@ -195,21 +195,37 @@ describe('compact field-type authoring', () => {
     ).toThrow('radioChoice.completeness is unsupported');
   });
 
-  it('copies authored profile identities into stable canonical output', () => {
+  it('snapshots and freezes authored definitions before deriving registrations or profiles', () => {
     const profile = { id: 'fixture.mutable-radio', version: 1 };
-    const type = defineContractedFormlyType({
+    const definition = {
       name: 'mutable-radio',
       profile,
       behavior: radioChoice(),
-    });
+    };
+    const type = defineContractedFormlyType(definition);
+
+    definition.name = 'changed-radio';
+    profile.id = 'fixture.changed-radio';
+    Reflect.set(definition.behavior, 'labelPath', 'changedLabel');
+
+    expect(Object.isFrozen(type)).toBe(true);
+    expect(Object.isFrozen(type.profile)).toBe(true);
+    expect(Object.isFrozen(type.behavior)).toBe(true);
+    expect(Reflect.set(type, 'name', 'other-radio')).toBe(false);
+    expect(Reflect.set(type.profile, 'id', 'fixture.other-radio')).toBe(false);
+
+    class MutableRadioComponent {}
+    const registration = toFormlyTypeRegistration(
+      type,
+      MutableRadioComponent,
+    );
     const registry = buildFieldTypeProfileRegistry({
       id: 'fixture.mutable-fields',
       version: 1,
       types: [type],
     });
 
-    profile.id = 'fixture.changed-radio';
-
+    expect(registration.name).toBe('mutable-radio');
     expect(registry.profiles[0]?.identity).toEqual({
       id: 'fixture.mutable-radio',
       version: 1,
@@ -217,6 +233,9 @@ describe('compact field-type authoring', () => {
     expect(registry.registrations[0]?.defaultProfile).toEqual({
       id: 'fixture.mutable-radio',
       version: 1,
+    });
+    expect(registry.profiles[0]?.valueDomain).toMatchObject({
+      labelPath: 'label',
     });
     expect(parseFieldTypeProfileRegistry(registry)).toBe(registry);
   });
