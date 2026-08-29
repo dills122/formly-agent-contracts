@@ -72,3 +72,41 @@
   and 1,005 tests, all package/application/fixture builds, linked and packed
   workspace consumers, release/pack/demo checks, documentation validation, and
   the production docs-site build.
+
+### Production implementation start
+
+- Preserved the reviewed research packet as commit `267badf` before changing
+  production code.
+- Began `TFI-MVP-1` with the reviewed workspace/compiler ownership boundary:
+  workspace owns ephemeral TypeScript descriptors beside the authoritative
+  source-linkage Program; compiler and the portable schema remain unchanged.
+- Added acceptance IDs `TFI1-AC-01` through `TFI1-AC-06` to the execution index.
+- Next: commit a failing workspace compatibility test before implementing the
+  normalized descriptor and canonical RxJS analysis.
+
+### `TFI-MVP-1` implementation evidence
+
+- Added a workspace-private analyzer that accepts the existing
+  `WorkspaceSourceUsageProgramDescriptor` and a declaration owned by that exact
+  Program. A foreign Program declaration is refused.
+- Added bounded normalized descriptors for primitives, literals, arrays,
+  tuples, unions/intersections, workspace object properties, call/construct
+  signatures, generic arguments, and explicit hazards.
+- Added canonical RxJS symbol recovery for direct imports and workspace
+  barrels, plus Subject, subclass, alias, union, and callback-return emission
+  types. Same-spelled application types are refused.
+- Observable results remain `type-only`; no factory is invoked and no stream is
+  subscribed.
+- Added deterministic fail-closed diagnostics for `any`, `unknown`, unresolved
+  generics, recursion, truncation, unsupported signatures, foreign Programs,
+  relevant TypeScript errors, and suppression directives.
+- Focused evidence: 15 analyzer tests pass; all 13 workspace test files and 257
+  workspace tests pass; workspace type-check and focused ESLint pass.
+- Corrected one verification command typo (`docs:check` to this repository's
+  `check:docs`). The first full check later reached the packed-consumer install
+  and hit the expected sandbox pnpm-store `EPERM`; the authorized rerun outside
+  that restriction passed.
+- `TFI-MVP-1` is complete. Final verification: `pnpm check` passes with 56 test
+  files and 1,020 tests, every package/application/fixture build, linked and
+  packed workspace consumers, release/pack/demo checks, documentation checks,
+  and the docs-site build.

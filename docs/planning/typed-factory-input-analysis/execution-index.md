@@ -42,3 +42,24 @@ not authorized production tasks until `TFI-2` and the reviews accept them.
 | `TFI-MVP-3` | Generated typed options-materializer scaffold colocated with the registered form definition                            | `TFI-MVP-2`, existing source-definition linkage                     |
 | `TFI-MVP-4` | Optional finite-static Observable expression evidence for the strict accepted allowlist                                | `TFI-MVP-1`, accepted `OBS-2`; may be deferred without blocking MVP |
 | `TFI-MVP-5` | Work-shaped fixture and checkout workflow proving the indexing-form and NIGO-style factory cases                       | `TFI-MVP-3`                                                         |
+
+## Production implementation status
+
+| ID          | Status      | Current acceptance boundary                                                                                                                                                                    |
+| ----------- | ----------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `TFI-MVP-1` | complete    | Workspace-private analysis reuses an existing `WorkspaceSourceUsageProgramDescriptor`, normalizes one supported factory input shape, resolves canonical RxJS emission types, and fails closed. |
+| `TFI-MVP-2` | not started | No use-site or materialization classification is added by `TFI-MVP-1`.                                                                                                                         |
+| `TFI-MVP-3` | not started | No scaffold or authoring output is added by `TFI-MVP-1`.                                                                                                                                       |
+| `TFI-MVP-4` | deferred    | No finite runtime values are inferred from Observable types.                                                                                                                                   |
+| `TFI-MVP-5` | not started | The production analyzer must pass its focused compatibility fixtures before the workplace-shaped pilot begins.                                                                                 |
+
+### `TFI-MVP-1` traceability
+
+| Acceptance ID | Requirement                                                                                                                | Evidence                                                                                           |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| `TFI1-AC-01`  | Analyze the exact caller-supplied source Program; do not construct or accept a replacement Program internally.             | Foreign-Program refusal test; analyzer accepts only an existing descriptor and declaration         |
+| `TFI1-AC-02`  | Recover a supported function/class factory's single options-object properties, callback signatures, and return types.      | Function, class, callback, generic, scalar, and unsupported-signature fixtures                     |
+| `TFI1-AC-03`  | Resolve emission types only for canonical RxJS `Observable` ancestry, including aliases, subjects, subclasses, and unions. | Direct, barrel, alias, Subject, subclass, union, callback-return, and same-spelling-negative tests |
+| `TFI1-AC-04`  | Normalize type structure within explicit depth, node, string, union, property, parameter, and signature limits.            | Repeated-equality, deep graph, property cap, and display cap tests                                 |
+| `TFI1-AC-05`  | Expose `any`, `unknown`, unresolved generic, recursive, truncated, and unsupported hazards without inventing values.       | Fail-closed hazard, semantic-error, and suppression matrix                                         |
+| `TFI1-AC-06`  | Keep the descriptor ephemeral and workspace-private; change no portable schema or artifact.                                | No barrel export, persistence, cache, schema, compiler, bundle, report, or scaffold change         |
