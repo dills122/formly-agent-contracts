@@ -813,10 +813,14 @@ result distinguishes captured callbacks, inert Observables, unavailable
 Angular view handles, explicit construction values, explicit capability
 bindings, and unsupported inputs. Destructuring, aliases, computed access,
 getters, unknown higher-order consumers, and unreviewed storage fail closed.
-It still emits no scaffold, invokes no factory or callback, subscribes to no
-stream, imports no application runtime, and changes no schema or portable
-artifact. `TFI-MVP-3` is the first slice allowed to render this private plan as
-an authoring scaffold.
+It invokes no factory or callback, subscribes to no stream, imports no
+application runtime, and changes no schema or portable artifact. `TFI-MVP-3`
+now renders this private plan as an ephemeral typed authoring draft. The draft
+references the real exported options interface with indexed-access types,
+keeps explicit and unsupported inputs visible, and depends only on a
+compiler-owned type contract with no runtime implementation. It writes no file
+and does not make the current trusted `create()` path an automatic
+application-factory runner.
 
 The trusted JIT/config worker and the `isolated-ci-v1` CI provider are not
 factory containment. No future task may extend the current `create()` path with

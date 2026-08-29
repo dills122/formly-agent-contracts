@@ -40,6 +40,12 @@ The returned diagnostics are part of the result, not incidental logging. An
 unsupported function, stream, hook, or custom type must remain explicit instead
 of being guessed or silently discarded.
 
+The package also exports the type-only `FactoryInputAuthoringHarness` contract
+used by workspace-generated local authoring drafts. It has no runtime
+implementation and does not authorize application-factory execution; generated
+drafts remain partial until their explicit inputs and unsupported cases are
+reviewed.
+
 ## For contributors
 
 Projection changes should add focused semantic and diagnostic tests. If output

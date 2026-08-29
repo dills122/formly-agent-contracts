@@ -16,6 +16,16 @@ to the canonical field-profile registry while sharing the Formly registration
 name. Canonical Angular-fixture goldens plus linked and packed consumers verify
 the generic pilot outside package-source imports.
 
+An additional workspace-private authoring slice can recover a supported
+factory's real exported options type, classify a bounded direct-use grammar,
+and render a deterministic partial TypeScript draft beside a registered form
+definition. The draft automates only typed capture placeholders for supported
+callbacks, canonical Observables, and unavailable view handles; it keeps
+construction values explicit and unsupported inputs unresolved. The compiler
+exports only the corresponding harness type—there is no runtime implementation
+or application-factory execution path, and no draft content enters portable
+contracts or hashes.
+
 The source-usage slice recognizes only the configured
 project-to-source-to-definition convention and supported direct calls or
 constructor expressions in one explicit leaf application Program. A separate

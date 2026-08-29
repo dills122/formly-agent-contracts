@@ -148,3 +148,37 @@
   files and 1,027 tests, every package/application/fixture build, linked and
   packed workspace consumers, release/pack/demo checks, documentation checks,
   and the docs-site build.
+
+### `TFI-MVP-3` implementation evidence
+
+- Accepted `TFI3-AC-01` through `TFI3-AC-06` before production changes and
+  retained the workspace/compiler ownership split from the reviewed design.
+- Added a workspace-private, ephemeral renderer that reuses the exact
+  `TFI-MVP-2` Program and declaration. It derives the real named exported
+  options type, a relative module specifier, and a suggested generated path
+  beside the registered definition source.
+- The draft uses indexed-access types and `satisfies Partial<TOptions>`.
+  Required captured callbacks, canonical Observables, and recognized Angular
+  view handles receive generated helper calls; construction values and other
+  bindings stay in a typed explicit `Pick`, optional capability inputs stay
+  explicit, and unsupported properties remain visible but unassigned.
+- Added the compiler-owned type-only `FactoryInputAuthoringHarness` contract.
+  It has no runtime implementation, so this slice cannot execute an application
+  factory, callback, subscription, or view capability and does not weaken the
+  separate FAC-3/FAC-4 containment gate.
+- The renderer accepts only bounded stable identifiers and normalized
+  workspace-relative TypeScript paths. It refuses unexported/external option
+  types and unsafe authoring context, copies no source snippets, values,
+  comments, absolute paths, or diagnostic paths, writes no files, and remains
+  absent from the workspace package barrel and portable schemas/artifacts.
+- Focused evidence: 14 scaffold/index tests pass, including a semantic
+  TypeScript check of the generated module; the combined compiler/workspace
+  suite passes with 20 test files and 357 tests; both package builds, focused
+  ESLint, documentation checks/site build, and `git diff --check` pass.
+- Final repository verification: `pnpm check` passes with 58 test files and
+  1,041 tests, every package/application/fixture build, linked and packed
+  workspace consumers, release/pack/demo checks, documentation validation, and
+  the production docs-site build.
+- Next: `TFI-MVP-5` adds sanitized Indexing- and NIGO-shaped fixtures and the
+  explicit checkout workflow, then measures generated, explicit, ambiguous,
+  and unsupported authoring burden before making workplace-value claims.

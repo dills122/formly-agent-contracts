@@ -24,8 +24,12 @@ Use in trusted build/test tooling that has Formly field configuration:
 - `compileFormContractScenario` for controlled scenario outcomes
 - field-profile preparation and resolution
 - cross-field effect resolution
+- the type-only `FactoryInputAuthoringHarness` surface used by local generated
+  factory-input drafts
 
-It projects through allowlists. It does not serialize live Formly objects.
+It projects through allowlists. It does not serialize live Formly objects, and
+the authoring harness type has no runtime implementation or factory-execution
+authority.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/compiler/README.md)
 documents extraction boundaries and focused checks.
 
