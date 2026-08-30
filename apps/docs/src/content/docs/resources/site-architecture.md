@@ -72,12 +72,16 @@ promise requires retained release docs. At that point, create version-prefixed
 content collections or publish immutable site builds from release tags. Do not
 copy today’s pages into `v0` directories before the first release.
 
-## Future API generation
+## API reference policy
 
-Generated API pages should land under `reference/api/` from package exports and
-schema metadata during the docs build. Generated output must be reproducible,
-ignored or checked according to an explicit policy, and subordinate to package
-types—not a hand-maintained second contract.
+The current [public API reference](../reference/api.md) is a curated map from
+supported use cases to package entry points. It is intentionally smaller than
+the generated TypeScript declarations, which remain exhaustive.
+
+If declaration-driven pages are added later, they should land under
+`reference/api/`, be reproducible, and stay subordinate to package exports and
+types—not become a second contract. Generated detail should augment the curated
+entry-point map rather than replace the user journey.
 
 ## Canonical-source policy
 

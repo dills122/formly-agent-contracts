@@ -18,9 +18,10 @@
   --color-warning: oklch(58% 0.13 76);
   --color-focus: oklch(55% 0.21 256);
 
-  --font-display: 'Space Grotesk', 'Avenir Next', ui-sans-serif, sans-serif;
-  --font-body: 'IBM Plex Sans', 'Avenir Next', ui-sans-serif, sans-serif;
-  --font-mono: 'JetBrains Mono', 'SFMono-Regular', ui-monospace, monospace;
+  --font-display: 'Avenir Next', 'Segoe UI', ui-sans-serif, sans-serif;
+  --font-body: 'Avenir Next', 'Segoe UI', ui-sans-serif, sans-serif;
+  --font-mono: 'SFMono-Regular', Consolas, 'Liberation Mono', ui-monospace,
+    monospace;
 
   --space-3xs: 0.125rem;
   --space-2xs: 0.25rem;
