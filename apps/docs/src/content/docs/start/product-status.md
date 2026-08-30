@@ -27,6 +27,11 @@ mean “available in the package.”
   checking, index parsing, and contract parsing APIs.
 - Pure `executeAgentContextQuery` over caller-assembled agent-context
   artifacts, including source-usage search by source path or form ID.
+- Strict typed test-intent and diagnostic DTOs plus a pure validator that turns
+  the maintained positive/negative synthetic operation subset into a canonical,
+  hashable, source-intent-bound, semantically revalidated execution plan.
+  Unsupported value policies, repeaters, usage actions, and outcomes fail
+  closed instead of becoming no-ops.
 - Angular CLI and Nx consumer-shaped fixtures plus a browser-rendered synthetic
   Formly test application.
 
@@ -38,7 +43,7 @@ mean “available in the package.”
 </div>
 
 - A production MCP server and CLI-managed query surface.
-- Typed test-intent validation and automatic Playwright generation.
+- Remaining typed-intent operations and automatic Playwright generation.
 - Generic and application-specific executable field drivers.
 - Browser observation and declared/resolved/observed parity reports.
 - Broader interprocedural source discovery, route/render proof, and complete

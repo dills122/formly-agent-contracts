@@ -231,13 +231,14 @@ Available today:
 - explicit form registration and optional direct-call source indexing;
 - custom-field profiles, cross-field effect metadata, and a browser-safe
   radio-choice authoring helper;
-- pure agent-context queries over caller-assembled artifacts; and
+- pure agent-context queries plus strict typed test-intent validation and
+  source-bound canonical plans over caller-assembled artifacts; and
 - Angular CLI, Nx, and browser-rendered synthetic examples.
 
 Not shipped:
 
 - a production MCP server or CLI-managed query service;
-- typed test-intent generation or automatic Playwright/Cypress tests;
+- automatic test-intent generation or executable Playwright/Cypress tests;
 - browser-executing field drivers or live DOM observation;
 - automatic route/render discovery or complete interprocedural source tracing;
   and

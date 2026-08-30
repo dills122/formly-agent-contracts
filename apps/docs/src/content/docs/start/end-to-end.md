@@ -3,17 +3,18 @@ title: End-to-end workspace vertical
 description: Configure a workspace, expose a form and custom field, generate a contract, trace it from application code, and use it as Playwright context.
 ---
 
-This vertical uses only current package surfaces through contract generation.
-The final Playwright lookup is consumer-owned code because a browser-executing
-Playwright integration and executable drivers are not shipped. The repository's
-private package with that name currently contains only an experimental
-trusted-local driver binding registry.
+This vertical uses current package surfaces through contract generation,
+source linkage, pure context queries, and typed-intent validation. The final
+Playwright lookup is consumer-owned code because a browser-executing Playwright
+integration and executable drivers are not shipped. The repository's private
+package with that name currently contains only an experimental trusted-local
+driver binding registry.
 
 <div class="status-line">
   <span class="status status--current">Current</span>
-  <span>Configure → discover → generate → validate → locate</span>
+  <span>Configure → discover → generate → locate → validate typed intent</span>
   <span class="status status--planned">Planned</span>
-  <span>Generate typed intents and execute profile drivers</span>
+  <span>Execute validated plans through profile drivers</span>
 </div>
 
 ## Resulting layout
@@ -392,19 +393,78 @@ For composite fields, select a locator by its `target` rather than assuming one
 node maps to one control. Empty locator arrays, diagnostics, and unknown profile
 aspects are missing evidence—not invitations to fall back to CSS selectors.
 
-## 9. Know where the current vertical ends
+## 9. Validate typed intent without loading the application
+
+Once a trusted caller has assembled the exact agent-context dataset, current
+live-owner state, and driver-registry manifest, it can validate an untrusted
+semantic intent entirely in `@formly-contract/schema`:
+
+```ts
+import {
+  revalidateAgentContextExecutionPlan,
+  validateAgentContextTestIntent,
+} from '@formly-contract/schema';
+
+const result = validateAgentContextTestIntent({
+  intent,
+  dataset,
+  liveOwners,
+  driverRegistryManifest,
+});
+
+if (result.status === 'invalid') {
+  throw new Error(result.diagnostics.map(({ code }) => code).join(', '));
+}
+
+const checked = revalidateAgentContextExecutionPlan({
+  intent,
+  contextRef: result.contextRef,
+  plan: result.plan,
+  planHash: result.planHash,
+  dataset,
+  liveOwners,
+  driverRegistryManifest,
+});
+
+if (checked.status !== 'valid') throw new Error('Plan authority changed.');
+```
+
+Keep the exact parsed intent with its validated plan. Revalidation binds the
+plan to that intent, reruns validation against current authority, and requires
+the rebuilt plan to match exactly. A current context that is now stale,
+ambiguous, or otherwise refused is not eligible for execution even when the
+submitted plan and its content hash still match each other. Intent and plan
+hashes provide deterministic content identity; they are not signatures or
+authorization tokens.
+
+The v0.1 validator supports the maintained synthetic path for `openUsage`,
+`set`, `expectState`, `commitValue`, `activateValidation`, `expectValue`, and
+`expectValidation`. Exact enumerated domain values and safely classified
+literals are supported. Pattern-constrained literals, runtime selection
+policies, generated invalid values, repeater capture, usage actions, and
+outcomes currently return stable blocking diagnostics because their complete
+source authority is not yet available. A targeted node with a declared wrapper
+activation precondition also blocks rather than silently omitting the required
+interaction; executable wrapper expansion is a fast follow.
+
+No selector, callback, Angular component, Formly registry, driver
+implementation, or browser object crosses this pure boundary.
+
+## 10. Know where the current vertical ends
 
 <div class="status-line">
   <span class="status status--planned">Planned layer</span>
-  <span>Agent query → typed intent → validated driver → Playwright execution</span>
+  <span>Validated plan → trusted driver call → Playwright execution</span>
 </div>
 
 The pure `executeAgentContextQuery` API can search an assembled, validated
-agent-context dataset by source path or form ID. The CLI does not yet assemble
-that dataset or expose a query/MCP command, and executable Playwright drivers,
-typed intent compilation, and browser parity remain planned. Today, an agent or
-test author can use the generated JSON as trustworthy context and write a
-strict consumer helper like the one above.
+agent-context dataset by source path or form ID, and
+`validateAgentContextTestIntent` can compile its currently supported semantic
+subset into a canonical plan. The CLI does not yet assemble that dataset or
+expose a query/MCP command. Executable Playwright drivers, the remaining intent
+operations, and browser parity remain planned. Today, an agent or test author
+can use generated JSON as trustworthy context, validate supported intent, and
+write a strict consumer helper like the one above.
 
 :::note[Maintained examples]
 The [Nx fixture root config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/formly-contracts.config.ts),

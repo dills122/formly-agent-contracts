@@ -10,8 +10,8 @@ the exhaustive authority for overloads and types.
 ## Choose an entry point
 
 - **`@formly-contract/schema`** — Node build/test tooling for portable DTOs,
-  strict parsers, canonical JSON, hashes, registries, and pure agent-context
-  queries.
+  strict parsers, canonical JSON, hashes, registries, pure agent-context
+  queries, and typed-intent validation.
 - **`@formly-contract/schema/field-type-authoring`** — Angular browser code or
   Node tooling for compact custom-field declarations shared by Formly
   registration and profile generation.
@@ -66,12 +66,42 @@ Primary entry points include `parseFieldTypeProfileRegistry`,
 `parseCrossFieldEffectRegistry`, `parseRuntimeProvenance`,
 `parseAgentContextArtifactSet`, `parseAgentContextSourceUsageCatalog`,
 `parseAgentContextJourneyCatalog`, `parseAgentContextExecutionAuthority`,
-`parseAgentContextDriverRegistryManifest`, `parseAgentContextQuery`, and
-`executeAgentContextQuery`.
+`parseAgentContextDriverRegistryManifest`, `parseAgentContextQuery`,
+`executeAgentContextQuery`, `parseAgentContextTestIntent`,
+`validateAgentContextTestIntent`, and
+`revalidateAgentContextExecutionPlan`.
 
 `executeAgentContextQuery` is pure. The caller must first assemble and validate
 the complete dataset; no CLI command or MCP transport currently performs that
 assembly.
+
+### Typed intent and canonical plans
+
+| API | Purpose |
+| --- | --- |
+| `parseAgentContextTestIntent(value)` | Strictly parse the closed semantic operation union; raw selectors and unknown operations are rejected. |
+| `parseAgentContextIntentDiagnostic(value)` | Enforce the schema-owned code, severity, blocking, exact code-specific location fields, and remediation policy. |
+| `validateAgentContextTestIntent(input)` | Purely join intent to one pinned current CTX-1 E2E slice and return either a canonical plan or blocking diagnostics. |
+| `parseAgentContextValidatedExecutionPlan(value)` | Strictly parse the closed plan union and reject unreviewed authority fields. |
+| `computeAgentContextTestIntentHash(value)` | Compute the canonical source-intent content identity retained by a validated plan. |
+| `computeAgentContextValidatedPlanHash(value)` | Compute canonical content identity for an already parsed or validated plan; this helper is not an untrusted-input parser, and the hash does not grant semantic authority. |
+| `revalidateAgentContextExecutionPlan(input)` | Require the exact source intent, verify intent/plan hashes, rerun validation against current authority, require a complete E2E slice, and compare the rebuilt plan exactly. |
+
+The first validator slice covers the maintained synthetic positive/negative
+path. Pattern-constrained literals, rich runtime value policies, repeaters,
+usage actions, outcomes, and browser execution remain fail-closed follow-up
+work. The supported pure length classifier follows Angular's optional-empty
+`minLength` behavior and relies on a separate `required` constraint for empty
+value invalidity. Declared wrapper activation preconditions also fail closed
+until lossless wrapper-plan expansion is implemented. These APIs never load
+Angular, Formly, driver implementations,
+or the DOM, and their strict parsers reject accessor/coercion-based input rather
+than executing caller code.
+
+The intent and plan hashes are deterministic content identities, not
+signatures or authorization tokens. A trusted caller must retain the exact
+intent beside its plan and supply current validated context inputs whenever it
+revalidates.
 
 ### Browser-safe field-type authoring
 

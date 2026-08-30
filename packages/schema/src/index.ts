@@ -225,6 +225,60 @@ export type {
 export { executeAgentContextQuery } from './agent-context-query-core.js';
 export type { AgentContextQueryPaginationRuntime } from './agent-context-query-core.js';
 export {
+  AGENT_CONTEXT_INTENT_DIAGNOSTIC_CODES,
+  AGENT_CONTEXT_INTENT_DIAGNOSTIC_POLICY,
+  AGENT_CONTEXT_INTENT_DIAGNOSTIC_SCHEMA_ID,
+  AGENT_CONTEXT_INTENT_DIAGNOSTIC_SCHEMA_VERSION,
+  AGENT_CONTEXT_TEST_INTENT_SCHEMA_ID,
+  AGENT_CONTEXT_TEST_INTENT_SCHEMA_VERSION,
+  canonicalizeAgentContextTestIntent,
+  parseAgentContextIntentDiagnostic,
+  parseAgentContextTestIntent,
+  parseAgentContextTestIntentContextReference,
+} from './agent-context-test-intent.js';
+export type {
+  AgentContextIntentBlockingDiagnostic,
+  AgentContextIntentDiagnostic,
+  AgentContextIntentDiagnosticCode,
+  AgentContextIntentDiagnosticLocation,
+  AgentContextIntentDiagnosticPhase,
+  AgentContextIntentDiagnosticRemediation,
+  AgentContextIntentDiagnosticSeverity,
+  AgentContextIntentItemContext,
+  AgentContextIntentValue,
+  AgentContextIntentWarning,
+  AgentContextOversizedRecordRecovery,
+  AgentContextTestIntent,
+  AgentContextTestIntentContextReference,
+  AgentContextTestIntentNodeTarget,
+  AgentContextTestIntentStep,
+} from './agent-context-test-intent.js';
+export {
+  AGENT_CONTEXT_SEMANTIC_POLICY_VERSION,
+  AGENT_CONTEXT_VALIDATED_PLAN_SCHEMA_ID,
+  AGENT_CONTEXT_VALIDATED_PLAN_SCHEMA_VERSION,
+  canonicalizeAgentContextValidatedPlan,
+  computeAgentContextTestIntentHash,
+  computeAgentContextValidatedPlanHash,
+  parseAgentContextValidatedExecutionPlan,
+  revalidateAgentContextExecutionPlan,
+  validateAgentContextTestIntent,
+} from './agent-context-intent-validator.js';
+export type {
+  AgentContextApprovedCommitResolution,
+  AgentContextApprovedItemContext,
+  AgentContextApprovedNodeBinding,
+  AgentContextApprovedNodeOperationAuthority,
+  AgentContextResolvedPlanValue,
+  AgentContextValidatedExecutionPlan,
+  AgentContextValidatedExecutionStep,
+  AgentContextValidatedPlanStepOrigin,
+  RevalidateAgentContextExecutionPlanInput,
+  RevalidateAgentContextExecutionPlanResult,
+  ValidateAgentContextTestIntentInput,
+  ValidateAgentContextTestIntentResult,
+} from './agent-context-intent-validator.js';
+export {
   collectContractConditionIds,
   collectContractNodes,
   contractEffectCycleComponents,

@@ -8,7 +8,11 @@ governed by the
 
 **Current status:** Form Contract `0.4.0` is the implemented compatibility
 boundary. `RH06-DOC`, `CTX-0A` through `CTX-1`, `DRV-0A/B`, and `DRV-0C1` are
-complete. `CTX-2`, `HOST-1`, `ANG-0`, and `FAC-1` are dependency-ready;
+complete. The `CTX-2A` through `CTX-2C` synthetic MVP checkpoint is implemented,
+while aggregate `CTX-2` remains in progress for rich value authority and the
+remaining intent operations. Executable wrapper prerequisites and hostile-input
+hardening for the standalone plan-hash helper are explicit fast follows; no
+CTX-2 pivot is currently required. `HOST-1`, `ANG-0`, and `FAC-1` are dependency-ready;
 aggregate `DRV-0` remains incomplete because `DRV-0C2` follows the validated
 plan/call ABI from `CTX-2`; `BHV-0` and `AUTH-0` await explicit approval of
 ADRs 0010 and 0011; and `LIN-0` is blocked on its sanitized representative
@@ -546,9 +550,9 @@ execution index. The current order is:
 
 1. retain the completed `RH06-DOC`, `CTX-0A` through `CTX-1`, `DRV-0A/B`, and
    `DRV-0C1` checkpoints;
-2. in the consumer lane, implement the now-ready `CTX-2` typed
-   intent/validation over the synthetic records; `CTX-2` exits only when the
-   synthetic positive/negative proof passes;
+2. retain the implemented `CTX-2A` through `CTX-2C` typed-intent, diagnostic,
+   canonical-plan, and synthetic validator checkpoint; complete `CTX-2V` and
+   `CTX-2D` before marking aggregate `CTX-2` complete;
 3. after `CTX-2` fixes the validated plan/call ABI, complete `DRV-0C2` exact
    call binding and then mark aggregate `DRV-0` complete;
 4. in the producer lanes, advance the canonical real producers `LIN-4`,
