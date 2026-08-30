@@ -1,9 +1,47 @@
-# Single Angular Project Example
+# Maintained Single-Project Angular Example
 
-This application is both a browser-rendered Formly catalog and the maintained
-single-project Formly Contract example. It uses the ordinary Angular CLI
-layout: the application, root contract config, and one project descriptor all
-live at the same project root.
+## Why this project exists
+
+This is the repository's maintained example and compliance fixture for the
+smallest common consumer shape: one Angular application, one Formly Contract
+project boundary, and no separate application libraries. It answers a basic
+support question continuously: can an ordinary Angular CLI application use the
+public Formly Contract configuration, source, profile, compiler, schema, and
+workspace APIs without adopting a monorepo layout?
+
+The project serves three audiences:
+
+- consumers can copy its ownership and configuration shape when introducing
+  Formly Contract to a single Angular application;
+- maintainers can add representative Formly authoring cases and lock their
+  projected contract behavior with focused assertions; and
+- CI can detect regressions in config loading, generation, canonical output,
+  diagnostics, custom field profiles, or Angular production compilation.
+
+This is not a toy hello-world application. Its synthetic corpus is deliberately
+broad enough to exercise native fields, custom interactions, repeaters,
+conditions, validation, asynchronous values, legacy aliases, and behavior that
+must remain explicitly unknown.
+
+## What this project proves
+
+- A root config can discover one adjacent project descriptor.
+- Multiple feature-owned form sources can coexist inside one application
+  boundary.
+- Browser-rendered factories can also be the authoritative contract factories
+  without duplicating field definitions.
+- Reviewed custom field profiles and explicit opaque diagnostics survive
+  deterministic generation.
+- The complete application still compiles with Angular's production builder.
+
+It does not claim browser-journey coverage, route reachability, execution of
+arbitrary callbacks, or compatibility beyond the pinned Angular/Formly
+baseline. Those boundaries are intentional parts of the example.
+
+## Project structure
+
+The application uses the ordinary Angular CLI layout: the application, root
+contract config, and one project descriptor all live at the same project root.
 
 ```text
 formly-contracts.config.ts       workspace policy and output location

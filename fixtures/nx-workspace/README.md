@@ -1,8 +1,50 @@
-# Nx Workspace Consumer Fixture
+# Maintained Nx Workspace Fixture
 
-This fixture is the real Nx integration anchor for project-aware discovery. It
-uses an integrated Nx `23.1.1` workspace with Angular `20.3.29` and Formly
-`6.1.8` across four independently configured projects:
+## Why this project exists
+
+This is the repository's maintained compliance fixture for a complex,
+project-aware Nx consumer. It is the place where Formly Contract support is
+tested against an actual Nx graph, independently owned Angular libraries,
+distributed contract configuration, source-usage indexing, and Nx's real build
+and cache behavior.
+
+The fixture intentionally uses a renewable-microgrid deployment workflow. That
+domain is unrelated to the insurance and annuity product that motivated the
+tool, but it creates comparable structural pressure: many variants, nested
+entities, jurisdiction-dependent cases, lifecycle stages, custom interactions,
+cross-field effects, and behavior that cannot always be projected exactly.
+
+The fixture serves three purposes:
+
+- consumers can see a production-shaped Nx integration rather than a minimal
+  single-library demonstration;
+- maintainers can add complex configurations and cases when expanding support
+  or preventing regressions; and
+- CI can verify discovery, generation, semantic projection, source linkage,
+  deterministic artifacts, Angular compilation, the Nx project graph, and task
+  caching together.
+
+## What this project proves
+
+- Four independently configured Nx projects can participate according to their
+  actual ownership boundaries.
+- Ten forms and seventeen named cases generate deterministically through the
+  same public APIs used by consumers.
+- Reviewed custom profiles, wrappers, nested arrays, object-valued choices,
+  declared effects, and explicit async/opaque diagnostics survive projection.
+- A direct Angular callsite resolves to the exact generated form candidate
+  through source-path and form-ID queries.
+- The production application builds through Nx and a repeated build is restored
+  from Nx's local cache.
+
+It does not claim browser-journey coverage, route reachability, execution of
+browser-only call arguments, complete static source coverage, or compatibility
+beyond the pinned Nx/Angular/Formly baseline.
+
+## Workspace structure
+
+The fixture uses an integrated Nx `23.1.1` workspace with Angular `20.3.29` and
+Formly `6.1.8` across four independently configured projects:
 
 ```text
 apps/test-app       Angular application and composition root
@@ -14,12 +56,10 @@ libs/feature-lib    consuming form and rendered page
 Nx resolves the static dependency chain as
 `fixture-nx-app → fixture-nx-feature-lib → fixture-nx-forms-kit → fixture-nx-formly-kit`.
 
-The fixture models a synthetic renewable-microgrid deployment workflow. This
-domain is deliberately distinct from the product that motivated the project,
-while retaining comparable structural pressure: configurable deployment
-models, multiple organizations and contacts, site classifications, equipment
-families, funding structures, permits, contributors, schedules, readiness
-gates, and jurisdiction-dependent cases.
+The synthetic workflow covers configurable deployment models, multiple
+organizations and contacts, site classifications, equipment families, funding
+structures, permits, contributors, schedules, readiness gates, and
+jurisdiction-dependent cases.
 
 ## Corpus
 

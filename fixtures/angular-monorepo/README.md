@@ -1,8 +1,44 @@
-# Angular Monorepo Consumer Fixture
+# Maintained Angular CLI Workspace Fixture
 
-This fixture is the consumer-shaped playground for workspace discovery and
-future Angular/Formly integration work. It deliberately uses an Angular CLI
-workspace layout without adding Nx as a prerequisite.
+## Why this project exists
+
+This is the repository's maintained compliance fixture for an Angular CLI
+workspace in which applications and reusable form libraries have separate
+ownership boundaries. It proves that distributed Formly Contract configuration
+does not depend on Nx and gives maintainers a canonical, reviewable artifact
+corpus for multi-project behavior.
+
+The fixture serves three purposes:
+
+- consumers can study how application, feature, form, and Formly integration
+  libraries participate without collapsing into one contract project;
+- maintainers can test distributed discovery, Node-safe entrypoints, reusable
+  fragments, effects, custom interactions, and content-addressed goldens; and
+- CI can detect changes to generated indexes and contracts byte-for-byte while
+  also compiling the full browser composition in production mode.
+
+This is the deepest committed golden corpus in the repository. Its forms are
+synthetic, but the boundaries and interaction shapes are deliberately modeled
+after the hard parts of real Angular/Formly workspaces.
+
+## What this project proves
+
+- A root config can discover several independently owned project descriptors.
+- Configuration-only projects and source-owning projects can coexist.
+- Angular library barrels can stay browser-oriented while dedicated contract
+  entrypoints remain safe for the Node-based loader.
+- Reusable fragments, declared effects, wrappers, and custom profiles produce
+  deterministic artifacts across library boundaries.
+- Generated output matches committed canonical goldens and the composed Angular
+  application still builds.
+
+It does not claim Nx integration, browser-journey coverage, arbitrary lazy-route
+reachability, or compatibility beyond the pinned Angular/Formly baseline.
+
+## Workspace structure
+
+The fixture deliberately uses an Angular CLI workspace layout without adding Nx
+as a prerequisite.
 
 ```text
 apps/test-app       browser application and composition root
@@ -15,7 +51,7 @@ The root `formly-contracts.config.ts` discovers one project descriptor at each
 boundary. `test-app` and `formly-kit` are valid configuration-only projects;
 `forms-kit` and `feature-lib` contribute source catalogs.
 
-This is the deep behavior corpus. Its six definitions deliberately cover
+Its six definitions deliberately cover
 static and dependent choices, a custom radio group, structured autocomplete,
 composite date entry, table selection, conditional visibility, and an
 expandable repeater. The forms are synthetic, but their library boundaries and
