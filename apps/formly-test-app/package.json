@@ -23,6 +23,7 @@
     "@angular/compiler-cli": "20.3.29",
     "@formly-contract/schema": "workspace:*",
     "@formly-contract/compiler": "workspace:*",
+    "@formly-contract/workspace": "workspace:*",
     "typescript": "5.9.3"
   }
 }

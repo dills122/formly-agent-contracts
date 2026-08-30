@@ -1,23 +1,30 @@
 import type { FormlyFieldConfig } from '@ngx-formly/core';
 
-export function createNxContactFragment(): FormlyFieldConfig[] {
+export function createNxSiteContactFragment(): FormlyFieldConfig[] {
   return [
     {
-      key: 'claimant.name',
+      key: 'contact.name',
       type: 'input',
-      id: 'nx-claimant-name',
-      props: { label: 'Claimant name', required: true },
+      id: 'nx-site-contact-name',
+      props: { label: 'Site contact name', required: true, maxLength: 80 },
     },
     {
-      key: 'claimant.contactPreference',
+      key: 'contact.email',
+      type: 'input',
+      id: 'nx-site-contact-email',
+      props: { label: 'Site contact email', type: 'email', required: true },
+    },
+    {
+      key: 'contact.preference',
       type: 'cool-radio-btn-grp',
-      id: 'nx-contact-preference',
+      id: 'nx-site-contact-preference',
       props: {
-        label: 'Preferred contact method',
+        label: 'Preferred coordination channel',
         required: true,
         options: [
           { label: 'Email', value: 'email' },
           { label: 'Phone', value: 'phone' },
+          { label: 'Project portal', value: 'portal' },
         ],
       },
     },

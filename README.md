@@ -622,7 +622,10 @@ Schema v0.4 can represent:
 
 The Angular test application contains twelve invented forms covering native
 and custom fields, wrappers, validators, extensions, presets, expressions,
-validation, repeaters, opaque behavior, and legacy Formly v6 aliases.
+validation, repeaters, opaque behavior, and legacy Formly v6 aliases. It is
+also a complete single-project workspace example: one adjacent root config and
+project descriptor expose the same browser factories through three form
+sources and a reviewed custom-field profile registry.
 
 ```sh
 pnpm app:serve
@@ -635,6 +638,9 @@ fixture module can implement `TestFormDefinition` and register a group through
 `TEST_FORM_DEFINITION_GROUPS` without copying workplace labels, identifiers,
 options, or rules into this public project.
 
+Run the contract compliance tests for this application, the multi-project
+Angular CLI fixture, and the Nx fixture together with `pnpm test:examples`.
+
 ## Repository layout
 
 ```text
@@ -645,11 +651,11 @@ packages/
 fixtures/
   synthetic-form/            Public golden form and real-builder compatibility fixture
   angular-monorepo/          Deep six-form Angular CLI discovery/interaction corpus
-  nx-workspace/              Real four-project Nx graph, build, and cache anchor
+  nx-workspace/              Ten-form microgrid corpus in a real four-project Nx graph
   workspace-config-loader/   ESM/CJS/TS config-loading fixtures for workspace tests
 apps/
   demo-cli/          Prints the deterministic golden contract
-  formly-test-app/   Browser-rendered Angular/Formly fixture catalog
+  formly-test-app/   Single-project Angular example and twelve-form browser corpus
   docs/              Astro Starlight documentation site
 docs/                Specifications, ADRs, delivery plans, and evidence
 ```
@@ -683,6 +689,7 @@ agent requests.
 - [v0.2 real-world semantics specification](docs/v0.2-real-world-semantics-spec.md)
 - [v0.3 test locator specification](docs/v0.3-test-locators-spec.md)
 - [Formly test application specification](docs/formly-test-app-spec.md)
+- [Maintained example matrix](apps/docs/src/content/docs/reference/examples.md)
 - [Parser MVP implementation plan](docs/implementation-plan.md)
 - [Workspace discovery implementation
   plan](docs/planning/workspace-discovery/implementation-plan.md)

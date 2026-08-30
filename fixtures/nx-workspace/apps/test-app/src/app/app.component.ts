@@ -5,14 +5,15 @@ import { Component } from '@angular/core';
   standalone: false,
   template: `
     <header>
-      <p class="eyebrow">Nx integration anchor</p>
-      <h1>Project-aware Formly workspace</h1>
+      <p class="eyebrow">Nx regulated-workflow corpus</p>
+      <h1>Renewable microgrid deployment</h1>
       <p>
-        The app consumes a feature library, reusable forms library, and base
-        Formly configuration through Nx-visible project dependencies.
+        Ten synthetic forms model project intake, site assessment, system
+        design, funding, permitting, and commissioning across Nx-visible
+        application and library boundaries.
       </p>
     </header>
-    <main><nx-fixture-claim-page /></main>
+    <main><nx-fixture-deployment-page /></main>
   `,
 })
 export class AppComponent {}

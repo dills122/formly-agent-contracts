@@ -105,6 +105,9 @@ importers:
       '@formly-contract/schema':
         specifier: workspace:*
         version: link:../../packages/schema
+      '@formly-contract/workspace':
+        specifier: workspace:*
+        version: link:../../packages/workspace
       typescript:
         specifier: 5.9.3
         version: 5.9.3
