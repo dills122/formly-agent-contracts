@@ -14,7 +14,9 @@ Use for portable data and validation:
 
 It does not load Formly, Angular, application configs, or browser code.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/schema/README.md)
-documents the browser-safe authoring subpath and contributor checks.
+documents the browser-safe authoring subpath and contributor checks. The
+[public API reference](./api.md#schema) groups its primary parsers, canonical
+operations, registries, query surface, and authoring helpers.
 
 ## `@formly-contract/compiler`
 
@@ -31,7 +33,8 @@ It projects through allowlists. It does not serialize live Formly objects, and
 the authoring harness type has no runtime implementation or factory-execution
 authority.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/compiler/README.md)
-documents extraction boundaries and focused checks.
+documents extraction boundaries and focused checks. See the
+[compiler API](./api.md#compiler) for declared and scenario entry points.
 
 ## `@formly-contract/workspace`
 
@@ -53,6 +56,8 @@ Program and lineage but does not call the registered form factory or write the
 suggested file.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/workspace/README.md)
 maps configuration, discovery, generation, source indexing, and CLI ownership.
+The [workspace API](./api.md#workspace) and [CLI reference](./cli-api.md) are
+the current consumer lookup surfaces.
 
 ## Private `@formly-contract/playwright` experiment
 
@@ -64,7 +69,8 @@ It does **not** currently depend on Playwright, launch a browser, generate tests
 or provide the planned typed-intent execution vertical. It is not a published
 user capability. See its
 [package README](https://github.com/dills122/formly-contract/blob/main/packages/playwright/README.md)
-before contributing there.
+and [private API boundary](./api.md#private-playwright-experiment) before
+contributing there.
 
 ## Applications and fixtures
 
@@ -95,6 +101,6 @@ is published in the current repository.
 :::note[Canonical package contracts]
 Use the package entry points and
 [architecture overview](https://github.com/dills122/formly-contract/blob/main/docs/architecture-overview.md)
-as authority. Package APIs take precedence over examples on this site if a
-future release changes them.
+as authority. The [public API reference](./api.md) is curated from those entry
+points; generated TypeScript declarations remain exhaustive.
 :::

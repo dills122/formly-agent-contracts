@@ -386,7 +386,7 @@ application-controlled Angular build with a synthetic model that selects the
 upstream value. For example, retain one base artifact for structure and compile
 one synthetic product-selected scenario for each option branch an E2E author
 must use. Resolved values are scenario-complete, not globally complete. The
-[scenario compiler example](../README.md#resolve-a-synthetic-scenario) shows
+[scenario compiler example](../apps/docs/src/content/docs/reference/api.md#controlled-scenario-compilation) shows
 the API and trust boundary.
 
 The pilot workspace CLI currently generates declared artifacts only;

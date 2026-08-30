@@ -53,16 +53,17 @@ It also includes:
 
 The parser, contract, programmatic workspace runner, opt-in static source-usage
 producer, pure agent-context query API, and generic pilot CLI with `list`,
-`generate`, and non-mutating `check` commands are the current product. A
-production MCP server, automatic Playwright generation, browser observation,
-and broader Angular application/route discovery are future layers and are not
-shipped by this MVP.
+`generate`, non-mutating `check`, and read-only `author-factory-inputs`
+commands are the current product. A production MCP server, automatic
+Playwright generation, browser observation, and broader Angular
+application/route discovery are future layers and are not shipped by this MVP.
 
 ## Start here
 
 | If you want to... | Go to... |
 | --- | --- |
 | understand the product boundary before installing anything | the [hosted documentation](https://dills122.github.io/formly-contract/) and [product status](apps/docs/src/content/docs/start/product-status.md) |
+| choose a package or programmatic entry point | the [public API reference](apps/docs/src/content/docs/reference/api.md) and [CLI reference](apps/docs/src/content/docs/reference/cli-api.md) |
 | evaluate Formly Contract in an application repository | the [workplace pilot guide](docs/workplace-pilot.md) |
 | choose a single-project, Angular workspace, or Nx example | the [maintained example matrix](apps/docs/src/content/docs/reference/examples.md) |
 | understand which implementation package owns a change | the [`packages/` guide](packages/README.md) |
@@ -83,7 +84,10 @@ for a fresh coding agent or maintainer.
 The [hosted Astro Starlight documentation](https://dills122.github.io/formly-contract/)
 provides the product-oriented path through installation, workspace discovery,
 custom-field profiles, generated artifacts, and reliable E2E context. Its
-source lives under `apps/docs/`. Run it locally with:
+source lives under `apps/docs/`. Use the
+[public API reference](apps/docs/src/content/docs/reference/api.md) for a
+curated map of supported entry points; generated TypeScript declarations remain
+exhaustive. Run the site locally with:
 
 ```sh
 pnpm docs:dev
@@ -99,7 +103,9 @@ source material without replacing it.
 The compiler and workspace packages run as build/test tooling beside your
 Angular application and do not enter its browser bundle. Production custom-field
 registration may import the schema package's dedicated browser-safe
-`field-type-authoring` subpath. A typical adoption flow is:
+`field-type-authoring` subpath. The maintained
+[end-to-end vertical](apps/docs/src/content/docs/start/end-to-end.md) is the
+shortest complete setup. At a high level, the flow is:
 
 ```text
 application-owned Formly factories
@@ -692,7 +698,7 @@ packages/
 fixtures/
   synthetic-form/            Public golden form and real-builder compatibility fixture
   angular-monorepo/          Deep six-form Angular CLI discovery/interaction corpus
-  nx-workspace/              Ten-form microgrid corpus in a real four-project Nx graph
+  nx-workspace/              Twelve-form corpus in a real four-project Nx graph
   workspace-config-loader/   ESM/CJS/TS config-loading fixtures for workspace tests
 apps/
   demo-cli/          Prints the deterministic golden contract
@@ -727,6 +733,9 @@ agent requests.
 
 ## Documentation
 
+- [Hosted documentation](https://dills122.github.io/formly-contract/)
+- [Public API reference](apps/docs/src/content/docs/reference/api.md)
+- [CLI reference](apps/docs/src/content/docs/reference/cli-api.md)
 - [Workplace pilot guide](docs/workplace-pilot.md)
 - [Workspace configuration reference](docs/workspace-configuration.md)
 - [Architecture overview](docs/architecture-overview.md)

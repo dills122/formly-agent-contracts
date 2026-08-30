@@ -21,9 +21,10 @@ Before handoff:
 pnpm check:docs
 ```
 
-That command checks Markdown links and trailing whitespace across the repository
-and then performs a production Astro build. The Starlight build also creates
-the Pagefind search index and fails on invalid content routes.
+That command checks Markdown links, heading fragments, repository-local GitHub
+links, raw site routes, and trailing whitespace across the repository, then
+performs a production Astro build. The Starlight build also creates the
+Pagefind search index.
 
 Use `pnpm docs:preview` to inspect the production output locally.
 
@@ -92,6 +93,7 @@ site’s orientation page in the same change.
 - No customer or workplace data appears in examples or screenshots.
 - Links resolve and `pnpm check:docs` passes.
 - Root-relative links do not bypass the configured GitHub Pages base path.
+- Theme assets do not add an unreviewed third-party request.
 - The page remains usable at 320, 375, 414, and 768 CSS pixels.
 
 :::note[Repository contribution policy]

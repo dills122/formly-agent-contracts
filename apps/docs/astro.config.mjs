@@ -61,12 +61,13 @@ export default defineConfig({
           label: 'Reference',
           items: [
             { label: 'Package responsibilities', slug: 'reference/packages' },
+            { label: 'Public API', slug: 'reference/api' },
+            { label: 'CLI', slug: 'reference/cli-api' },
             { label: 'Workspace configuration', slug: 'reference/workspace' },
             { label: 'Maintained examples', slug: 'reference/examples' },
             { label: 'Form sources', slug: 'reference/form-sources' },
             { label: 'Custom field profiles', slug: 'reference/field-profiles' },
             { label: 'Artifacts and linkage', slug: 'reference/artifacts' },
-            { label: 'CLI and API', slug: 'reference/cli-api' },
           ],
         },
         {

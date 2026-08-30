@@ -23,7 +23,8 @@ Use it to:
 - generate content-addressed contracts and publish `workspace-index.json` last;
 - run a non-mutating byte-for-byte artifact check;
 - optionally index the supported direct-root-call source convention; and
-- invoke the `formly-contracts list`, `generate`, and `check` commands.
+- invoke the `formly-contracts list`, `generate`, `check`, and read-only
+  `author-factory-inputs` commands.
 
 Configuration and form factories are executable application code. Run this
 package only against trusted workspaces. Generated artifacts are the portable,
@@ -47,9 +48,12 @@ workspace runner, index parsing, and related types. The installed binary is
 
 ```ts
 import {
+  checkWorkspace,
   defineConfig,
   defineFormContractProject,
   defineFormContractSource,
+  inspectWorkspaceFactoryInputs,
+  parseWorkspaceContractIndex,
   runWorkspace,
 } from '@formly-contract/workspace';
 ```
@@ -57,6 +61,10 @@ import {
 For a complete adoption path, use the
 [workspace configuration reference](../../docs/workspace-configuration.md) and
 [maintained examples](../../apps/docs/src/content/docs/reference/examples.md).
+The [workspace API reference](../../apps/docs/src/content/docs/reference/api.md#workspace)
+groups the supported configuration, discovery, authoring, generation/checking,
+and index-parsing functions; the [CLI reference](../../apps/docs/src/content/docs/reference/cli-api.md)
+documents every command and option.
 
 ## Contributor map
 

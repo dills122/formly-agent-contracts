@@ -37,10 +37,10 @@ hero:
     <span class="home-index__title">Understand</span>
     <span class="home-index__description">Follow declared, resolved, and observed evidence through the package boundaries.</span>
   </a>
-  <a class="home-index__row" href="./reference/workspace/">
+  <a class="home-index__row" href="./reference/api/">
     <span class="home-index__number">04</span>
     <span class="home-index__title">Reference</span>
-    <span class="home-index__description">Look up workspace policy, source descriptors, profiles, artifacts, CLI commands, and APIs.</span>
+    <span class="home-index__description">Choose package entry points, then look up workspace policy, sources, profiles, artifacts, and CLI commands.</span>
   </a>
   <a class="home-index__row" href="./resources/research-roadmap/">
     <span class="home-index__number">05</span>

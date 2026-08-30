@@ -58,5 +58,6 @@ is the canonical private-repository evaluation path.
 
 - First integration: [install the local packages](./installation.md).
 - Real monorepo wiring: [run the end-to-end vertical](./end-to-end.md).
+- Programmatic integration: [choose a public API entry point](../reference/api.md).
 - Architecture review: [understand the evidence model](../concepts/architecture.md).
 - Current versus future: [read the capability matrix](./product-status.md).
