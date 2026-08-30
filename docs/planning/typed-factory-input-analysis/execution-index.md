@@ -1,6 +1,6 @@
 # Typed Factory Input Analysis Execution Index
 
-- Status: Research review and MVP implementation through TFI-MVP-5 complete; all three production implementation reviews reconciled; post-remediation review cycle authorized
+- Status: Research review and MVP implementation through TFI-MVP-5 complete; all production and post-remediation review findings reconciled
 - Scope: research, retained experiments, technical design, and review
 - Production behavior changes: bounded typed factory-input analysis and read-only local authoring workflow
 
@@ -65,7 +65,7 @@ authorized post-remediation cycle are tracked in
 | `TFI1-AC-01`  | Analyze the exact caller-supplied source Program; do not construct or accept a replacement Program internally.             | Foreign-Program refusal test; analyzer accepts only an existing descriptor and declaration         |
 | `TFI1-AC-02`  | Recover a supported function/class factory's single options-object properties, callback signatures, and return types.      | Function, class, callback, generic, scalar, and unsupported-signature fixtures                     |
 | `TFI1-AC-03`  | Resolve emission types only for canonical RxJS `Observable` ancestry, including aliases, subjects, subclasses, and unions. | Direct, barrel, alias, Subject, subclass, union, callback-return, and same-spelling-negative tests |
-| `TFI1-AC-04`  | Normalize type structure within explicit depth, node, string, union, property, parameter, and signature limits.            | Repeated-equality, deep graph, property cap, and display cap tests                                 |
+| `TFI1-AC-04`  | Normalize type structure within explicit depth, node, string, union, property, parameter, and signature limits.            | Repeated-equality, deep graph, property/display caps, and factory-wide truncation-refusal tests    |
 | `TFI1-AC-05`  | Expose `any`, `unknown`, unresolved generic, recursive, truncated, and unsupported hazards without inventing values.       | Fail-closed hazard, options-container/property semantic-error, and suppression matrix              |
 | `TFI1-AC-06`  | Keep the descriptor ephemeral and workspace-private; change no portable schema or artifact.                                | No barrel export, persistence, cache, schema, compiler, bundle, report, or scaffold change         |
 
@@ -86,8 +86,8 @@ authorized post-remediation cycle are tracked in
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `TFI3-AC-01`  | Render a deterministic TypeScript authoring draft from the `TFI-MVP-2` result using the real exported options type through indexed-access types and `satisfies Partial<TOptions>`.                | Golden repeated-render test plus a TypeScript semantic type-check of the generated module                              |
 | `TFI3-AC-02`  | Generate helpers only for captured callbacks, inert canonical Observables, and recognized unavailable view handles; keep construction values and other reviewed bindings explicit.                | Mixed Indexing-shaped disposition matrix and exact generated helper assertions                                         |
-| `TFI3-AC-03`  | Preserve unsupported properties and incomplete coverage as visible review blockers rather than manufacturing a value or a complete options object.                                                | Unsupported/hazard fixture plus reason/storage-path review details and absence of a generated assignment               |
-| `TFI3-AC-04`  | Accept only bounded identifiers plus privacy-safe relative or package module specifiers; emit no absolute paths, source snippets, comments, initializers, credentials, or customer values.        | Invalid identifier/specifier matrix and leak-sentinel assertions over the rendered bytes                               |
+| `TFI3-AC-03`  | Preserve unsupported properties and incomplete coverage as visible review blockers rather than manufacturing a value or a complete options object.                                                | Unsupported/hazard fixture, global truncation refusal, bounded reason/type/storage-path details, and no generated assignment |
+| `TFI3-AC-04`  | Accept only bounded identifiers plus privacy-safe relative or package module specifiers; emit no absolute paths, source snippets, comments, initializers, credentials, or customer values.        | Invalid identifier/specifier matrix plus oversized storage/type-path leak-sentinel assertions over rendered bytes      |
 | `TFI3-AC-05`  | Keep the result workspace-private and ephemeral. Do not write files, alter the portable schema, bundle it with contracts, or add it to canonical hashes.                                          | Renderer remains outside the package barrel and all artifact/schema/golden tests remain unchanged                      |
 | `TFI3-AC-06`  | Add only the compiler-owned type contract needed by the generated draft; neither the compiler nor workspace creates runtime capability values or invokes factories, callbacks, streams, or views. | Generated-module semantic check against the real compiler export, source inspection, and focused/full repository gates |
 

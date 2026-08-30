@@ -17,6 +17,7 @@ const FORM_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:\[\]*%\-]*$/u;
 const PROPERTY_KEY_PATTERN = /^[A-Za-z_$][A-Za-z0-9_$]*$/u;
 const MAX_IDENTIFIER_CHARACTERS = 120;
 const MAX_PATH_CHARACTERS = 480;
+const REDACTED_DIAGNOSTIC_PATH = "$unavailable";
 
 export type FactoryInputScaffoldErrorCode =
   | "FACTORY_INPUT_SCAFFOLD_ANALYSIS_UNAVAILABLE"
@@ -67,6 +68,7 @@ export interface FactoryInputScaffoldExplicitProperty {
 
 export interface FactoryInputScaffoldDiagnostic {
   readonly code: FactoryInputDiagnosticCode | FactoryInputUsageDiagnosticCode;
+  readonly path?: string;
   readonly propertyKey?: string;
   readonly reason?: FactoryInputUseAmbiguityReason;
   readonly storagePath?: string;
@@ -279,9 +281,18 @@ function diagnosticKey(diagnostic: FactoryInputScaffoldDiagnostic): string {
   return [
     diagnostic.propertyKey ?? "",
     diagnostic.code,
+    diagnostic.path ?? "",
     diagnostic.reason ?? "",
     diagnostic.storagePath ?? "",
   ].join("\0");
+}
+
+function boundedDiagnosticPath(path: string): string {
+  return path.length > 0 &&
+    path.length <= MAX_PATH_CHARACTERS &&
+    !/[\u0000-\u001f\u007f]/u.test(path)
+    ? path
+    : REDACTED_DIAGNOSTIC_PATH;
 }
 
 function createReview(
@@ -327,11 +338,14 @@ function createReview(
       ...(diagnostic.propertyKey === undefined
         ? {}
         : { propertyKey: diagnostic.propertyKey }),
+      ...("path" in diagnostic && diagnostic.path !== undefined
+        ? { path: boundedDiagnosticPath(diagnostic.path) }
+        : {}),
       ...("reason" in diagnostic && diagnostic.reason !== undefined
         ? { reason: diagnostic.reason }
         : {}),
       ...("storagePath" in diagnostic && diagnostic.storagePath !== undefined
-        ? { storagePath: diagnostic.storagePath }
+        ? { storagePath: boundedDiagnosticPath(diagnostic.storagePath) }
         : {}),
     };
     diagnostics.set(diagnosticKey(value), value);

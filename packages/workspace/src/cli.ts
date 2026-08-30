@@ -305,13 +305,36 @@ function formatFactoryInputDrafts(
   result: InspectWorkspaceFactoryInputsResult,
 ): string {
   return result.drafts
-    .map(
-      (draft) =>
+    .map((draft) => {
+      const diagnostics = draft.review.diagnostics
+        .map((diagnostic) => {
+          const details = [
+            ...(diagnostic.propertyKey === undefined
+              ? []
+              : [`property=${diagnostic.propertyKey}`]),
+            ...(diagnostic.path === undefined
+              ? []
+              : [`path=${JSON.stringify(diagnostic.path)}`]),
+            ...(diagnostic.reason === undefined
+              ? []
+              : [`reason=${diagnostic.reason}`]),
+            ...(diagnostic.storagePath === undefined
+              ? []
+              : [`storage=${JSON.stringify(diagnostic.storagePath)}`]),
+          ];
+          return `Review diagnostic [${diagnostic.code}]${
+            details.length === 0 ? '' : ` ${details.join(' ')}`
+          }\n`;
+        })
+        .join('');
+      return (
         `Factory input draft: project=${draft.projectId} source=${draft.sourceId} form=${draft.formId} factory=${draft.factorySymbol}\n` +
         `Suggested path: ${draft.suggestedPath}\n` +
         `Review: generated=${draft.metrics.generated} explicit=${draft.metrics.explicit} ambiguous=${draft.metrics.ambiguous} unsupported=${draft.metrics.unsupported} coverage=${draft.metrics.coverage} unattributedAmbiguity=${draft.metrics.unattributedAmbiguity}\n` +
-        draft.code,
-    )
+        diagnostics +
+        draft.code
+      );
+    })
     .join('');
 }
 

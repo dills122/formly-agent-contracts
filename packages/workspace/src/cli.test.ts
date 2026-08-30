@@ -131,7 +131,13 @@ describe('workspace CLI', () => {
             generated: [],
             explicit: [],
             unsupported: [],
-            diagnostics: [],
+            diagnostics: [
+              {
+                code: 'FACTORY_INPUT_TYPE_ANY',
+                propertyKey: 'unsafeOwnerFilter',
+                path: 'unsafeOwnerFilter.call[0].return',
+              },
+            ],
           },
         },
       ],
@@ -162,6 +168,7 @@ describe('workspace CLI', () => {
       'Factory input draft: project=claims source=claims/forms form=claims.indexing factory=IndexingFormConfig\n' +
         'Suggested path: libs/forms/indexing-form.contract.factory-input.generated.ts\n' +
         'Review: generated=3 explicit=2 ambiguous=0 unsupported=1 coverage=incomplete unattributedAmbiguity=true\n' +
+        'Review diagnostic [FACTORY_INPUT_TYPE_ANY] property=unsafeOwnerFilter path="unsafeOwnerFilter.call[0].return"\n' +
         'export const draft = {} as const;\n',
     );
     expect(captured.stderr).toEqual([]);

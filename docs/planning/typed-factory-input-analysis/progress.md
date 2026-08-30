@@ -169,7 +169,8 @@
 - The renderer accepts only bounded stable identifiers and normalized
   workspace-relative TypeScript paths. It refuses unexported/external option
   types and unsafe authoring context, copies no source snippets, values,
-  comments, absolute paths, or diagnostic paths, writes no files, and remains
+  comments or absolute paths, emits only bounded/redacted diagnostic paths,
+  writes no files, and remains
   absent from the workspace package barrel and portable schemas/artifacts.
 - Focused evidence: 14 scaffold/index tests pass, including a semantic
   TypeScript check of the generated module; the combined compiler/workspace
@@ -358,3 +359,33 @@
 - The maintainer requested one last fresh-context review, so this new cycle is
   capped at two instances. No additional reviewer will be started after the
   final pass; any non-blocking residuals will be recorded as fast follows.
+
+### Post-remediation independent review instance 2 reconciliation
+
+- The final authorized reviewer inspected the clean `8a856d3..3bfe5aa`
+  snapshot and returned two P1 fail-closed findings plus one P2 diagnostic-DX
+  finding. All three were reproduced and accepted.
+- Any type-analysis truncation now blocks automatic materialization for the
+  whole input object. A partial 64-property view can no longer produce helpers
+  while an unseen property graph remains unanalyzed.
+- Static storage paths are bounded to 16 segments, 120 characters per segment,
+  and 480 rendered characters. Invalid, oversized, or control-bearing keys
+  become `unsupported-storage` ambiguity without copying the source key into
+  diagnostics or generated output.
+- Scaffold review preserves bounded type-hazard paths and redacts an unsafe
+  path as `$unavailable`. The CLI prints these local review diagnostics with
+  their bounded property/path/reason/storage context.
+- TDD began with five failing expectations across four new regression cases
+  and one CLI projection update. Focused verification passes with 3 files and
+  52 tests; workspace type-check and focused ESLint also pass.
+- The cycle is now closed at the maintainer-authorized two instances. Packed
+  consumer coverage for the authoring command, an explicit usage-AST node
+  budget, and richer workspace-owned Observable-subclass member inspection are
+  recorded as non-blocking fast follows rather than silently expanding the
+  MVP.
+- Final reconciled repository verification: `pnpm check` passes with 61 test
+  files and 1,083 tests, every package/application/fixture build, linked and
+  packed workspace consumers, release/pack/demo checks, validation of 136
+  documentation files, and the 19-page production docs-site build. The first
+  sandboxed full run reached the consumer install before DNS refusal; the
+  authorized network-enabled rerun of the exact command passed.

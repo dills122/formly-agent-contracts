@@ -167,8 +167,11 @@ The outer emission type was recovered, but the descriptor was tagged
 retained walk also enters application-owned object properties. The experiment
 bounds traversal at depth 8 and 256 visited types. If either bound is reached,
 it reports `analysis-truncated`; it does not assert that the unseen graph is
-safe. The tool can explain the known outer shape and typed result branch, but
-it cannot claim the nested collection's element shape.
+safe. In the production authoring workflow, any truncation is a global
+automatic-materialization kill switch for that factory input: the retained
+properties remain visible for review, but none receives a generated helper.
+The tool can explain the known outer shape and typed result branch, but it
+cannot claim the nested collection's element shape.
 
 Top-level `Observable<any>` is `unsafe-any`; `Observable<unknown>` is
 `unknown`. Neither receives a generated semantic value or actionable option
@@ -428,6 +431,13 @@ production classifier may add symbol-resolved destructuring and bounded
 immutable aliases only after focused positive and adversarial acceptance tests.
 Lexical function nesting is never itself evidence of deferred execution.
 
+Reviewed storage evidence is also bounded before it enters local output. A
+storage path accepts at most 16 property segments, 120 characters per segment,
+and 480 rendered characters, and refuses ASCII control characters. A rejected
+key becomes `unsupported-storage` ambiguity without preserving the source key.
+Type-hazard paths use the same 480-character/control-character output boundary;
+unsafe paths are represented as `$unavailable` rather than copied.
+
 Use-site classification and input-type classification are separate axes. An
 `inside-stored-function` access becomes a generated `captured-callback` only
 when the accessed input property's own type has a supported call signature and
@@ -528,6 +538,10 @@ Unknown values are expected metadata, not necessarily fatal generation errors.
 They become fatal only when the selected projection or interaction profile
 requires stronger actionable evidence.
 
+The local authoring CLI prints the stable diagnostic code plus any safe bounded
+property, type path, ambiguity reason, or reviewed storage path. It never prints
+an unbounded rejected source key.
+
 ## Evidence and retained experiment
 
 Files:
@@ -611,6 +625,8 @@ and it does not independently unlock arbitrary factory execution.
   canonical RxJS-symbol availability internally; defer a cross-version support
   matrix and public compatibility claim.
 - Define depth/node/string/union limits and make truncation an explicit hazard.
+- Treat every truncation diagnostic as a factory-wide block on automatic
+  materialization; never generate from a known partial property set.
 - Canonically sort each bounded local output and test repeated byte identity.
   Test workspace path confinement and prove no local report/scaffold content
   enters portable artifacts. A future portable descriptor requires a separate
@@ -624,6 +640,9 @@ and it does not independently unlock arbitrary factory execution.
 - Start with direct property access. Destructuring, aliases, computed access,
   getters, and unknown higher-order consumers remain incomplete/refused until
   each grammar addition has adversarial tests.
+- Bound static storage segments and rendered paths before retaining them; an
+  unsafe key must become unattributed/unsupported storage without source-text
+  projection.
 - Combine use-site disposition with the input property's own type. Only a
   supported callable in a reviewed storage position can become a captured
   callback; scalar reads inside stored functions stay explicit.
@@ -642,6 +661,8 @@ and it does not independently unlock arbitrary factory execution.
   privacy-safe module specifiers, reject copied source snippets/literals,
   absolute paths, credentials, and customer values, and exclude it from every
   portable artifact.
+- Preserve only bounded diagnostic paths for review and use a stable redaction
+  marker when a source-derived path is unsafe.
 - Colocate the form definition/root anchor with the real form package or its
   Node-safe contracts entry point.
 - Let the author provide only named explicit variants/values.

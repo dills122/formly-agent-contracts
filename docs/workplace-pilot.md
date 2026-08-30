@@ -294,10 +294,16 @@ exported options type and supported direct uses in the factory, then prints:
 - mutually exclusive generated, explicit, ambiguous, and unsupported property
   counts, plus overall coverage and an unattributed-ambiguity flag.
 
+The summary is followed by stable review diagnostics with safe bounded
+property, type-path, ambiguity-reason, and storage-path context. Unsafe paths
+are redacted or refused rather than copied from source.
+
 Unsupported final materialization has count precedence over keyed ambiguity,
 so a type hazard remains visible even when its flow is also ambiguous. Direct
 `eval()` is an unattributed reflective refusal and blocks generated helpers; it
 is never inspected or executed.
+Any type-analysis truncation likewise blocks every generated helper for that
+factory input; the tool does not automate from a partial property view.
 
 The output is a review aid, not a runtime harness. The command does not invoke
 the source `list()`, the real factory, callbacks, streams, or Angular views and

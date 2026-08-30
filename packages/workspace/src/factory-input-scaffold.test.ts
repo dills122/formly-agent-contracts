@@ -211,9 +211,14 @@ describe("generateFactoryInputScaffold", () => {
         },
         {
           code: "FACTORY_INPUT_TYPE_UNKNOWN",
+          path: "templateRef<0>",
           propertyKey: "templateRef",
         },
-        { code: "FACTORY_INPUT_TYPE_ANY", propertyKey: "unsafeAny" },
+        {
+          code: "FACTORY_INPUT_TYPE_ANY",
+          path: "unsafeAny",
+          propertyKey: "unsafeAny",
+        },
       ],
     });
     expect(generated.code).toContain(
@@ -488,6 +493,131 @@ describe("generateFactoryInputScaffold", () => {
         },
       ])
     );
+  });
+
+  it("blocks every generated helper when type analysis truncates", () => {
+    const propertyLines = Array.from(
+      { length: 65 },
+      (_, index) =>
+        `readonly callback${String(index).padStart(2, "0")}: () => void;`
+    ).join("\n");
+    const expressionLines = Array.from({ length: 65 }, (_, index) => {
+      const suffix = String(index).padStart(2, "0");
+      return `${JSON.stringify(
+        `props.callback${suffix}`
+      )}: () => options.callback${suffix}(),`;
+    }).join("\n");
+    const program = createProgram(`
+      export interface IndexingFormOptions {
+        ${propertyLines}
+      }
+      export function IndexingFormConfig(
+        options: IndexingFormOptions,
+      ): readonly object[] {
+        return [{ expressions: { ${expressionLines} } }];
+      }
+    `);
+
+    const generated = generate(program);
+
+    expect(generated.review).toMatchObject({
+      coverage: "incomplete",
+      generated: [],
+      diagnostics: [
+        {
+          code: "FACTORY_TYPE_ANALYSIS_TRUNCATED",
+          path: "$input",
+        },
+      ],
+    });
+    expect(generated.review.unsupported).toHaveLength(64);
+    expect(generated.code).not.toContain("h.capturedCallback");
+  });
+
+  it("refuses and redacts an unbounded storage key", () => {
+    const sentinel = `WORKPLACE-CUSTOMER-SECRET-${"x".repeat(5_000)}`;
+    const program = createProgram(`
+      export interface IndexingFormOptions {
+        readonly change: () => void;
+      }
+      export function IndexingFormConfig(
+        options: IndexingFormOptions,
+      ): readonly object[] {
+        return [{
+          expressions: {
+            ${JSON.stringify(sentinel)}: () => options.change(),
+          },
+        }];
+      }
+    `);
+
+    const generated = generate(program);
+    const serialized = JSON.stringify(generated);
+
+    expect(generated.review).toMatchObject({
+      coverage: "incomplete",
+      generated: [],
+      diagnostics: [
+        {
+          code: "FACTORY_INPUT_CAPABILITY_UNSUPPORTED",
+          propertyKey: "change",
+        },
+        {
+          code: "FACTORY_INPUT_USE_AMBIGUOUS",
+          propertyKey: "change",
+          reason: "unsupported-storage",
+        },
+      ],
+    });
+    expect(serialized).not.toContain("WORKPLACE-CUSTOMER-SECRET");
+    expect(serialized.length).toBeLessThan(2_000);
+  });
+
+  it("preserves a precise bounded type-hazard path", () => {
+    const program = createProgram(`
+      import type { Observable } from 'rxjs';
+      interface Payload { readonly nested: { readonly value: any }; }
+      export interface IndexingFormOptions {
+        readonly values$: Observable<Payload>;
+      }
+      export function IndexingFormConfig(
+        options: IndexingFormOptions,
+      ): readonly object[] {
+        return [{ props: { values$: options.values$ } }];
+      }
+    `);
+
+    expect(generate(program).review.diagnostics).toContainEqual({
+      code: "FACTORY_INPUT_TYPE_ANY",
+      path: "values$.emission.nested.value",
+      propertyKey: "values$",
+    });
+  });
+
+  it("redacts an unsafe type-hazard path without copying source text", () => {
+    const sentinel = `WORKPLACE-TYPE-PATH-SECRET-${"x".repeat(5_000)}`;
+    const program = createProgram(`
+      import type { Observable } from 'rxjs';
+      interface Payload { readonly ${JSON.stringify(sentinel)}: any; }
+      export interface IndexingFormOptions {
+        readonly values$: Observable<Payload>;
+      }
+      export function IndexingFormConfig(
+        options: IndexingFormOptions,
+      ): readonly object[] {
+        return [{ props: { values$: options.values$ } }];
+      }
+    `);
+
+    const generated = generate(program);
+    const serialized = JSON.stringify(generated);
+
+    expect(generated.review.diagnostics).toContainEqual({
+      code: "FACTORY_INPUT_TYPE_ANY",
+      path: "$unavailable",
+      propertyKey: "values$",
+    });
+    expect(serialized).not.toContain("WORKPLACE-TYPE-PATH-SECRET");
   });
 
   it("refuses non-identifier option keys instead of embedding arbitrary source names", () => {

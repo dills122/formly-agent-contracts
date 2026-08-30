@@ -46,10 +46,17 @@ counts. It also prints overall grammar coverage and an
 `unattributedAmbiguity` flag because some unsupported flows cannot safely be
 assigned to one input property.
 
+The command prints each local review diagnostic after the summary, including
+safe bounded property, type-path, ambiguity-reason, and reviewed-storage
+context. Type/storage paths are limited before projection; unsafe paths are
+redacted or treated as unsupported storage rather than copied from source.
+
 Each property contributes to at most one count. Final unsupported
 materialization has precedence over flow ambiguity so a type hazard cannot be
 hidden by an alias or other ambiguous use. Direct `eval()` is refused as
 unattributed reflection; the command never parses or executes its string.
+Any type-analysis truncation also blocks every generated helper for that input
+object; a partial property view is never treated as safe enough to automate.
 
 This is a local, read-only authoring aid. It does not call source `list()`
 functions or application factories, subscribe to Observables, access Angular

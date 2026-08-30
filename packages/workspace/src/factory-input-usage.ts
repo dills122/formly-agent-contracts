@@ -40,6 +40,10 @@ const ANGULAR_VIEW_SYMBOLS = new Set([
   "ViewContainerRef",
 ]);
 
+const MAX_STORAGE_PATH_CHARACTERS = 480;
+const MAX_STORAGE_PATH_SEGMENTS = 16;
+const MAX_STORAGE_SEGMENT_CHARACTERS = 120;
+
 export type FactoryInputUseKind =
   | "ambiguous"
   | "construction-call"
@@ -252,24 +256,37 @@ function rootedAtOptionsParameter(
 }
 
 function staticPropertyName(name: ts.PropertyName): string | undefined {
+  let value: string | undefined;
   if (
     ts.isIdentifier(name) ||
     ts.isStringLiteral(name) ||
     ts.isNoSubstitutionTemplateLiteral(name)
   ) {
-    return name.text;
+    value = name.text;
   }
-  return undefined;
+  return value !== undefined &&
+    value.length > 0 &&
+    value.length <= MAX_STORAGE_SEGMENT_CHARACTERS &&
+    !/[\u0000-\u001f\u007f]/u.test(value)
+    ? value
+    : undefined;
 }
 
-function renderStoragePath(segments: readonly string[]): string {
-  return segments
-    .map((segment, index) =>
-      /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(segment)
-        ? `${index === 0 ? "" : "."}${segment}`
-        : `[${JSON.stringify(segment)}]`
-    )
-    .join("");
+function renderStoragePath(segments: readonly string[]): string | undefined {
+  if (segments.length === 0 || segments.length > MAX_STORAGE_PATH_SEGMENTS) {
+    return undefined;
+  }
+  let path = "";
+  for (const [index, segment] of segments.entries()) {
+    const rendered = /^[A-Za-z_$][A-Za-z0-9_$]*$/u.test(segment)
+      ? `${index === 0 ? "" : "."}${segment}`
+      : `[${JSON.stringify(segment)}]`;
+    if (path.length + rendered.length > MAX_STORAGE_PATH_CHARACTERS) {
+      return undefined;
+    }
+    path += rendered;
+  }
+  return path;
 }
 
 function isAssignmentToThisProperty(node: ts.Node): boolean {
@@ -762,6 +779,9 @@ export function analyzeFactoryInputUsages(
     );
   }
   const state = analyzeBodyUses(checker, body, parameterSymbol);
+  const automaticMaterializationBlocked = typeAnalysis.diagnostics.some(
+    ({ code }) => code === "FACTORY_TYPE_ANALYSIS_TRUNCATED"
+  );
   const unattributedAmbiguity = state.diagnostics.some(
     ({ code, propertyKey }) =>
       code === "FACTORY_INPUT_USE_AMBIGUOUS" && propertyKey === undefined
@@ -771,11 +791,9 @@ export function analyzeFactoryInputUsages(
     return {
       ...property,
       uses,
-      materialization: propertyMaterialization(
-        property,
-        uses,
-        unattributedAmbiguity
-      ),
+      materialization: automaticMaterializationBlocked
+        ? "unsupported"
+        : propertyMaterialization(property, uses, unattributedAmbiguity),
     };
   });
   for (const property of properties) {

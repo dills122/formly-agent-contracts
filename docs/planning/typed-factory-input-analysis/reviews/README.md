@@ -37,7 +37,7 @@ plan, not only the previous review's remediation patch.
 3. [Implementation round 3 — Codex](./implementation-round-3-codex.md): three
    fail-closed findings and two documentation drifts accepted and reconciled.
 
-## Post-remediation implementation cycle — final review pending
+## Post-remediation implementation cycle — complete
 
 The maintainer explicitly requested a new review cycle after all three
 production instances were reconciled. It is a distinct cycle, not a
@@ -47,4 +47,11 @@ one last review after the first reconciliation.
 
 1. [Post-remediation round 1 — Codex](./post-remediation-round-1-codex.md): two
    P1 and one P2 findings accepted and reconciled.
-2. Final post-remediation round — pending.
+2. [Post-remediation round 2 — Codex](./post-remediation-round-2-codex.md): two
+   P1 fail-closed findings and one P2 diagnostic-projection finding accepted
+   and reconciled. Packed-consumer feature smoke, a usage-AST node budget, and
+   richer Observable-subclass member analysis are recorded as fast follows.
+
+No third reviewer will be started in this cycle. Final remediation is covered
+by focused regressions, the complete workspace suite, and the repository gate
+recorded in the progress log.
