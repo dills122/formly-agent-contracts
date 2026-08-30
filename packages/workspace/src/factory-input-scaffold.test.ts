@@ -263,6 +263,86 @@ describe("generateFactoryInputScaffold", () => {
     );
   });
 
+  it("does not generate helpers for properties with TypeScript errors", () => {
+    const program = createProgram(`
+      import type { TemplateRef } from '@angular/core';
+      import type { Observable } from 'rxjs';
+
+      export class IndexingFormOptions {
+        readonly change: (value: string) => void = 123;
+        readonly values$: Observable<string> = 123;
+        readonly templateRef: TemplateRef<unknown> = 123;
+      }
+
+      export function IndexingFormConfig(
+        options: IndexingFormOptions,
+      ): readonly object[] {
+        return [{
+          props: {
+            change: options.change,
+            values$: options.values$,
+            header: options.templateRef,
+          },
+        }];
+      }
+    `);
+
+    expect(generate(program).review).toMatchObject({
+      coverage: "incomplete",
+      generated: [],
+      unsupported: ["change", "templateRef", "values$"],
+      diagnostics: [
+        {
+          code: "FACTORY_TYPESCRIPT_DIAGNOSTIC",
+          propertyKey: "change",
+        },
+        {
+          code: "FACTORY_TYPESCRIPT_DIAGNOSTIC",
+          propertyKey: "templateRef",
+        },
+        {
+          code: "FACTORY_TYPESCRIPT_DIAGNOSTIC",
+          propertyKey: "values$",
+        },
+      ],
+    });
+  });
+
+  it("does not generate helpers for properties with TypeScript suppressions", () => {
+    const optionsPath = `${WORKSPACE_ROOT}/libs/forms/indexing-options.ts`;
+    const program = createProgram(
+      `
+        import type { IndexingFormOptions } from './indexing-options.js';
+
+        export function IndexingFormConfig(
+          options: IndexingFormOptions,
+        ): readonly object[] {
+          return [{ props: { change: options.change } }];
+        }
+      `,
+      {
+        [optionsPath]: `
+          export class IndexingFormOptions {
+            // @ts-ignore intentional fixture
+            readonly change: (value: string) => void = 123;
+          }
+        `,
+      }
+    );
+
+    expect(generate(program).review).toMatchObject({
+      coverage: "incomplete",
+      generated: [],
+      unsupported: ["change"],
+      diagnostics: [
+        {
+          code: "FACTORY_TYPESCRIPT_SUPPRESSION",
+          propertyKey: "change",
+        },
+      ],
+    });
+  });
+
   it("keeps optional auto-capability candidates explicit so presence is not invented", () => {
     const program = createProgram(`
       import type { Observable } from 'rxjs';

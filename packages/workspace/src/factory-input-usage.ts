@@ -91,6 +91,7 @@ export interface FactoryInputUsagePropertyAnalysis {
   readonly key: string;
   readonly optional: boolean;
   readonly readonly: boolean;
+  readonly safety: FactoryInputPropertyTypeAnalysis["safety"];
   readonly expectedType: NormalizedTypeDescriptor;
   readonly observables: FactoryInputPropertyTypeAnalysis["observables"];
   readonly uses: readonly FactoryInputUse[];
@@ -613,6 +614,9 @@ function propertyMaterialization(
   uses: readonly FactoryInputUse[],
   unattributedAmbiguity: boolean
 ): FactoryInputMaterialization {
+  if (property.safety !== "safe") {
+    return "unsupported";
+  }
   const recognizedAngularView = angularViewType(property.expectedType);
   if (property.expectedType.hazards.length > 0 && !recognizedAngularView) {
     return "unsupported";

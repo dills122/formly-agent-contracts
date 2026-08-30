@@ -285,20 +285,24 @@ package dependency direction:
    directory inside the consumer workspace. It is excluded from portable
    bundles and is committed only by explicit author choice.
 3. The generated application scaffold references the compiler-owned RH-02
-   type-only authoring contract. `packages/compiler` does not currently validate
-   or materialize those bindings and supplies no runtime harness implementation;
-   the deferred FAC-3/FAC-4 runner remains responsible for any future reviewed
-   materialization. Compiler does not import TypeScript or consume workspace
-   compiler objects. No new runtime DTO or reverse dependency is introduced
-   between workspace and compiler.
+   type-only authoring contract. The MVP compiler surface validates nothing and
+   materializes nothing at runtime; it only types application-authored helper
+   calls. Compiler remains the owner of any future RH-02 inert-binding
+   validation/materialization API, while the deferred FAC-3/FAC-4 runner remains
+   responsible for contained execution. Compiler does not import TypeScript or
+   consume workspace compiler objects. No new runtime DTO or reverse dependency
+   is introduced between workspace and compiler.
 
 The MVP intentionally has no cache, so there is no stale descriptor to
 invalidate. Each run reuses the workspace-created leaf Program for both source
-lineage and factory input analysis. The report records supported
-TypeScript/RxJS versions and the existing privacy-safe program/source identity;
-changes to tsconfig, sources, declarations, or dependency versions are
-naturally observed on the next run. The separate code-free source-registration
-sidecar remains workspace-owned and does not gain executable factory inputs.
+lineage and factory input analysis. The internal analysis records the active
+TypeScript runtime version and whether RxJS resolved to a canonical package
+symbol; the local scaffold/review draft does not publish dependency-version
+claims. Changes to tsconfig, sources, declarations, or dependency versions are
+naturally observed on the next run. A cross-version compatibility matrix is a
+future release gate, not an implemented MVP feature. The separate code-free
+source-registration sidecar remains workspace-owned and does not gain
+executable factory inputs.
 
 ### Output and privacy boundary
 
@@ -369,7 +373,8 @@ unbounded serialization of TypeScript internals:
 - literal/union members when bounded;
 - array/tuple element descriptors;
 - application symbol identity using the existing program/path privacy model;
-- recognized external package identity and supported version;
+- recognized external package identity (without claiming a supported version
+  range in the descriptor);
 - call/construct parameter and return descriptors;
 - generic arguments; and
 - `any`, `unknown`, unresolved, recursive, truncated, and unsupported hazards.
@@ -592,8 +597,10 @@ and it does not independently unlock arbitrary factory execution.
   the full graph across the workspace/compiler boundary.
 - Resolve factory parameter types, callback signatures/returns, and canonical
   RxJS emission types from the configured leaf Program.
-- Pin supported TypeScript/RxJS compatibility and retain alias/subclass/barrel
-  fixtures.
+- Pin the repository's tested TypeScript/RxJS fixture versions and retain
+  alias/subclass/barrel fixtures. Record the active TypeScript version and
+  canonical RxJS-symbol availability internally; defer a cross-version support
+  matrix and public compatibility claim.
 - Define depth/node/string/union limits and make truncation an explicit hazard.
 - Canonically sort each bounded local output and test repeated byte identity.
   Test workspace path confinement and prove no local report/scaffold content
@@ -612,8 +619,9 @@ and it does not independently unlock arbitrary factory execution.
   supported callable in a reviewed storage position can become a captured
   callback; scalar reads inside stored functions stay explicit.
 - Render known callbacks/Observables/view capabilities as compiler-authoring
-  helper calls in the generated application scaffold. Compiler remains the
-  owner of RH-02 inert binding validation/materialization.
+  helper calls in the generated application scaffold. The MVP compiler API is
+  type-only; compiler remains the owner of a future RH-02 inert-binding
+  validation/materialization API.
 - Require explicit values for construction-affecting properties.
 - Emit incomplete coverage rather than guessing through unsupported flow.
 
@@ -657,7 +665,9 @@ and it does not independently unlock arbitrary factory execution.
 Proceed from analysis to the workplace pilot only if:
 
 - the exact leaf Program has no relevant semantic diagnostics;
-- supported TypeScript/RxJS package identities match the compatibility matrix;
+- the repository-pinned TypeScript runtime is active and RxJS resolves to the
+  canonical package identity (a cross-version compatibility matrix remains a
+  later release gate);
 - every used input is auto-inert, explicitly bound, or deterministically
   refused;
 - no `any`/`unknown` hazard is hidden within the bounded traversed graph, and

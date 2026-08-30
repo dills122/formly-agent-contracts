@@ -282,3 +282,35 @@
   files and 1,064 tests, every package/application/fixture build, linked and
   packed workspace consumers, release/pack/demo checks, validation of 119
   documentation files, and the production docs-site build.
+
+### Production independent review instance 3 reconciliation
+
+- The final reviewer in the original three-instance production cycle returned
+  one P1 and two P2 fail-closed findings plus two documentation drifts. All were
+  accepted without an architecture change.
+- Property analysis now carries explicit TypeScript safety evidence. A semantic
+  error or suppression forces unsupported materialization before callback,
+  Observable, or Angular-view helper selection.
+- Descriptor diagnostics now traverse bounded call/construct parameters and
+  returns plus generic constraints, so nested `any`/`unknown` hazards prevent
+  complete coverage using stable canonical paths.
+- Omitted form selection remains unfiltered, while explicit `formIds: []`
+  refuses before discovery even when the workspace contains valid targets.
+- The research design now distinguishes the implemented TypeScript/canonical
+  RxJS evidence from a deferred cross-version matrix, and the current compiler
+  type-only interface from future runtime validation/materialization ownership.
+- TDD began with three failing reproductions. Reconciled focused evidence is 3
+  files and 41 tests; the complete workspace suite passes with 16 files and 299
+  tests, and workspace type-check plus focused lint pass.
+- A quick author review found no additional correctness, readability,
+  architecture, security, or performance blockers. The safety gate precedes
+  every helper special case, traversal reuses existing bounded descriptors, no
+  dependency or portable contract changed, and explicit-empty refusal occurs
+  before workspace loading.
+- Final reconciled repository verification: `pnpm check` passes with 60 test
+  files and 1,067 tests, every package/application/fixture build, linked and
+  packed workspace consumers, release/pack/demo checks, validation of 120
+  documentation files, and the production docs-site build.
+- The maintainer explicitly authorized a distinct post-remediation independent
+  review cycle. Its first blind-first fresh-context instance will inspect the
+  clean commit produced from this reconciliation.

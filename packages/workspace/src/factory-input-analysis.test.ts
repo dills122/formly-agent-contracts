@@ -390,6 +390,61 @@ describe("analyzeFactoryInputTypes", () => {
     });
   });
 
+  it("reports hazards nested in callable object members", () => {
+    const program = createProgram(`
+      interface Result {
+        readonly id: string;
+      }
+
+      interface Service {
+        run(value: any): string;
+        read(): unknown;
+        map<T extends { readonly payload: any }>(value: T): T;
+        create: new (seed: unknown) => Result;
+      }
+
+      export interface Options {
+        readonly service: Service;
+      }
+
+      export function CallableMemberForm(options: Options): readonly object[] {
+        return [{ props: { service: options.service } }];
+      }
+    `);
+
+    const analysis = analyzeFactoryInputTypes({
+      workspaceRoot: WORKSPACE_ROOT,
+      descriptor: descriptor(program),
+      factoryDeclaration: factoryDeclaration(program, "CallableMemberForm"),
+    });
+
+    expect(analysis.coverage).toBe("incomplete");
+    expect(analysis.diagnostics).toEqual(
+      expect.arrayContaining([
+        {
+          code: "FACTORY_INPUT_TYPE_UNKNOWN",
+          path: "service.create.construct[0].parameter[0]",
+          propertyKey: "service",
+        },
+        {
+          code: "FACTORY_INPUT_TYPE_ANY",
+          path: "service.map.call[0].parameter[0].constraint.payload",
+          propertyKey: "service",
+        },
+        {
+          code: "FACTORY_INPUT_TYPE_UNKNOWN",
+          path: "service.read.call[0].return",
+          propertyKey: "service",
+        },
+        {
+          code: "FACTORY_INPUT_TYPE_ANY",
+          path: "service.run.call[0].parameter[0]",
+          propertyKey: "service",
+        },
+      ])
+    );
+  });
+
   it("fails closed when only part of a union is a canonical Observable", () => {
     const program = createProgram(`
       import type { Observable } from 'rxjs';

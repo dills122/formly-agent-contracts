@@ -73,8 +73,14 @@ function normalizedFormIds(formIds: readonly string[] | undefined): {
   readonly formIds: readonly string[] | undefined;
   readonly diagnostics: readonly WorkspaceFactoryInputAuthoringDiagnostic[];
 } {
-  if (formIds === undefined || formIds.length === 0) {
+  if (formIds === undefined) {
     return { formIds: undefined, diagnostics: [] };
+  }
+  if (formIds.length === 0) {
+    return {
+      formIds: undefined,
+      diagnostics: [{ code: "FACTORY_INPUT_AUTHORING_NO_TARGETS" }],
+    };
   }
   const diagnostics: WorkspaceFactoryInputAuthoringDiagnostic[] = [];
   const normalized: string[] = [];

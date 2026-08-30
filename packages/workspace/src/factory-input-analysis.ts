@@ -130,6 +130,7 @@ export interface FactoryInputPropertyTypeAnalysis {
   readonly key: string;
   readonly optional: boolean;
   readonly readonly: boolean;
+  readonly safety: "safe" | "typescript-diagnostic" | "typescript-suppression";
   readonly expectedType: NormalizedTypeDescriptor;
   readonly observables: readonly ObservableTypeAnalysis[];
 }
@@ -939,6 +940,47 @@ function diagnosticsForDescriptor(
     for (const [index, argument] of (current.typeArguments ?? []).entries()) {
       visit(argument, `${currentPath}<${index}>`, new Set(active));
     }
+    for (const [signatureIndex, signature] of (
+      current.callSignatures ?? []
+    ).entries()) {
+      for (const [
+        parameterIndex,
+        parameter,
+      ] of signature.parameters.entries()) {
+        visit(
+          parameter.type,
+          `${currentPath}.call[${signatureIndex}].parameter[${parameterIndex}]`,
+          new Set(active)
+        );
+      }
+      visit(
+        signature.returnType,
+        `${currentPath}.call[${signatureIndex}].return`,
+        new Set(active)
+      );
+    }
+    for (const [signatureIndex, signature] of (
+      current.constructSignatures ?? []
+    ).entries()) {
+      for (const [
+        parameterIndex,
+        parameter,
+      ] of signature.parameters.entries()) {
+        visit(
+          parameter.type,
+          `${currentPath}.construct[${signatureIndex}].parameter[${parameterIndex}]`,
+          new Set(active)
+        );
+      }
+      visit(
+        signature.returnType,
+        `${currentPath}.construct[${signatureIndex}].return`,
+        new Set(active)
+      );
+    }
+    if (current.constraint !== undefined) {
+      visit(current.constraint, `${currentPath}.constraint`, new Set(active));
+    }
     active.delete(current);
   };
   visit(descriptor, path, new Set());
@@ -1091,7 +1133,8 @@ function optionsContainerSafetyNodes(
         ? (current as ts.TypeReference).target
         : objectType;
     if ((target.objectFlags & ts.ObjectFlags.ClassOrInterface) === 0) return;
-    for (const baseType of checker.getBaseTypes(target as ts.InterfaceType) ?? []) {
+    for (const baseType of checker.getBaseTypes(target as ts.InterfaceType) ??
+      []) {
       visit(baseType);
     }
   };
@@ -1213,8 +1256,9 @@ export function analyzeFactoryInputTypes(
         (typeSafety.hasSuppression(declaration) ||
           typeSafety.hasIntersectingError(declaration))
       ) {
+        const suppressed = typeSafety.hasSuppression(declaration);
         diagnostics.push({
-          code: typeSafety.hasSuppression(declaration)
+          code: suppressed
             ? "FACTORY_TYPESCRIPT_SUPPRESSION"
             : "FACTORY_TYPESCRIPT_DIAGNOSTIC",
           path: property.getName(),
@@ -1224,6 +1268,9 @@ export function analyzeFactoryInputTypes(
           key: property.getName(),
           optional: (property.flags & ts.SymbolFlags.Optional) !== 0,
           readonly: propertyReadonly(property),
+          safety: suppressed
+            ? "typescript-suppression"
+            : "typescript-diagnostic",
           expectedType: expectedPropertyType,
           observables: [],
         };
@@ -1384,6 +1431,7 @@ export function analyzeFactoryInputTypes(
         key: property.getName(),
         optional: (property.flags & ts.SymbolFlags.Optional) !== 0,
         readonly: propertyReadonly(property),
+        safety: "safe",
         expectedType: expectedPropertyType,
         observables,
       };

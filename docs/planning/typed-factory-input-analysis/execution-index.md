@@ -1,6 +1,6 @@
 # Typed Factory Input Analysis Execution Index
 
-- Status: Research review and MVP implementation through TFI-MVP-5 complete; production implementation reviews 1 and 2 of 3 reconciled
+- Status: Research review and MVP implementation through TFI-MVP-5 complete; all three production implementation reviews reconciled; post-remediation review cycle authorized
 - Scope: research, retained experiments, technical design, and review
 - Production behavior changes: bounded typed factory-input analysis and read-only local authoring workflow
 
@@ -54,9 +54,9 @@ acceptance boundary and verification gate.
 | `TFI-MVP-4` | deferred | No finite runtime values are inferred from Observable types.                                                                                                                                   |
 | `TFI-MVP-5` | complete | Sanitized Nx Indexing/NIGO roots prove existing definition/lineage discovery, a read-only local authoring command, measured review burden, and containment checks.                             |
 
-The separate production implementation review cycle is tracked in
-[`reviews/README.md`](./reviews/README.md). Instances 1 and 2 are reconciled;
-instance 3 remains pending.
+The completed production implementation review cycle and the separately
+authorized post-remediation cycle are tracked in
+[`reviews/README.md`](./reviews/README.md).
 
 ### `TFI-MVP-1` traceability
 
@@ -66,19 +66,19 @@ instance 3 remains pending.
 | `TFI1-AC-02`  | Recover a supported function/class factory's single options-object properties, callback signatures, and return types.      | Function, class, callback, generic, scalar, and unsupported-signature fixtures                     |
 | `TFI1-AC-03`  | Resolve emission types only for canonical RxJS `Observable` ancestry, including aliases, subjects, subclasses, and unions. | Direct, barrel, alias, Subject, subclass, union, callback-return, and same-spelling-negative tests |
 | `TFI1-AC-04`  | Normalize type structure within explicit depth, node, string, union, property, parameter, and signature limits.            | Repeated-equality, deep graph, property cap, and display cap tests                                 |
-| `TFI1-AC-05`  | Expose `any`, `unknown`, unresolved generic, recursive, truncated, and unsupported hazards without inventing values.       | Fail-closed hazard, options-container/property semantic-error, and suppression matrix               |
+| `TFI1-AC-05`  | Expose `any`, `unknown`, unresolved generic, recursive, truncated, and unsupported hazards without inventing values.       | Fail-closed hazard, options-container/property semantic-error, and suppression matrix              |
 | `TFI1-AC-06`  | Keep the descriptor ephemeral and workspace-private; change no portable schema or artifact.                                | No barrel export, persistence, cache, schema, compiler, bundle, report, or scaffold change         |
 
 ### `TFI-MVP-2` traceability
 
-| Acceptance ID | Requirement                                                                                                                                                          | Verification                                                                                                         |
-| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------- |
-| `TFI2-AC-01`  | Reuse the exact `TFI-MVP-1` Program/declaration boundary and support only a function or class constructor with one identifier options parameter.                     | Function/class positives plus foreign-Program, destructured-parameter, and unsupported-signature refusals            |
+| Acceptance ID | Requirement                                                                                                                                                          | Verification                                                                                                                      |
+| ------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------- |
+| `TFI2-AC-01`  | Reuse the exact `TFI-MVP-1` Program/declaration boundary and support only a function or class constructor with one identifier options parameter.                     | Function/class positives plus foreign-Program, destructured-parameter, and unsupported-signature refusals                         |
 | `TFI2-AC-02`  | Classify direct construction reads/calls, direct returned escapes, reviewed stored functions, immediate IIFEs/synchronous collection callbacks, and ambiguous flow.  | Indexing-shaped positive matrix plus unknown higher-order consumer, getter, alias, destructuring, computed, and direct-eval cases |
-| `TFI2-AC-03`  | Combine use evidence with the property type: only supported callables in reviewed deferred storage become captured callbacks.                                        | Callable and scalar values in identical storage positions produce different dispositions                             |
-| `TFI2-AC-04`  | Classify canonical property Observables as inert streams and recognized Angular view handles as unavailable views only when they escape directly into returned data. | Canonical Observable, same-spelling negative, Angular `TemplateRef`, and non-view object cases                       |
-| `TFI2-AC-05`  | Require explicit values/bindings or mark unsupported whenever construction, ambiguity, hazards, or an unreviewed capability prevents safe automation.                | Mixed-use, immediate capability, `any`/`unknown`, unused, and unreviewed storage cases                               |
-| `TFI2-AC-06`  | Keep the plan bounded, deterministic, ephemeral, workspace-private, and free of factory calls, subscriptions, application imports, persistence, and portable output. | Repeated-equality assertion, source inspection, no barrel/schema/compiler/artifact changes, and full repository gate |
+| `TFI2-AC-03`  | Combine use evidence with the property type: only supported callables in reviewed deferred storage become captured callbacks.                                        | Callable and scalar values in identical storage positions produce different dispositions                                          |
+| `TFI2-AC-04`  | Classify canonical property Observables as inert streams and recognized Angular view handles as unavailable views only when they escape directly into returned data. | Canonical Observable, same-spelling negative, Angular `TemplateRef`, and non-view object cases                                    |
+| `TFI2-AC-05`  | Require explicit values/bindings or mark unsupported whenever construction, ambiguity, hazards, or an unreviewed capability prevents safe automation.                | Mixed-use, immediate capability, `any`/`unknown`, unused, and unreviewed storage cases                                            |
+| `TFI2-AC-06`  | Keep the plan bounded, deterministic, ephemeral, workspace-private, and free of factory calls, subscriptions, application imports, persistence, and portable output. | Repeated-equality assertion, source inspection, no barrel/schema/compiler/artifact changes, and full repository gate              |
 
 ### `TFI-MVP-3` traceability
 
@@ -86,7 +86,7 @@ instance 3 remains pending.
 | ------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | `TFI3-AC-01`  | Render a deterministic TypeScript authoring draft from the `TFI-MVP-2` result using the real exported options type through indexed-access types and `satisfies Partial<TOptions>`.                | Golden repeated-render test plus a TypeScript semantic type-check of the generated module                              |
 | `TFI3-AC-02`  | Generate helpers only for captured callbacks, inert canonical Observables, and recognized unavailable view handles; keep construction values and other reviewed bindings explicit.                | Mixed Indexing-shaped disposition matrix and exact generated helper assertions                                         |
-| `TFI3-AC-03`  | Preserve unsupported properties and incomplete coverage as visible review blockers rather than manufacturing a value or a complete options object.                                                | Unsupported/hazard fixture plus reason/storage-path review details and absence of a generated assignment                |
+| `TFI3-AC-03`  | Preserve unsupported properties and incomplete coverage as visible review blockers rather than manufacturing a value or a complete options object.                                                | Unsupported/hazard fixture plus reason/storage-path review details and absence of a generated assignment               |
 | `TFI3-AC-04`  | Accept only bounded identifiers plus privacy-safe relative or package module specifiers; emit no absolute paths, source snippets, comments, initializers, credentials, or customer values.        | Invalid identifier/specifier matrix and leak-sentinel assertions over the rendered bytes                               |
 | `TFI3-AC-05`  | Keep the result workspace-private and ephemeral. Do not write files, alter the portable schema, bundle it with contracts, or add it to canonical hashes.                                          | Renderer remains outside the package barrel and all artifact/schema/golden tests remain unchanged                      |
 | `TFI3-AC-06`  | Add only the compiler-owned type contract needed by the generated draft; neither the compiler nor workspace creates runtime capability values or invokes factories, callbacks, streams, or views. | Generated-module semantic check against the real compiler export, source inspection, and focused/full repository gates |

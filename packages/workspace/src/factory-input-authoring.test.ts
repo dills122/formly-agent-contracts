@@ -141,6 +141,8 @@ describe("inspectWorkspaceFactoryInputs", () => {
   });
 
   it("does not treat an explicitly empty form selection as success", async () => {
+    state.targets = [target()];
+
     const result = await inspectWorkspaceFactoryInputs({
       workspaceRoot: process.cwd(),
       rootConfigPath: "formly-contracts.config.ts",

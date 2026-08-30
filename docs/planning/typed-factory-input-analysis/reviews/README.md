@@ -23,10 +23,10 @@ and current verification evidence.
 - [Round 3 — Codex](./round-3-codex.md): two localized research/design blockers
   and two hygiene findings accepted and reconciled.
 
-## Production implementation cycle — in progress
+## Production implementation cycle — complete
 
 The implemented `TFI-MVP-1`, `TFI-MVP-2`, `TFI-MVP-3`, and `TFI-MVP-5`
-workflow is undergoing a separate three-instance fresh-context review cycle.
+workflow underwent a separate three-instance fresh-context review cycle.
 Each instance reviews the complete implementation branch and the implementation
 plan, not only the previous review's remediation patch.
 
@@ -34,4 +34,13 @@ plan, not only the previous review's remediation patch.
    and three P2 findings accepted and reconciled.
 2. [Implementation round 2 — Codex](./implementation-round-2-codex.md): three
    P1, two P2, and one P3 finding accepted and reconciled.
-3. Implementation round 3 — pending.
+3. [Implementation round 3 — Codex](./implementation-round-3-codex.md): three
+   fail-closed findings and two documentation drifts accepted and reconciled.
+
+## Post-remediation implementation cycle — authorized
+
+The maintainer explicitly requested a new review cycle after all three
+production instances were reconciled. It is a distinct cycle, not a
+renumbering or silent extension of the completed three-instance cycle above.
+Its first fresh-context review will inspect the new clean remediation snapshot
+using the same blind-first protocol.
