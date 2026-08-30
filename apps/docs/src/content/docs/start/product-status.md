@@ -21,9 +21,10 @@ mean “available in the package.”
   portable `source-usage-catalog.json`.
 - Browser-safe compact authoring for contracted radio-choice Formly types,
   shared by production registration and canonical profile generation.
-- `formly-contracts list`, `generate`, and non-mutating `check` commands.
-- Programmatic workspace discovery, generation, checking, index parsing, and
-  contract parsing APIs.
+- `formly-contracts list`, `generate`, non-mutating `check`, and read-only
+  `author-factory-inputs` commands.
+- Programmatic workspace discovery, local factory-input inspection, generation,
+  checking, index parsing, and contract parsing APIs.
 - Pure `executeAgentContextQuery` over caller-assembled agent-context
   artifacts, including source-usage search by source path or form ID.
 - Angular CLI and Nx consumer-shaped fixtures plus a browser-rendered synthetic

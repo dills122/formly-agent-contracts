@@ -119,8 +119,9 @@ pnpm install
 pnpm exec formly-contracts --help
 ```
 
-The binary accepts `list`, `generate`, and `check`. A successful help check
-starts with `Usage: formly-contracts <command> [options]`.
+The binary accepts `list`, `generate`, `check`, and the read-only
+`author-factory-inputs` command. A successful help check starts with
+`Usage: formly-contracts <command> [options]`.
 
 Repository CI also packs the three built packages and runs the workspace CLI in
 an isolated temporary consumer. That is a technical tarball boundary check,
@@ -269,6 +270,56 @@ Without that manual MVP ownership anchor, the call emits
 original factory normally; the indexer resolves its TypeScript symbol without
 executing or serializing arguments such as `window.location.pathname`.
 
+### Author a typed factory-input adapter from the real root
+
+When the real factory requires an options object, the same explicit
+`lineage.rootSymbol` can drive a local typed authoring draft. No second map of
+factory paths or symbol names is needed:
+
+```sh
+pnpm exec formly-contracts author-factory-inputs \
+  --workspace-root . \
+  --config formly-contracts.config.ts \
+  --form-id claims.create
+```
+
+This command reuses the configured source-usage TypeScript Programs and the
+exact project/source/definition/root relationship. It statically reads the real
+exported options type and supported direct uses in the factory, then prints:
+
+- a workspace-relative suggested path beside the definition;
+- a typed `satisfies Partial<Options>` draft;
+- generated placeholders for supported captured callbacks, canonical inert
+  Observables, and unavailable Angular view handles; and
+- mutually exclusive generated, explicit, ambiguous, and unsupported property
+  counts, plus overall coverage and an unattributed-ambiguity flag.
+
+The summary is followed by stable review diagnostics with safe bounded
+property, type-path, ambiguity-reason, and storage-path context. Unsafe paths
+are redacted or refused rather than copied from source.
+
+Unsupported final materialization has count precedence over keyed ambiguity,
+so a type hazard remains visible even when its flow is also ambiguous. Direct
+`eval()` is an unattributed reflective refusal and blocks generated helpers; it
+is never inspected or executed.
+Any type-analysis truncation likewise blocks every generated helper for that
+factory input; the tool does not automate from a partial property view.
+
+The output is a review aid, not a runtime harness. The command does not invoke
+the source `list()`, the real factory, callbacks, streams, or Angular views and
+does not create the suggested file. Copy it only after review. Business data,
+service objects, and construction-time values remain explicit; ambiguous or
+unsafe inputs stay unresolved. This keeps the Node-safe definition adapter
+truthful while removing much of the hand-written callback/Observable/view
+boilerplate.
+
+The current bounded grammar requires one identifier options parameter and a
+named exported options type. Direct reads, reviewed Formly callback storage,
+canonical Observable escapes, and recognized view handles are supported.
+Destructuring, aliases, getters, computed access, unknown higher-order flows,
+`any`, and overlapping application Programs fail closed. A missing or duplicate
+stable form ID is a diagnostic, not a best-effort match.
+
 Generation still executes each definition's `create` with no arguments. When
 `lineage` is omitted, implicit root inference accepts that `create` symbol only
 when TypeScript proves a zero-argument-compatible signature. With explicit
@@ -338,9 +389,10 @@ must use. Resolved values are scenario-complete, not globally complete. The
 [scenario compiler example](../README.md#resolve-a-synthetic-scenario) shows
 the API and trust boundary.
 
-The pilot workspace CLI currently generates declared artifacts only; it does
-not yet execute named Angular scenarios. Record required scenario artifacts as
-a follow-up rather than adding private runtime values to a declared source.
+The pilot workspace CLI currently generates declared artifacts only;
+`author-factory-inputs` emits a separate local draft and does not execute named
+Angular scenarios. Record required scenario artifacts as a follow-up rather
+than adding private runtime values to a declared source.
 
 ## 5. Contract one custom radio type once
 

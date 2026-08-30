@@ -245,6 +245,27 @@ zero-argument-compatible call signature. With explicit
 Node-safe `create` adapter supplies the generated declared form without
 inventing runtime data.
 
+For that explicit-lineage case, the read-only
+`formly-contracts author-factory-inputs --form-id <stable-id>` command can
+recover the real exported options type and supported direct-use patterns from
+the same TypeScript Program. It prints a typed partial draft, mutually exclusive
+property counts, coverage, and whether any ambiguity could not be attributed to
+one property. Review diagnostics include bounded property/type/storage context;
+unsafe source-derived paths are redacted or refused. It does not call the
+source `list()`, factory, callbacks, Observables, or Angular views and does not
+create the suggested file.
+Construction values and unsafe or ambiguous inputs remain explicit. Duplicate,
+unsupported, tooling-only, or overlapping roots produce stable diagnostics
+instead of an empty successful result.
+
+The counts use final materialization precedence: an unsupported type hazard
+stays `unsupported` even when its use is also ambiguous; ambiguity otherwise
+precedes explicit or generated review categories. Direct `eval()` is refused
+as unattributed reflection rather than inspected or executed.
+Any type-analysis truncation blocks all automatic helpers for that input
+object, so an incomplete property graph cannot yield a partially trusted
+materializer.
+
 Every workspace-contained project config, source descriptor, form definition,
 root declaration, and authority alias traversed between them is checked against
 the final file bytes used for catalog materialization. A changed or unreadable

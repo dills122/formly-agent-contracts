@@ -28,8 +28,9 @@ The fixture serves three purposes:
 
 - Four independently configured Nx projects can participate according to their
   actual ownership boundaries.
-- Ten forms and seventeen named cases generate deterministically through the
-  same public APIs used by consumers.
+- Twelve forms generate deterministically through the same public APIs used by
+  consumers: ten microgrid forms with seventeen named cases plus two sanitized
+  workplace-shaped factory-input forms.
 - Reviewed custom profiles, wrappers, nested arrays, object-valued choices,
   declared effects, and explicit async/opaque diagnostics survive projection.
 - A direct Angular callsite resolves to the exact generated form candidate
@@ -69,18 +70,18 @@ jurisdiction-dependent cases.
 Two reusable forms live in `forms-kit` and eight workflow forms live in
 `feature-lib`:
 
-| Form | Representative coverage |
-| --- | --- |
-| `microgrid.shared.site-contact` | reusable contact fragment and custom radio choice |
-| `microgrid.shared.organization-profile` | nested organization identity and static classification |
-| `microgrid.project-intake` | wrappers, deployment variants, conditional host fields, source lineage |
-| `microgrid.site-assessment` | date range, table selection, populated expandable repeater |
-| `microgrid.system-design` | technology-dependent equipment, capacity constraints, resilience modes |
-| `microgrid.funding-plan` | object-valued autocomplete, Observable options, contribution repeater, model options |
-| `microgrid.permitting` | jurisdiction cases, multi-row approvals, conditional evidence |
-| `microgrid.commissioning` | date windows, approvers, readiness checkpoints, lifecycle hooks |
-| `microgrid.stakeholder-governance` | multi-party roles, voting membership, conditional escalation |
-| `microgrid.operations-plan` | service windows, spare parts, telemetry, preventive maintenance |
+| Form                                    | Representative coverage                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `microgrid.shared.site-contact`         | reusable contact fragment and custom radio choice                                    |
+| `microgrid.shared.organization-profile` | nested organization identity and static classification                               |
+| `microgrid.project-intake`              | wrappers, deployment variants, conditional host fields, source lineage               |
+| `microgrid.site-assessment`             | date range, table selection, populated expandable repeater                           |
+| `microgrid.system-design`               | technology-dependent equipment, capacity constraints, resilience modes               |
+| `microgrid.funding-plan`                | object-valued autocomplete, Observable options, contribution repeater, model options |
+| `microgrid.permitting`                  | jurisdiction cases, multi-row approvals, conditional evidence                        |
+| `microgrid.commissioning`               | date windows, approvers, readiness checkpoints, lifecycle hooks                      |
+| `microgrid.stakeholder-governance`      | multi-party roles, voting membership, conditional escalation                         |
+| `microgrid.operations-plan`             | service windows, spare parts, telemetry, preventive maintenance                      |
 
 The eight-form deployment source declares seventeen named cases, including urban
 rooftop, remote seasonal access, hosted campus, cooperative ownership, blended
@@ -106,7 +107,26 @@ DeploymentPageComponent direct createNxMicrogridProjectForm(...) call
 NX_COOL_RADIO_TYPE + radioChoice()
   -> real Formly registration name
   -> generated canonical field-type profile registry
+
+IndexingFormConfig + NigoAddFormConfig
+  -> existing source + definition + lineage.rootSymbol chain
+  -> real Angular feature callsites
+  -> read-only typed factory-input authoring drafts
 ```
+
+The sanitized workplace-shaped factories retain the input patterns that matter
+to authoring without retaining workplace names or business data. Accepted
+fixture measurements are:
+
+| Form shape | Total inputs | Generated | Explicit | Ambiguous | Unsupported |
+| ---------- | -----------: | --------: | -------: | --------: | ----------: |
+| Indexing   |           12 |         6 |        5 |         0 |           1 |
+| NIGO       |            8 |         2 |        6 |         0 |           0 |
+
+Generated inputs are only supported captured callbacks, canonical inert
+Observables, and unavailable Angular view handles. Explicit inputs remain real
+construction values or bindings; the unsupported Indexing input deliberately
+uses `any` to prove the workflow fails closed.
 
 Root `sourceUsage` points to `apps/test-app/tsconfig.app.json`. The analysis
 program also includes discovered project configs, so the Node-safe contract
@@ -136,6 +156,7 @@ From the repository root:
 
 ```sh
 pnpm exec vitest run fixtures/nx-workspace/workspace-fixture.test.ts
+pnpm exec vitest run fixtures/nx-workspace/factory-input-authoring.test.ts
 pnpm --filter @formly-contract/nx-workspace-fixture show:projects
 pnpm --filter @formly-contract/nx-workspace-fixture build
 pnpm fixture:nx:serve
@@ -147,11 +168,27 @@ so it intentionally has no private `pnpm-lock.yaml` and is not a direct CLI
 `workspaceRoot`. Real consumer commands run at the consumer's actual workspace
 root, where the canonical lockfile exists.
 
+After building `@formly-contract/workspace`, inspect either work-shaped form
+from the repository root without writing a file:
+
+```sh
+node packages/workspace/dist/cli-main.js author-factory-inputs \
+  --workspace-root fixtures/nx-workspace \
+  --config formly-contracts.config.ts \
+  --form-id nx.workplace.indexing
+```
+
+In a linked or installed consumer use `pnpm exec formly-contracts` instead of
+the repository-local `node` path. The command follows the same root symbol that
+source usage already links; it neither invokes the fixture factories nor calls
+the source's `list()` function, and the suggested generated path remains absent
+until a human intentionally copies and reviews the printed draft.
+
 Run the build command twice to observe the second execution as a local Nx cache
 hit. Run `pnpm --filter @formly-contract/nx-workspace-fixture graph` to
 inspect the project graph interactively.
 
-Generation writes `workspace-index.json`, ten content-addressed contracts,
+Generation writes `workspace-index.json`, twelve content-addressed contracts,
 and the opt-in `source-usage-catalog.json`. The acceptance test also assembles
 the pure query dataset and proves that both supported filters reach the same
 exact form candidate. Separate assertions cover all six custom profiles,
@@ -161,7 +198,7 @@ repeated generation.
 
 This fixture validates the workspace shell, graph, task executor, cache,
 browser composition, complex Formly configuration, profile lowering, static
-source linkage, effects, diagnostics, and distributed Formly Contract
-configuration. The future
+source linkage, effects, diagnostics, typed factory-input authoring, and
+distributed Formly Contract configuration. The future
 `@formly-contract/nx` plugin will use this same workspace to prove
 inferred contract targets and affected execution.

@@ -6,7 +6,8 @@ The implemented generic pilot now includes schema v0.4, declared and trusted
 scenario compilation, legacy project-owned custom-field profiles,
 repository-aware root/project/source configuration, deterministic multi-project
 discovery and artifact generation, a workspace index, generic
-`formly-contracts list`, `generate`, and non-mutating `check` commands, strict
+`formly-contracts list`, `generate`, non-mutating `check`, and read-only
+`author-factory-inputs` commands, strict
 project-owned cross-field effect registries, and deterministic resolution of
 validated effects into form artifacts and workspace indexes. It also includes
 two opt-in workplace MVP slices: typed form definitions with explicit
@@ -14,7 +15,22 @@ two opt-in workplace MVP slices: typed form definitions with explicit
 and compact `radioChoice()` custom-type authoring that lowers reviewed semantics
 to the canonical field-profile registry while sharing the Formly registration
 name. Canonical Angular-fixture goldens plus linked and packed consumers verify
-the generic pilot outside package-source imports.
+the generic pilot outside package-source imports. The authoring command follows
+the same exact source lineage to a real factory declaration without adding a
+second target registry.
+
+An additional local workspace authoring slice can recover a supported
+factory's real exported options type, classify a bounded direct-use grammar,
+and render a deterministic partial TypeScript draft beside a registered form
+definition. The public workspace API and CLI orchestrate that inspection from
+the existing workspace/config and optional stable form IDs; the lower-level
+renderer remains private. The draft automates only typed capture placeholders for supported
+callbacks, canonical Observables, and unavailable view handles; it keeps
+construction values explicit and unsupported inputs unresolved. The compiler
+exports only the corresponding harness type—there is no runtime implementation
+or application-factory execution path. Inspection calls neither source
+`list()` nor the registered factory, writes no suggested file, and places no
+draft content in portable contracts or hashes.
 
 The source-usage slice recognizes only the configured
 project-to-source-to-definition convention and supported direct calls or

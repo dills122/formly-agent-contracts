@@ -48,3 +48,4 @@ export type {
   ResolvedFieldTypeProfileRegistryIdentity,
   ResolvedFieldTypeProfileUnknown,
 } from './field-type-profiles.js';
+export type { FactoryInputAuthoringHarness } from './factory-input-authoring.js';

@@ -81,6 +81,7 @@ describe('workspace CLI', () => {
     const generate = vi.fn();
     const list = vi.fn();
     const check = vi.fn();
+    const authorFactoryInputs = vi.fn();
 
     await expect(
       runWorkspaceCli(['--help'], {
@@ -88,17 +89,169 @@ describe('workspace CLI', () => {
         generate,
         list,
         check,
+        authorFactoryInputs,
       }),
     ).resolves.toBe(0);
 
     expect(generate).not.toHaveBeenCalled();
     expect(list).not.toHaveBeenCalled();
     expect(check).not.toHaveBeenCalled();
+    expect(authorFactoryInputs).not.toHaveBeenCalled();
     expect(captured.stdout.join('')).toContain('formly-contracts <command>');
     expect(captured.stdout.join('')).toContain('generate');
     expect(captured.stdout.join('')).toContain('list');
     expect(captured.stdout.join('')).toContain('check');
+    expect(captured.stdout.join('')).toContain('author-factory-inputs');
     expect(captured.stderr).toEqual([]);
+  });
+
+  it('prints deterministic local factory-input drafts without writing them', async () => {
+    const captured = captureIo();
+    const authorFactoryInputs = vi.fn().mockResolvedValue({
+      drafts: [
+        {
+          projectId: 'claims',
+          sourceId: 'claims/forms',
+          formId: 'claims.indexing',
+          factorySymbol: 'IndexingFormConfig',
+          suggestedPath:
+            'libs/forms/indexing-form.contract.factory-input.generated.ts',
+          metrics: {
+            generated: 3,
+            explicit: 2,
+            ambiguous: 0,
+            unsupported: 1,
+            coverage: 'incomplete',
+            unattributedAmbiguity: true,
+          },
+          code: 'export const draft = {} as const;\n',
+          review: {
+            formId: 'claims.indexing',
+            coverage: 'incomplete',
+            generated: [],
+            explicit: [],
+            unsupported: [],
+            diagnostics: [
+              {
+                code: 'FACTORY_INPUT_TYPE_ANY',
+                propertyKey: 'unsafeOwnerFilter',
+                path: 'unsafeOwnerFilter.call[0].return',
+              },
+            ],
+          },
+        },
+      ],
+      diagnostics: [],
+    });
+
+    await expect(
+      runWorkspaceCli(
+        [
+          'author-factory-inputs',
+          '--workspace-root',
+          '/workspace',
+          '--config',
+          'config/formly.ts',
+          '--form-id',
+          'claims.indexing',
+        ],
+        { ...captured.io, authorFactoryInputs },
+      ),
+    ).resolves.toBe(0);
+
+    expect(authorFactoryInputs).toHaveBeenCalledWith({
+      workspaceRoot: '/workspace',
+      rootConfigPath: 'config/formly.ts',
+      formIds: ['claims.indexing'],
+    });
+    expect(captured.stdout.join('')).toBe(
+      'Factory input draft: project=claims source=claims/forms form=claims.indexing factory=IndexingFormConfig\n' +
+        'Suggested path: libs/forms/indexing-form.contract.factory-input.generated.ts\n' +
+        'Review: generated=3 explicit=2 ambiguous=0 unsupported=1 coverage=incomplete unattributedAmbiguity=true\n' +
+        'Review diagnostic [FACTORY_INPUT_TYPE_ANY] property=unsafeOwnerFilter path="unsafeOwnerFilter.call[0].return"\n' +
+        'export const draft = {} as const;\n',
+    );
+    expect(captured.stderr).toEqual([]);
+  });
+
+  it('returns a stable failure for an unavailable requested authoring root', async () => {
+    const captured = captureIo();
+    const authorFactoryInputs = vi.fn().mockResolvedValue({
+      drafts: [],
+      diagnostics: [
+        {
+          code: 'FACTORY_INPUT_AUTHORING_FORM_NOT_FOUND',
+          formId: 'claims.missing',
+        },
+      ],
+    });
+
+    await expect(
+      runWorkspaceCli(
+        ['author-factory-inputs', '--form-id', 'claims.missing'],
+        { ...captured.io, authorFactoryInputs },
+      ),
+    ).resolves.toBe(1);
+
+    expect(captured.stdout).toEqual([]);
+    expect(captured.stderr.join('')).toBe(
+      'Factory input authoring diagnostic [FACTORY_INPUT_AUTHORING_FORM_NOT_FOUND] form=claims.missing\n',
+    );
+  });
+
+  it('reports safe workspace failures while authoring factory inputs', async () => {
+    const captured = captureIo();
+    const authorFactoryInputs = vi.fn().mockRejectedValue(
+      new WorkspaceGenerationError(
+        'SOURCE_USAGE_INDEX_FAILED',
+        'extraction',
+        { projectId: 'claims', formId: 'claims.indexing' },
+        new Error('private TypeScript program detail'),
+      ),
+    );
+
+    await expect(
+      runWorkspaceCli(['author-factory-inputs'], {
+        ...captured.io,
+        authorFactoryInputs,
+      }),
+    ).resolves.toBe(1);
+
+    expect(captured.stderr.join('')).toBe(
+      'Authoring failed [SOURCE_USAGE_INDEX_FAILED] phase=extraction project=claims form=claims.indexing\n' +
+        'Source-usage indexing failed.\n',
+    );
+    expect(captured.stderr.join('')).not.toContain(
+      'private TypeScript program detail',
+    );
+  });
+
+  it('uses safe config-load guidance for factory-input authoring', async () => {
+    const captured = captureIo();
+    const privateConfigPath = '/private/workspace/apps/claims/project.ts';
+    const authorFactoryInputs = vi.fn().mockRejectedValue(
+      new WorkspaceConfigLoadError(
+        'CONFIG_LOAD_FAILED',
+        privateConfigPath,
+        `Unable to load workspace config: ${privateConfigPath}`,
+        new Error('Cannot import private Angular package @company/forms'),
+      ),
+    );
+
+    await expect(
+      runWorkspaceCli(['author-factory-inputs'], {
+        ...captured.io,
+        authorFactoryInputs,
+      }),
+    ).resolves.toBe(1);
+
+    expect(captured.stderr.join('')).toBe(
+      'Authoring failed [WORKSPACE_DISCOVERY_FAILED]\n' +
+        'Workspace factory input inspection failed.\n' +
+        'Hint: verify tsconfigPath and import a Node-safe contracts entry point; Angular browser barrels may require a dedicated contracts shim.\n',
+    );
+    expect(captured.stderr.join('')).not.toContain(privateConfigPath);
+    expect(captured.stderr.join('')).not.toContain('@company/forms');
   });
 
   it('lists deterministic project and source inventory', async () => {

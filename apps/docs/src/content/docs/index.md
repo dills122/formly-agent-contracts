@@ -52,7 +52,7 @@ hero:
 <section class="capability-band" aria-label="Current and planned boundaries">
   <div>
     <h2>Usable now</h2>
-    <p>Strict schema v0.4, declared extraction, controlled scenario compilation, custom-field profiles, deterministic workspace discovery, and <code>list</code>, <code>generate</code>, and <code>check</code>.</p>
+    <p>Strict schema v0.4, declared extraction, controlled scenario compilation, custom-field profiles, deterministic workspace discovery, and <code>list</code>, <code>generate</code>, <code>check</code>, and read-only factory-input authoring.</p>
   </div>
   <div>
     <h2>Not shipped</h2>

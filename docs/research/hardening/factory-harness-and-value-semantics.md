@@ -17,6 +17,10 @@ until a versioned schema adds controlled node evidence.
 No-go for Angular/Formly-resolved evidence under RH-02; that remains a separate
 Task 8 evidence/security mode.
 
+A focused follow-up now evaluates TypeScript-derived factory input shapes and
+RxJS emission types without weakening this document's execution boundary:
+[Typed factory input and Observable analysis](./typed-factory-input-analysis.md).
+
 ## Executive conclusion
 
 Real synchronous form factories such as

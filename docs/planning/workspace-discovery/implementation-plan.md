@@ -784,6 +784,54 @@ program produces `incomplete`, not an authoritative empty usage list.
 | `FAC-1`–`FAC-2` | Schema/compiler own inert binding/value DTOs and pure projection; workspace owns the code-free sidecar and structural-identity gate | `FAC-1` ready; `FAC-2` pending `FAC-1`                                                                                        |
 | `FAC-3`–`FAC-4` | An external rootless OCI provider owns conformance; workspace may orchestrate only after it passes                                  | **Blocked** until `oci-rootless-v1`, the catch-resistant runner ledger, structural controls, and retained negative cases pass |
 
+The focused
+[typed factory input and Observable analysis](../../research/hardening/typed-factory-input-analysis.md)
+refines this branch without changing its authority. Type descriptors, bounded
+usage classification, inert binding plans, diagnostics, and generated reviewed
+scaffolds map to `FAC-1`. A code-free identity/registration sidecar remains
+`FAC-2`. Automatic application factory execution remains `FAC-3`/`FAC-4`, and
+subscribed/resolved Observable emissions remain Task 8 evidence. Type-derived
+emission shapes or literal-union candidates never satisfy those later gates.
+
+For `TFI-MVP-1`, workspace reuses the exact leaf TypeScript Program and checker
+that already power source linkage. The full normalized descriptor is ephemeral
+workspace analysis state and does not cross into compiler, cache, schema, or
+portable contract artifacts. This first slice emits no report or scaffold.
+`TFI-MVP-3` renders a bounded, canonically ordered,
+privacy-filtered local authoring report and typed application scaffold. That
+scaffold references a compiler-owned RH-02 type-only authoring contract.
+Compiler supplies no runtime harness and does not currently validate or
+materialize the bindings; that work remains behind the deferred FAC-3/FAC-4
+runner. Compiler still does not import TypeScript or receive Program objects.
+The existing code-free identity/registration sidecar remains separate. A future
+persisted or cross-package type artifact requires a separate versioned schema
+decision; the MVP does not silently create one.
+
+`TFI-MVP-5` exposes the renderer through a read-only workspace API and CLI. It
+discovers only exact application-Program roots from the existing project,
+source, definition, and `lineage.rootSymbol` chain and accepts optional stable
+form-ID filters; there is no second target registry. Sanitized Indexing- and
+NIGO-shaped Nx fixtures measure mutually exclusive generated, explicit,
+ambiguous, and unsupported property counts, and separately report coverage plus
+unattributed ambiguity. The command neither calls source `list()` nor application
+factories, writes no scaffold, and publishes nothing into portable artifacts.
+
+`TFI-MVP-2` adds only ephemeral workspace analysis beside that descriptor. It
+classifies the bounded direct-use grammar in the declared factory body and
+combines use evidence with the corresponding normalized property type. The
+result distinguishes captured callbacks, inert Observables, unavailable
+Angular view handles, explicit construction values, explicit capability
+bindings, and unsupported inputs. Destructuring, aliases, computed access,
+getters, unknown higher-order consumers, and unreviewed storage fail closed.
+It invokes no factory or callback, subscribes to no stream, imports no
+application runtime, and changes no schema or portable artifact. `TFI-MVP-3`
+now renders this private plan as an ephemeral typed authoring draft. The draft
+references the real exported options interface with indexed-access types,
+keeps explicit and unsupported inputs visible, and depends only on a
+compiler-owned type contract with no runtime implementation. It writes no file
+and does not make the current trusted `create()` path an automatic
+application-factory runner.
+
 The trusted JIT/config worker and the `isolated-ci-v1` CI provider are not
 factory containment. No future task may extend the current `create()` path with
 application factory execution as a shortcut around FAC-3.
@@ -1919,10 +1967,11 @@ project sources.
 architecture overview for generic config discovery and bulk source adapters.
 
 **Current status:** the root README, workspace configuration reference, and
-workplace pilot guide cover `list`, `generate`, and `check`; linked and packed
-temporary consumers exercise the CLI. A standalone workspace package README
-and polished empty-directory release walkthrough remain before this release
-task is complete.
+workplace pilot guide cover `list`, `generate`, `check`, and read-only
+factory-input authoring; linked and packed temporary consumers exercise the
+artifact CLI. A standalone workspace package README and polished
+empty-directory release walkthrough remain before this release task is
+complete.
 
 **Acceptance criteria:**
 

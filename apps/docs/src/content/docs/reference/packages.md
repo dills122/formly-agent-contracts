@@ -24,8 +24,12 @@ Use in trusted build/test tooling that has Formly field configuration:
 - `compileFormContractScenario` for controlled scenario outcomes
 - field-profile preparation and resolution
 - cross-field effect resolution
+- the type-only `FactoryInputAuthoringHarness` surface used by local generated
+  factory-input drafts
 
-It projects through allowlists. It does not serialize live Formly objects.
+It projects through allowlists. It does not serialize live Formly objects, and
+the authoring harness type has no runtime implementation or factory-execution
+authority.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/compiler/README.md)
 documents extraction boundaries and focused checks.
 
@@ -36,12 +40,17 @@ Use for repository-aware adoption:
 - `defineConfig`, `defineFormContractProject`, and
   `defineFormContractSource`
 - `discoverWorkspaceProjects`
+- `inspectWorkspaceFactoryInputs` for read-only, definition-linked authoring
+  drafts
 - `runWorkspace` and `checkWorkspace`
 - `parseWorkspaceContractIndex`
 - the `formly-contracts` CLI
 
 Configuration and source factories are trusted executable code. Generated
-indexes and contracts are portable validated data.
+indexes and contracts are portable validated data. Factory-input drafts are a
+separate local authoring result: the inspector reads the existing TypeScript
+Program and lineage but does not call the registered form factory or write the
+suggested file.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/workspace/README.md)
 maps configuration, discovery, generation, source indexing, and CLI ownership.
 
@@ -65,8 +74,9 @@ before contributing there.
 - `fixtures/angular-monorepo` exercises distributed Angular CLI integration,
   cross-field effects, custom profiles, and committed contract goldens.
 - `fixtures/nx-workspace` exercises Nx project boundaries, path aliases,
-  a ten-form regulated-workflow corpus, custom fields, source-usage linkage,
-  effects, and deterministic generation.
+  a ten-form regulated-workflow corpus plus two sanitized typed-input authoring
+  forms, custom fields, source-usage linkage, effects, and deterministic
+  generation.
 
 See [Maintained examples](./examples.md) for the exact support evidence
 and shared compliance command.

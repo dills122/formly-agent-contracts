@@ -42,6 +42,28 @@ export interface WorkspaceSourceUsageIndexedForm {
   readonly contractHash: Sha256Digest;
 }
 
+export interface WorkspaceFactoryInputAuthoringTarget {
+  readonly projectId: string;
+  readonly sourceId: string;
+  readonly formId: string;
+  readonly definitionFilePath: string;
+  readonly factorySymbol: string;
+  readonly descriptor: WorkspaceSourceUsageProgramDescriptor;
+  readonly factoryDeclaration: ts.FunctionDeclaration | ts.ClassDeclaration;
+}
+
+export type WorkspaceFactoryInputAuthoringTargetDiagnosticCode =
+  | "APPLICATION_PROGRAM_AMBIGUOUS"
+  | "APPLICATION_PROGRAM_UNAVAILABLE"
+  | "FORM_DEFINITION_DUPLICATE"
+  | "FORM_ROOT_UNAVAILABLE";
+
+export interface WorkspaceFactoryInputAuthoringTargetDiagnostic {
+  readonly code: WorkspaceFactoryInputAuthoringTargetDiagnosticCode;
+  readonly projectId: string;
+  readonly formId: string;
+}
+
 export type WorkspaceSourceUsageDiagnosticCode =
   | "DEFINITION_HELPER_NOT_FOUND"
   | "FORM_DEFINITION_DUPLICATE"
@@ -81,11 +103,15 @@ export interface IndexWorkspaceSourceUsagesInput {
   readonly programs: readonly WorkspaceSourceUsageProgramDescriptor[];
   readonly indexedForms: readonly WorkspaceSourceUsageIndexedForm[];
   readonly readSourceFile?: (absolutePath: string) => Uint8Array;
+  readonly onFactoryInputAuthoringTarget?: (
+    target: WorkspaceFactoryInputAuthoringTarget
+  ) => void;
 }
 
 export interface IndexWorkspaceSourceUsagesResult {
   readonly catalog: AgentContextSourceUsageCatalog;
   readonly diagnostics: readonly WorkspaceSourceUsageDiagnostic[];
+  readonly factoryInputAuthoringDiagnostics: readonly WorkspaceFactoryInputAuthoringTargetDiagnostic[];
 }
 
 interface ResolvedProjectDescriptor {
@@ -123,6 +149,14 @@ interface RawDefinition {
 interface ProvenancedDefinition extends RawDefinition {
   readonly evidenceRefs: readonly string[];
   readonly projectId: string;
+  readonly sourceId: string;
+}
+
+interface FactoryInputAuthoringCandidate {
+  readonly definitionFilePath: string;
+  readonly descriptor: WorkspaceSourceUsageProgramDescriptor;
+  readonly factoryDeclaration: ts.FunctionDeclaration | ts.ClassDeclaration;
+  readonly factorySymbol: string;
 }
 
 interface RawDefinitionRegistration {
@@ -1270,6 +1304,10 @@ export function indexWorkspaceSourceUsages(
   const runtimeResolutionDiagnosticKeys = new Set<string>();
   const creationInvocationKeys = new Set<string>();
   const definitionsBySite = new Map<string, RawDefinition>();
+  const authoringCandidatesBySite = new Map<
+    string,
+    FactoryInputAuthoringCandidate[]
+  >();
   const conflictedDefinitionSites = new Set<string>();
   const invalidDefinitionSites = new Set<string>();
   const registrationsBySite = new Map<string, RawDefinitionRegistration>();
@@ -2065,6 +2103,28 @@ export function indexWorkspaceSourceUsages(
           symbolId: publicSymbolId(anchor, anchorKey),
           symbolKind: rootSymbolKind(declaration),
         };
+        if (
+          context.descriptor.purpose === "application" &&
+          (ts.isFunctionDeclaration(declaration) ||
+            ts.isClassDeclaration(declaration)) &&
+          declaration.name !== undefined
+        ) {
+          const candidates = authoringCandidatesBySite.get(siteKey) ?? [];
+          if (
+            !candidates.some(
+              ({ descriptor }) =>
+                descriptor.programId === context.descriptor.programId
+            )
+          ) {
+            candidates.push({
+              definitionFilePath: source.path,
+              descriptor: context.descriptor,
+              factoryDeclaration: declaration,
+              factorySymbol: declaration.name.text,
+            });
+            authoringCandidatesBySite.set(siteKey, candidates);
+          }
+        }
         const existingDefinition = definitionsBySite.get(siteKey);
         if (
           existingDefinition === undefined &&
@@ -2145,6 +2205,7 @@ export function indexWorkspaceSourceUsages(
       dependencyPaths,
       evidenceRefs: [descriptorEvidence, symbolEvidence].sort(compareText),
       projectId: membership.projectId,
+      sourceId: membership.sourceId,
     });
     definitionsByForm.set(formKey, definitions);
   }
@@ -2158,6 +2219,59 @@ export function indexWorkspaceSourceUsages(
         formId: registration.formId,
       });
     }
+  }
+  const factoryInputAuthoringDiagnostics: WorkspaceFactoryInputAuthoringTargetDiagnostic[] =
+    [];
+  for (const [formKey, registration] of [...registrationsByForm.entries()].sort(
+    ([left], [right]) => compareText(left, right)
+  )) {
+    const definitions = definitionsByForm.get(formKey) ?? [];
+    if (registration.siteKeys.size !== 1) {
+      factoryInputAuthoringDiagnostics.push({
+        code: "FORM_DEFINITION_DUPLICATE",
+        projectId: registration.projectId,
+        formId: registration.formId,
+      });
+      continue;
+    }
+    if (definitions.length !== 1) {
+      factoryInputAuthoringDiagnostics.push({
+        code: "FORM_ROOT_UNAVAILABLE",
+        projectId: registration.projectId,
+        formId: registration.formId,
+      });
+      continue;
+    }
+    const definition = definitions[0]!;
+    const candidates =
+      authoringCandidatesBySite.get(definition.definitionSiteKey) ?? [];
+    if (candidates.length === 0) {
+      factoryInputAuthoringDiagnostics.push({
+        code: "APPLICATION_PROGRAM_UNAVAILABLE",
+        projectId: registration.projectId,
+        formId: registration.formId,
+      });
+      continue;
+    }
+    if (candidates.length !== 1) {
+      factoryInputAuthoringDiagnostics.push({
+        code: "APPLICATION_PROGRAM_AMBIGUOUS",
+        projectId: registration.projectId,
+        formId: registration.formId,
+      });
+      continue;
+    }
+    if (input.onFactoryInputAuthoringTarget === undefined) continue;
+    const candidate = candidates[0]!;
+    input.onFactoryInputAuthoringTarget({
+      projectId: definition.projectId,
+      sourceId: definition.sourceId,
+      formId: definition.formId,
+      definitionFilePath: candidate.definitionFilePath,
+      factorySymbol: candidate.factorySymbol,
+      descriptor: candidate.descriptor,
+      factoryDeclaration: candidate.factoryDeclaration,
+    });
   }
   for (const [formKey, indexedForm] of [...indexedForms.entries()].sort(
     ([left], [right]) => compareText(left, right)
@@ -2422,5 +2536,15 @@ export function indexWorkspaceSourceUsages(
       )
       .map(({ usage }) => usage),
   });
-  return { catalog, diagnostics: normalizeDiagnostics(diagnostics) };
+  return {
+    catalog,
+    diagnostics: normalizeDiagnostics(diagnostics),
+    factoryInputAuthoringDiagnostics: factoryInputAuthoringDiagnostics.sort(
+      (left, right) =>
+        compareText(
+          `${left.projectId}\0${left.formId}\0${left.code}`,
+          `${right.projectId}\0${right.formId}\0${right.code}`
+        )
+    ),
+  };
 }

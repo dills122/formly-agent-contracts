@@ -7,11 +7,11 @@ The repository maintains three executable Angular examples as a compliance
 suite. Each uses the same public configuration, source, schema, compiler, and
 workspace APIs that a consumer uses.
 
-| Example | Layout | Forms | Primary evidence |
-| --- | --- | ---: | --- |
-| [`apps/formly-test-app`](https://github.com/dills122/formly-contract/tree/main/apps/formly-test-app) | One Angular CLI application and one contract project | 12 | broad Formly authoring corpus, browser rendering, declared generation, reviewed custom interactions, explicit opaque diagnostics |
-| [`fixtures/angular-monorepo`](https://github.com/dills122/formly-contract/tree/main/fixtures/angular-monorepo) | Angular CLI `apps/` and `libs/` workspace with four contract projects | 6 | distributed discovery, reusable fragments, custom profiles, wrappers, cross-field effects, canonical goldens |
-| [`fixtures/nx-workspace`](https://github.com/dills122/formly-contract/tree/main/fixtures/nx-workspace) | Integrated Nx workspace with four projects | 10 | regulated microgrid workflow, seventeen cases, six custom profiles, effects, diagnostics, source-usage indexing, deterministic artifacts, Nx graph/build/cache |
+| Example                                                                                                        | Layout                                                                | Forms | Primary evidence                                                                                                                                                                                  |
+| -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [`apps/formly-test-app`](https://github.com/dills122/formly-contract/tree/main/apps/formly-test-app)           | One Angular CLI application and one contract project                  |    12 | broad Formly authoring corpus, browser rendering, declared generation, reviewed custom interactions, explicit opaque diagnostics                                                                  |
+| [`fixtures/angular-monorepo`](https://github.com/dills122/formly-contract/tree/main/fixtures/angular-monorepo) | Angular CLI `apps/` and `libs/` workspace with four contract projects |     6 | distributed discovery, reusable fragments, custom profiles, wrappers, cross-field effects, canonical goldens                                                                                      |
+| [`fixtures/nx-workspace`](https://github.com/dills122/formly-contract/tree/main/fixtures/nx-workspace)         | Integrated Nx workspace with four projects                            |    12 | regulated microgrid workflow, seventeen cases, two sanitized factory-input forms, six custom profiles, effects, diagnostics, source-usage indexing, deterministic artifacts, Nx graph/build/cache |
 
 Run their contract-level acceptance tests together:
 
@@ -37,10 +37,10 @@ one adjacent project descriptor:
 
 ```ts
 export default defineConfig({
-  projectConfigs: ['formly-contracts.project.ts'],
-  tsconfigPath: 'tsconfig.json',
-  output: { directory: 'dist/formly-contracts' },
-  diagnostics: { failOn: ['error'] },
+  projectConfigs: ["formly-contracts.project.ts"],
+  tsconfigPath: "tsconfig.json",
+  output: { directory: "dist/formly-contracts" },
+  diagnostics: { failOn: ["error"] },
 });
 ```
 
@@ -73,8 +73,9 @@ ongoing operations.
 Its acceptance test links a direct application call to the exact generated
 contract and then reaches the same candidate through both source-path and form
 ID queries. It also verifies seventeen named cases, six reviewed custom types,
-three cross-field effects, deliberate async/opaque diagnostics, nested repeaters,
-object-valued options, and byte-identical repeated generation.
+three cross-field effects, two sanitized typed-input authoring cases, deliberate
+async/opaque diagnostics, nested repeaters, object-valued options, and
+byte-identical repeated generation.
 
 ## Reading support claims
 

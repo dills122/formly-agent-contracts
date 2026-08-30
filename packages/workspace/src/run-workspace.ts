@@ -815,7 +815,7 @@ function buildIndex(
   });
 }
 
-async function prepareSourceUsagePrograms(
+export async function prepareSourceUsagePrograms(
   workspaceRoot: string,
   discovered: DiscoveredWorkspace
 ): Promise<readonly WorkspaceSourceUsageProgramDescriptor[] | undefined> {
