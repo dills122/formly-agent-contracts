@@ -1604,9 +1604,18 @@ describe("runWorkspace", () => {
     expect(result.artifactPaths[0]).toMatch(/^dist\/contracts\/projects\//u);
   });
 
-  it.each(["./", "././", ".\\"])(
-    "rejects workspace-root output alias %s through the stable runner error boundary",
-    async (outputDirectory) => {
+  it.each([
+    ["", "WORKSPACE_DISCOVERY_FAILED"],
+    ["./", "WORKSPACE_DISCOVERY_FAILED"],
+    ["././", "WORKSPACE_DISCOVERY_FAILED"],
+    [".\\", "WORKSPACE_DISCOVERY_FAILED"],
+    ["dist/**", "WORKSPACE_DISCOVERY_FAILED"],
+    ["dist/../other", "WORKSPACE_DISCOVERY_FAILED"],
+    ["../outside", "OUTPUT_PATH_OUTSIDE_WORKSPACE"],
+    ["/outside", "OUTPUT_PATH_OUTSIDE_WORKSPACE"],
+  ])(
+    "classifies invalid root output directory %j as %s",
+    async (outputDirectory, code) => {
       const workspaceRoot = await createTemporaryWorkspace();
       await seedRoot(
         workspaceRoot,
@@ -1616,7 +1625,7 @@ describe("runWorkspace", () => {
       await expect(runWorkspace(runnerOptions(workspaceRoot))).rejects.toEqual(
         expect.objectContaining({
           name: "WorkspaceGenerationError",
-          code: "OUTPUT_PATH_OUTSIDE_WORKSPACE",
+          code,
           phase: "inventory",
         })
       );

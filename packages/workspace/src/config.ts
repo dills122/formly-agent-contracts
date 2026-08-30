@@ -15,6 +15,7 @@ import {
 import { parseFormContractSource, type FormContractSource } from './source.js';
 import {
   invalid,
+  outsideWorkspacePath,
   rejectUnknownKeys,
   requireRecord,
   requireStableId,
@@ -215,18 +216,35 @@ function readOptionalOwnDataProperty(
   return descriptor.value;
 }
 
-function isUnsafeRelativePath(value: string): boolean {
-  return (
-    value.length === 0 ||
-    value.includes('\0') ||
-    value.startsWith('/') ||
-    /^[A-Za-z]:[\\/]/u.test(value) ||
-    value.split(/[\\/]/u).some((segment) => segment === '..')
-  );
+function isOutsideWorkspacePath(value: string): boolean {
+  if (value.startsWith('/') || /^[A-Za-z]:[\\/]/u.test(value)) {
+    return true;
+  }
+  let depth = 0;
+  for (const segment of value.split(/[\\/]/u)) {
+    if (segment === '' || segment === '.') {
+      continue;
+    }
+    if (segment === '..') {
+      if (depth === 0) {
+        return true;
+      }
+      depth -= 1;
+      continue;
+    }
+    depth += 1;
+  }
+  return false;
 }
 
 function requireRelativePath(value: unknown, path: string): string {
-  if (typeof value !== 'string' || isUnsafeRelativePath(value)) {
+  if (typeof value !== 'string' || value.length === 0 || value.includes('\0')) {
+    invalid(path, 'must be a safe workspace-relative path.');
+  }
+  if (isOutsideWorkspacePath(value)) {
+    outsideWorkspacePath(path);
+  }
+  if (value.split(/[\\/]/u).includes('..')) {
     invalid(path, 'must be a safe workspace-relative path.');
   }
   return value;
