@@ -53,5 +53,5 @@ pnpm docs:build
 ```
 
 The build emits canonical URLs, a sitemap, base-prefixed assets, and the local
-Pagefind search index. Generated `.astro/` and `dist/` directories stay out of
-Git.
+Pagefind search index. The theme uses system font stacks and makes no external
+font request. Generated `.astro/` and `dist/` directories stay out of Git.

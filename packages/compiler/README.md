@@ -46,6 +46,11 @@ implementation and does not authorize application-factory execution; generated
 drafts remain partial until their explicit inputs and unsupported cases are
 reviewed.
 
+The [compiler API reference](../../apps/docs/src/content/docs/reference/api.md#compiler)
+lists the declared/scenario entry points and the reviewed profile/effect
+resolution surface. Import only the package root; internal modules are not
+consumer entry points.
+
 ## For contributors
 
 Projection changes should add focused semantic and diagnostic tests. If output
@@ -58,4 +63,6 @@ pnpm --filter @formly-contract/compiler build
 ```
 
 See the [main repository](https://github.com/dills122/formly-contract)
-for compatibility details, scenario examples, and the contract evidence model.
+for compatibility details and the contract evidence model. The
+[controlled scenario example](../../apps/docs/src/content/docs/reference/api.md#controlled-scenario-compilation)
+shows the trusted builder boundary.

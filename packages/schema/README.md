@@ -46,6 +46,12 @@ import {
 The Node-oriented package root is not a browser entry point and does not
 re-export these helpers.
 
+The browser-safe subpath exports the complete compact authoring surface:
+`radioChoice`, `defineContractedFormlyType`, `toFormlyTypeRegistration`, and
+`buildFieldTypeProfileRegistry`, plus their input/output types. See the
+[public API reference](../../apps/docs/src/content/docs/reference/api.md#browser-safe-field-type-authoring)
+for one end-to-end registration example.
+
 The package also exposes strict, versioned application metadata registries for
 custom field profiles and explicit cross-field effects. Effect registries are
 declared data only: parsing rejects callbacks, observed/candidate authority,
@@ -68,4 +74,6 @@ pnpm --filter @formly-contract/schema build
 ```
 
 See the [main repository](https://github.com/dills122/formly-contract)
-for the contract model, compatibility policy, and complete examples.
+for the contract model and compatibility policy, or use the
+[schema API reference](../../apps/docs/src/content/docs/reference/api.md#schema)
+for the current consumer entry points.

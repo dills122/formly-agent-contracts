@@ -14,6 +14,9 @@ those bindings deterministically. Keeping that experiment behind the eventual
 package boundary lets later browser work consume stable identities without
 putting executable modules or selectors into portable artifacts.
 
+Its current root exports are documented under the
+[private API boundary](../../apps/docs/src/content/docs/reference/api.md#private-playwright-experiment).
+
 The package is private and versioned `0.0.0`. Users evaluating Formly Contract
 today should consume generated contracts directly from their own Playwright or
 Cypress helpers; see the

@@ -102,6 +102,10 @@ Stable loader errors are:
 Start with `formly-contracts list`. If loading fails, confirm the TypeScript
 config and move discovery exports out of Angular browser barrels.
 
+Use the [workspace API reference](./api.md#workspace) for programmatic
+discovery, generation, checking, authoring inspection, and index parsing. Use
+the [CLI reference](./cli-api.md) for command options and refusal behavior.
+
 :::note[Canonical reference]
 The complete option, validation, trust, provenance, and publication semantics
 live in [workspace-configuration.md](https://github.com/dills122/formly-contract/blob/main/docs/workspace-configuration.md).
