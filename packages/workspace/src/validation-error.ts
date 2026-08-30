@@ -1,16 +1,34 @@
 export class WorkspaceConfigValidationError extends TypeError {
   readonly code = 'CONFIG_INVALID' as const;
   readonly path: string;
+  readonly reason: WorkspaceConfigValidationReason;
 
-  constructor(path: string, message: string) {
+  constructor(
+    path: string,
+    message: string,
+    reason: WorkspaceConfigValidationReason = 'invalid',
+  ) {
     super(`${path}: ${message}`);
     this.name = 'WorkspaceConfigValidationError';
     this.path = path;
+    this.reason = reason;
   }
 }
 
+export type WorkspaceConfigValidationReason =
+  | 'invalid'
+  | 'path-outside-workspace';
+
 export function invalid(path: string, message: string): never {
   throw new WorkspaceConfigValidationError(path, message);
+}
+
+export function outsideWorkspacePath(path: string): never {
+  throw new WorkspaceConfigValidationError(
+    path,
+    'must remain within the workspace.',
+    'path-outside-workspace',
+  );
 }
 
 export function isPlainRecord(
