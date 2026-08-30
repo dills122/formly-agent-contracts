@@ -53,7 +53,7 @@ not begin until it is accepted.
 | ID         | Scope                                                                                                            | Primary owner                                                                        | Depends on                                  | Status  | Exit gate                                                                                                                                                                 |
 | ---------- | ---------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------ | ------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `CTX-1`    | Pure progressive usage/context/node/E2E-slice query core, including live freshness comparison/status             | Schema-backed pure module boundary selected in this task                             | `CTX-0D`                                    | complete | Both CTX-0D slices, complete-or-refuse projections, bounded pagination, staleness/ambiguity, package publication, and a measured 512-node progressive-disclosure gate pass |
-| `CTX-2`    | Typed intent, pure validator, canonical plan, and exhaustive stable diagnostic DTO/policy                        | `packages/schema` plus the Playwright-neutral validator module selected in this task | `CTX-1`                                     | ready   | Both synthetic walkthroughs validate/refuse exactly; no browser or registry lookup                                                                                        |
+| `CTX-2`    | Typed intent, pure validator, canonical plan, and exhaustive stable diagnostic DTO/policy                        | `packages/schema`; see the [CTX-2 task packet](ctx-2-spec.md)                         | `CTX-1`                                     | MVP complete; aggregate in progress | Both synthetic walkthroughs and the current missing/hidden/ordering/readiness/wrapper refusal matrix validate exactly; no browser or registry lookup |
 | `DRV-0`    | Hash-addressed driver-registry manifest and native/application registration inventory, without browser execution | `packages/schema` plus private experimental `@formly-contract/playwright`            | `CTX-0C`                                    | ready   | Exact driver IDs, versions, capabilities, registry hash, duplicate/refusal, and no agent-selected modules                                                                 |
 | `CTX-GATE` | Real representative producer/workplace context pilot                                                             | Maintainer/research                                                                  | `CTX-2`, `LIN-4`, `BHV-4`, `ANG-5`, `DRV-0` | pending | One redacted current pinned context proves exact usage/journey selection, complete-or-refuse planning, payload/remediation value, and retained producer coverage evidence |
 | `MCP-1`    | Read-only MCP transport adapter                                                                                  | future `@formly-contract/mcp`                                                        | `CTX-GATE` go                               | pending | Transport exactly preserves pure query/validation semantics                                                                                                               |
@@ -141,9 +141,15 @@ topology evidence before a public Nx package is necessary.
 
 ## Immediate dispatch rule
 
-`CTX-0A` through `CTX-1` are complete. `CTX-2` is now ready for immediate
-dispatch; it also supplies the validated plan/call ABI required by the
-remaining `DRV-0C2` packet. `HOST-1`, `ANG-0`, and `FAC-1` are also
+`CTX-0A` through `CTX-1` are complete. `CTX-2` is in progress under its
+[traceable task packet](ctx-2-spec.md); it also supplies the validated
+plan/call ABI required by the remaining `DRV-0C2` packet. The task packet
+records the discovered value-semantics authority gap rather than permitting
+the validator to infer codecs, runtime enumeration, or invalid-value
+construction. Its CTX-2A/B/C MVP checkpoint is complete; executable wrapper
+preconditions, hostile-input hardening for the standalone plan-hash helper,
+CTX-2V/2D, and browser/runtime parity are explicit fast follows, with no pivot
+currently required. `HOST-1`, `ANG-0`, and `FAC-1` are also
 dependency-ready, but they remain separate producer task packets and must not
 freeze named-environment or adapter-authority APIs beyond the accepted
 `AUTH-PILOT` surface before `AUTH-0` is accepted. `LIN-PILOT` is complete;

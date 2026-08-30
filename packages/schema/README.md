@@ -61,6 +61,37 @@ This package is pre-1.0. Its schema version is explicit in every contract, and
 unsupported or unknown Formly behavior remains diagnostic evidence rather than
 an inferred value.
 
+The package root also exposes the current CTX-2 typed-intent boundary:
+`parseAgentContextTestIntent`, `validateAgentContextTestIntent`,
+`computeAgentContextTestIntentHash`,
+`parseAgentContextValidatedExecutionPlan`, and
+`revalidateAgentContextExecutionPlan`. This is a pure synthetic-proof slice,
+not a browser runner. Unsupported runtime value policies, repeaters, usage
+actions, outcomes, and pattern-constrained literals return blocking diagnostics
+until their complete source authority, semantic policy, and driver-call ABI are
+implemented. Targeted nodes with declared wrapper activation preconditions also
+fail closed in this checkpoint; automatic wrapper expansion is a documented
+fast follow rather than an omitted plan step.
+
+Public validation and revalidation envelopes are hostile-data boundaries:
+required values must be own enumerable data properties, and proxy, accessor,
+inherited, hidden, or coercion-based input is rejected without execution.
+Diagnostic DTOs are code-discriminated and enforce the exact location fields
+owned by each stable code. The pure length classifier mirrors Angular's
+optional-empty `minLength` rule; `required` remains the independent authority
+that classifies an empty value as invalid.
+
+A validated plan retains the canonical source-intent hash and the
+classification authority for every resolved value. Revalidation requires the
+exact source intent, reruns the validator against current context authority,
+requires a complete CTX-1 E2E slice, and accepts only an exactly rebuilt plan.
+The intent and plan hashes are content identities, not signatures.
+Strict parsers reject proxies, accessors, non-enumerable properties, invalid
+closed-enum values, and caller-controlled coercion hooks.
+`computeAgentContextValidatedPlanHash` should currently receive only a plan
+returned by the strict parser or validator; hostile-input preflight for the
+standalone hash helper is a fast follow.
+
 ## For contributors
 
 Changes here can affect every downstream package and generated artifact. Keep

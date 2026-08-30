@@ -11,6 +11,8 @@ Use for portable data and validation:
 - `canonicalStringify`
 - contract, profile, effect, and provenance types
 - canonical serialization and SHA-256 hashes
+- pure agent-context queries, strict typed intent, and source-intent-bound
+  canonical plan validation/revalidation
 
 It does not load Formly, Angular, application configs, or browser code.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/schema/README.md)

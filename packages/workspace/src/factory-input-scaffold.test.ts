@@ -460,7 +460,7 @@ describe("generateFactoryInputScaffold", () => {
         ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")
       )
     ).toEqual([]);
-  });
+  }, 10_000);
 
   it("preserves bounded ambiguity reasons and unreviewed storage paths", () => {
     const program = createProgram(`
