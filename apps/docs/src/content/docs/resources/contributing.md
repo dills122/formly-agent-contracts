@@ -27,6 +27,22 @@ the Pagefind search index and fails on invalid content routes.
 
 Use `pnpm docs:preview` to inspect the production output locally.
 
+## Find the owning documentation
+
+- The root [`README.md`](https://github.com/dills122/formly-contract/blob/main/README.md)
+  is the repository landing page and shortest product overview.
+- Group and package READMEs explain local purpose, boundaries, and focused
+  contributor commands where someone encounters the code.
+- The root
+  [`docs/` guide](https://github.com/dills122/formly-contract/blob/main/docs/README.md)
+  distinguishes canonical specifications and ADRs from research, plans, and
+  historical handoffs.
+- This Starlight site is the concise user journey and current reference layer.
+
+When a package or fixture becomes confusing without prior repository context,
+improve the nearest README and link it from the relevant group guide. Avoid
+forcing users to read a planning document to understand current behavior.
+
 ## Deployment workflow
 
 The [Docs Site workflow](https://github.com/dills122/formly-contract/actions/workflows/docs-site.yml)

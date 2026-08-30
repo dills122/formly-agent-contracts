@@ -95,6 +95,8 @@ pnpm test:examples
 ```
 
 That suite also exercises the Angular CLI monorepo and Nx workspace examples.
+The repository [`fixtures/` guide](../../fixtures/README.md) explains how those
+consumer examples differ from the low-level test inputs.
 
 ## Adapting the layout
 

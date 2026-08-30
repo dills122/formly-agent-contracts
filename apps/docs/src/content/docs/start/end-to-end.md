@@ -4,8 +4,10 @@ description: Configure a workspace, expose a form and custom field, generate a c
 ---
 
 This vertical uses only current package surfaces through contract generation.
-The final Playwright lookup is consumer-owned code because the planned
-Playwright package and executable drivers are not shipped.
+The final Playwright lookup is consumer-owned code because a browser-executing
+Playwright integration and executable drivers are not shipped. The repository's
+private package with that name currently contains only an experimental
+trusted-local driver binding registry.
 
 <div class="status-line">
   <span class="status status--current">Current</span>
@@ -407,7 +409,7 @@ strict consumer helper like the one above.
 :::note[Maintained examples]
 The [Nx fixture root config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/formly-contracts.config.ts),
 [project config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/formly-contracts.project.ts),
-[source descriptor](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/src/lib/claims.source.ts),
+[source descriptor](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/src/lib/deployment.source.ts),
 and [field profiles](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/forms-kit/src/lib/field-type-profiles.ts)
 are executable, test-covered references for this vertical.
 :::

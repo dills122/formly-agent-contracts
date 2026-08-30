@@ -1,6 +1,6 @@
 ---
 title: Package responsibilities
-description: Choose the Formly Contract package that owns the schema, compiler, or workspace behavior you need.
+description: Choose the Formly Contract package or repository group that owns the behavior you need.
 ---
 
 ## `@formly-contract/schema`
@@ -13,6 +13,8 @@ Use for portable data and validation:
 - canonical serialization and SHA-256 hashes
 
 It does not load Formly, Angular, application configs, or browser code.
+Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/schema/README.md)
+documents the browser-safe authoring subpath and contributor checks.
 
 ## `@formly-contract/compiler`
 
@@ -24,6 +26,8 @@ Use in trusted build/test tooling that has Formly field configuration:
 - cross-field effect resolution
 
 It projects through allowlists. It does not serialize live Formly objects.
+Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/compiler/README.md)
+documents extraction boundaries and focused checks.
 
 ## `@formly-contract/workspace`
 
@@ -38,6 +42,20 @@ Use for repository-aware adoption:
 
 Configuration and source factories are trusted executable code. Generated
 indexes and contracts are portable validated data.
+Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/workspace/README.md)
+maps configuration, discovery, generation, source indexing, and CLI ownership.
+
+## Private `@formly-contract/playwright` experiment
+
+The repository contains a private `0.0.0` package that binds validated driver
+identities to reviewed trusted-local implementation definitions. The directory
+reserves the intended ownership boundary and supports ongoing design work.
+
+It does **not** currently depend on Playwright, launch a browser, generate tests,
+or provide the planned typed-intent execution vertical. It is not a published
+user capability. See its
+[package README](https://github.com/dills122/formly-contract/blob/main/packages/playwright/README.md)
+before contributing there.
 
 ## Applications and fixtures
 
@@ -53,8 +71,16 @@ indexes and contracts are portable validated data.
 See [Maintained examples](./examples.md) for the exact support evidence
 and shared compliance command.
 
-No MCP server, Playwright driver package, or test-intent package is published
-in the current repository.
+For repository navigation, the
+[`packages/` guide](https://github.com/dills122/formly-contract/blob/main/packages/README.md),
+[`apps/` guide](https://github.com/dills122/formly-contract/blob/main/apps/README.md),
+and
+[`fixtures/` guide](https://github.com/dills122/formly-contract/blob/main/fixtures/README.md)
+explain which directories are product code, runnable examples, or test-only
+inputs.
+
+No MCP server, browser-executing Playwright integration, or test-intent package
+is published in the current repository.
 
 :::note[Canonical package contracts]
 Use the package entry points and

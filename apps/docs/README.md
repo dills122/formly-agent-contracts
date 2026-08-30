@@ -16,6 +16,10 @@ pnpm docs:dev
 Use `pnpm check:docs` for Markdown validation plus a production build, and
 `pnpm docs:preview` to inspect the generated static files.
 
+The site is the concise user-facing layer. Canonical specifications, ADRs,
+research, and planning have distinct roles under `docs/`; read the root
+[`docs/` guide](../../docs/README.md) before moving or duplicating content.
+
 ## GitHub Pages deployment
 
 `.github/workflows/docs-site.yml` deploys `apps/docs/dist` after a push to

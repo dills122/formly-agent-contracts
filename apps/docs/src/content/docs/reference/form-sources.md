@@ -117,7 +117,7 @@ before form factories execute, but this MVP does not provide complete runtime
 or Jiti module snapshots and retains a short config-loading-to-Program window.
 
 :::note[Maintained example]
-See the [Nx form definition](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/src/lib/claim.contract.ts),
-[source descriptor](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/src/lib/claims.source.ts),
+See the [Nx form definition](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/src/lib/deployment.contract.ts),
+[source descriptor](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/src/lib/deployment.source.ts),
 and [project config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/formly-contracts.project.ts).
 :::

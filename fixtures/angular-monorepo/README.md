@@ -47,6 +47,9 @@ libs/forms-kit      reusable fragments, forms, and custom fields
 libs/feature-lib    page/view that composes and renders the reusable forms
 ```
 
+See the [`libs/` guide](./libs/README.md) for the browser and contract
+responsibility of each library.
+
 The root `formly-contracts.config.ts` discovers one project descriptor at each
 boundary. `test-app` and `formly-kit` are valid configuration-only projects;
 `forms-kit` and `feature-lib` contribute source catalogs.
@@ -87,6 +90,9 @@ contract filenames use the `.contract.golden.json` suffix so they remain
 reviewable repository fixtures rather than ignored runtime output. The golden
 index and the `claims.intake` contract preserve the complete declared effect
 DTOs, including their resolved source and target node IDs.
+
+The [`goldens/` guide](./goldens/README.md) explains the encoded directory
+layout and when those files may be updated.
 
 The production build verifies the complete app → feature-lib → forms-kit →
 formly-kit browser composition.
