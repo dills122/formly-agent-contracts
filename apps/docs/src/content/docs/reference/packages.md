@@ -50,7 +50,7 @@ indexes and contracts are portable validated data.
   a ten-form regulated-workflow corpus, custom fields, source-usage linkage,
   effects, and deterministic generation.
 
-See [Maintained examples](/reference/examples/) for the exact support evidence
+See [Maintained examples](./examples.md) for the exact support evidence
 and shared compliance command.
 
 No MCP server, Playwright driver package, or test-intent package is published
