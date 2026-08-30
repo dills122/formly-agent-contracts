@@ -75,60 +75,59 @@ const fixtureRuntimeProvenance: RuntimeProvenance = {
   runtimePackages: [],
 };
 
-const EXPECTED_NX_RADIO_PROFILE: FieldTypeProfileRegistry['profiles'][number] = {
-      identity: { id: "fixture.nx-cool-radio", version: 1 },
-      semanticType: "single-choice",
-      valueShape: "scalar",
-      evidence: "declared",
-      parts: [
-        {
-          name: "group",
-          role: "radiogroup",
-          cardinality: "one",
-          evidence: "declared",
-        },
-        {
-          name: "option",
-          role: "radio",
-          cardinality: "many",
-          evidence: "declared",
-        },
-      ],
-      interaction: {
-        kind: "choice",
-        operation: "check",
-        optionPart: "option",
-      },
-      valueDomain: {
-        kind: "projected",
-        source: "adapter",
-        completeness: "complete",
-        collectionPath: "props.options",
-        labelPath: "label",
-        valuePath: "value",
+const EXPECTED_NX_RADIO_PROFILE: FieldTypeProfileRegistry["profiles"][number] =
+  {
+    identity: { id: "fixture.nx-cool-radio", version: 1 },
+    semanticType: "single-choice",
+    valueShape: "scalar",
+    evidence: "declared",
+    parts: [
+      {
+        name: "group",
+        role: "radiogroup",
+        cardinality: "one",
         evidence: "declared",
       },
-      driver: {
-        kind: "generic",
-        id: "generic.choice",
-        version: 1,
-        capabilities: ["check"],
+      {
+        name: "option",
+        role: "radio",
+        cardinality: "many",
+        evidence: "declared",
       },
-      effectCapabilities: { targetProperties: ["options"], readiness: [] },
-      unknowns: [],
-};
+    ],
+    interaction: {
+      kind: "choice",
+      operation: "check",
+      optionPart: "option",
+    },
+    valueDomain: {
+      kind: "projected",
+      source: "adapter",
+      completeness: "complete",
+      collectionPath: "props.options",
+      labelPath: "label",
+      valuePath: "value",
+      evidence: "declared",
+    },
+    driver: {
+      kind: "generic",
+      id: "generic.choice",
+      version: 1,
+      capabilities: ["check"],
+    },
+    effectCapabilities: { targetProperties: ["options"], readiness: [] },
+    unknowns: [],
+  };
 
 function collectContractNodes(
   nodes: readonly ContractNode[]
 ): readonly ContractNode[] {
   return nodes.flatMap((node) => [
     node,
-    ...collectContractNodes(
-      [
-        ...node.children,
-        ...(node.arrayTemplate === undefined ? [] : [node.arrayTemplate]),
-      ]
-    ),
+    ...collectContractNodes([
+      ...node.children,
+      ...(node.arrayTemplate === undefined ? [] : [node.arrayTemplate]),
+    ]),
   ]);
 }
 
@@ -141,9 +140,7 @@ function findContractNode(
   );
 }
 
-async function readGeneratedContract(
-  artifactPath: string | undefined
-) {
+async function readGeneratedContract(artifactPath: string | undefined) {
   if (artifactPath === undefined) {
     throw new Error("Expected a generated contract artifact.");
   }
@@ -214,7 +211,8 @@ describe("Nx workspace consumer fixture", () => {
       const usage = catalog.usages.find(
         (candidate) =>
           candidate.resolution.status === "exact" &&
-          candidate.resolution.candidate.form.formId === "microgrid.project-intake"
+          candidate.resolution.candidate.form.formId ===
+            "microgrid.project-intake"
       );
 
       expect(indexedForm).toBeDefined();
@@ -365,7 +363,7 @@ describe("Nx workspace consumer fixture", () => {
       "hosted-campus-network",
       "remote-community-cooperative",
     ]);
-  });
+  }, 20_000);
 
   it("retains compact radio authoring inside the expanded reviewed registry", async () => {
     const root = parseRootConfig(
@@ -400,9 +398,9 @@ describe("Nx workspace consumer fixture", () => {
       variants: [],
     });
     expect(generated?.profiles).toHaveLength(6);
-    expect(generated?.wrappers.map(({ wrapperName }) => wrapperName)).toEqual(
-      ["nx-section"]
-    );
+    expect(generated?.wrappers.map(({ wrapperName }) => wrapperName)).toEqual([
+      "nx-section",
+    ]);
   }, 20_000);
 
   it("is a real Nx workspace with four independently owned projects", async () => {
@@ -439,7 +437,7 @@ describe("Nx workspace consumer fixture", () => {
     );
   });
 
-  it("loads ten forms and seventeen named cases across local source catalogs", async () => {
+  it("loads the ten microgrid forms and seventeen named cases", async () => {
     const root = parseRootConfig(
       await loadWorkspaceConfigModule(
         resolve(fixtureRoot, "formly-contracts.config.ts"),
@@ -528,9 +526,7 @@ describe("Nx workspace consumer fixture", () => {
       "expandable-repeater",
       "table-select",
     ]);
-    expect(feature.crossFieldEffects?.id).toBe(
-      "fixture.nx-microgrid-effects"
-    );
+    expect(feature.crossFieldEffects?.id).toBe("fixture.nx-microgrid-effects");
 
     if (
       formsKit.fieldTypeProfiles === undefined ||
@@ -630,38 +626,36 @@ describe("Nx workspace consumer fixture", () => {
       });
 
       const funding = await contractFor("microgrid.funding-plan");
-      expect(findContractNode(funding.nodes, "funding.leadPartner")).toMatchObject(
-        {
-          valueDomain: {
-            kind: "enumerated",
-            values: [
-              { id: "partner-atlas" },
-              { id: "partner-juniper" },
-              { id: "partner-northstar" },
-            ],
+      expect(
+        findContractNode(funding.nodes, "funding.leadPartner")
+      ).toMatchObject({
+        valueDomain: {
+          kind: "enumerated",
+          values: [
+            { id: "partner-atlas" },
+            { id: "partner-juniper" },
+            { id: "partner-northstar" },
+          ],
+        },
+        interactionProfile: {
+          interaction: {
+            kind: "autocomplete",
+            operation: "type-and-pick",
           },
-          interactionProfile: {
-            interaction: {
-              kind: "autocomplete",
-              operation: "type-and-pick",
-            },
-          },
-        }
-      );
+        },
+      });
       expect(new Set(funding.diagnostics.map(({ code }) => code))).toEqual(
         new Set(["ASYNC_VALUE", "UNSUPPORTED_RULE"])
       );
 
       const commissioning = await contractFor("microgrid.commissioning");
       expect(
-        findContractNode(
-          commissioning.nodes,
-          "commissioning.checkpoints.*"
-        )?.modelPath
+        findContractNode(commissioning.nodes, "commissioning.checkpoints.*")
+          ?.modelPath
       ).toEqual(["commissioning", "checkpoints", "*"]);
-      expect(
-        commissioning.diagnostics.map(({ code }) => code)
-      ).toContain("OPAQUE_FUNCTION");
+      expect(commissioning.diagnostics.map(({ code }) => code)).toContain(
+        "OPAQUE_FUNCTION"
+      );
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
@@ -697,18 +691,18 @@ describe("Nx workspace consumer fixture", () => {
         id: "fixture.nx-microgrid-effects",
         version: 1,
       });
-      expect(designIndex?.declaredEffects?.map(({ identity }) => identity.id)).toEqual(
-        ["fixture.technology-filters-equipment"]
-      );
+      expect(
+        designIndex?.declaredEffects?.map(({ identity }) => identity.id)
+      ).toEqual(["fixture.technology-filters-equipment"]);
       expect(
         operationsIndex?.declaredEffects?.map(({ identity }) => identity.id)
       ).toEqual(["fixture.monitoring-controls-telemetry"]);
-      expect(findContractNode(design.nodes, "system.equipmentModel")).toMatchObject(
-        {
-          formlyType: "dependent-select",
-          valueDomain: { kind: "dynamic", source: "function" },
-        }
-      );
+      expect(
+        findContractNode(design.nodes, "system.equipmentModel")
+      ).toMatchObject({
+        formlyType: "dependent-select",
+        valueDomain: { kind: "dynamic", source: "function" },
+      });
       expect(
         findContractNode(design.nodes, "system.equipmentModel")
           ?.interactionProfile
@@ -720,14 +714,17 @@ describe("Nx workspace consumer fixture", () => {
       expect(
         findContractNode(design.nodes, "system.equipmentModel")?.dynamicRules
       ).toContainEqual(
-        expect.objectContaining({ property: "props.options", source: "function" })
+        expect.objectContaining({
+          property: "props.options",
+          source: "function",
+        })
       );
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
   }, 30_000);
 
-  it("generates deterministic portable bytes for all ten forms", async () => {
+  it("generates deterministic portable bytes for all twelve forms", async () => {
     const temporaryDirectory = await mkdtemp(
       resolve(fixtureRoot, ".workspace-runner-")
     );
@@ -763,7 +760,7 @@ describe("Nx workspace consumer fixture", () => {
         )
       );
 
-      expect(first.index.forms).toHaveLength(10);
+      expect(first.index.forms).toHaveLength(12);
       expect(first.index.projects).toHaveLength(4);
       expect(first.index).toEqual(second.index);
       expect(firstIndex).toBe(secondIndex);

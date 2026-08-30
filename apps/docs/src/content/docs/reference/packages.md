@@ -74,8 +74,9 @@ before contributing there.
 - `fixtures/angular-monorepo` exercises distributed Angular CLI integration,
   cross-field effects, custom profiles, and committed contract goldens.
 - `fixtures/nx-workspace` exercises Nx project boundaries, path aliases,
-  a ten-form regulated-workflow corpus, custom fields, source-usage linkage,
-  effects, and deterministic generation.
+  a ten-form regulated-workflow corpus plus two sanitized typed-input authoring
+  forms, custom fields, source-usage linkage, effects, and deterministic
+  generation.
 
 See [Maintained examples](./examples.md) for the exact support evidence
 and shared compliance command.

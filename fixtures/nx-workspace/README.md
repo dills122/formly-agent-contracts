@@ -28,8 +28,9 @@ The fixture serves three purposes:
 
 - Four independently configured Nx projects can participate according to their
   actual ownership boundaries.
-- Ten forms and seventeen named cases generate deterministically through the
-  same public APIs used by consumers.
+- Twelve forms generate deterministically through the same public APIs used by
+  consumers: ten microgrid forms with seventeen named cases plus two sanitized
+  workplace-shaped factory-input forms.
 - Reviewed custom profiles, wrappers, nested arrays, object-valued choices,
   declared effects, and explicit async/opaque diagnostics survive projection.
 - A direct Angular callsite resolves to the exact generated form candidate
@@ -69,18 +70,18 @@ jurisdiction-dependent cases.
 Two reusable forms live in `forms-kit` and eight workflow forms live in
 `feature-lib`:
 
-| Form | Representative coverage |
-| --- | --- |
-| `microgrid.shared.site-contact` | reusable contact fragment and custom radio choice |
-| `microgrid.shared.organization-profile` | nested organization identity and static classification |
-| `microgrid.project-intake` | wrappers, deployment variants, conditional host fields, source lineage |
-| `microgrid.site-assessment` | date range, table selection, populated expandable repeater |
-| `microgrid.system-design` | technology-dependent equipment, capacity constraints, resilience modes |
-| `microgrid.funding-plan` | object-valued autocomplete, Observable options, contribution repeater, model options |
-| `microgrid.permitting` | jurisdiction cases, multi-row approvals, conditional evidence |
-| `microgrid.commissioning` | date windows, approvers, readiness checkpoints, lifecycle hooks |
-| `microgrid.stakeholder-governance` | multi-party roles, voting membership, conditional escalation |
-| `microgrid.operations-plan` | service windows, spare parts, telemetry, preventive maintenance |
+| Form                                    | Representative coverage                                                              |
+| --------------------------------------- | ------------------------------------------------------------------------------------ |
+| `microgrid.shared.site-contact`         | reusable contact fragment and custom radio choice                                    |
+| `microgrid.shared.organization-profile` | nested organization identity and static classification                               |
+| `microgrid.project-intake`              | wrappers, deployment variants, conditional host fields, source lineage               |
+| `microgrid.site-assessment`             | date range, table selection, populated expandable repeater                           |
+| `microgrid.system-design`               | technology-dependent equipment, capacity constraints, resilience modes               |
+| `microgrid.funding-plan`                | object-valued autocomplete, Observable options, contribution repeater, model options |
+| `microgrid.permitting`                  | jurisdiction cases, multi-row approvals, conditional evidence                        |
+| `microgrid.commissioning`               | date windows, approvers, readiness checkpoints, lifecycle hooks                      |
+| `microgrid.stakeholder-governance`      | multi-party roles, voting membership, conditional escalation                         |
+| `microgrid.operations-plan`             | service windows, spare parts, telemetry, preventive maintenance                      |
 
 The eight-form deployment source declares seventeen named cases, including urban
 rooftop, remote seasonal access, hosted campus, cooperative ownership, blended
@@ -187,7 +188,7 @@ Run the build command twice to observe the second execution as a local Nx cache
 hit. Run `pnpm --filter @formly-contract/nx-workspace-fixture graph` to
 inspect the project graph interactively.
 
-Generation writes `workspace-index.json`, ten content-addressed contracts,
+Generation writes `workspace-index.json`, twelve content-addressed contracts,
 and the opt-in `source-usage-catalog.json`. The acceptance test also assembles
 the pure query dataset and proves that both supported filters reach the same
 exact form candidate. Separate assertions cover all six custom profiles,

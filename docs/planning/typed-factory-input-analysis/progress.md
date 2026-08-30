@@ -340,9 +340,20 @@
   1.7–1.8 seconds and the full 19-test file at 1.5 seconds. That intentionally
   compiler-heavy test now has a local 10-second budget; its assertions and the
   production implementation are unchanged.
-- Final reconciled repository verification: `pnpm check` passes with 60 test
-  files and 1,073 tests, every package/application/fixture build, linked and
-  packed workspace consumers, release/pack/demo checks, validation of 121
+- The first reconciled repository verification passed with 60 test files and
+  1,073 tests. Before final review, the branch was rebased onto the two merged
+  fixture-expansion commits now on `main`. The conflict resolution preserves
+  the ten-form microgrid deployment corpus and adds the two sanitized
+  workplace-shaped factories, so the combined workspace deterministically
+  emits twelve contracts.
+- The combined Nx compliance load exposed two more test-budget assumptions:
+  the order-independence setup performs two full workspace inspections, and a
+  project-definition assertion loads the real TypeScript config. Both passed
+  together with the expanded fixture; only their local time budgets changed to
+  tolerate full-suite CPU contention.
+- Definitive post-rebase verification: `pnpm check` passes with 61 test files
+  and 1,079 tests, every package/application/fixture build, linked and packed
+  workspace consumers, release/pack/demo checks, validation of 123
   documentation files, and the production docs-site build.
 - The maintainer requested one last fresh-context review, so this new cycle is
   capped at two instances. No additional reviewer will be started after the
