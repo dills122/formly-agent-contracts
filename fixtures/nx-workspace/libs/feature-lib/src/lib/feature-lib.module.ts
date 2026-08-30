@@ -4,11 +4,11 @@ import { ReactiveFormsModule } from '@angular/forms';
 import { FormsKitModule } from '@nx-fixture/forms-kit';
 import { FormlyModule } from '@ngx-formly/core';
 
-import { ClaimPageComponent } from './claim-page.component.js';
+import { DeploymentPageComponent } from './deployment-page.component.js';
 
 @NgModule({
-  declarations: [ClaimPageComponent],
+  declarations: [DeploymentPageComponent],
   imports: [CommonModule, ReactiveFormsModule, FormlyModule, FormsKitModule],
-  exports: [ClaimPageComponent],
+  exports: [DeploymentPageComponent],
 })
 export class FeatureLibModule {}

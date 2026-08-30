@@ -42,11 +42,16 @@ indexes and contracts are portable validated data.
 ## Applications and fixtures
 
 - `apps/demo-cli` proves deterministic extraction against a synthetic form.
-- `apps/formly-test-app` renders a synthetic Angular/Formly corpus for
-  compatibility and research.
-- `fixtures/angular-monorepo` exercises Angular CLI integration.
+- `apps/formly-test-app` is the maintained single Angular project example. It
+  renders and generates contracts for a twelve-form synthetic corpus.
+- `fixtures/angular-monorepo` exercises distributed Angular CLI integration,
+  cross-field effects, custom profiles, and committed contract goldens.
 - `fixtures/nx-workspace` exercises Nx project boundaries, path aliases,
-  custom fields, and deterministic generation.
+  a ten-form regulated-workflow corpus, custom fields, source-usage linkage,
+  effects, and deterministic generation.
+
+See [Maintained examples](./examples.md) for the exact support evidence
+and shared compliance command.
 
 No MCP server, Playwright driver package, or test-intent package is published
 in the current repository.

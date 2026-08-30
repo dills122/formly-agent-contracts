@@ -43,6 +43,10 @@ Sources for the integration patterns:
 The application deliberately validates the requested Angular 20/Formly 6.1
 pair. It does not expand the repository's general compatibility claim.
 
+The same application is also the maintained single-project workspace example.
+Its adjacent root and project configs expose the browser fixture factories as
+three feature-owned contract sources without introducing library boundaries.
+
 `@angular/build@20.3.29` advertises a Vitest 3 peer for its optional test
 builder, while this repository pins Vitest 4. The workspace uses Angular's
 application and dev-server builders only, so pnpm contains one package-scoped
@@ -201,3 +205,6 @@ Tests assert repository behavior, not Formly's internal implementation.
 7. `pnpm check` and the high-severity dependency audit pass.
 8. Documentation explains how private workplace-only fixtures can consume the
    same registry shape without entering this repository.
+9. The single-project workspace config generates all twelve forms
+   deterministically and preserves representative native, repeated, custom,
+   conditional, and opaque semantics.

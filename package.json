@@ -33,6 +33,7 @@
     "release:check": "node scripts/release-manifest.mjs",
     "release:pack": "pnpm build:demo && node scripts/pack-release.mjs --destination artifacts/releases",
     "test": "vitest run",
+    "test:examples": "vitest run apps/formly-test-app/workspace-fixture.test.ts fixtures/angular-monorepo/workspace-fixture.test.ts fixtures/nx-workspace/workspace-fixture.test.ts",
     "test:watch": "vitest"
   },
   "devDependencies": {

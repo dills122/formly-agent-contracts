@@ -62,6 +62,7 @@ export default defineConfig({
           items: [
             { label: 'Package responsibilities', slug: 'reference/packages' },
             { label: 'Workspace configuration', slug: 'reference/workspace' },
+            { label: 'Maintained examples', slug: 'reference/examples' },
             { label: 'Form sources', slug: 'reference/form-sources' },
             { label: 'Custom field profiles', slug: 'reference/field-profiles' },
             { label: 'Artifacts and linkage', slug: 'reference/artifacts' },
