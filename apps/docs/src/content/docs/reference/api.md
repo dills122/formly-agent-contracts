@@ -262,13 +262,52 @@ See the [CLI reference](./cli-api.md) for the matching
 ## Private Playwright experiment
 
 `@formly-contract/playwright` currently exports
-`createAgentContextDriverImplementationRegistry` and
-`bindAgentContextDriverImplementationRegistry` plus their related types. The
+`createAgentContextDriverImplementationRegistry`,
+`bindAgentContextDriverImplementationRegistry`, and
+`bindAgentContextValidatedPlanDriverCalls` plus their related types. The
 package binds schema-validated driver identities to reviewed trusted-local
-implementations.
+implementations and can lower an already validated plan into an all-or-nothing
+batch of exact trusted driver-call bindings.
+
+The plan binder accepts only the exact frozen implementation-binding result
+returned by `bindAgentContextDriverImplementationRegistry`. An internal class
+with an ECMAScript private field prevents ordinary TypeScript object spread or
+resolver replacement from preserving the nominal result type. Private runtime
+provenance separately rejects cloned and proxied objects; a content-hash match
+alone does not authenticate executable state.
+
+```ts
+import {
+  bindAgentContextDriverImplementationRegistry,
+  bindAgentContextValidatedPlanDriverCalls,
+  createAgentContextDriverImplementationRegistry,
+} from '@formly-contract/playwright';
+
+const implementationBinding =
+  bindAgentContextDriverImplementationRegistry(registry, manifest);
+
+const calls = bindAgentContextValidatedPlanDriverCalls(
+  {
+    intent,
+    contextRef: validated.contextRef,
+    plan: validated.plan,
+    planHash: validated.planHash,
+    dataset,
+    liveOwners,
+    driverRegistryManifest: manifest,
+  },
+  implementationBinding,
+);
+```
+
+The binder repeats complete semantic revalidation before the first resolver
+lookup. Every call contains the exact approved plan step, driver identity, and
+required capabilities; there is no secondary selector or argument bag. The
+result exposes callable identities but never invokes them and never returns a
+partial call batch.
 
 It is private, versioned `0.0.0`, and does not depend on Playwright, launch a
-browser, compile typed test intent, or execute interactions. Do not treat the
+browser, generate Playwright source, or execute interactions. Do not treat the
 package name as a shipped E2E API.
 
 ## API authority and stability

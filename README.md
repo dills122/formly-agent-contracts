@@ -194,7 +194,7 @@ configuration and form registration.
 | [`@formly-contract/schema`](packages/schema/README.md) | Versioned DTOs, strict parsers, canonical JSON, hashing, profiles, effects, and pure query data | `0.4.0`; prepared for first npm release |
 | [`@formly-contract/compiler`](packages/compiler/README.md) | Allowlisted declared extraction and trusted Formly scenario compilation | `0.4.0`; prepared for first npm release |
 | [`@formly-contract/workspace`](packages/workspace/README.md) | Trusted config loading, discovery, generation, checking, source usage, and CLI tooling | `0.1.0`; private and experimental |
-| [`@formly-contract/playwright`](packages/playwright/README.md) | Trusted-local driver binding experiment | `0.0.0`; private, no browser execution |
+| [`@formly-contract/playwright`](packages/playwright/README.md) | Trusted-local driver inventory and validated-plan call-binding experiment | `0.0.0`; private, no browser execution |
 
 The main dependency direction is:
 

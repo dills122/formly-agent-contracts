@@ -1,16 +1,20 @@
 # `@formly-contract/playwright`
 
-Private experimental trusted-local driver implementation inventory.
+Private experimental trusted-local driver inventory and validated-plan call
+binding.
 
 ## Current status
 
 Despite the package name, this is **not** a shipped Playwright integration. It
 does not depend on Playwright, launch a browser, generate test source, compile
-typed test intent, or execute form interactions.
+typed test intent into source, or execute form interactions.
 
-The current package has one narrow responsibility: bind schema-validated driver
-IDs and capabilities to reviewed local implementation definitions, then resolve
-those bindings deterministically. Keeping that experiment behind the eventual
+The current package has two narrow responsibilities: bind schema-validated
+driver IDs and capabilities to reviewed local implementation definitions, then
+revalidate a CTX-2 plan and bind each exact approved step to its trusted local
+implementation. The call result is reviewable and data-only apart from the
+paired callable identity; it has no selector or free-form argument bag and
+never invokes the callable. Keeping that experiment behind the eventual
 package boundary lets later browser work consume stable identities without
 putting executable modules or selectors into portable artifacts.
 
@@ -24,8 +28,8 @@ Cypress helpers; see the
 
 ## Contributor boundary
 
-This package may own trusted driver implementation registration and eventual
-validated-plan/browser execution. It must not own:
+This package may own trusted driver implementation registration,
+validated-plan call lowering, and eventual browser execution. It must not own:
 
 - form discovery or trusted config loading;
 - schema DTOs, driver identity contracts, or intent validation;
@@ -33,7 +37,20 @@ validated-plan/browser execution. It must not own:
 - semantic claims not already present in validated artifacts.
 
 Current implementation and tests live in
-`src/driver-implementation-registry.ts` and its adjacent test.
+`src/driver-implementation-registry.ts`,
+`src/validated-plan-driver-call-binding.ts`, and their adjacent tests.
+
+`bindAgentContextValidatedPlanDriverCalls(revalidationInput, binding)` first
+runs the complete schema revalidator. Only then does it lower each plan step in
+order and resolve the exact driver identity and required capabilities. Invalid
+plans never reach the resolver, an incompatible or mismatched implementation
+allowlist returns no calls, and one resolution refusal makes the entire batch
+unavailable. The binder accepts only the exact frozen binding result returned
+by `bindAgentContextDriverImplementationRegistry`. Its internal-class private
+field prevents ordinary TypeScript object spread or resolver replacement from
+preserving the nominal result type, while private runtime provenance rejects
+cloned and proxied objects. The returned implementation functions remain
+opaque and uncalled.
 
 ```sh
 pnpm exec vitest run packages/playwright/src

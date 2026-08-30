@@ -227,6 +227,8 @@ manifest. A hash is content identity, not execution approval.
 `DRV-0C1` has added and verified the private
 `@formly-contract/playwright` implementation inventory keyed by these exact
 triples, including exact whole-inventory binding and resolution without browser
-execution. Aggregate `DRV-0` remains incomplete until `DRV-0C2` binds the five
-CTX-2-reserved capabilities to validated plans containing exact authority.
-Browser conformance remains evidence for the later `PW-1` and `PW-2` lanes.
+execution. `DRV-0C2` now binds every currently valid CTX-2 plan step only after
+complete semantic revalidation and covers four reachable reserved
+capabilities. Aggregate `DRV-0` remains incomplete until `CTX-2D2` can produce
+and prove the fifth, `activate-wrapper`, as an executable plan step. Browser
+conformance remains evidence for the later `PW-1` and `PW-2` lanes.

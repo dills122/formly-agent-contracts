@@ -2,7 +2,7 @@
   "name": "@formly-contract/playwright",
   "version": "0.0.0",
   "private": true,
-  "description": "Experimental trusted-local driver inventory for Formly Contract.",
+  "description": "Experimental trusted-local driver inventory and validated-plan call binding for Formly Contract.",
   "license": "MIT",
   "type": "module",
   "exports": {

@@ -1,9 +1,14 @@
 # Agent Context and Deterministic E2E Delivery Plan
 
-**Status:** Reconciled with RH-06; `RH06-DOC` and `CTX-0A` through `CTX-0D`
-are complete. `CTX-1` and `DRV-0` are ready. `LIN-0` is blocked on
-representative workplace evidence, and `BHV-0` awaits explicit approval of ADR
-0010.
+**Status:** Reconciled with RH-06; `RH06-DOC`, `CTX-0A` through `CTX-0D`, and
+`CTX-1` are complete. The bounded `CTX-2` MVP and current-plan `DRV-0C2` call
+binding are implemented; aggregate `CTX-2` remains in progress and aggregate
+`DRV-0` remains ready until their explicitly deferred operations are proved.
+`LIN-0` is
+blocked on representative workplace evidence, and `BHV-0` awaits explicit
+approval of ADR 0010. The
+[execution index](../agent-context-hardening/execution-index.md) is normative
+for current packet status.
 
 **Decision:** Conditional go for a bounded contract/query/validator pilot
 
@@ -454,9 +459,11 @@ contract expansion before `CTX-0A`.
 
 ## Task-dispatch readiness
 
-The approved RH-06 planning baseline first made `CTX-0A` eligible. The complete
-shared checkpoint now comprises `CTX-0A` through `CTX-0D`; `CTX-1` and `DRV-0`
-are the independently ready next packets. Each packet must state:
+The approved RH-06 planning baseline first made `CTX-0A` eligible. The shared
+checkpoint now comprises `CTX-0A` through `CTX-0D`; `CTX-1`, the bounded
+`CTX-2` MVP, and the current-plan `DRV-0C2` call binding have since been
+implemented. The execution index names the remaining packets. Each dispatched
+packet must state:
 
 - the exact contract and package owner;
 - dependencies and base commit;
@@ -485,6 +492,7 @@ High-level planning is reconciled when the maintainer agrees to:
 - the real representative `CTX-GATE`, requiring `CTX-2`, `LIN-4`, `BHV-4`,
   `ANG-5`, and `DRV-0`, before MCP transport or browser-driver expansion.
 
-Those points are now represented in RH-06. `CTX-0A` through `CTX-0D` are
-complete; dispatch `CTX-1` and `DRV-0` independently, while all other tasks
-remain governed by the execution index.
+Those points are now represented in RH-06. `CTX-0A` through `CTX-1`, the
+bounded `CTX-2` MVP, and the current-plan driver-call binding are implemented;
+all remaining tasks and aggregate completion states remain governed by the
+execution index.

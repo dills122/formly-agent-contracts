@@ -1,9 +1,10 @@
-# DRV-0C1 Trusted-Local Driver Implementation Inventory
+# DRV-0C Trusted-Local Driver Inventory and Plan Binding
 
-- Status: DRV-0C1 complete; DRV-0C2 deferred until CTX-2
+- Status: DRV-0C1 complete; DRV-0C2 current-plan binding complete with CTX-2D1
 - Owner: experimental `@formly-contract/playwright` package core
 - Dependency: reviewed DRV-0A/B driver-registry manifest at `1f79901`
-- Scope: DRV-0C1 only; this document does not mark aggregate `DRV-0` complete
+- Scope: DRV-0C1 inventory plus DRV-0C2 current-plan binding; no driver
+  invocation or browser conformance
 
 ## Objective
 
@@ -169,15 +170,84 @@ first same-name driver, and never invokes the returned function. Malformed
 requests throw `TypeError`; a valid but unauthorized request returns a
 structured refusal.
 
+## DRV-0C2 exact validated-plan call binding
+
+`CTX-2D1` lowers only a successfully revalidated
+`agent-context.validated-plan@0.1.0` into a deterministic sequence of trusted
+driver-call bindings. The private Playwright package owns this lowering because
+it joins portable plan data to executable local identities. It does not move
+semantic validation or driver DTO ownership out of `@formly-contract/schema`.
+
+Each data-only call is exactly:
+
+```ts
+interface AgentContextValidatedPlanDriverCall {
+  readonly planStepId: string;
+  readonly driver: AgentContextDriverReference;
+  readonly requiredCapabilities: readonly [
+    AgentContextDriverCapability,
+    ...AgentContextDriverCapability[],
+  ];
+  readonly approvedStep: AgentContextValidatedExecutionStep;
+}
+```
+
+The binding result pairs that closed call with the exact callable returned by
+the already allowlist-bound resolver. The call binder accepts only the exact,
+frozen binding result created by
+`bindAgentContextDriverImplementationRegistry`; module-private runtime
+provenance rejects structural clones and resolver replacements before they can
+yield calls. The exported result type is backed by an internal class with an
+ECMAScript private field, so ordinary TypeScript object spread or resolver
+replacement cannot preserve its nominal identity. The separate runtime
+`WeakSet` still authenticates the exact returned object, including against
+type-preserving `Proxy` wrappers. There is deliberately no independent
+selector, locator list, free-form argument bag, module path, or override field.
+The approved step is the sole execution payload and remains reviewable as data.
+
+Binding follows this order and may not reorder it:
+
+1. invoke the complete pure CTX-2 revalidator with the source intent, submitted
+   context and plan hash, current dataset/live owners, and pinned manifest;
+2. reject the whole request on any revalidation diagnostic, before inspecting
+   the implementation binding;
+3. authenticate the exact frozen registry-binding result and reject structural
+   clones or resolver replacements;
+4. parse the now-authorized plan and lower its steps in canonical plan order;
+5. request the exact serialized driver identity and capability set for every
+   call; and
+6. return all bound calls only when every resolution succeeds. Any refusal
+   returns step-local issues and no partial call batch.
+
+The currently validated step union maps without inference:
+
+- `open-usage` requires `open-usage` from its application driver;
+- `wait-readiness`, `set-value`, `perform-node-operation`, `expect-value`, and
+  `expect-validation` reuse their exact approved binding driver and operations;
+- `expect-state` requires `assert-state` from its exact assertion driver.
+
+This binds the five CTX-2-reserved capabilities (`commit-value`,
+`activate-validation`, `assert-value`, `assert-validation`, and, when CTX-2
+later admits wrapper expansions, `activate-wrapper`) through one ABI. The first
+four are exercised by the current positive/negative plans. Wrapper expansion
+remains fail closed in CTX-2 and therefore cannot create a call yet.
+
+The operation returns callable identities but never invokes them. Browser
+arguments, return values, error semantics, fixtures, and conformance remain
+owned by `PW-1`/`PW-2`. Repeater capture, usage actions, transitions, and
+outcomes remain `CTX-2D2`; they may extend the closed validated-step union and
+then use this same lossless binding rule.
+
 ## Commands and project structure
 
 - Source: `packages/playwright/src/driver-implementation-registry.ts`
-- Tests: `packages/playwright/src/driver-implementation-registry.test.ts`
+- Call binding: `packages/playwright/src/validated-plan-driver-call-binding.ts`
+- Tests: adjacent `*.test.ts` files under `packages/playwright/src`
 - Focused test:
-  `pnpm exec vitest run packages/playwright/src/driver-implementation-registry.test.ts`
+  `pnpm exec vitest run packages/playwright/src`
 - Typecheck: `pnpm exec tsc --project packages/playwright/tsconfig.json`
 - Scoped lint:
-  `pnpm exec eslint packages/playwright/src/driver-implementation-registry.ts packages/playwright/src/driver-implementation-registry.test.ts`
+  `pnpm exec eslint packages/playwright/src/driver-implementation-registry.ts packages/playwright/src/driver-implementation-registry.test.ts packages/playwright/src/validated-plan-driver-call-binding.ts packages/playwright/src/validated-plan-driver-call-binding.test.ts packages/playwright/src/index.ts`
 - Documentation check: `node .github/scripts/check-docs.mjs`
 
 Production uses immutable, discriminated result objects and schema-owned
@@ -205,10 +275,15 @@ observable results and the absence of callback execution.
 | `DRV-0C1-REQ-05` private immutable executable state | Hide map and freeze public data | mutation/surface/identity tests | Complete |
 | `DRV-0C1I-REQ-01` package integration | Add the private package index/build config/root paths/lock wiring | package and repository gates | Complete |
 | `DRV-0C1I-REQ-02` C1 status reconciliation | Update the execution index and governing plans after integration while keeping aggregate `DRV-0` incomplete | docs/status review | Complete |
-| `DRV-0C2-REQ-01` validated-plan call binding | Bind the five CTX-2-reserved capabilities through the exact validated-plan/call ABI | CTX-2 positive/negative plan and exact-authority tests | Deferred until CTX-2 |
+| `DRV-0C2-REQ-01` validated-plan call ABI | Preserve each exact closed validated step without a secondary argument or selector bag | positive/negative call-shape and deterministic-order tests | Complete (`CTX-2D1`) |
+| `DRV-0C2-REQ-02` revalidation before lookup | Run complete CTX-2 revalidation before any implementation-binding access | caller-rehashed mutation plus binding-access trap | Complete (`CTX-2D1`) |
+| `DRV-0C2-REQ-03` authenticated exact all-or-nothing resolution | Accept only the authentic frozen binding, match its allowlist hash, bind each exact driver/capability pair, and return no partial batch | clone/resolver-replacement rejection, direct per-step mapping, mismatched/incompatible binding tests, plus C1 missing identity/capability and no-fallback tests | Complete (`CTX-2D1`) |
+| `DRV-0C2-REQ-04` no invocation | Retain original callable identities without executing them | throwing implementation and invocation-count tests | Complete (`CTX-2D1`) |
+| `DRV-0C2-REQ-05` reserved-capability coverage | Bind the four currently reachable reserved capabilities and preserve the wrapper capability as a future closed-union extension | positive/negative capability coverage and wrapper fail-closed evidence | Current union complete; executable wrapper proof remains `CTX-2D2` |
 | `PW-1/PW-2` browser conformance | Controlled browser fixtures and execution evidence | browser suites | Deferred |
 
 The DRV-0C1 core and its private-package integration satisfy the first seven
-rows. Aggregate `DRV-0` remains incomplete: DRV-0C2 begins only after CTX-2
-defines the validated-plan/call ABI and binds its five reserved capabilities.
-Browser conformance remains separate.
+rows. `CTX-2D1` completes the bounded DRV-0C2 binding for every currently valid
+plan step. Aggregate `DRV-0` completion remains withheld only because CTX-2
+cannot yet produce an executable `activate-wrapper` plan step; that proof stays
+with `CTX-2D2`. Browser conformance remains separate.
