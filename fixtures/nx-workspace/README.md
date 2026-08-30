@@ -53,6 +53,9 @@ libs/forms-kit      reusable fragment and custom radio field
 libs/feature-lib    consuming form and rendered page
 ```
 
+See the [`libs/` guide](./libs/README.md) for how Nx ownership, Angular browser
+exports, and Formly Contract entrypoints relate inside each library.
+
 Nx resolves the static dependency chain as
 `fixture-nx-app → fixture-nx-feature-lib → fixture-nx-forms-kit → fixture-nx-formly-kit`.
 

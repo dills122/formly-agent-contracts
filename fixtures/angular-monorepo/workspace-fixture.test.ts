@@ -698,7 +698,9 @@ describe('Angular monorepo workspace fixture', () => {
       ].sort();
       const expectedGoldenPaths = generatedPaths.map(goldenRelativePath);
 
-      expect(await listRelativeFiles(goldenRoot)).toEqual(expectedGoldenPaths);
+      expect(await listRelativeFiles(goldenRoot)).toEqual(
+        ['README.md', ...expectedGoldenPaths].sort(),
+      );
       await Promise.all(
         generatedPaths.map(async (generatedPath) => {
           const [actual, expected] = await Promise.all([

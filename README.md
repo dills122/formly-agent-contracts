@@ -30,6 +30,11 @@ This repository currently provides schema v0.4 and three packages:
 | `@formly-contract/compiler`  | Safe declared extraction and trusted scenario compilation for Formly 6.x                                                                                                                |
 | `@formly-contract/workspace` | Experimental trusted config loading, strict root/project/source descriptors, policy resolution, deterministic multi-project artifact generation, and opt-in static direct-call indexing |
 
+The repository also contains a private `@formly-contract/playwright` `0.0.0`
+experiment for trusted-local driver implementation binding. It is not a fourth
+shipped user package and does not launch a browser or generate Playwright tests.
+See the [`packages/` guide](packages/README.md) for the complete ownership map.
+
 It also includes:
 
 - a deterministic CLI demo using a synthetic golden form;
@@ -52,6 +57,21 @@ producer, pure agent-context query API, and generic pilot CLI with `list`,
 production MCP server, automatic Playwright generation, browser observation,
 and broader Angular application/route discovery are future layers and are not
 shipped by this MVP.
+
+## Start here
+
+| If you want to... | Go to... |
+| --- | --- |
+| understand the product boundary before installing anything | the [hosted documentation](https://dills122.github.io/formly-contract/) and [product status](apps/docs/src/content/docs/start/product-status.md) |
+| evaluate Formly Contract in an application repository | the [workplace pilot guide](docs/workplace-pilot.md) |
+| choose a single-project, Angular workspace, or Nx example | the [maintained example matrix](apps/docs/src/content/docs/reference/examples.md) |
+| understand which implementation package owns a change | the [`packages/` guide](packages/README.md) |
+| understand runnable apps and test fixtures | the [`apps/` guide](apps/README.md) and [`fixtures/` guide](fixtures/README.md) |
+| contribute code or documentation | [`CONTRIBUTING.md`](CONTRIBUTING.md) and the [`docs/` guide](docs/README.md) |
+
+Directory READMEs explain local purpose and boundaries before implementation
+details. Specifications and ADRs remain the canonical source when an example or
+orientation page is less precise.
 
 Evaluating the current product in a private application repository? Start with
 the [workplace pilot guide](docs/workplace-pilot.md). It provides one complete
@@ -659,6 +679,10 @@ apps/
   docs/              Astro Starlight documentation site
 docs/                Specifications, ADRs, delivery plans, and evidence
 ```
+
+Each top-level group has its own navigation README:
+[`packages/`](packages/README.md), [`apps/`](apps/README.md),
+[`fixtures/`](fixtures/README.md), and [`docs/`](docs/README.md).
 
 ## Roadmap
 

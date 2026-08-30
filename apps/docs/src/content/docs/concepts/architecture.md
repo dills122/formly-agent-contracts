@@ -40,6 +40,11 @@ compilation, field-profile resolution, and allowlisted projection belong in
 config loading, discovery, policy resolution, index generation, artifact
 publication, and CLI commands belong in `@formly-contract/workspace`.
 
+The repository also contains a private `@formly-contract/playwright` experiment
+for trusted-local driver implementation binding. It is not a fourth shipped
+product layer: it launches no browser and provides no automatic Playwright
+generation or execution. Its portable identities remain schema-owned.
+
 Future query, intent, and browser packages consume these contracts. They must
 not create a second configuration system or evaluate trusted application code
 inside an untrusted MCP request.
