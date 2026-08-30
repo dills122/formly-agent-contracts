@@ -314,3 +314,36 @@
 - The maintainer explicitly authorized a distinct post-remediation independent
   review cycle. Its first blind-first fresh-context instance will inspect the
   clean commit produced from this reconciliation.
+
+### Post-remediation independent review instance 1 reconciliation
+
+- The first reviewer in the separately authorized post-remediation cycle
+  returned two P1 and one P2 localized analyzer findings. All were reproduced
+  directly and accepted; no package boundary or architecture change is needed.
+- Class option containers now contribute their name, type parameters, and
+  heritage clauses to the same declaration safety gate used by interfaces.
+- Property safety checks every unique symbol/value declaration, closing merged
+  interface and accessor-pair paths that previously trusted only one node.
+- Callable properties retain specialized call/Observable analysis while the
+  remaining normalized descriptor branches diagnose construct/member hazards.
+  Direct canonical Observables do not expand inherited RxJS implementation
+  internals.
+- The Angular unavailable-view exception is now explicit: recognized view
+  identity may retain an opaque generic argument because the helper supplies no
+  value and throws if invoked; declaration errors still refuse first.
+- TDD began with four failing focused regressions. Reconciled focused evidence
+  is 2 files and 40 tests; the complete workspace package suite passes with 16
+  files and 305 tests, and workspace type-check plus focused lint pass.
+- The first full repository run reached 1,072 passing tests before the existing
+  semantic-compilation test exceeded Vitest's shared 5-second default under
+  full-suite contention. The unchanged assertion passed three isolated runs in
+  1.7–1.8 seconds and the full 19-test file at 1.5 seconds. That intentionally
+  compiler-heavy test now has a local 10-second budget; its assertions and the
+  production implementation are unchanged.
+- Final reconciled repository verification: `pnpm check` passes with 60 test
+  files and 1,073 tests, every package/application/fixture build, linked and
+  packed workspace consumers, release/pack/demo checks, validation of 121
+  documentation files, and the production docs-site build.
+- The maintainer requested one last fresh-context review, so this new cycle is
+  capped at two instances. No additional reviewer will be started after the
+  final pass; any non-blocking residuals will be recorded as fast follows.

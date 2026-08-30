@@ -987,6 +987,24 @@ function diagnosticsForDescriptor(
   return diagnostics;
 }
 
+function diagnosticsForPropertyDescriptor(
+  descriptor: NormalizedTypeDescriptor,
+  propertyKey: string,
+  options: {
+    readonly callSignaturesHandled: boolean;
+    readonly directObservableHandled: boolean;
+  }
+): readonly FactoryInputDiagnostic[] {
+  if (options.directObservableHandled) {
+    return [];
+  }
+  let remainder = descriptor;
+  if (options.callSignaturesHandled) {
+    remainder = { ...remainder, callSignatures: [] };
+  }
+  return diagnosticsForDescriptor(remainder, propertyKey, propertyKey);
+}
+
 function declarationNameNode(
   declaration: ts.Declaration
 ): ts.DeclarationName | undefined {
@@ -1090,9 +1108,12 @@ function isSupportedOptionsObject(type: ts.Type): boolean {
 function optionsDeclarationSafetyNodes(
   declaration: ts.Declaration
 ): readonly ts.Node[] {
-  if (ts.isInterfaceDeclaration(declaration)) {
+  if (
+    ts.isInterfaceDeclaration(declaration) ||
+    ts.isClassDeclaration(declaration)
+  ) {
     return [
-      declaration.name,
+      ...(declaration.name === undefined ? [] : [declaration.name]),
       ...(declaration.typeParameters ?? []),
       ...(declaration.heritageClauses ?? []),
     ];
@@ -1241,6 +1262,15 @@ export function analyzeFactoryInputTypes(
     .map((property): FactoryInputPropertyTypeAnalysis => {
       const declaration =
         property.valueDeclaration ?? property.declarations?.[0];
+      const safetyDeclarations = [
+        ...(property.valueDeclaration === undefined
+          ? []
+          : [property.valueDeclaration]),
+        ...(property.declarations ?? []),
+      ].filter(
+        (candidate, index, declarations) =>
+          declarations.indexOf(candidate) === index
+      );
       const propertyType = checker.getTypeOfSymbolAtLocation(
         property,
         declaration ?? parameterDeclaration ?? input.factoryDeclaration
@@ -1251,12 +1281,13 @@ export function analyzeFactoryInputTypes(
         declaration ?? input.factoryDeclaration,
         propertyType
       );
-      if (
-        declaration !== undefined &&
-        (typeSafety.hasSuppression(declaration) ||
-          typeSafety.hasIntersectingError(declaration))
-      ) {
-        const suppressed = typeSafety.hasSuppression(declaration);
+      const suppressed = safetyDeclarations.some((candidate) =>
+        typeSafety.hasSuppression(candidate)
+      );
+      const hasTypeScriptError = safetyDeclarations.some((candidate) =>
+        typeSafety.hasIntersectingError(candidate)
+      );
+      if (suppressed || hasTypeScriptError) {
         diagnostics.push({
           code: suppressed
             ? "FACTORY_TYPESCRIPT_SUPPRESSION"
@@ -1276,6 +1307,7 @@ export function analyzeFactoryInputTypes(
         };
       }
       const observables: ObservableTypeAnalysis[] = [];
+      let directObservableHandled = false;
       const callSignatures = checker.getSignaturesOfType(
         propertyType,
         ts.SignatureKind.Call
@@ -1288,6 +1320,7 @@ export function analyzeFactoryInputTypes(
           declaration ?? input.factoryDeclaration
         );
         if (direct !== undefined) {
+          directObservableHandled = true;
           const emissionType = combinedEmissionDescriptor(
             checker,
             workspaceRoot,
@@ -1310,6 +1343,7 @@ export function analyzeFactoryInputTypes(
         } else if (
           containsCanonicalObservable(checker, observableSymbol, propertyType)
         ) {
+          directObservableHandled = true;
           diagnostics.push({
             code: "FACTORY_OBSERVABLE_TYPE_UNRESOLVED",
             path: property.getName(),
@@ -1418,15 +1452,16 @@ export function analyzeFactoryInputTypes(
             )
           );
         });
-      if (observables.length === 0 && callSignatures.length === 0) {
-        diagnostics.push(
-          ...diagnosticsForDescriptor(
-            expectedPropertyType,
-            property.getName(),
-            property.getName()
-          )
-        );
-      }
+      diagnostics.push(
+        ...diagnosticsForPropertyDescriptor(
+          expectedPropertyType,
+          property.getName(),
+          {
+            callSignaturesHandled: callSignatures.length > 0,
+            directObservableHandled,
+          }
+        )
+      );
       return {
         key: property.getName(),
         optional: (property.flags & ts.SymbolFlags.Optional) !== 0,

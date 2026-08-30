@@ -37,10 +37,14 @@ plan, not only the previous review's remediation patch.
 3. [Implementation round 3 — Codex](./implementation-round-3-codex.md): three
    fail-closed findings and two documentation drifts accepted and reconciled.
 
-## Post-remediation implementation cycle — authorized
+## Post-remediation implementation cycle — final review pending
 
 The maintainer explicitly requested a new review cycle after all three
 production instances were reconciled. It is a distinct cycle, not a
 renumbering or silent extension of the completed three-instance cycle above.
-Its first fresh-context review will inspect the new clean remediation snapshot
-using the same blind-first protocol.
+The maintainer subsequently capped this cycle at two instances by asking for
+one last review after the first reconciliation.
+
+1. [Post-remediation round 1 — Codex](./post-remediation-round-1-codex.md): two
+   P1 and one P2 findings accepted and reconciled.
+2. Final post-remediation round — pending.

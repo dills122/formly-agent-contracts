@@ -445,6 +445,50 @@ describe("analyzeFactoryInputTypes", () => {
     );
   });
 
+  it("reports construct and attached-member hazards on a callable property", () => {
+    const program = createProgram(`
+      interface Result {
+        readonly id: string;
+      }
+
+      interface Hybrid {
+        (value: string): void;
+        new (seed: any): Result;
+        readonly metadata: unknown;
+      }
+
+      export interface Options {
+        readonly hybrid: Hybrid;
+      }
+
+      export function HybridForm(options: Options): readonly object[] {
+        return [{ props: { change: options.hybrid } }];
+      }
+    `);
+
+    const analysis = analyzeFactoryInputTypes({
+      workspaceRoot: WORKSPACE_ROOT,
+      descriptor: descriptor(program),
+      factoryDeclaration: factoryDeclaration(program, "HybridForm"),
+    });
+
+    expect(analysis.coverage).toBe("incomplete");
+    expect(analysis.diagnostics).toEqual(
+      expect.arrayContaining([
+        {
+          code: "FACTORY_INPUT_TYPE_ANY",
+          path: "hybrid.construct[0].parameter[0]",
+          propertyKey: "hybrid",
+        },
+        {
+          code: "FACTORY_INPUT_TYPE_UNKNOWN",
+          path: "hybrid.metadata",
+          propertyKey: "hybrid",
+        },
+      ])
+    );
+  });
+
   it("fails closed when only part of a union is a canonical Observable", () => {
     const program = createProgram(`
       import type { Observable } from 'rxjs';
@@ -733,6 +777,46 @@ describe("analyzeFactoryInputTypes", () => {
       properties: [],
     });
   });
+
+  it.each([
+    ["extends", "extends MissingBase", "BrokenOptions"],
+    ["implements", "implements MissingContract", "BrokenOptions"],
+    [
+      "generic constraint",
+      "<T extends MissingConstraint>",
+      "BrokenOptions<never>",
+    ],
+  ])(
+    "refuses TypeScript errors on class options %s",
+    (_, declarationTail, optionsType) => {
+      const program = createProgram(`
+      export class BrokenOptions${declarationTail} {
+        readonly change!: (value: string) => void;
+      }
+
+      export function ClassContainerErrorForm(
+        options: ${optionsType},
+      ): readonly object[] {
+        return [{ props: { change: options.change } }];
+      }
+    `);
+
+      const analysis = analyzeFactoryInputTypes({
+        workspaceRoot: WORKSPACE_ROOT,
+        descriptor: descriptor(program),
+        factoryDeclaration: factoryDeclaration(
+          program,
+          "ClassContainerErrorForm"
+        ),
+      });
+
+      expect(analysis).toMatchObject({
+        coverage: "incomplete",
+        diagnostics: [{ code: "FACTORY_TYPESCRIPT_DIAGNOSTIC" }],
+        properties: [],
+      });
+    }
+  );
 
   it("refuses suppression directives that could hide relevant type errors", () => {
     const program = createProgram(`

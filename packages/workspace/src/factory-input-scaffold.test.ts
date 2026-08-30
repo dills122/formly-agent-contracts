@@ -246,7 +246,7 @@ describe("generateFactoryInputScaffold", () => {
         ts.flattenDiagnosticMessageText(diagnostic.messageText, "\n")
       )
     ).toEqual([]);
-  });
+  }, 10_000);
 
   it("fails closed when the real options type is not exported", () => {
     const program = createProgram(
@@ -330,13 +330,69 @@ describe("generateFactoryInputScaffold", () => {
       }
     );
 
+    expect(() => generate(program)).toThrowError(
+      expect.objectContaining<Partial<FactoryInputScaffoldError>>({
+        code: "FACTORY_INPUT_SCAFFOLD_ANALYSIS_UNAVAILABLE",
+      })
+    );
+  });
+
+  it("checks every merged property declaration before generating helpers", () => {
+    const program = createProgram(`
+      export interface IndexingFormOptions {
+        readonly change: (value: string) => void;
+      }
+
+      export interface IndexingFormOptions {
+        readonly change: MissingType;
+      }
+
+      export function IndexingFormConfig(
+        options: IndexingFormOptions,
+      ): readonly object[] {
+        return [{ props: { change: options.change } }];
+      }
+    `);
+
     expect(generate(program).review).toMatchObject({
       coverage: "incomplete",
       generated: [],
       unsupported: ["change"],
       diagnostics: [
         {
-          code: "FACTORY_TYPESCRIPT_SUPPRESSION",
+          code: "FACTORY_TYPESCRIPT_DIAGNOSTIC",
+          propertyKey: "change",
+        },
+      ],
+    });
+  });
+
+  it("checks both accessor declarations before generating helpers", () => {
+    const program = createProgram(`
+      export class IndexingFormOptions {
+        get change(): (value: string) => void {
+          return () => undefined;
+        }
+
+        set change(value: MissingType) {
+          void value;
+        }
+      }
+
+      export function IndexingFormConfig(
+        options: IndexingFormOptions,
+      ): readonly object[] {
+        return [{ props: { change: options.change } }];
+      }
+    `);
+
+    expect(generate(program).review).toMatchObject({
+      coverage: "incomplete",
+      generated: [],
+      unsupported: ["change"],
+      diagnostics: [
+        {
+          code: "FACTORY_TYPESCRIPT_DIAGNOSTIC",
           propertyKey: "change",
         },
       ],

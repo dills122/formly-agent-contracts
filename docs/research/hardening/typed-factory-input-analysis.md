@@ -403,6 +403,15 @@ property's type alone.
 | `any`, `unknown`, unresolved generic          | any use                                                                                     | fail closed with a focused diagnostic                                                                                         |
 | Unsupported alias/control flow                | helper indirection or unbounded flow                                                        | incomplete coverage plus explicit binding/refusal                                                                             |
 
+The unavailable-view result is a deliberate structural exception to the
+general hazard rule. A symbol-resolved Angular view such as
+`TemplateRef<unknown>` may retain an `unknown` generic argument because the
+generated helper neither creates, reads, nor substitutes a view value; it marks
+that capability unavailable if invoked. TypeScript declaration errors or
+suppressions still refuse the property before this exception, and no
+same-spelled application type receives it. All other `any`/`unknown` hazards
+remain unsupported.
+
 The demonstrated research grammar supports:
 
 - direct `options.property` access;
