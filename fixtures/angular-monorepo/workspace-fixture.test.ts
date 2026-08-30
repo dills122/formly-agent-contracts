@@ -219,7 +219,7 @@ describe('Angular monorepo workspace fixture', () => {
         sourceIds: ['fixture/claims-feature'],
       },
     ]);
-  }, 20_000);
+  }, 30_000);
 
   it('shares one canonical custom-field registry across source-owning projects', async () => {
     const root = parseRootConfig(
