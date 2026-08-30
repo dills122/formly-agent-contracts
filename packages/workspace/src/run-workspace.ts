@@ -323,6 +323,16 @@ function canonicalOutputDirectory(path: string): string {
   return posix.normalize(normalizeRelativePath(path)).replace(/\/+$/u, "");
 }
 
+function isOutsideWorkspaceOutputConfigError(
+  error: unknown
+): error is WorkspaceConfigValidationError {
+  return (
+    error instanceof WorkspaceConfigValidationError &&
+    error.reason === "path-outside-workspace" &&
+    error.path.endsWith("output.directory")
+  );
+}
+
 function workspaceRelativePath(
   workspaceRoot: string,
   relativePath: string,
@@ -364,10 +374,7 @@ function resolveProjects(
         },
       };
     } catch (error) {
-      if (
-        error instanceof WorkspaceConfigValidationError &&
-        error.path.endsWith("output.directory")
-      ) {
+      if (isOutsideWorkspaceOutputConfigError(error)) {
         throw new WorkspaceGenerationError(
           "OUTPUT_PATH_OUTSIDE_WORKSPACE",
           "inventory",
@@ -1223,10 +1230,7 @@ async function planWorkspaceRun(
   try {
     discovered = await discoverWorkspaceProjects(options);
   } catch (error) {
-    if (
-      error instanceof WorkspaceConfigValidationError &&
-      error.path.endsWith("output.directory")
-    ) {
+    if (isOutsideWorkspaceOutputConfigError(error)) {
       throw new WorkspaceGenerationError(
         "OUTPUT_PATH_OUTSIDE_WORKSPACE",
         "inventory",
