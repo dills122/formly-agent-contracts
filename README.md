@@ -256,6 +256,11 @@ Construction values and unsafe or ambiguous inputs remain explicit. Duplicate,
 unsupported, tooling-only, or overlapping roots produce stable diagnostics
 instead of an empty successful result.
 
+The counts use final materialization precedence: an unsupported type hazard
+stays `unsupported` even when its use is also ambiguous; ambiguity otherwise
+precedes explicit or generated review categories. Direct `eval()` is refused
+as unattributed reflection rather than inspected or executed.
+
 Every workspace-contained project config, source descriptor, form definition,
 root declaration, and authority alias traversed between them is checked against
 the final file bytes used for catalog materialization. A changed or unreadable

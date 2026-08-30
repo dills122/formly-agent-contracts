@@ -55,6 +55,7 @@ export type FactoryInputUseAmbiguityReason =
   | "parameter-escape"
   | "parameter-alias"
   | "property-alias"
+  | "reflective-access"
   | "unknown-callback-consumer"
   | "unsupported-storage";
 
@@ -465,6 +466,19 @@ function analyzeBodyUses(
 ): MutableUsageState {
   const state: MutableUsageState = { diagnostics: [], uses: new Map() };
   const visit = (node: ts.Node): void => {
+    const calledExpression = ts.isCallExpression(node)
+      ? unwrapExpression(node.expression)
+      : undefined;
+    if (
+      calledExpression !== undefined &&
+      ts.isIdentifier(calledExpression) &&
+      calledExpression.text === "eval"
+    ) {
+      addDiagnostic(state, {
+        code: "FACTORY_INPUT_USE_AMBIGUOUS",
+        reason: "reflective-access",
+      });
+    }
     if (
       ts.isIdentifier(node) &&
       node !== body.parameter.name &&

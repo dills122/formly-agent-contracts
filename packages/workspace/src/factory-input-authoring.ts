@@ -73,7 +73,9 @@ function normalizedFormIds(formIds: readonly string[] | undefined): {
   readonly formIds: readonly string[] | undefined;
   readonly diagnostics: readonly WorkspaceFactoryInputAuthoringDiagnostic[];
 } {
-  if (formIds === undefined) return { formIds: undefined, diagnostics: [] };
+  if (formIds === undefined || formIds.length === 0) {
+    return { formIds: undefined, diagnostics: [] };
+  }
   const diagnostics: WorkspaceFactoryInputAuthoringDiagnostic[] = [];
   const normalized: string[] = [];
   for (const formId of formIds) {
@@ -112,12 +114,14 @@ function targetKey(
 function metrics(
   result: FactoryInputScaffoldResult
 ): WorkspaceFactoryInputAuthoringMetrics {
+  const unsupported = new Set(result.review.unsupported);
   const ambiguous = new Set(
     result.review.diagnostics
       .filter(({ code }) => code === "FACTORY_INPUT_USE_AMBIGUOUS")
       .flatMap(({ propertyKey }) =>
         propertyKey === undefined ? [] : [propertyKey]
       )
+      .filter((propertyKey) => !unsupported.has(propertyKey))
   );
   const unattributedAmbiguity = result.review.diagnostics.some(
     ({ code, propertyKey }) =>
@@ -128,9 +132,7 @@ function metrics(
     explicit: result.review.explicit.filter(({ key }) => !ambiguous.has(key))
       .length,
     ambiguous: ambiguous.size,
-    unsupported: result.review.unsupported.filter(
-      (propertyKey) => !ambiguous.has(propertyKey)
-    ).length,
+    unsupported: unsupported.size,
     coverage: result.review.coverage,
     unattributedAmbiguity,
   };

@@ -1045,6 +1045,60 @@ function isSupportedOptionsObject(type: ts.Type): boolean {
   return type.isIntersection() && type.types.every(isSupportedOptionsObject);
 }
 
+function optionsDeclarationSafetyNodes(
+  declaration: ts.Declaration
+): readonly ts.Node[] {
+  if (ts.isInterfaceDeclaration(declaration)) {
+    return [
+      declaration.name,
+      ...(declaration.typeParameters ?? []),
+      ...(declaration.heritageClauses ?? []),
+    ];
+  }
+  if (ts.isTypeAliasDeclaration(declaration)) {
+    return [
+      declaration.name,
+      ...(declaration.typeParameters ?? []),
+      declaration.type,
+    ];
+  }
+  return [];
+}
+
+function optionsContainerSafetyNodes(
+  checker: ts.TypeChecker,
+  type: ts.Type
+): readonly ts.Node[] {
+  const nodes: ts.Node[] = [];
+  const visited = new Set<ts.Type>();
+  const visit = (current: ts.Type): void => {
+    if (visited.has(current)) return;
+    visited.add(current);
+    const symbol = canonicalSymbol(
+      checker,
+      current.aliasSymbol ?? current.symbol
+    );
+    for (const declaration of symbol?.declarations ?? []) {
+      nodes.push(...optionsDeclarationSafetyNodes(declaration));
+    }
+    if (current.isUnionOrIntersection()) {
+      current.types.forEach(visit);
+    }
+    if ((current.flags & ts.TypeFlags.Object) === 0) return;
+    const objectType = current as ts.ObjectType;
+    const target =
+      (objectType.objectFlags & ts.ObjectFlags.Reference) !== 0
+        ? (current as ts.TypeReference).target
+        : objectType;
+    if ((target.objectFlags & ts.ObjectFlags.ClassOrInterface) === 0) return;
+    for (const baseType of checker.getBaseTypes(target as ts.InterfaceType) ?? []) {
+      visit(baseType);
+    }
+  };
+  visit(type);
+  return nodes;
+}
+
 export function analyzeFactoryInputTypes(
   input: AnalyzeFactoryInputTypesInput
 ): FactoryInputTypeAnalysis {
@@ -1090,6 +1144,13 @@ export function analyzeFactoryInputTypes(
     parameter,
     parameterDeclaration ?? input.factoryDeclaration
   );
+  const optionsContainerNodes = optionsContainerSafetyNodes(checker, inputType);
+  if (optionsContainerNodes.some(typeSafety.hasSuppression)) {
+    return emptyAnalysis(input, "FACTORY_TYPESCRIPT_SUPPRESSION");
+  }
+  if (optionsContainerNodes.some(typeSafety.hasIntersectingError)) {
+    return emptyAnalysis(input, "FACTORY_TYPESCRIPT_DIAGNOSTIC");
+  }
   const expectedType = normalize(
     checker,
     workspaceRoot,

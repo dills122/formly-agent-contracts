@@ -258,3 +258,27 @@
   the production docs-site build. A sandboxed run reached only the packed
   consumer install before DNS refusal; the authorized network-enabled rerun of
   the exact command passed.
+
+### Production independent review instance 2 reconciliation
+
+- A second fresh Codex reviewer inspected the exact clean `fd5e77c..2e23e81`
+  snapshot with the required blind-first protocol. Its initial verdict was not
+  ready, with three P1, two P2, and one P3 finding; all six were accepted.
+- The reviewer reproduced two fail-closed defects with the repository's exact
+  TypeScript 5.9.3 dependency: an unresolved inherited options base and direct
+  `eval()` could both yield complete coverage and a generated callback plan.
+- Options analysis now checks named container and recursively traversed base
+  declarations for relevant TypeScript errors/suppressions. Direct `eval()` is
+  a syntactic unattributed-reflection refusal that blocks all generated
+  helpers without inspecting or executing the string.
+- Empty explicit form filters normalize to unfiltered selection, unsupported
+  materialization has metric precedence over ambiguity, and scaffold review
+  diagnostics preserve bounded reasons and storage paths.
+- Added the required minor compiler changeset and refreshed stale research
+  work-item statuses. Focused TDD evidence is 4 files and 48 tests, including
+  all five behavioral findings; workspace/compiler typechecks, lint, changeset
+  status, documentation, and diff checks pass.
+- Final reconciled repository verification: `pnpm check` passes with 60 test
+  files and 1,064 tests, every package/application/fixture build, linked and
+  packed workspace consumers, release/pack/demo checks, validation of 119
+  documentation files, and the production docs-site build.

@@ -32,5 +32,6 @@ plan, not only the previous review's remediation patch.
 
 1. [Implementation round 1 — Codex](./implementation-round-1-codex.md): two P1
    and three P2 findings accepted and reconciled.
-2. Implementation round 2 — pending.
+2. [Implementation round 2 — Codex](./implementation-round-2-codex.md): three
+   P1, two P2, and one P3 finding accepted and reconciled.
 3. Implementation round 3 — pending.

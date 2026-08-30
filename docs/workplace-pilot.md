@@ -294,6 +294,11 @@ exported options type and supported direct uses in the factory, then prints:
 - mutually exclusive generated, explicit, ambiguous, and unsupported property
   counts, plus overall coverage and an unattributed-ambiguity flag.
 
+Unsupported final materialization has count precedence over keyed ambiguity,
+so a type hazard remains visible even when its flow is also ambiguous. Direct
+`eval()` is an unattributed reflective refusal and blocks generated helpers; it
+is never inspected or executed.
+
 The output is a review aid, not a runtime harness. The command does not invoke
 the source `list()`, the real factory, callbacks, streams, or Angular views and
 does not create the suggested file. Copy it only after review. Business data,

@@ -399,6 +399,37 @@ describe("analyzeFactoryInputUsages", () => {
     ]);
   });
 
+  it("fails closed when direct eval can reflectively consume the options object", () => {
+    const program = createProgram(`
+      interface Options {
+        readonly change: (value?: string) => void;
+      }
+
+      export function ReflectiveForm(options: Options): readonly object[] {
+        eval("options.change()");
+        return [{ props: { change: options.change } }];
+      }
+    `);
+
+    const analysis = analyzeFactoryInputUsages({
+      workspaceRoot: WORKSPACE_ROOT,
+      descriptor: descriptor(program),
+      factoryDeclaration: factoryDeclaration(program, "ReflectiveForm"),
+    });
+
+    expect(analysis.coverage).toBe("incomplete");
+    expect(analysis.diagnostics).toContainEqual({
+      code: "FACTORY_INPUT_USE_AMBIGUOUS",
+      reason: "reflective-access",
+    });
+    expect(analysis.properties).toEqual([
+      expect.objectContaining({
+        key: "change",
+        materialization: "explicit-binding-required",
+      }),
+    ]);
+  });
+
   it("applies the reviewed callback-slot allowlist to direct callable storage", () => {
     const program = createProgram(`
       interface Options {

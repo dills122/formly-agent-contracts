@@ -321,6 +321,39 @@ describe("generateFactoryInputScaffold", () => {
     ).toEqual([]);
   });
 
+  it("preserves bounded ambiguity reasons and unreviewed storage paths", () => {
+    const program = createProgram(`
+      export interface IndexingFormOptions {
+        readonly aliased: (value: string) => void;
+        readonly custom: (value: string) => void;
+      }
+      export function IndexingFormConfig(
+        options: IndexingFormOptions,
+      ): readonly object[] {
+        const alias = options.aliased;
+        return [{
+          alias,
+          props: { customDriver: options.custom },
+        }];
+      }
+    `);
+
+    expect(generate(program).review.diagnostics).toEqual(
+      expect.arrayContaining([
+        {
+          code: "FACTORY_INPUT_USE_AMBIGUOUS",
+          propertyKey: "aliased",
+          reason: "property-alias",
+        },
+        {
+          code: "FACTORY_INPUT_STORAGE_UNREVIEWED",
+          propertyKey: "custom",
+          storagePath: "props.customDriver",
+        },
+      ])
+    );
+  });
+
   it("refuses non-identifier option keys instead of embedding arbitrary source names", () => {
     const program = createProgram(`
       export interface IndexingFormOptions {

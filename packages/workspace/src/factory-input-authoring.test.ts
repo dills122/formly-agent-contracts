@@ -140,6 +140,19 @@ describe("inspectWorkspaceFactoryInputs", () => {
     });
   });
 
+  it("does not treat an explicitly empty form selection as success", async () => {
+    const result = await inspectWorkspaceFactoryInputs({
+      workspaceRoot: process.cwd(),
+      rootConfigPath: "formly-contracts.config.ts",
+      formIds: [],
+    });
+
+    expect(result).toEqual({
+      drafts: [],
+      diagnostics: [{ code: "FACTORY_INPUT_AUTHORING_NO_TARGETS" }],
+    });
+  });
+
   it("reports mutually exclusive property counts plus global coverage", async () => {
     state.targets = [target()];
     state.scaffold = {
@@ -153,11 +166,15 @@ describe("inspectWorkspaceFactoryInputs", () => {
           { key: "ambiguous", requirement: "binding" },
           { key: "mode", requirement: "value" },
         ],
-        unsupported: ["unsafe"],
+        unsupported: ["ambiguousUnsafe", "unsafe"],
         diagnostics: [
           {
             code: "FACTORY_INPUT_USE_AMBIGUOUS",
             propertyKey: "ambiguous",
+          },
+          {
+            code: "FACTORY_INPUT_USE_AMBIGUOUS",
+            propertyKey: "ambiguousUnsafe",
           },
           { code: "FACTORY_INPUT_USE_AMBIGUOUS" },
         ],
@@ -174,7 +191,7 @@ describe("inspectWorkspaceFactoryInputs", () => {
       generated: 1,
       explicit: 1,
       ambiguous: 1,
-      unsupported: 1,
+      unsupported: 2,
       coverage: "incomplete",
       unattributedAmbiguity: true,
     });

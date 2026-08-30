@@ -6,6 +6,7 @@ import {
   analyzeFactoryInputUsages,
   type AnalyzeFactoryInputUsagesInput,
   type FactoryInputMaterialization,
+  type FactoryInputUseAmbiguityReason,
   type FactoryInputUsageDiagnosticCode,
   type FactoryInputUsageAnalysis,
 } from "./factory-input-usage.js";
@@ -67,6 +68,8 @@ export interface FactoryInputScaffoldExplicitProperty {
 export interface FactoryInputScaffoldDiagnostic {
   readonly code: FactoryInputDiagnosticCode | FactoryInputUsageDiagnosticCode;
   readonly propertyKey?: string;
+  readonly reason?: FactoryInputUseAmbiguityReason;
+  readonly storagePath?: string;
 }
 
 export interface FactoryInputScaffoldReview {
@@ -273,7 +276,12 @@ function helperFor(
 }
 
 function diagnosticKey(diagnostic: FactoryInputScaffoldDiagnostic): string {
-  return `${diagnostic.propertyKey ?? ""}\0${diagnostic.code}`;
+  return [
+    diagnostic.propertyKey ?? "",
+    diagnostic.code,
+    diagnostic.reason ?? "",
+    diagnostic.storagePath ?? "",
+  ].join("\0");
 }
 
 function createReview(
@@ -319,6 +327,12 @@ function createReview(
       ...(diagnostic.propertyKey === undefined
         ? {}
         : { propertyKey: diagnostic.propertyKey }),
+      ...("reason" in diagnostic && diagnostic.reason !== undefined
+        ? { reason: diagnostic.reason }
+        : {}),
+      ...("storagePath" in diagnostic && diagnostic.storagePath !== undefined
+        ? { storagePath: diagnostic.storagePath }
+        : {}),
     };
     diagnostics.set(diagnosticKey(value), value);
   }

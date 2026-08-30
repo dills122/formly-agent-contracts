@@ -651,6 +651,34 @@ describe("analyzeFactoryInputTypes", () => {
     });
   });
 
+  it("refuses TypeScript errors on the options container heritage", () => {
+    const program = createProgram(`
+      interface BrokenBase extends MissingApplicationBase {}
+
+      export interface BrokenOptions extends BrokenBase {
+        readonly change: (value?: string) => void;
+      }
+
+      export function HeritageErrorForm(
+        options: BrokenOptions,
+      ): readonly object[] {
+        return [{ props: { change: options.change } }];
+      }
+    `);
+
+    const analysis = analyzeFactoryInputTypes({
+      workspaceRoot: WORKSPACE_ROOT,
+      descriptor: descriptor(program),
+      factoryDeclaration: factoryDeclaration(program, "HeritageErrorForm"),
+    });
+
+    expect(analysis).toMatchObject({
+      coverage: "incomplete",
+      diagnostics: [{ code: "FACTORY_TYPESCRIPT_DIAGNOSTIC" }],
+      properties: [],
+    });
+  });
+
   it("refuses suppression directives that could hide relevant type errors", () => {
     const program = createProgram(`
       export function SuppressedForm(
