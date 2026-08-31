@@ -12,7 +12,7 @@ internal files.
 | [`@formly-contract/schema`](./schema/README.md) | portable DTOs, strict parsers, canonical JSON, hashing, diagnostics, profiles, effects, and query data | loading Angular/Formly application code |
 | [`@formly-contract/compiler`](./compiler/README.md) | projecting trusted Formly field configuration into a validated contract | repository discovery or artifact publication |
 | [`@formly-contract/workspace`](./workspace/README.md) | config loading, project/source discovery, generation, checking, indexes, source usage, and the `formly-contracts` CLI | defining a second contract model or browser automation |
-| [`@formly-contract/playwright`](./playwright/README.md) | the current private experiment for binding validated driver identities to trusted-local implementations | launching browsers, generating Playwright tests, or claiming shipped E2E execution |
+| [`@formly-contract/playwright`](./playwright/README.md) | the current private experiment for binding validated driver identities and exact revalidated plan steps to trusted-local implementations | launching browsers, generating Playwright tests, invoking drivers, or claiming shipped E2E execution |
 
 The main dependency direction is:
 

@@ -15,3 +15,13 @@ export type {
   AgentContextDriverResolutionResult,
   AgentContextGenericDriverImplementationSource,
 } from './driver-implementation-registry.js';
+export {
+  AGENT_CONTEXT_VALIDATED_PLAN_DRIVER_CALL_SCHEMA_VERSION,
+  bindAgentContextValidatedPlanDriverCalls,
+} from './validated-plan-driver-call-binding.js';
+export type {
+  AgentContextBoundValidatedPlanDriverCall,
+  AgentContextValidatedPlanDriverCall,
+  AgentContextValidatedPlanDriverCallBindingResult,
+  AgentContextValidatedPlanDriverCallResolutionIssue,
+} from './validated-plan-driver-call-binding.js';

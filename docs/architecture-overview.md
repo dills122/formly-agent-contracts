@@ -59,7 +59,8 @@ envelope, source usage and journeys, scenario references and execution
 authority, the driver-registry manifest, and progressive agent-context query
 DTOs. The schema package publishes the pure query API, and the private
 experimental Playwright package contains the trusted-local driver
-implementation inventory. These are not fields of the v0.4 contract. A real
+implementation inventory plus exact validated-plan call binding without driver
+invocation. These are not fields of the v0.4 contract. A real
 producer now exists only for the narrow source-usage convention described
 above; broader lineage, journey, scenario, Angular-observation, production MCP,
 and browser-execution producers do not yet exist. The canonical ownership and

@@ -64,12 +64,14 @@ the current consumer lookup surfaces.
 ## Private `@formly-contract/playwright` experiment
 
 The repository contains a private `0.0.0` package that binds validated driver
-identities to reviewed trusted-local implementation definitions. The directory
-reserves the intended ownership boundary and supports ongoing design work.
+identities to reviewed trusted-local implementation definitions. It can also
+revalidate a CTX-2 plan and produce an all-or-nothing ordered batch pairing each
+exact approved step with its trusted implementation. The directory reserves
+the intended ownership boundary and supports ongoing design work.
 
 It does **not** currently depend on Playwright, launch a browser, generate tests,
-or provide the planned typed-intent execution vertical. It is not a published
-user capability. See its
+invoke drivers, or provide the planned browser execution vertical. It is not a
+published user capability. See its
 [package README](https://github.com/dills122/formly-contract/blob/main/packages/playwright/README.md)
 and [private API boundary](./api.md#private-playwright-experiment) before
 contributing there.

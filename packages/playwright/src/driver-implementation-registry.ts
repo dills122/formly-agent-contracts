@@ -110,7 +110,7 @@ interface AgentContextDriverImplementationBindingHashes {
   readonly allowlistManifestContentHash: Sha256Digest;
 }
 
-export type AgentContextDriverImplementationBindingResult =
+type AgentContextDriverImplementationBindingShape =
   | (AgentContextDriverImplementationBindingHashes & {
       readonly status: 'compatible';
       readonly issues: readonly [];
@@ -123,6 +123,63 @@ export type AgentContextDriverImplementationBindingResult =
         ...AgentContextDriverImplementationBindingIssue[],
       ];
     });
+
+abstract class AgentContextDriverImplementationBindingBase
+  implements AgentContextDriverImplementationBindingHashes
+{
+  readonly #provenance = true;
+
+  readonly inventoryManifestContentHash: Sha256Digest;
+  readonly allowlistManifestContentHash: Sha256Digest;
+
+  protected constructor(hashes: AgentContextDriverImplementationBindingHashes) {
+    this.inventoryManifestContentHash = hashes.inventoryManifestContentHash;
+    this.allowlistManifestContentHash = hashes.allowlistManifestContentHash;
+  }
+}
+
+class AgentContextCompatibleDriverImplementationBinding
+  extends AgentContextDriverImplementationBindingBase
+{
+  readonly status = 'compatible' as const;
+  readonly issues: readonly [];
+  readonly resolver: AgentContextBoundDriverResolver;
+
+  constructor(
+    input: Extract<
+      AgentContextDriverImplementationBindingShape,
+      { readonly status: 'compatible' }
+    >,
+  ) {
+    super(input);
+    this.issues = input.issues;
+    this.resolver = input.resolver;
+  }
+}
+
+class AgentContextIncompatibleDriverImplementationBinding
+  extends AgentContextDriverImplementationBindingBase
+{
+  readonly status = 'incompatible' as const;
+  readonly issues: readonly [
+    AgentContextDriverImplementationBindingIssue,
+    ...AgentContextDriverImplementationBindingIssue[],
+  ];
+
+  constructor(
+    input: Extract<
+      AgentContextDriverImplementationBindingShape,
+      { readonly status: 'incompatible' }
+    >,
+  ) {
+    super(input);
+    this.issues = input.issues;
+  }
+}
+
+export type AgentContextDriverImplementationBindingResult =
+  | AgentContextCompatibleDriverImplementationBinding
+  | AgentContextIncompatibleDriverImplementationBinding;
 
 interface InstalledDriver {
   readonly driver: AgentContextDriverReference;
@@ -166,9 +223,34 @@ const registryStates = new WeakMap<
   AgentContextDriverImplementationRegistry,
   RegistryState
 >();
+const implementationBindingResults = new WeakSet<object>();
 
 function fail(path: string, message: string): never {
   throw new TypeError(`${path}: ${message}`);
+}
+
+function freezeImplementationBindingResult(
+  input: AgentContextDriverImplementationBindingShape,
+): AgentContextDriverImplementationBindingResult {
+  const result: AgentContextDriverImplementationBindingResult =
+    input.status === 'compatible'
+      ? new AgentContextCompatibleDriverImplementationBinding(input)
+      : new AgentContextIncompatibleDriverImplementationBinding(input);
+  Object.freeze(result);
+  implementationBindingResults.add(result);
+  return result;
+}
+
+export function requireAgentContextDriverImplementationBinding(
+  input: AgentContextDriverImplementationBindingResult,
+): AgentContextDriverImplementationBindingResult {
+  if (!implementationBindingResults.has(input)) {
+    fail(
+      'implementationBinding',
+      'must be a binding returned by bindAgentContextDriverImplementationRegistry.',
+    );
+  }
+  return input;
 }
 
 function compareText(left: string, right: string): number {
@@ -779,14 +861,14 @@ export function bindAgentContextDriverImplementationRegistry(
       issues[0]!,
       ...issues.slice(1),
     ]);
-    return Object.freeze({
+    return freezeImplementationBindingResult({
       status: 'incompatible',
       ...hashes,
       issues: frozenIssues,
     });
   }
   const noIssues: readonly [] = Object.freeze([]);
-  return Object.freeze({
+  return freezeImplementationBindingResult({
     status: 'compatible',
     ...hashes,
     issues: noIssues,

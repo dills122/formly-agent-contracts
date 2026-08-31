@@ -7,14 +7,14 @@ This vertical uses current package surfaces through contract generation,
 source linkage, pure context queries, and typed-intent validation. The final
 Playwright lookup is consumer-owned code because a browser-executing Playwright
 integration and executable drivers are not shipped. The repository's private
-package with that name currently contains only an experimental trusted-local
-driver binding registry.
+package with that name currently contains an experimental trusted-local driver
+registry plus exact validated-plan call binding, but no invocation layer.
 
 <div class="status-line">
   <span class="status status--current">Current</span>
-  <span>Configure → discover → generate → locate → validate typed intent</span>
+  <span>Configure → discover → generate → locate → validate → bind exact calls</span>
   <span class="status status--planned">Planned</span>
-  <span>Execute validated plans through profile drivers</span>
+  <span>Invoke bound calls through browser-conformant profile drivers</span>
 </div>
 
 ## Resulting layout
@@ -453,18 +453,23 @@ implementation, or browser object crosses this pure boundary.
 ## 10. Know where the current vertical ends
 
 <div class="status-line">
-  <span class="status status--planned">Planned layer</span>
-  <span>Validated plan → trusted driver call → Playwright execution</span>
+  <span class="status status--current">Current</span>
+  <span>Validated plan → exact trusted driver-call binding</span>
+  <span class="status status--planned">Planned</span>
+  <span>Invoke bound calls through Playwright</span>
 </div>
 
 The pure `executeAgentContextQuery` API can search an assembled, validated
 agent-context dataset by source path or form ID, and
 `validateAgentContextTestIntent` can compile its currently supported semantic
-subset into a canonical plan. The CLI does not yet assemble that dataset or
-expose a query/MCP command. Executable Playwright drivers, the remaining intent
-operations, and browser parity remain planned. Today, an agent or test author
-can use generated JSON as trustworthy context, validate supported intent, and
-write a strict consumer helper like the one above.
+subset into a canonical plan. The private Playwright experiment can revalidate
+that plan and bind every approved step to the exact implementation from an
+authenticated, allowlist-bound local registry result. It does not invoke those
+implementations. The CLI does not yet assemble the dataset or expose a
+query/MCP command, and browser invocation, the remaining intent operations,
+and browser parity remain planned. Today, an agent or test author can use
+generated JSON as trustworthy context, validate supported intent, and either
+consume the resulting plan directly or inspect its exact trusted call binding.
 
 :::note[Maintained examples]
 The [Nx fixture root config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/formly-contracts.config.ts),

@@ -183,9 +183,10 @@ mutation returns `PLAN_SEMANTIC_INVALID`; a byte/hash mismatch returns
 | `CTX-2B` | Pure single-step validator for exact-domain/safely classified values and the two synthetic operation subsets | `CTX-2A` | Positive and negative synthetic intents produce complete plans; reversed ordering, stale context, missing authority, hidden-state, mismatched coalescing, pattern, and value failures produce exact blockers and no plan |
 | `CTX-2C` | Canonical plan parser/hash, source-intent binding, and complete semantic revalidation | `CTX-2B` | Canonical hashes reproduce; context/hash/deletion/classification mutations and current refused slices fail before any executable lookup |
 | `CTX-2V` | Rich value-semantics authority for runtime enumeration, codecs, candidates, and constraint-violation construction | separate schema decision | `first-enabled` and constructed invalid values execute only from exact versioned authority; otherwise fail closed |
-| `CTX-2D` | Remaining repeater/action/transition operation gates and DRV-0C2 call ABI | `CTX-2C`, relevant source authority | Exact capture/current-step/transition/call bindings pass all RH-05 losslessness gates |
+| `CTX-2D1` | Lossless current-plan call ABI and DRV-0C2 trusted implementation binding, without invocation | `CTX-2C`, `DRV-0C1` | Complete: exact positive/negative calls bind only after revalidation; lookup/refusal/no-invocation gates pass |
+| `CTX-2D2` | Remaining repeater/action/transition/outcome plan gates | `CTX-2D1`, relevant source authority | Exact capture/current-step/transition bindings pass the remaining RH-05 losslessness gates |
 
-`CTX-2A` through `CTX-2C` are the MVP checkpoint. `CTX-2V` and `CTX-2D` are
+`CTX-2A` through `CTX-2C` are the MVP checkpoint. `CTX-2V`, `CTX-2D1`, and `CTX-2D2` are
 required before aggregate CTX-2 is marked complete unless their authority is
 deliberately removed from the v0.1 public intent union in a reviewed schema
 decision.
@@ -198,9 +199,9 @@ decision.
 | `CTX-2-REQ-02` closed diagnostic policy | `CTX-2A` | exhaustive code-policy parity and wrong-tuple/no-message tests | MVP complete |
 | `CTX-2-REQ-03` exact pinned current context | `CTX-2B` | mismatch/stale/unknown owner and missing-authority tests | MVP complete for the current refusal matrix |
 | `CTX-2-REQ-04` no guessed values | `CTX-2B`, `CTX-2V` | domain/literal/opaque/runtime-policy/violation tests | Partial: exact domain/literal supported; rich authority pending |
-| `CTX-2-REQ-05` exact execution authority | `CTX-2B`, `CTX-2D` | binding/ordering/state/commit/validation/repeater/transition tests | Partial: synthetic operation subset complete; repeater/transition pending |
+| `CTX-2-REQ-05` exact execution authority | `CTX-2B`, `CTX-2D1`, `CTX-2D2` | binding/ordering/state/commit/validation/call/repeater/transition tests | Partial: current synthetic operation and call binding complete; repeater/transition pending |
 | `CTX-2-REQ-06` lossless canonical plan | `CTX-2B`, `CTX-2C` | plan/intent round-trip, stable hashes, origin, value-classification, and authority equality tests | MVP complete for supported subset |
-| `CTX-2-REQ-07` revalidation before executable lookup | `CTX-2C` | exact-intent replay plus hash/context/deletion/classification/current-refusal mutation tests with a lookup trap | MVP complete; no executable lookup exists in this package |
+| `CTX-2-REQ-07` revalidation before executable lookup | `CTX-2C`, `CTX-2D1` | exact-intent replay plus hash/context/deletion/classification/current-refusal mutation tests with an implementation-binding access trap | Complete for current validated-plan binding |
 | `CTX-2-REQ-08` synthetic proof | `CTX-2B`, `CTX-2C` | both RH-05 fixture cases validate or refuse exactly | MVP complete |
 
 The implemented checkpoint remains deliberately narrower than aggregate
@@ -220,8 +221,8 @@ fail closed until implemented:
   only parser/validator output;
 - complete `CTX-2V` rich runtime value, codec, candidate, and constructed
   violation authority;
-- complete `CTX-2D` repeater, action, transition, outcome, and driver-call ABI
-  gates; and
+- complete `CTX-2D2` repeater, action, transition, outcome, and executable
+  wrapper plan gates; and
 - prove trusted-driver and browser/runtime parity in the downstream driver and
   Playwright lanes.
 
