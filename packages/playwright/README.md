@@ -52,6 +52,14 @@ preserving the nominal result type, while private runtime provenance rejects
 cloned and proxied objects. The returned implementation functions remain
 opaque and uncalled.
 
+Runtime provenance is local to one evaluated copy of this package. Create the
+implementation binding and consume it with the call binder from that same
+module instance. Duplicate bundles, preserved-symlink package copies, or hot
+reload can otherwise load separate provenance stores and reject an authentic
+binding from the other copy. This rejection is fail-closed: deduplicate the
+package instance or recreate the implementation binding through the consuming
+instance instead of copying or bypassing it.
+
 ```sh
 pnpm exec vitest run packages/playwright/src
 pnpm --filter @formly-contract/playwright build
