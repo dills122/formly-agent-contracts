@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+
 import { describe, expect, it } from 'vitest';
 
 import {
@@ -492,6 +494,66 @@ function validate(
 }
 
 describe('agent-context pure typed-intent validator', () => {
+  it('strictly parses standalone plan-hash inputs before canonical hashing', () => {
+    const value = boundary('positive');
+    const intent = positiveIntent(value);
+    const validated = validate(value, intent);
+    if (validated.status !== 'valid') throw new Error('expected a valid plan');
+
+    const expectedHash = `sha256:${createHash('sha256')
+      .update(canonicalStringify(validated.plan))
+      .digest('hex')}`;
+    expect(computeAgentContextValidatedPlanHash(validated.plan)).toBe(
+      expectedHash,
+    );
+
+    let proxyTrapCalled = false;
+    const proxy = new Proxy(validated.plan, {
+      getPrototypeOf() {
+        proxyTrapCalled = true;
+        throw new Error('caller-controlled proxy trap executed');
+      },
+    });
+    expect(() => computeAgentContextValidatedPlanHash(proxy)).toThrow(/proxy/u);
+    expect(proxyTrapCalled).toBe(false);
+
+    let getterCalled = false;
+    const accessor: Record<string, unknown> = { ...validated.plan };
+    Object.defineProperty(accessor, 'unreviewedAuthority', {
+      enumerable: true,
+      get() {
+        getterCalled = true;
+        return true;
+      },
+    });
+    expect(() => computeAgentContextValidatedPlanHash(accessor)).toThrow(
+      /enumerable data property/u,
+    );
+    expect(getterCalled).toBe(false);
+
+    const hidden: Record<string, unknown> = { ...validated.plan };
+    Object.defineProperty(hidden, 'unreviewedAuthority', {
+      enumerable: false,
+      value: true,
+    });
+    expect(() => computeAgentContextValidatedPlanHash(hidden)).toThrow(
+      /enumerable data property/u,
+    );
+
+    expect(() =>
+      computeAgentContextValidatedPlanHash({
+        ...validated.plan,
+        unreviewedAuthority: true,
+      }),
+    ).toThrow(/unreviewedAuthority.*not allowed/u);
+
+    const cyclic: Record<string, unknown> = { ...validated.plan };
+    cyclic.unreviewedAuthority = cyclic;
+    expect(() => computeAgentContextValidatedPlanHash(cyclic)).toThrow(
+      /cycle/u,
+    );
+  });
+
   it('produces a deterministic lossless positive plan and coalesces the shared blur', () => {
     const value = boundary('positive');
     const intent = positiveIntent(value);
@@ -1372,7 +1434,7 @@ describe('agent-context pure typed-intent validator', () => {
       intent,
       contextRef: validated.contextRef,
       plan: extraKeyPlan,
-      planHash: computeAgentContextValidatedPlanHash(extraKeyPlan),
+      planHash: validated.planHash,
       dataset: value.dataset,
       liveOwners: value.liveOwners,
       driverRegistryManifest: value.manifest,
