@@ -43,7 +43,7 @@ export default defineConfig({
           items: [
             { label: 'Evaluate the project', slug: 'start' },
             { label: 'Installation', slug: 'start/installation' },
-            { label: 'End-to-end vertical', slug: 'start/end-to-end' },
+            { label: 'One form, end to end', slug: 'start/end-to-end' },
             { label: 'Product status', slug: 'start/product-status' },
           ],
         },

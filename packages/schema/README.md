@@ -87,10 +87,11 @@ exact source intent, reruns the validator against current context authority,
 requires a complete CTX-1 E2E slice, and accepts only an exactly rebuilt plan.
 The intent and plan hashes are content identities, not signatures.
 Strict parsers reject proxies, accessors, non-enumerable properties, invalid
-closed-enum values, and caller-controlled coercion hooks.
-`computeAgentContextValidatedPlanHash` should currently receive only a plan
-returned by the strict parser or validator; hostile-input preflight for the
-standalone hash helper is a fast follow.
+closed-enum values, and caller-controlled coercion hooks. The standalone
+`computeAgentContextValidatedPlanHash` helper runs the same strict plan parse
+before hashing, so proxy, accessor, hidden, cyclic, and unknown-key input is
+rejected without evaluating caller-controlled behavior. Valid parsed or
+validator-produced plans retain the same canonical hash.
 
 ## For contributors
 

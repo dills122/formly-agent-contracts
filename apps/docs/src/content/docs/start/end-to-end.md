@@ -1,46 +1,271 @@
 ---
-title: End-to-end workspace vertical
-description: Configure a workspace, expose a form and custom field, generate a contract, trace it from application code, and use it as Playwright context.
+title: One Formly form, end to end
+description: Follow one maintained Angular Formly form from application code through workspace wiring, repeatable generation, and an agent-readable contract.
 ---
 
-This vertical uses current package surfaces through contract generation,
-source linkage, pure context queries, and typed-intent validation. The final
-Playwright lookup is consumer-owned code because a browser-executing Playwright
-integration and executable drivers are not shipped. The repository's private
-package with that name currently contains an experimental trusted-local driver
-registry plus exact validated-plan call binding, but no invocation layer.
+This is the complete path through Formly Contract, using one form that is
+compiled and checked in this repository—not a disconnected documentation
+sample. You will see the form first, then follow the exact code that owns it,
+connect it to a workspace, generate it repeatedly, and read what the resulting
+contract actually says.
 
-<div class="status-line">
-  <span class="status status--current">Current</span>
-  <span>Configure → discover → generate → locate → validate → bind exact calls</span>
-  <span class="status status--planned">Planned</span>
-  <span>Invoke bound calls through browser-conformant profile drivers</span>
+<div class="status-line" aria-label="Walkthrough capability status">
+  <span class="status status--current">Works today</span>
+  <span>Formly code → source → project → contract</span>
+  <span class="status status--current">Supported intent</span>
+  <span>Hash-pinned context → validated plan → bound driver calls</span>
+  <span class="status status--planned">Not shipped</span>
+  <span>Driver invocation in a browser</span>
 </div>
 
-## Resulting layout
+<nav class="walkthrough-map" aria-label="End-to-end walkthrough">
+  <a href="#1-author-the-form"><span>01</span>Author</a>
+  <a href="#2-connect-it"><span>02</span>Connect</a>
+  <a href="#3-generate-and-regenerate"><span>03</span>Generate</a>
+  <a href="#4-read-the-contract"><span>04</span>Inspect</a>
+  <a href="#5-use-it-without-guessing"><span>05</span>Use</a>
+</nav>
 
-```text
-formly-contracts.config.ts
-apps/claims/formly-contracts.project.ts
-libs/claims/
-├── formly-contracts.project.ts
-└── src/
-    ├── forms/claim.fields.ts
-    ├── contracts.ts
-    └── field-type-profiles.ts
-dist/formly-contracts/
-├── workspace-index.json
-├── source-usage-catalog.json
-└── projects/.../sha256-….contract.json
+## Start with the thing a person sees
+
+The maintained example is a small contact-preferences fragment from the
+[Angular CLI workspace fixture](https://github.com/dills122/formly-contract/tree/main/fixtures/angular-monorepo).
+It combines an ordinary Formly input with an application-owned radio type and
+an expansion-panel wrapper.
+
+<figure class="form-specimen">
+  <figcaption>
+    <strong>Contact preferences</strong>
+    <span>Illustrated from the fixture · sample value · expanded state</span>
+  </figcaption>
+  <div class="form-specimen__body">
+    <label class="form-specimen__field">
+      <span>Claimant name <span aria-hidden="true">*</span></span>
+      <input type="text" value="Maya Chen" disabled />
+    </label>
+    <div class="form-specimen__panel">
+      <div class="form-specimen__panel-title">Preferred contact method</div>
+      <fieldset disabled>
+        <legend>Preferred contact method <span aria-hidden="true">*</span></legend>
+        <label><input type="radio" name="contact-preview" checked /> Email</label>
+        <label><input type="radio" name="contact-preview" /> Phone</label>
+      </fieldset>
+    </div>
+  </div>
+</figure>
+
+The application owns this definition. Formly Contract does not replace the
+form, add a parallel DSL, or scrape the rendered DOM:
+
+```ts title="libs/forms-kit/src/lib/fragments/contact.fragment.ts"
+import type { FormlyFieldConfig } from '@ngx-formly/core';
+
+export function createContactFragment(): FormlyFieldConfig[] {
+  return [
+    {
+      key: 'claimant.name',
+      type: 'input',
+      id: 'claimant-name',
+      props: { label: 'Claimant name', required: true },
+    },
+    {
+      key: 'claimant.contactPreference',
+      type: 'cool-radio-btn-grp',
+      id: 'contact-preference',
+      wrappers: ['fixture-expansion-panel'],
+      props: {
+        label: 'Preferred contact method',
+        required: true,
+        options: [
+          { label: 'Email', value: 'email' },
+          { label: 'Phone', value: 'phone' },
+        ],
+      },
+    },
+  ];
+}
 ```
 
-The stable join keys are `projectId`, `sourceId`, and `formId`. Generated file
-names are content-addressed and must be discovered through
-`workspace-index.json`, not reconstructed by consumers.
+Already present in ordinary Formly configuration are the model paths, labels,
+required constraints, choices, Formly types, wrapper, and DOM IDs. The
+compiler projects that evidence conservatively—it does not fill in missing
+meaning.
 
-## 1. Configure the workspace root
+## 1. Author the form
 
-Create `formly-contracts.config.ts` beside the consumer’s root `package.json`:
+Keep form factories with the application or library that owns them. A contract
+factory must return fresh fields and safe model state whenever generation calls
+it. It must not fetch customer data, contact remote services, or depend on a
+browser-only bootstrap path.
+
+The same `createContactFragment()` factory can be composed into a real Angular
+page and exposed to contract generation. There is no copied field tree to
+become stale.
+
+<div class="evidence-pair" role="list" aria-label="Application and contract ownership">
+  <div role="listitem">
+    <strong>Browser side</strong>
+    <span>Angular registers and renders the input, custom radio component, and wrapper.</span>
+  </div>
+  <div role="listitem">
+    <strong>Build side</strong>
+    <span>A Node-safe source calls the same field factory under a stable form ID.</span>
+  </div>
+</div>
+
+The browser side remains ordinary Angular/Formly code. The maintained custom
+type renders real radios, and the feature module registers the type name used
+by the field configuration:
+
+```ts title="cool-radio-button-group.component.ts (focused excerpt)"
+@Component({
+  selector: 'fixture-cool-radio-button-group',
+  template: `
+    <fieldset class="cool-radio-group" role="radiogroup">
+      <legend>{{ props.label }}</legend>
+      @for (option of props.options ?? []; track option.value) {
+        <label>
+          <input
+            type="radio"
+            [value]="option.value"
+            [formControl]="formControl"
+            [formlyAttributes]="field"
+          />
+          <span>{{ option.label }}</span>
+        </label>
+      }
+    </fieldset>
+  `,
+})
+export class CoolRadioButtonGroupComponent extends FieldType<
+  FieldTypeConfig<CoolRadioProps>
+> {}
+
+FormlyModule.forChild({
+  types: [
+    {
+      name: 'cool-radio-btn-grp',
+      component: CoolRadioButtonGroupComponent,
+    },
+  ],
+});
+```
+
+:::caution[Keep the boundary Node-safe]
+Contract discovery evaluates the project and source import graph in Node. Keep
+Angular modules and browser-only barrels out of that graph. A small dedicated
+`contracts` entry point is usually enough.
+:::
+
+## 2. Connect it
+
+Three small declarations connect application code to a workspace. Each one has
+one job.
+
+<div class="connection-map" aria-label="Form contract connection map">
+  <div><span>Form definition</span><strong>What the form is</strong></div>
+  <div><span>Source</span><strong>Which forms belong together</strong></div>
+  <div><span>Project</span><strong>Who owns sources and profiles</strong></div>
+  <div><span>Workspace</span><strong>What to discover and where to write</strong></div>
+</div>
+
+### Give the form a stable identity
+
+The source groups related forms and assigns a stable `formId`. The ID is the
+semantic handle consumers use even when the generated filename changes.
+
+```ts title="libs/forms-kit/src/lib/shared-forms.source.ts"
+import { defineFormContractSource } from '@formly-contract/workspace';
+import { createContactFragment } from './fragments/contact.fragment.js';
+
+export const SHARED_FORMS_SOURCE = defineFormContractSource({
+  sourceId: 'fixture/shared-forms',
+  list: () => [
+    {
+      id: 'shared.contact-preferences',
+      create: () => ({ fields: createContactFragment(), model: {} }),
+    },
+  ],
+});
+```
+
+Use source boundaries that match feature or library ownership. They are not
+required to mirror every folder.
+
+### Put the source in an owning project
+
+The project descriptor attaches the source and the reviewed custom-field
+profiles owned by this library:
+
+```ts title="libs/forms-kit/formly-contracts.project.ts"
+import { defineFormContractProject } from '@formly-contract/workspace';
+import {
+  FIXTURE_FIELD_TYPE_PROFILES,
+  SHARED_FORMS_SOURCE,
+} from '@fixture/forms-kit/contracts';
+
+export default defineFormContractProject({
+  projectId: 'fixture-forms-kit',
+  sources: [SHARED_FORMS_SOURCE],
+  fieldTypeProfiles: FIXTURE_FIELD_TYPE_PROFILES,
+});
+```
+
+The custom `cool-radio-btn-grp` is meaningful only because the project also
+declares its interaction profile. The important part is:
+
+```ts title="field-type-profiles.ts (focused excerpt)"
+{
+  identity: { id: 'fixture.cool-radio', version: 1 },
+  semanticType: 'single-choice',
+  valueShape: 'scalar',
+  evidence: 'declared',
+  parts: [
+    {
+      name: 'group',
+      role: 'radiogroup',
+      cardinality: 'one',
+      evidence: 'declared',
+    },
+    {
+      name: 'option',
+      role: 'radio',
+      cardinality: 'many',
+      evidence: 'declared',
+    },
+  ],
+  interaction: {
+    kind: 'choice',
+    operation: 'check',
+    optionPart: 'option',
+  },
+  driver: {
+    kind: 'generic',
+    id: 'generic.choice',
+    version: 1,
+    capabilities: ['check'],
+  },
+  valueDomain: {
+    kind: 'projected',
+    source: 'adapter',
+    completeness: 'complete',
+    collectionPath: 'props.options',
+    labelPath: 'label',
+    valuePath: 'value',
+    evidence: 'declared',
+  },
+  effectCapabilities: { targetProperties: ['options'], readiness: [] },
+  unknowns: [],
+}
+```
+
+The wrapper profile adds one precondition: activate its `wrapper-expand`
+button before interacting with the radio options. Profiles describe reviewed
+semantics; they are not executable Playwright implementations.
+
+### Let the root discover projects
+
+The root config sets workspace-wide policy and output location:
 
 ```ts title="formly-contracts.config.ts"
 import { defineConfig } from '@formly-contract/workspace';
@@ -50,431 +275,253 @@ export default defineConfig({
     'apps/**/formly-contracts.project.ts',
     'libs/**/formly-contracts.project.ts',
   ],
-  tsconfigPath: 'tsconfig.base.json',
-  sourceUsage: {
-    convention: 'direct-root-call-v1',
-    tsconfigPath: 'apps/claims/tsconfig.app.json',
-  },
+  tsconfigPath: 'tsconfig.json',
   output: { directory: 'dist/formly-contracts' },
-  locators: { testIdAttributes: ['data-testid', 'data-cy'] },
   diagnostics: { failOn: ['error'] },
 });
 ```
 
-Use `tsconfig.json` in an Angular CLI workspace or `tsconfig.base.json` in an
-Nx workspace when that is the file that owns the aliases imported by your
-Node-safe contracts entry points. Paths are workspace-relative. Project config
-globs do not follow symlinks.
+Use the TypeScript config that owns aliases imported by the Node-safe contract
+entry points: commonly `tsconfig.json` in Angular CLI or `tsconfig.base.json`
+in Nx.
 
-The MVP source pass accepts TypeScript project configs (`.ts`, `.mts`, or
-`.cts`) only. JavaScript project configs remain supported for generation when
-the pass is off; with `sourceUsage` enabled they fail as
-`SOURCE_USAGE_PROJECT_CONFIG_UNSUPPORTED` so the runner never broadens the
-leaf application program with `allowJs`.
+## 3. Generate and regenerate
 
-## 2. Expose an application-owned form
-
-Keep the existing Formly factory in application code. Add a small Node-safe
-source descriptor that gives the form a stable ID:
-
-```ts title="libs/claims/src/contracts.ts"
-import {
-  defineFormContractDefinition,
-  defineFormContractSource,
-} from '@formly-contract/workspace';
-import { createClaimFields } from './forms/claim.fields.js';
-
-export const CLAIM_FORM = defineFormContractDefinition({
-  id: 'claims.create',
-  create: () => ({ fields: createClaimFields() }),
-  lineage: { rootSymbol: createClaimFields },
-});
-
-export const CLAIMS_SOURCE = defineFormContractSource({
-  sourceId: 'claims/forms',
-  list: () => [CLAIM_FORM],
-});
-```
-
-Every `list()` call and `create()` call must return fresh data. Prefer the
-factory's inherent safe defaults. Do not invent service, model, form-state, or
-business values merely to make discovery run, and never load customer data,
-credentials, or remote options during discovery.
-
-This is explicit registration, not guessing arbitrary form exports.
-`lineage.rootSymbol` anchors the definition to the real application factory.
-The no-argument `create()` callback still runs during generation, so factories
-with required runtime inputs need safe defaults or a deliberate Node-safe
-adapter.
-
-The optional source-usage pass only reads TypeScript syntax. It never executes
-or serializes arguments passed by application code.
-
-## 3. Describe one custom Formly field
-
-Assume `createClaimFields()` includes an application type named
-`cool-radio-btn-grp`. Define its supported radio behavior once and use that
-same definition for production Formly registration and canonical metadata:
-
-```ts title="libs/claims/src/field-type-profiles.ts"
-import {
-  buildFieldTypeProfileRegistry,
-  defineContractedFormlyType,
-  radioChoice,
-} from '@formly-contract/schema/field-type-authoring';
-
-export const COOL_RADIO_TYPE = defineContractedFormlyType({
-  name: 'cool-radio-btn-grp',
-  profile: { id: 'claims.cool-radio', version: 1 },
-  behavior: radioChoice(),
-});
-
-export const CLAIM_FIELD_PROFILES = buildFieldTypeProfileRegistry({
-  id: 'claims.fields',
-  version: 1,
-  types: [COOL_RADIO_TYPE],
-});
-```
-
-```ts title="libs/claims/src/claims-formly.module.ts"
-import { NgModule } from '@angular/core';
-import { FormlyModule } from '@ngx-formly/core';
-import { toFormlyTypeRegistration } from '@formly-contract/schema/field-type-authoring';
-import { CoolRadioComponent } from './cool-radio.component.js';
-import { COOL_RADIO_TYPE } from './field-type-profiles.js';
-
-@NgModule({
-  imports: [
-    FormlyModule.forChild({
-      types: [
-        toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponent),
-      ],
-    }),
-  ],
-})
-export class ClaimsFormlyModule {}
-```
-
-The compact API currently supports radio choices only. Other custom types use
-the legacy reviewed registry or remain explicitly unmapped/unknown. Profiles
-are metadata, not executable Playwright code.
-
-## 4. Attach the source and profile to the project
-
-```ts title="libs/claims/formly-contracts.project.ts"
-import { defineFormContractProject } from '@formly-contract/workspace';
-import { CLAIMS_SOURCE } from './src/contracts.js';
-import { CLAIM_FIELD_PROFILES } from './src/field-type-profiles.js';
-
-export default defineFormContractProject({
-  projectId: 'claims/forms',
-  sources: [CLAIMS_SOURCE],
-  fieldTypeProfiles: CLAIM_FIELD_PROFILES,
-});
-```
-
-The project config is the ownership boundary. Infrastructure or base Formly
-libraries may declare a project with no sources. The application or feature
-library containing the consuming component also needs a discovered project
-config, even when it owns no form source:
-
-```ts title="apps/claims/formly-contracts.project.ts"
-import { defineFormContractProject } from '@formly-contract/workspace';
-
-export default defineFormContractProject({
-  projectId: 'claims/feature',
-  sources: [],
-});
-```
-
-The real component continues to call the ordinary factory with runtime data:
-
-```ts title="apps/claims/src/app/claim-page.component.ts"
-const fields = createClaimFields({ initialStep: this.route.snapshot.url });
-```
-
-The source index records the invocation shape and location, not the argument or
-its value.
-
-## 5. Discover before executing factories
+Start with discovery. `list` loads configuration and inventories projects and
+sources without calling the form factories:
 
 ```sh
 pnpm exec formly-contracts list
 ```
 
-`list` loads configuration and inventories projects and source IDs without
-calling source lists or form factories. Use it to diagnose paths and aliases
-before trusted application code executes.
-
-Expected shape:
-
-```text
-Discovered 2 projects and 1 source.
-Project: claims/feature config="apps/claims/formly-contracts.project.ts" sources=-
-Project: claims/forms config="libs/claims/formly-contracts.project.ts" sources=claims/forms
-```
-
-## 6. Generate and verify the artifacts
+Then generate the artifact set and verify it is current:
 
 ```sh
 pnpm exec formly-contracts generate
 pnpm exec formly-contracts check
 ```
 
-`generate` validates IDs, extracts every registered form, writes
-content-addressed contracts, and publishes `workspace-index.json` last.
-`check` repeats trusted extraction and exact-compares canonical bytes without
-modifying the output directory.
-
-`source-usage-catalog.json` has an explicit opt-in lifecycle. If `sourceUsage`
-is later removed from the root config, `check` reports an existing catalog as
-`stale` without modifying it. The next successful `generate` removes that
-obsolete fixed-name catalog before publishing the new workspace index. This
-prevents consumers from accidentally trusting linkage generated under a
-disabled configuration.
-
-Treat diagnostics as contract output. A warning such as
-`UNMAPPED_FIELD_TYPE` means the field stays visible in the contract but does
-not gain invented operational semantics.
-
-## 7. Resolve application usage to the exact contract
-
-When `sourceUsage` is enabled, generation also writes
-`source-usage-catalog.json`. A consumer can start from a source file, require
-one exact resolution, and join its form identity and hash to the workspace
-index:
-
-```ts title="e2e/support/load-form-contract.ts"
-import { createHash } from 'node:crypto';
-import { readFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import {
-  parseAgentContextSourceUsageCatalog,
-  parseFormContract,
-} from '@formly-contract/schema';
-import { parseWorkspaceContractIndex } from '@formly-contract/workspace';
-
-const workspaceRoot = resolve(import.meta.dirname, '../..');
-
-function sha256(bytes: Uint8Array): string {
-  return `sha256:${createHash('sha256').update(bytes).digest('hex')}`;
-}
-
-export async function loadFormContractForSource(sourcePath: string) {
-  const output = resolve(workspaceRoot, 'dist/formly-contracts');
-  const indexPath = resolve(output, 'workspace-index.json');
-  const usagePath = resolve(output, 'source-usage-catalog.json');
-  const index = parseWorkspaceContractIndex(
-    JSON.parse(await readFile(indexPath, 'utf8')),
-  );
-  const catalog = parseAgentContextSourceUsageCatalog(
-    JSON.parse(await readFile(usagePath, 'utf8')),
-  );
-  if (
-    catalog.workspaceIndex.schemaVersion !== index.schemaVersion ||
-    catalog.workspaceIndex.contentHash !== index.contentHash
-  ) {
-    throw new Error('Source-usage catalog targets a different workspace index.');
-  }
-
-  const matches = catalog.usages.filter(
-    (usage) =>
-      usage.invocation.location.kind === 'path' &&
-      usage.invocation.location.path === sourcePath &&
-      usage.resolution.status === 'exact',
-  );
-  if (matches.length !== 1) {
-    throw new Error(
-      `Expected one exact form usage for ${sourcePath}; found ${matches.length}.`,
-    );
-  }
-
-  const usage = matches[0];
-  if (!usage || usage.resolution.status !== 'exact') {
-    throw new Error('Exact source usage disappeared.');
-  }
-  const sourceBytes = await readFile(resolve(workspaceRoot, sourcePath));
-  if (sha256(sourceBytes) !== usage.invocation.sourceFileHash) {
-    throw new Error('Application source changed after source-usage generation.');
-  }
-
-  const form = usage.resolution.candidate.form;
-  const entry = index.forms.find(
-    (candidate) =>
-      candidate.projectId === form.projectId &&
-      candidate.formId === form.formId &&
-      candidate.contentHash === form.contractHash,
-  );
-  if (!entry) throw new Error('Resolved contract is absent from the index.');
-
-  const artifactPath = resolve(workspaceRoot, entry.artifactPath);
-  const contract = parseFormContract(
-    JSON.parse(await readFile(artifactPath, 'utf8')),
-  );
-  if (
-    contract.contentHash !== entry.contentHash ||
-    contract.contentHash !== form.contractHash
-  ) {
-    throw new Error('Resolved contract hash does not match its pinned lineage.');
-  }
-  return contract;
-}
-```
-
-This is a static convention, not runtime tracing. It supports direct calls and
-constructor uses of the registered symbol (including aliases and re-export
-barrels) and reports incomplete coverage. Recognized unsafe optional or computed
-rooted calls may emit a diagnostic; wrappers and dynamic aliases or dispatch can
-remain unindexed. All are fail-closed because they produce no exact actionable
-link. Angular component context is lexical evidence only; the catalog does not
-prove a route, rendered page, or executed invocation.
-
-## 8. Use the contract as Playwright context
-
-The following is consumer-owned helper code, not a shipped Formly Contract
-Playwright API. It validates JSON, searches by semantic model path, and refuses
-to continue when exact locator evidence is absent:
-
-```ts title="e2e/claims-create.spec.ts"
-import { expect, test } from '@playwright/test';
-import type {
-  ContractNode,
-  ModelPathSegment,
-} from '@formly-contract/schema';
-import { loadFormContractForSource } from './support/load-form-contract.js';
-
-function findNodeByPath(
-  nodes: readonly ContractNode[],
-  modelPath: readonly ModelPathSegment[],
-): ContractNode | undefined {
-  for (const node of nodes) {
-    const matches =
-      node.modelPath.length === modelPath.length &&
-      node.modelPath.every((segment, index) => segment === modelPath[index]);
-    if (matches) return node;
-
-    const nested = findNodeByPath(
-      node.arrayTemplate
-        ? [...node.children, node.arrayTemplate]
-        : node.children,
-      modelPath,
-    );
-    if (nested) return nested;
-  }
-}
-
-test('creates a claim using contract evidence', async ({ page }) => {
-  const contract = await loadFormContractForSource(
-    'apps/claims/src/app/claim-page.component.ts',
-  );
-  const claimantName = findNodeByPath(
-    contract.nodes,
-    ['claimant', 'name'],
-  );
-  const testId = claimantName?.locators.find(
-    (locator) =>
-      locator.strategy === 'testId' &&
-      locator.attribute === 'data-testid',
-  );
-
-  if (!claimantName || !testId) {
-    throw new Error(
-      'claimant.name has no declared data-testid locator; refusing to guess.',
-    );
-  }
-
-  await page.goto('/claims/new');
-  await page.getByTestId(testId.value).fill('Ada Lovelace');
-  await expect(page.getByTestId(testId.value)).toHaveValue('Ada Lovelace');
-});
-```
-
-For composite fields, select a locator by its `target` rather than assuming one
-node maps to one control. Empty locator arrays, diagnostics, and unknown profile
-aspects are missing evidence—not invitations to fall back to CSS selectors.
-
-## 9. Validate typed intent without loading the application
-
-Once a trusted caller has assembled the exact agent-context dataset, current
-live-owner state, and driver-registry manifest, it can validate an untrusted
-semantic intent entirely in `@formly-contract/schema`:
-
-```ts
-import {
-  revalidateAgentContextExecutionPlan,
-  validateAgentContextTestIntent,
-} from '@formly-contract/schema';
-
-const result = validateAgentContextTestIntent({
-  intent,
-  dataset,
-  liveOwners,
-  driverRegistryManifest,
-});
-
-if (result.status === 'invalid') {
-  throw new Error(result.diagnostics.map(({ code }) => code).join(', '));
-}
-
-const checked = revalidateAgentContextExecutionPlan({
-  intent,
-  contextRef: result.contextRef,
-  plan: result.plan,
-  planHash: result.planHash,
-  dataset,
-  liveOwners,
-  driverRegistryManifest,
-});
-
-if (checked.status !== 'valid') throw new Error('Plan authority changed.');
-```
-
-Keep the exact parsed intent with its validated plan. Revalidation binds the
-plan to that intent, reruns validation against current authority, and requires
-the rebuilt plan to match exactly. A current context that is now stale,
-ambiguous, or otherwise refused is not eligible for execution even when the
-submitted plan and its content hash still match each other. Intent and plan
-hashes provide deterministic content identity; they are not signatures or
-authorization tokens.
-
-The v0.1 validator supports the maintained synthetic path for `openUsage`,
-`set`, `expectState`, `commitValue`, `activateValidation`, `expectValue`, and
-`expectValidation`. Exact enumerated domain values and safely classified
-literals are supported. Pattern-constrained literals, runtime selection
-policies, generated invalid values, repeater capture, usage actions, and
-outcomes currently return stable blocking diagnostics because their complete
-source authority is not yet available. A targeted node with a declared wrapper
-activation precondition also blocks rather than silently omitting the required
-interaction; executable wrapper expansion is a fast follow.
-
-No selector, callback, Angular component, Formly registry, driver
-implementation, or browser object crosses this pure boundary.
-
-## 10. Know where the current vertical ends
-
-<div class="status-line">
-  <span class="status status--current">Current</span>
-  <span>Validated plan → exact trusted driver-call binding</span>
-  <span class="status status--planned">Planned</span>
-  <span>Invoke bound calls through Playwright</span>
+<div class="regeneration-loop" aria-label="Regeneration workflow">
+  <div><strong>Edit</strong><span>Change the Formly factory, profile, or config.</span></div>
+  <div><strong>Generate</strong><span>Publish canonical contracts and the index.</span></div>
+  <div><strong>Review</strong><span>Inspect the semantic diff and diagnostics.</span></div>
+  <div><strong>Check</strong><span>Fail CI if expected output is stale.</span></div>
 </div>
 
-The pure `executeAgentContextQuery` API can search an assembled, validated
-agent-context dataset by source path or form ID, and
-`validateAgentContextTestIntent` can compile its currently supported semantic
-subset into a canonical plan. The private Playwright experiment can revalidate
-that plan and bind every approved step to the exact implementation from an
-authenticated, allowlist-bound local registry result. It does not invoke those
-implementations. The CLI does not yet assemble the dataset or expose a
-query/MCP command, and browser invocation, the remaining intent operations,
-and browser parity remain planned. Today, an agent or test author can use
-generated JSON as trustworthy context, validate supported intent, and either
-consume the resulting plan directly or inspect its exact trusted call binding.
+`generate` validates stable IDs, calls the trusted factories, writes each
+content-addressed contract, and publishes `workspace-index.json` last. `check`
+performs the same extraction in memory and exact-compares canonical bytes
+without changing the output directory.
 
-:::note[Maintained examples]
-The [Nx fixture root config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/formly-contracts.config.ts),
-[project config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/formly-contracts.project.ts),
-[source descriptor](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/src/lib/deployment.source.ts),
-and [field profiles](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/forms-kit/src/lib/field-type-profiles.ts)
-are executable, test-covered references for this vertical.
+```text
+dist/formly-contracts/
+├── workspace-index.json
+└── projects/
+    └── id_Zml4dHVyZS1mb3Jtcy1raXQ/
+        └── forms/
+            └── id_c2hhcmVkLmNvbnRhY3QtcHJlZmVyZW5jZXM/
+                └── sha256-322b…e6ca.contract.json
+```
+
+Do not construct that encoded path yourself. Look up stable IDs in the index
+and open its recorded `artifactPath`:
+
+```json title="workspace-index.json (focused excerpt)"
+{
+  "formId": "shared.contact-preferences",
+  "projectId": "fixture-forms-kit",
+  "sourceId": "fixture/shared-forms",
+  "contractSchemaVersion": "0.4.0",
+  "contentHash": "sha256:322b444e514927b3dbccaf9271e581d8fe7222dfed2c804dcdd96de143e6e6ca",
+  "artifactPath": "dist/formly-contracts/projects/id_Zml4dHVyZS1mb3Jtcy1raXQ/forms/id_c2hhcmVkLmNvbnRhY3QtcHJlZmVyZW5jZXM/sha256-322b444e514927b3dbccaf9271e581d8fe7222dfed2c804dcdd96de143e6e6ca.contract.json"
+}
+```
+
+The hash changes when canonical contract content changes. `formId`,
+`projectId`, and `sourceId` are stable joins across generations.
+
+:::note[Try the maintained example]
+From this repository root, run
+`pnpm exec vitest run fixtures/angular-monorepo/workspace-fixture.test.ts`.
+The test generates the workspace twice, compares byte-identical output, and
+checks it against the committed golden artifact used on this page.
 :::
+
+## 4. Read the contract
+
+Here is the generated node for the application-owned radio field. This is a
+formatted excerpt of the canonical
+[`shared.contact-preferences` golden](https://github.com/dills122/formly-contract/blob/main/fixtures/angular-monorepo/goldens/projects/id_Zml4dHVyZS1mb3Jtcy1raXQ/forms/id_c2hhcmVkLmNvbnRhY3QtcHJlZmVyZW5jZXM/sha256-322b444e514927b3dbccaf9271e581d8fe7222dfed2c804dcdd96de143e6e6ca.contract.golden.json):
+
+```json title="shared.contact-preferences · contactPreference node"
+{
+  "id": "shared.contact-preferences::path:s_claimant.s_contactPreference",
+  "kind": "control",
+  "modelPath": ["claimant", "contactPreference"],
+  "formlyType": "cool-radio-btn-grp",
+  "semanticType": "single-choice",
+  "presentation": { "label": "Preferred contact method" },
+  "constraints": [{ "kind": "required" }],
+  "options": [
+    { "label": "Email", "value": "email" },
+    { "label": "Phone", "value": "phone" }
+  ],
+  "valueDomain": {
+    "kind": "enumerated",
+    "values": ["email", "phone"],
+    "completeness": "complete",
+    "source": "adapter",
+    "evidence": "declared"
+  },
+  "locators": [
+    {
+      "strategy": "domId",
+      "value": "contact-preference",
+      "target": "control",
+      "confidence": "derived",
+      "evidence": "declared"
+    }
+  ],
+  "wrappers": ["fixture-expansion-panel"],
+  "interactionProfile": {
+    "profile": { "id": "fixture.cool-radio", "version": 1 },
+    "interaction": {
+      "kind": "choice",
+      "operation": "check",
+      "optionPart": "option"
+    },
+    "preconditions": [
+      {
+        "kind": "activate",
+        "part": "wrapper-expand",
+        "operation": "click",
+        "evidence": "declared"
+      }
+    ],
+    "driver": {
+      "kind": "generic",
+      "id": "generic.choice",
+      "version": 1,
+      "capabilities": ["check"]
+    },
+    "unknowns": []
+  },
+  "evidence": "declared"
+}
+```
+
+### What each part connects
+
+<dl class="contract-anatomy">
+  <div>
+    <dt><code>formId</code> + <code>modelPath</code></dt>
+    <dd>Stable semantic identity: this is the contact preference in this form, independent of DOM layout.</dd>
+  </div>
+  <div>
+    <dt><code>presentation</code> + <code>constraints</code></dt>
+    <dd>The human label and required rule projected from Formly props.</dd>
+  </div>
+  <div>
+    <dt><code>options</code> + <code>valueDomain</code></dt>
+    <dd>The two legal values are known and the profile says the set is complete.</dd>
+  </div>
+  <div>
+    <dt><code>locators</code></dt>
+    <dd>The application supplied an ID. The contract records declared, derived locator evidence—not a selector invented later.</dd>
+  </div>
+  <div>
+    <dt><code>interactionProfile</code></dt>
+    <dd>The custom component behaves as a single choice: check one option with the reviewed generic choice driver contract.</dd>
+  </div>
+  <div>
+    <dt><code>preconditions</code></dt>
+    <dd>The expansion wrapper must be activated before its radio option is available.</dd>
+  </div>
+  <div>
+    <dt><code>evidence</code> + <code>unknowns</code></dt>
+    <dd>Every claim states where it came from. Missing knowledge remains explicit instead of being silently guessed.</dd>
+  </div>
+  <div>
+    <dt><code>contentHash</code></dt>
+    <dd>The whole contract has deterministic content identity, so stale references and changed artifacts can be detected.</dd>
+  </div>
+</dl>
+
+The form-level `diagnostics` array for this example is empty. That does not
+mean all forms are always fully understood. Unsupported callbacks, async
+values, unmapped types, or incomplete effect analysis appear as stable
+diagnostics and unknowns in other artifacts.
+
+## 5. Use it without guessing
+
+A consumer begins with stable semantic intent, not a selector:
+
+```text
+Set claimant.contactPreference to "email"
+```
+
+The contract supplies the chain of authority:
+
+```text
+shared.contact-preferences
+  └─ modelPath: claimant.contactPreference
+      ├─ legal value: email
+      ├─ precondition: click wrapper-expand
+      ├─ operation: check option
+      ├─ trusted driver contract: generic.choice@1
+      └─ declared locator candidate: #contact-preference
+```
+
+For this exact field, the current typed-intent validator stops there. Its
+declared wrapper activation precondition cannot yet be expanded into a lossless
+plan step, so validation returns `UNSUPPORTED_INTERACTION` instead of silently
+dropping the required click. The example is inspectable contract evidence, but
+it is intentionally **refused for execution** today.
+
+<div class="evidence-pair" role="list" aria-label="Current example boundary">
+  <div role="listitem">
+    <strong>Actionable as context</strong>
+    <span>Identity, legal values, locator evidence, interaction, and wrapper precondition are explicit.</span>
+  </div>
+  <div role="listitem">
+    <strong>Refused for execution</strong>
+    <span>The current plan grammar cannot preserve the wrapper activation step, so no plan is returned.</span>
+  </div>
+</div>
+
+For fields inside the currently supported synthetic proof slice, the remaining
+path is deliberately fail-closed:
+
+<ol class="authority-chain">
+  <li><strong>Query</strong><span>Resolve one usage or form against an exact artifact-set hash.</span></li>
+  <li><strong>Validate</strong><span>Compile supported typed intent only when the field, value, state, and driver authority are actionable.</span></li>
+  <li><strong>Plan</strong><span>Produce a canonical plan and content hash bound to that exact context.</span></li>
+  <li><strong>Revalidate</strong><span>Reject stale, ambiguous, changed, or newly refused authority before execution.</span></li>
+  <li><strong>Bind</strong><span>Resolve every approved step to the exact implementation in an authenticated, allowlist-bound local driver registry.</span></li>
+</ol>
+
+That is the important shift. An agent or test author does not inspect the page
+and improvise `page.locator('.radio:nth-child(1)')`. It asks for a semantic
+field, verifies the requested value is inside a complete domain, observes the
+wrapper precondition, and refuses when exact evidence is absent.
+
+Current package surfaces can query an assembled agent-context dataset,
+validate the supported typed-intent subset, revalidate its canonical plan, and
+bind approved steps to exact trusted driver calls. The private Playwright
+package does **not** invoke those calls in a browser, and the CLI does not yet
+assemble or expose the query dataset. Generated JSON is usable context today;
+production MCP transport and browser execution remain future layers.
+
+The standalone plan-hash helper also strict-parses before hashing. Proxy,
+accessor, hidden, cyclic, and unknown-key input is rejected; a valid canonical
+plan retains the same deterministic hash.
+
+<div class="walkthrough-finish">
+  <strong>The loop is deliberately boring.</strong>
+  <span>Change the real form. Regenerate. Review the semantic diff. Run <code>check</code> in CI. Let consumers follow stable identities and explicit evidence.</span>
+</div>
+
+For field-by-field DTO details, continue to
+<a href="../../reference/artifacts/">Artifacts and source linkage</a>. For
+alternate repository layouts, compare the
+<a href="../../reference/examples/">maintained examples</a>.
