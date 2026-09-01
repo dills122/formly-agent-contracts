@@ -1,9 +1,9 @@
 # Changesets
 
 This directory manages release versioning and changelogs for every
-non-private package under `packages/` (currently `@formly-contract/schema`
-and `@formly-contract/compiler`; `@formly-contract/workspace` stays private
-and is skipped automatically).
+non-private package under `packages/` (currently `@formly-contract/schema`,
+`@formly-contract/compiler`, `@formly-contract/workspace`, and
+`@formly-contract/angular`; private packages are skipped automatically).
 
 ## Adding a changeset
 

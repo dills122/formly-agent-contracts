@@ -7,12 +7,15 @@ export type {
   WorkspaceConfigLoaderOptions,
 } from "./config-loader.js";
 export {
+  discoverWorkspaceProjectConfigs,
   discoverWorkspaceProjects,
   WorkspaceDiscoveryError,
 } from "./discover-projects.js";
 export type {
   DiscoveredWorkspace,
+  DiscoveredWorkspaceProjectConfigs,
   DiscoveredWorkspaceProject,
+  DiscoverWorkspaceProjectConfigsOptions,
   DiscoverWorkspaceProjectsOptions,
   LoadedWorkspaceRootConfig,
   WorkspaceDiscoveryErrorCode,
@@ -78,7 +81,24 @@ export type {
   WorkspaceSourceUsageDiagnosticCode,
 } from "./source-usage.js";
 export {
+  DYNAMIC_SEMANTICS_LLM0_CORPUS,
+  createDynamicSemanticsContextPack,
+  createDynamicSemanticsCandidateFromModelOutput,
+  evaluateDynamicSemanticsCandidates,
+  runDynamicSemanticsEnrichment,
+} from './dynamic-semantics.js';
+export type {
+  DynamicSemanticsContextPack,
+  DynamicSemanticsContextSpan,
+  DynamicSemanticsContextSpanRequest,
+  DynamicSemanticsEvalCase,
+  DynamicSemanticsEvalItem,
+  DynamicSemanticsEvalResult,
+  DynamicSemanticsProvider,
+} from './dynamic-semantics.js';
+export {
   checkWorkspace,
+  discoverWorkspaceProjectsInWorkers,
   runWorkspace,
   WorkspaceGenerationError,
 } from "./run-workspace.js";
@@ -88,6 +108,7 @@ export type {
   WorkspaceCheckResult,
   WorkspaceGenerationErrorCode,
   WorkspaceGenerationPhase,
+  WorkspaceProjectExecutionFailure,
   WorkspaceRunResult,
 } from "./run-workspace.js";
 export {
@@ -104,3 +125,30 @@ export type {
   WorkspaceIndexProject,
 } from "./workspace-index.js";
 export { WorkspaceConfigValidationError } from "./validation-error.js";
+export {
+  defineRuntimeHostModuleDescriptor,
+  parseProjectExecutionRequest,
+  parseRuntimeHostModuleDescriptor,
+  parseRuntimeHostParentMessage,
+  parseRuntimeHostWorkerMessage,
+  RUNTIME_HOST_PROTOCOL_VERSION,
+} from './runtime-host/index.js';
+export type {
+  ProjectExecutionRequest,
+  RuntimeHostFailureCode,
+  RuntimeHostModuleDescriptor,
+  RuntimeHostOperation,
+  RuntimeHostParentMessage,
+  RuntimeHostProjectInventory,
+  RuntimeHostWorkerMessage,
+} from './runtime-host/index.js';
+export {
+  createProjectWorkerEnvironment,
+  ProjectWorkerSupervisorError,
+  spawnProjectWorker,
+} from './runtime-host/index.js';
+export type {
+  ProjectWorkerSession,
+  ProjectWorkerSupervisorErrorCode,
+  SpawnProjectWorkerOptions,
+} from './runtime-host/index.js';

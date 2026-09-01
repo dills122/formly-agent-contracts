@@ -11,7 +11,9 @@ import { execFile as execFileCallback } from 'node:child_process';
 import {
   mkdir,
   mkdtemp,
+  realpath,
   rm,
+  symlink,
   writeFile,
 } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -138,12 +140,16 @@ export function verifyPackedPackage({
 const REQUIRED_EXPORTS_BY_PACKAGE_NAME = {
   '@formly-contract/schema': ['parseFormContract'],
   '@formly-contract/compiler': ['extractFormContract'],
+  '@formly-contract/workspace': ['runWorkspace'],
+  '@formly-contract/angular': ['runAngularWorkspace'],
 };
 
 const FORBIDDEN_ROOT_EXPORTS_BY_PACKAGE_NAME = {
   '@formly-contract/schema': [
     'buildFieldTypeProfileRegistry',
+    'defineContractedFormlyWrapper',
     'defineContractedFormlyType',
+    'stepper',
     'radioChoice',
     'toFormlyTypeRegistration',
   ],
@@ -155,10 +161,24 @@ const REQUIRED_SUBPATH_EXPORTS_BY_PACKAGE_NAME = {
       specifier: '@formly-contract/schema/field-type-authoring',
       requiredExports: [
         'buildFieldTypeProfileRegistry',
+        'defineContractedFormlyWrapper',
         'defineContractedFormlyType',
         'radioChoice',
+        'stepper',
         'toFormlyTypeRegistration',
       ],
+    },
+  ],
+  '@formly-contract/workspace': [
+    {
+      specifier: '@formly-contract/workspace/runtime-host',
+      requiredExports: ['defineRuntimeHostModuleDescriptor'],
+    },
+  ],
+  '@formly-contract/angular': [
+    {
+      specifier: '@formly-contract/angular/jit',
+      requiredExports: ['angularJitRuntimeHost', 'runAngularWorkspace'],
     },
   ],
 };
@@ -179,7 +199,7 @@ export function getPackedPackageSmokeImports(packageName) {
   ];
 }
 
-async function smokeTestTarballs(packages, temporaryDirectory) {
+async function smokeTestTarballs(packages, temporaryDirectory, rootDirectory) {
   const installRoot = join(temporaryDirectory, 'packed-install');
   for (const packedPackage of packages) {
     const packageDirectory = join(
@@ -195,6 +215,28 @@ async function smokeTestTarballs(packages, temporaryDirectory) {
       '-C',
       packageDirectory,
     ]);
+  }
+  const internalNames = new Set(packages.map(({ name }) => name));
+  const externalOwners = new Map();
+  for (const { dependencies, directory } of packages) {
+    for (const name of Object.keys(dependencies ?? {})) {
+      if (!internalNames.has(name) && !externalOwners.has(name)) {
+        externalOwners.set(name, directory);
+      }
+    }
+  }
+  for (const [name, ownerDirectory] of externalOwners) {
+    const linkPath = join(installRoot, 'node_modules', ...name.split('/'));
+    const sourcePath = await realpath(
+      join(
+        rootDirectory,
+        ownerDirectory,
+        'node_modules',
+        ...name.split('/'),
+      ),
+    );
+    await mkdir(dirname(linkPath), { recursive: true });
+    await symlink(sourcePath, linkPath, 'dir');
   }
 
   const smokeImports = packages.flatMap(({ name }) =>
@@ -273,11 +315,16 @@ export async function packReleasePackages({
       });
       packedPackages.push({
         ...releasePackage,
+        dependencies: packedManifest.dependencies,
         filename: packResult.filename,
       });
     }
 
-    await smokeTestTarballs(packedPackages, temporaryDirectory);
+    await smokeTestTarballs(
+      packedPackages,
+      temporaryDirectory,
+      resolvedRoot,
+    );
     return packedPackages;
   } finally {
     await rm(temporaryDirectory, { force: true, recursive: true });

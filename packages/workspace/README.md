@@ -3,9 +3,8 @@
 Repository-aware discovery, deterministic artifact generation, and the
 `formly-contracts` command-line interface.
 
-This package is currently private. Evaluations may link it from a sibling
-Formly Contract checkout or install the retained tarball produced by
-`pnpm pilot:pack`. See the
+This package is prepared for public release alongside the schema, compiler,
+and Angular runtime-host package. See the
 [installation guide](../../apps/docs/src/content/docs/start/installation.md).
 
 ## Why this package exists
@@ -21,9 +20,12 @@ Use it to:
   configuration;
 - load TypeScript or JavaScript configuration in trusted local/CI execution;
 - discover project descriptors without guessing form roots;
+- isolate project config and factory execution in disposable workers;
 - generate content-addressed contracts and publish `workspace-index.json` last;
 - run a non-mutating byte-for-byte artifact check;
 - optionally index the supported direct-root-call source convention; and
+- create bounded dynamic-semantics context packs and score provider-neutral
+  proposal outputs; and
 - invoke the `formly-contracts list`, `generate`, `check`, and read-only
   `author-factory-inputs` commands.
 
@@ -33,6 +35,13 @@ returns safe per-config failure records. An exact workspace-relative
 Selected generation/check indexes live under a deterministic
 `scopes/projects/<selection-hash>/` directory and never replace the complete
 workspace index.
+
+Trusted compositions can select worker execution. All workers inventory first,
+so cross-project duplicates fail before any form factory runs. With
+`continueOnProjectError`, failed projects are skipped and returned as safe
+`projectFailures`; healthy projects still produce a deterministic index. A
+single-writer lock spans generation through index-last publication, and the
+selected pnpm lockfile is rechecked immediately before commit.
 
 Configuration and form factories are executable application code. Run this
 package only against trusted workspaces. Generated artifacts are the portable,
@@ -47,6 +56,8 @@ strictly validated boundary intended for downstream consumers.
 - It does not prove route reachability, render Angular, launch a browser, or
   execute arbitrary source-usage call arguments.
 - It does not currently expose an MCP server or automatic Playwright workflow.
+- It never calls an LLM during `generate` or `check`; dynamic-semantics
+  candidates belong to a separate proposal-only review workflow.
 
 ## Consumer entry points
 
@@ -82,6 +93,8 @@ documents every command and option.
 | Trusted config loading | `src/config-loader.ts`, `src/load-config.ts` |
 | Discovery | `src/discover-projects.ts` |
 | Generation and checking | `src/run-workspace.ts`, `src/workspace-index.ts` |
+| Worker/runtime-host protocol | `src/project-worker.ts`, `src/runtime-host/` |
+| Dynamic-semantics evidence/evals | `src/dynamic-semantics.ts` |
 | Static direct-call indexing | `src/source-program.ts`, `src/source-usage.ts` |
 | CLI | `src/cli.ts`, `src/cli-main.ts` |
 

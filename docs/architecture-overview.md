@@ -228,19 +228,19 @@ The compiler must not serialize live field objects. Built fields contain circula
 
 #### Controlled project execution hosts
 
-> This subsection describes the long-term, per-project child-process host
-> (see "Current implementation boundary" above). Today, `runWorkspace`
-> extracts in-process — its recorded runtime provenance worker id is
-> `@formly-contract/workspace/in-process` — not via the child-process
-> protocol below.
+> The per-project child-process host is implemented as an opt-in workspace
+> execution mode and is the mandatory path used by `runAngularWorkspace` and
+> `checkAngularWorkspace`. The generic `runWorkspace` compatibility path still
+> defaults to in-process declared extraction unless trusted composition code
+> selects worker execution.
 
-The current in-process runner preserves complete-workspace fail-closed
-generation. For recovery and diagnosis it also supports exact project-config
-selection before import and project-ID selection after import. Selected runs
+Both execution paths support exact project-config selection before import and
+project-ID selection after inventory. The worker path discovers project config
+paths without importing them in the parent, performs global duplicate checks
+before compile approval, and can either fail closed or skip/report isolated
+project failures through `continueOnProjectError`. Selected runs
 publish a deterministic scoped index rather than replacing the complete
-workspace index. `list` may return healthy inventory plus safe per-config load
-failures, but those failures never become a partially successful full-workspace
-generation.
+workspace index.
 
 Trusted project configuration and future Formly/Angular execution must not run
 in the root orchestrator, Nx daemon, or MCP request process. The workspace
@@ -271,12 +271,11 @@ the pre-factory global duplicate gate or contend for the same generation lock
 and index. Finer-grained Nx sharding requires a separate protocol design that
 retains those invariants.
 
-`@formly-contract/workspace` is the framework-neutral host and orchestrator;
-it stays `private: true` and experimental for now (see
-[Releasing](releasing.md)), unlike `@formly-contract/schema` and
-`@formly-contract/compiler`, which are on the npm-publish path. A future
-`@formly-contract/angular` peer will own Angular-specific JIT and AOT
-integration; schema owns portable compatibility and provenance DTOs. Angular
+`@formly-contract/workspace` is the publishable framework-neutral host and
+orchestrator, while `@formly-contract/angular` owns the guarded Angular 20 JIT
+composition. Its separate browser/AOT authoring host remains reserved and
+fails explicitly until the retained compatibility gate is implemented. Schema
+owns portable compatibility and provenance DTOs. Angular
 packages must resolve from the explicit project runtime base without
 treating TypeScript aliases as runtime package authority. Any core/compiler
 anchor preflight is a bounded compatibility check, not proof of whole-graph

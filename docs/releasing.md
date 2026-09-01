@@ -5,11 +5,11 @@ Today that is:
 
 - `packages/schema` (`@formly-contract/schema`)
 - `packages/compiler` (`@formly-contract/compiler`)
+- `packages/workspace` (`@formly-contract/workspace`)
+- `packages/angular` (`@formly-contract/angular`)
 
-`packages/workspace` (`@formly-contract/workspace`) exists but stays
-`private: true` — it is experimental and not yet part of a release. Adding a
-new `@formly-contract/*` package to the release needs no script or workflow
-edit: clear its `private: true` and satisfy the metadata checks in
+Adding a new `@formly-contract/*` package to the release needs no script or
+workflow edit: leave it non-private and satisfy the metadata checks in
 [scripts/release-manifest.mjs](../scripts/release-manifest.mjs) (name,
 description, semantic version, `files: ["dist"]`, public `publishConfig`, and
 a `repository.directory` matching its real path). See

@@ -19,12 +19,9 @@ The compatibility suite is pinned to Angular `20.3.29` and Formly `6.1.8`.
 
 ## Link the packages before the first release
 
-`@formly-contract/schema` and `@formly-contract/compiler` are not published
-to npm yet. `@formly-contract/workspace` is experimental and stays private
-(see [`docs/releasing.md`](https://github.com/dills122/formly-contract/blob/main/docs/releasing.md)
-for the current release scope) — it isn't on the same npm-publish track as
-the other two, but it links the same way for local development. Clone this
-repository beside the consumer and build all three packages:
+The packages are prepared for their first public release but may still need to
+be linked before the npm bootstrap completes. Clone this repository beside the
+consumer and build the four publishable packages:
 
 ```sh
 git clone https://github.com/dills122/formly-contract.git
@@ -33,6 +30,7 @@ pnpm install --frozen-lockfile
 pnpm --filter @formly-contract/schema build
 pnpm --filter @formly-contract/compiler build
 pnpm --filter @formly-contract/workspace build
+pnpm --filter @formly-contract/angular build
 ```
 
 In the consuming repository, add sibling links with paths adjusted for your
@@ -45,7 +43,8 @@ layout:
   },
   "devDependencies": {
     "@formly-contract/compiler": "link:../formly-contract/packages/compiler",
-    "@formly-contract/workspace": "link:../formly-contract/packages/workspace"
+    "@formly-contract/workspace": "link:../formly-contract/packages/workspace",
+    "@formly-contract/angular": "link:../formly-contract/packages/angular"
   }
 }
 ```
@@ -68,15 +67,15 @@ A successful check begins with
 ## Pack a portable workplace pilot bundle
 
 When a sibling checkout is not available on the consuming machine, build and
-retain all three required tarballs plus a checksum/install manifest:
+retain the required pilot tarballs plus a checksum/install manifest:
 
 ```sh
 pnpm pilot:pack
 ```
 
 Copy `artifacts/pilot/` to the consumer, then run the `pnpm` command described
-by `formly-contract-pilot.json`. The bundle includes the private experimental
-workspace CLI without adding it to the public npm release. Third-party Angular,
+by `formly-contract-pilot.json`. The pilot remains a retained evaluation
+handoff even though workspace and Angular are now on the public release path. Third-party Angular,
 Formly, TypeScript, and pnpm dependencies still require the consumer's normal
 registry or package cache; this is not an offline dependency bundle.
 

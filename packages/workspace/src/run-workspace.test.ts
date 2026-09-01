@@ -1715,4 +1715,43 @@ describe("runWorkspace", () => {
     );
     expect(await readdir(outside)).toEqual([]);
   });
+
+  it('rejects concurrent generation before discovery and preserves the owner lock', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(workspaceRoot, '.formly-contract-generation.lock', 'owner\n');
+    await expect(runWorkspace(runnerOptions(workspaceRoot))).rejects.toEqual(
+      expect.objectContaining({ code: 'GENERATION_LOCKED', phase: 'inventory' }),
+    );
+    expect(await readFile(join(workspaceRoot, '.formly-contract-generation.lock'), 'utf8')).toBe('owner\n');
+  });
+
+  it('refuses publication when the dependency snapshot changes during factory execution', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `import { writeFileSync } from 'node:fs';
+export default {
+  projectId: 'forms',
+  sources: [{ sourceId: 'forms', list: () => [{
+    id: 'claims.form',
+    create: () => {
+      writeFileSync(new URL('../pnpm-lock.yaml', import.meta.url), "lockfileVersion: '9.0'\\n# changed\\n");
+      return { fields: [{ key: 'name', type: 'input' }] };
+    }
+  }] }]
+};`,
+    );
+    await expect(runWorkspace(runnerOptions(workspaceRoot))).rejects.toEqual(
+      expect.objectContaining({ code: 'DEPENDENCY_SNAPSHOT_CHANGED', phase: 'output' }),
+    );
+    await expect(lstat(join(workspaceRoot, 'dist/formly-contracts/workspace-index.json'))).rejects.toEqual(
+      expect.objectContaining({ code: 'ENOENT' }),
+    );
+    await expect(lstat(join(workspaceRoot, '.formly-contract-generation.lock'))).rejects.toEqual(
+      expect.objectContaining({ code: 'ENOENT' }),
+    );
+  });
 });

@@ -223,7 +223,9 @@ describe('getPackedPackageSmokeImports', () => {
         requiredExports: ['parseFormContract'],
         forbiddenExports: [
           'buildFieldTypeProfileRegistry',
+          'defineContractedFormlyWrapper',
           'defineContractedFormlyType',
+          'stepper',
           'radioChoice',
           'toFormlyTypeRegistration',
         ],
@@ -232,19 +234,38 @@ describe('getPackedPackageSmokeImports', () => {
         specifier: '@formly-contract/schema/field-type-authoring',
         requiredExports: [
           'buildFieldTypeProfileRegistry',
+          'defineContractedFormlyWrapper',
           'defineContractedFormlyType',
           'radioChoice',
+          'stepper',
           'toFormlyTypeRegistration',
         ],
       },
     ]);
   });
 
-  it('keeps a generic root import for packages without a pinned export', () => {
+  it('checks the public workspace root and runtime-host subpath', () => {
     expect(getPackedPackageSmokeImports('@formly-contract/workspace')).toEqual([
       {
         specifier: '@formly-contract/workspace',
-        requiredExports: [],
+        requiredExports: ['runWorkspace'],
+      },
+      {
+        specifier: '@formly-contract/workspace/runtime-host',
+        requiredExports: ['defineRuntimeHostModuleDescriptor'],
+      },
+    ]);
+  });
+
+  it('checks the Angular root and guarded JIT subpath', () => {
+    expect(getPackedPackageSmokeImports('@formly-contract/angular')).toEqual([
+      {
+        specifier: '@formly-contract/angular',
+        requiredExports: ['runAngularWorkspace'],
+      },
+      {
+        specifier: '@formly-contract/angular/jit',
+        requiredExports: ['angularJitRuntimeHost', 'runAngularWorkspace'],
       },
     ]);
   });

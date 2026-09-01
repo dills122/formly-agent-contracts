@@ -112,14 +112,15 @@ Adjust the relative path to match the two checkouts:
   "devDependencies": {
     "@formly-contract/compiler": "link:../formly-contract/packages/compiler",
     "@formly-contract/workspace": "link:../formly-contract/packages/workspace",
+    "@formly-contract/angular": "link:../formly-contract/packages/angular",
     "@formly-contract/playwright": "link:../formly-contract/packages/playwright"
   }
 }
 ```
 
 `schema` must be a regular dependency when the Angular application imports the
-browser-safe field-type-authoring subpath. Compiler, workspace, and the private
-Playwright binding experiment remain Node-side dev dependencies. The latter
+browser-safe field-type-authoring subpath. Compiler, workspace, Angular host,
+and the private Playwright binding experiment remain Node-side dev dependencies. The latter
 does not depend on Playwright or invoke a browser despite its package name.
 
 If a sibling checkout is not portable to the work machine, run
@@ -155,10 +156,9 @@ The selected index is written beneath a deterministic
 index untouched. Run unfiltered `list` to see both healthy inventory and safe
 per-config failure records.
 
-Repository CI also packs the three built packages and runs the workspace CLI in
-an isolated temporary consumer. That is a technical tarball boundary check,
-not an npm release: `@formly-contract/workspace` remains private until the
-release-readiness work adds package documentation and publication metadata.
+Repository CI packs every publishable package and runs the workspace CLI in an
+isolated temporary consumer. Workspace and Angular now participate in the same
+release-readiness and tarball boundary checks as schema and compiler.
 
 ## 3. Add one root configuration
 

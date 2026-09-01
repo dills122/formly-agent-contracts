@@ -1,0 +1,75 @@
+{
+  "name": "@formly-contract/angular",
+  "version": "0.1.0",
+  "description": "Controlled Angular runtime-host descriptors for Formly Contract.",
+  "author": "Dylan Steele <dylansteele57@gmail.com>",
+  "license": "MIT",
+  "homepage": "https://github.com/dills122/formly-contract#readme",
+  "bugs": {
+    "url": "https://github.com/dills122/formly-contract/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dills122/formly-contract.git",
+    "directory": "packages/angular"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
+  "type": "module",
+  "bin": {
+    "formly-contracts-angular": "./dist/cli-main.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./jit": {
+      "types": "./dist/jit.d.ts",
+      "default": "./dist/jit.js"
+    },
+    "./authoring": {
+      "types": "./dist/authoring.d.ts",
+      "default": "./dist/authoring.js"
+    },
+    "./cli": {
+      "types": "./dist/cli-main.d.ts",
+      "default": "./dist/cli-main.js"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "pnpm typecheck && tsc --project tsconfig.build.json",
+    "typecheck": "tsc --project tsconfig.json"
+  },
+  "engines": {
+    "node": ">=22.13.0 <23"
+  },
+  "peerDependencies": {
+    "@angular/compiler": ">=20.0.0 <21.0.0",
+    "@angular/core": ">=20.0.0 <21.0.0",
+    "@formly-contract/workspace": "^0.1.0",
+    "@ngx-formly/core": ">=6.0.0 <7.0.0"
+  },
+  "peerDependenciesMeta": {
+    "@angular/compiler": {
+      "optional": true
+    },
+    "@angular/core": {
+      "optional": true
+    },
+    "@ngx-formly/core": {
+      "optional": true
+    }
+  },
+  "devDependencies": {
+    "@angular/compiler": "20.3.29",
+    "@angular/core": "20.3.29",
+    "@formly-contract/workspace": "workspace:*",
+    "@ngx-formly/core": "6.1.8"
+  }
+}

@@ -1,10 +1,17 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  autocompleteChoice,
   buildFieldTypeProfileRegistry,
+  choiceControl,
   defineContractedFormlyType,
   radioChoice,
+  repeater,
+  rowSelection,
+  stepper,
   toFormlyTypeRegistration,
+  typedInput,
+  defineContractedFormlyWrapper,
 } from './field-type-authoring.js';
 import {
   canonicalizeFieldTypeProfileRegistry,
@@ -27,6 +34,96 @@ function createRadioType(
 }
 
 describe('compact field-type authoring', () => {
+  it('lowers typed, choice, structural, and collection presets through one typed builder', () => {
+    const authored = [
+      defineContractedFormlyType({
+        name: 'phone',
+        profile: { id: 'fixture.phone', version: 1 },
+        behavior: typedInput({ semanticType: 'phone-number' }),
+      }),
+      defineContractedFormlyType({
+        name: 'fund-select',
+        profile: { id: 'fixture.fund-select', version: 1 },
+        behavior: choiceControl({ presentation: 'overlay' }),
+      }),
+      defineContractedFormlyType({
+        name: 'preferences',
+        profile: { id: 'fixture.preferences', version: 1 },
+        behavior: choiceControl({
+          multiple: true,
+          presentation: 'checkbox',
+        }),
+      }),
+      defineContractedFormlyType({
+        name: 'advisor-search',
+        profile: { id: 'fixture.advisor-search', version: 1 },
+        behavior: autocompleteChoice({ completeness: 'scenario' }),
+      }),
+      defineContractedFormlyType({
+        name: 'account-table',
+        profile: { id: 'fixture.account-table', version: 1 },
+        behavior: rowSelection(),
+      }),
+      defineContractedFormlyType({
+        name: 'dependants',
+        profile: { id: 'fixture.dependants', version: 1 },
+        behavior: repeater({ expandable: true }),
+      }),
+      defineContractedFormlyType({
+        name: 'application-stepper',
+        profile: { id: 'fixture.application-stepper', version: 1 },
+        behavior: stepper(),
+      }),
+    ];
+
+    const registry = buildFieldTypeProfileRegistry({
+      id: 'fixture.extended-fields',
+      version: 1,
+      types: authored,
+    });
+
+    expect(parseFieldTypeProfileRegistry(registry)).toBe(registry);
+    expect(
+      registry.profiles.map(({ semanticType, driver }) => [
+        semanticType,
+        driver.id,
+      ]),
+    ).toEqual([
+      ['multi-row-selection', 'generic.row-selection'],
+      ['single-choice', 'generic.autocomplete'],
+      ['stepper', 'generic.stepper'],
+      ['repeater', 'generic.repeater'],
+      ['single-choice', 'generic.choice'],
+      ['phone-number', 'generic.fill'],
+      ['multi-choice', 'generic.choice'],
+    ]);
+    const stepperProfile = registry.profiles.find(
+      ({ semanticType }) => semanticType === 'stepper',
+    );
+    expect(stepperProfile?.driver.capabilities).toEqual([
+      'next-step',
+      'previous-step',
+      'submit-stepper',
+    ]);
+    expect(stepperProfile?.parts.map(({ name }) => name)).toEqual([
+      'step',
+      'next',
+      'previous',
+      'submit',
+    ]);
+  });
+
+  it('rejects contradictory compact choice presets', () => {
+    expect(() =>
+      choiceControl({ multiple: true, presentation: 'radio' }),
+    ).toThrow('choiceControl.multiple is unsupported for radio');
+    expect(() => choiceControl({ presentation: 'checkbox' })).toThrow(
+      'choiceControl.multiple must be true for checkbox',
+    );
+    expect(() => typedInput({ semanticType: 'phone', role: 'button' as 'textbox' }))
+      .toThrow('typedInput.role is unsupported');
+  });
+
   it('lowers the default radio preset to the existing canonical Nx registry bytes', () => {
     const registry = buildFieldTypeProfileRegistry({
       id: 'fixture.nx-fields',
@@ -341,5 +438,28 @@ describe('compact field-type authoring', () => {
         cyclicType as unknown as ReturnType<typeof createRadioType>,
       ),
     ).toThrow('type.profile contains unknown property name');
+  });
+
+  it('authors wrapper activation without a verbose registry object', () => {
+    const wrapper = defineContractedFormlyWrapper({
+      name: 'expansion-panel',
+      profile: { id: 'fixture.expansion-wrapper', version: 1 },
+      activation: {},
+    });
+    const registry = buildFieldTypeProfileRegistry({
+      id: 'fixture.wrapper-fields',
+      version: 1,
+      types: [],
+      wrappers: [wrapper],
+    });
+    expect(registry.wrappers).toEqual([{
+      identity: { id: 'fixture.expansion-wrapper', version: 1 },
+      wrapperName: 'expansion-panel',
+      evidence: 'declared',
+      parts: [{ name: 'activate', role: 'button', cardinality: 'one', evidence: 'declared' }],
+      preconditions: [{ kind: 'activate', part: 'activate', operation: 'click', evidence: 'declared' }],
+      unknowns: [],
+    }]);
+    expect(parseFieldTypeProfileRegistry(registry)).toEqual(registry);
   });
 });
