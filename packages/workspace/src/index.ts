@@ -18,6 +18,7 @@ export type {
   WorkspaceDiscoveryErrorCode,
   WorkspaceDiscoveryInventory,
   WorkspacePluginInventoryEntry,
+  WorkspaceProjectDiscoveryFailure,
   WorkspaceProjectInventoryEntry,
 } from "./discover-projects.js";
 export {

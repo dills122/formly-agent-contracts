@@ -19,6 +19,8 @@ Options:
   --config <path>          Root config path (default: formly-contracts.config.ts)
   --output <path>          Override output for generate or check
   --fail-on <severity>     Fail on warning or error; generate or check only
+  --project <id>           Select a project ID; may be repeated
+  --project-config <path>  Select an exact project config; may be repeated
   --form-id <id>           Select a stable form ID; author-factory-inputs only
   -h, --help               Show this help
 ```
@@ -27,6 +29,21 @@ Use repeatable `--fail-on` flags to select both severities. `list` rejects
 `--output` and `--fail-on` because it does not generate contracts.
 `author-factory-inputs` also rejects those write-oriented options and accepts a
 repeatable `--form-id` filter instead.
+
+Use repeatable `--project` for IDs when the whole project-config inventory is
+Node-loadable. If a browser-only project config fails during import, select the
+healthy workspace-relative path directly:
+
+```sh
+pnpm exec formly-contracts generate \
+  --project-config libs/forms-kit/formly-contracts.project.ts
+```
+
+The two selector forms cannot be combined. Selected runs place their index and
+source-usage catalog under a deterministic `scopes/projects/<selection-hash>/`
+directory, leaving the complete workspace index untouched. `list` reports
+healthy inventory and safe per-config failures together, returning a non-zero
+status when any matched config was unavailable.
 
 ## Review factory inputs locally
 

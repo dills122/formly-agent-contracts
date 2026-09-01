@@ -30,6 +30,7 @@
     "docs:sync": "pnpm --filter @formly-contract/docs sync",
     "lint": "pnpm docs:sync && eslint .",
     "pack:check": "node scripts/pack-release.mjs",
+    "pilot:pack": "pnpm build:demo && node scripts/pack-pilot.mjs --destination artifacts/pilot",
     "release:check": "node scripts/release-manifest.mjs",
     "release:pack": "pnpm build:demo && node scripts/pack-release.mjs --destination artifacts/releases",
     "test": "vitest run",

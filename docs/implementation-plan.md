@@ -545,6 +545,19 @@ not add compilation, Angular execution, storage, or mutation to MCP requests.
 
 ## Post-MVP Increments
 
+Sanitized workplace feedback adds two immediate producer-readiness checkpoints:
+
+- isolate project-config load failures for inventory, support exact project
+  selection, and keep selected indexes distinct from complete workspace output;
+- retain a packed pilot handoff containing schema, compiler, and the private
+  workspace CLI when sibling links are not portable.
+
+For callbacks and runtime option providers, the compiler remains authoritative.
+The proposed model-assisted authoring/evaluation lane is specified in
+[LLM-assisted dynamic semantics](research/llm-assisted-dynamic-semantics.md);
+model output is review evidence until an explicit declaration or controlled
+scenario gate promotes it.
+
 The earlier aspirational increment list is superseded by RH-06 and the
 execution index. The current order is:
 

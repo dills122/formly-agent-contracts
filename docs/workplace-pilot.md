@@ -122,6 +122,13 @@ browser-safe field-type-authoring subpath. Compiler, workspace, and the private
 Playwright binding experiment remain Node-side dev dependencies. The latter
 does not depend on Playwright or invoke a browser despite its package name.
 
+If a sibling checkout is not portable to the work machine, run
+`pnpm pilot:pack` in Formly Contract and copy `artifacts/pilot/` for the
+compiler/workspace portion of the pilot. Its `formly-contract-pilot.json`
+records the schema, compiler, and workspace tarballs, SHA-256 digests, and
+exact pnpm install arguments. The separate Playwright experiment is not part of
+that compiler bundle.
+
 Install with the workplace repository's normal pnpm workflow, then verify the
 linked binary:
 
@@ -133,6 +140,20 @@ pnpm exec formly-contracts --help
 The binary accepts `list`, `generate`, `check`, and the read-only
 `author-factory-inputs` command. A successful help check starts with
 `Usage: formly-contracts <command> [options]`.
+
+When one project imports an Angular browser barrel that Node cannot load, use
+an exact config-path selection to continue with a healthy project without
+importing the broken sibling:
+
+```sh
+pnpm exec formly-contracts generate \
+  --project-config libs/forms-kit/formly-contracts.project.ts
+```
+
+The selected index is written beneath a deterministic
+`scopes/projects/<selection-hash>/` directory, leaving the complete workspace
+index untouched. Run unfiltered `list` to see both healthy inventory and safe
+per-config failure records.
 
 Repository CI also packs the three built packages and runs the workspace CLI in
 an isolated temporary consumer. That is a technical tarball boundary check,

@@ -173,7 +173,7 @@ pnpm exec formly-contracts check
 ```
 
 - `list` inventories configured projects and sources without running form
-  factories.
+  factories, retaining healthy inventory plus safe per-config failures.
 - `generate` writes content-addressed contracts and publishes the workspace
   index last.
 - `check` verifies the expected canonical bytes without changing generated
@@ -181,9 +181,15 @@ pnpm exec formly-contracts check
 - `author-factory-inputs` is an optional, read-only aid for reviewing supported
   typed factory inputs.
 
+Use repeatable `--project` selectors when every project config loads, or an
+exact workspace-relative `--project-config` selector to avoid importing a
+known browser-only sibling. Selected runs publish a separate deterministic
+scoped index.
+
 The packages are not available from npm yet. Follow the
 [installation guide](apps/docs/src/content/docs/start/installation.md) to build
-and link them from a sibling checkout, then use the
+and link them from a sibling checkout or create a portable `pnpm pilot:pack`
+tarball bundle, then use the
 [end-to-end workspace guide](apps/docs/src/content/docs/start/end-to-end.md) for
 configuration and form registration.
 

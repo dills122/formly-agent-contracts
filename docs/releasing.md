@@ -127,6 +127,10 @@ immutable even when unpublished.
 - `pnpm release:pack` builds the workspace packages and retains verified
   tarballs in the ignored `artifacts/releases/` directory for manual
   inspection.
+- `pnpm pilot:pack` builds and retains schema, compiler, and the private
+  workspace CLI under `artifacts/pilot/`, with SHA-256 metadata and a pnpm
+  install argument list. It is a portable pilot handoff, not a public release
+  or an offline third-party dependency bundle.
 
 ## Failure and retry behavior
 

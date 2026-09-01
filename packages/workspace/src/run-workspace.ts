@@ -323,6 +323,30 @@ function canonicalOutputDirectory(path: string): string {
   return posix.normalize(normalizeRelativePath(path)).replace(/\/+$/u, "");
 }
 
+function isScopedRun(options: RunWorkspaceOptions): boolean {
+  return (
+    (options.selectedProjectIds?.length ?? 0) > 0 ||
+    (options.selectedProjectConfigPaths?.length ?? 0) > 0
+  );
+}
+
+function scopedAggregateOutputDirectory(
+  outputDirectory: string,
+  projects: readonly ResolvedProject[],
+  options: RunWorkspaceOptions
+): string {
+  if (!isScopedRun(options)) {
+    return outputDirectory;
+  }
+  const projectIds = projects
+    .map(({ resolved }) => resolved.projectId)
+    .sort(compareCodeUnits);
+  const scopeHash = createHash("sha256")
+    .update(canonicalStringify(projectIds))
+    .digest("hex");
+  return posix.join(outputDirectory, "scopes", "projects", scopeHash);
+}
+
 function isOutsideWorkspaceOutputConfigError(
   error: unknown
 ): error is WorkspaceConfigValidationError {
@@ -1245,6 +1269,12 @@ async function planWorkspaceRun(
       error
     );
   }
+  if ((discovered.failures?.length ?? 0) > 0) {
+    throw new WorkspaceGenerationError(
+      "WORKSPACE_DISCOVERY_FAILED",
+      "inventory"
+    );
+  }
   const sourceUsagePrograms = await prepareSourceUsagePrograms(
     workspaceRoot,
     discovered
@@ -1274,10 +1304,15 @@ async function planWorkspaceRun(
       discovered.root.config.output?.directory ??
       DEFAULT_OUTPUT_DIRECTORY
   );
+  const scopedOutputDirectory = scopedAggregateOutputDirectory(
+    aggregateOutputDirectory,
+    projects,
+    options
+  );
   const indexPath = workspaceRelativePath(
     workspaceRoot,
     posix.join(
-      normalizeRelativePath(aggregateOutputDirectory),
+      normalizeRelativePath(scopedOutputDirectory),
       "workspace-index.json"
     ),
     "extraction"
@@ -1286,14 +1321,14 @@ async function planWorkspaceRun(
     discovered,
     projects,
     extracted.forms,
-    aggregateOutputDirectory,
+    scopedOutputDirectory,
     runtimeProvenance
   );
   const sourceUsage = planSourceUsage(
     workspaceRoot,
     discovered,
     index,
-    aggregateOutputDirectory,
+    scopedOutputDirectory,
     sourceUsagePrograms
   );
   const retiredPaths =
@@ -1301,7 +1336,7 @@ async function planWorkspaceRun(
       ? [
           sourceUsageCatalogRelativePath(
             workspaceRoot,
-            aggregateOutputDirectory
+            scopedOutputDirectory
           ),
         ]
       : [];

@@ -3,8 +3,9 @@
 Repository-aware discovery, deterministic artifact generation, and the
 `formly-contracts` command-line interface.
 
-This package is currently private and linked from a sibling Formly Contract
-checkout during evaluation. See the
+This package is currently private. Evaluations may link it from a sibling
+Formly Contract checkout or install the retained tarball produced by
+`pnpm pilot:pack`. See the
 [installation guide](../../apps/docs/src/content/docs/start/installation.md).
 
 ## Why this package exists
@@ -25,6 +26,13 @@ Use it to:
 - optionally index the supported direct-root-call source convention; and
 - invoke the `formly-contracts list`, `generate`, `check`, and read-only
   `author-factory-inputs` commands.
+
+`list` retains healthy inventory when another project config fails to load and
+returns safe per-config failure records. An exact workspace-relative
+`--project-config` selection avoids importing known browser-only siblings.
+Selected generation/check indexes live under a deterministic
+`scopes/projects/<selection-hash>/` directory and never replace the complete
+workspace index.
 
 Configuration and form factories are executable application code. Run this
 package only against trusted workspaces. Generated artifacts are the portable,
