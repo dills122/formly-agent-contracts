@@ -35,24 +35,59 @@ an expansion-panel wrapper.
 
 <figure class="form-specimen">
   <figcaption>
-    <strong>Contact preferences</strong>
-    <span>Illustrated from the fixture · sample value · expanded state</span>
+    <span class="form-specimen__caption-title">
+      <span>Maintained fixture</span>
+      <strong>Claim contact preferences</strong>
+    </span>
+    <span>Controls from the fixture · illustrative application shell</span>
   </figcaption>
-  <div class="form-specimen__body">
-    <label class="form-specimen__field">
-      <span>Claimant name <span aria-hidden="true">*</span></span>
-      <input type="text" value="Maya Chen" disabled />
-    </label>
-    <div class="form-specimen__panel">
-      <div class="form-specimen__panel-title">Preferred contact method</div>
-      <fieldset disabled>
-        <legend>Preferred contact method <span aria-hidden="true">*</span></legend>
-        <label><input type="radio" name="contact-preview" checked /> Email</label>
-        <label><input type="radio" name="contact-preview" /> Phone</label>
-      </fieldset>
+  <div class="form-specimen__surface">
+    <header class="form-specimen__header">
+      <span class="form-specimen__step">Contact details</span>
+      <div>
+        <h3>How should we reach the claimant?</h3>
+        <p>Confirm the claimant and choose one preferred contact channel.</p>
+      </div>
+      <span class="form-specimen__requirement">2 required fields</span>
+    </header>
+    <div class="form-specimen__body">
+      <label class="form-specimen__field">
+        <span>Claimant name <span aria-hidden="true">*</span></span>
+        <input type="text" value="Maya Chen" disabled />
+        <small>Use the name associated with the claim.</small>
+      </label>
+      <section class="form-specimen__panel" aria-label="Expanded contact method wrapper">
+        <div class="form-specimen__panel-title">
+          <span>Preferred contact method <span aria-hidden="true">*</span></span>
+          <span>Expanded</span>
+        </div>
+        <fieldset disabled>
+          <legend>Choose one option</legend>
+          <label class="form-specimen__option">
+            <input type="radio" name="contact-preview" checked />
+            <span>Email</span>
+            <span>Selected</span>
+          </label>
+          <label class="form-specimen__option">
+            <input type="radio" name="contact-preview" />
+            <span>Phone</span>
+          </label>
+        </fieldset>
+      </section>
     </div>
+    <footer class="form-specimen__model">
+      <span>Sample model</span>
+      <code>{ claimant: { name: 'Maya Chen', contactPreference: 'email' } }</code>
+    </footer>
   </div>
 </figure>
+
+The shell around the controls is intentionally presentational. The fields,
+labels, required state, option labels, values, selected sample value, and
+wrapper state all come from the maintained example. This is the same separation
+you see in Formly's official advanced-layout and Material stepper examples:
+Formly owns field configuration and state; the application or UI package owns
+the visual composition.
 
 The application owns this definition. Formly Contract does not replace the
 form, add a parallel DSL, or scrape the rendered DOM:
@@ -114,8 +149,9 @@ become stale.
 </div>
 
 The browser side remains ordinary Angular/Formly code. The maintained custom
-type renders real radios, and the feature module registers the type name used
-by the field configuration:
+type extends `FieldType`, binds Formly's `formControl`, and forwards
+`formlyAttributes` to the actual input. Those are the important integration
+points; the surrounding markup and CSS are application-owned:
 
 ```ts title="cool-radio-button-group.component.ts (focused excerpt)"
 @Component({
@@ -127,6 +163,7 @@ by the field configuration:
         <label>
           <input
             type="radio"
+            [name]="field.name ?? id"
             [value]="option.value"
             [formControl]="formControl"
             [formlyAttributes]="field"
@@ -140,16 +177,99 @@ by the field configuration:
 export class CoolRadioButtonGroupComponent extends FieldType<
   FieldTypeConfig<CoolRadioProps>
 > {}
-
-FormlyModule.forChild({
-  types: [
-    {
-      name: 'cool-radio-btn-grp',
-      component: CoolRadioButtonGroupComponent,
-    },
-  ],
-});
 ```
+
+### Register custom UI where Angular boots
+
+Registration creates the alias used by JSON-style field configuration. Keep
+one root Formly setup for the chosen UI package, then register application-owned
+types and wrappers at the feature boundary that owns them.
+
+This repository's Angular fixture is NgModule-based, so its feature library
+uses `FormlyModule.forChild(...)`. The application calls `forRoot(...)` once;
+feature libraries use `forChild(...)` for their aliases:
+
+```ts title="forms-kit.module.ts (maintained fixture, focused excerpt)"
+@NgModule({
+  declarations: [
+    CoolRadioButtonGroupComponent,
+    FixtureExpansionPanelWrapperComponent,
+  ],
+  imports: [
+    ReactiveFormsModule,
+    FormlyModule.forChild({
+      types: [
+        {
+          name: 'cool-radio-btn-grp',
+          component: CoolRadioButtonGroupComponent,
+        },
+      ],
+      wrappers: [
+        {
+          name: 'fixture-expansion-panel',
+          component: FixtureExpansionPanelWrapperComponent,
+        },
+      ],
+    }),
+  ],
+})
+export class FormsKitModule {}
+```
+
+For a new standalone Formly v7 application, the equivalent split is
+`provideFormlyCore(...)` once at the root and `provideFormlyConfig(...)` for
+feature-owned aliases:
+
+```ts title="app.config.ts (standalone equivalent)"
+import { ApplicationConfig } from '@angular/core';
+import {
+  provideFormlyConfig,
+  provideFormlyCore,
+} from '@ngx-formly/core';
+import { withFormlyBootstrap } from '@ngx-formly/bootstrap';
+
+export const appConfig: ApplicationConfig = {
+  providers: [
+    provideFormlyCore(withFormlyBootstrap()),
+    provideFormlyConfig({
+      types: [
+        {
+          name: 'cool-radio-btn-grp',
+          component: CoolRadioButtonGroupComponent,
+        },
+      ],
+      wrappers: [
+        {
+          name: 'fixture-expansion-panel',
+          component: FixtureExpansionPanelWrapperComponent,
+        },
+      ],
+    }),
+  ],
+};
+```
+
+Both approaches produce the same aliases used by the field definition:
+
+```ts
+{
+  type: 'cool-radio-btn-grp',
+  wrappers: ['fixture-expansion-panel'],
+}
+```
+
+If every use of a custom type always needs the same wrapper, put
+`wrappers: ['fixture-expansion-panel']` on the **type registration** instead.
+Keep it on the individual field, as this fixture does, when wrapping is a
+per-usage decision. Formly's API also accepts the component class directly,
+but stable string aliases are the useful case for shared or JSON-powered field
+configuration—and they are what Formly Contract can record as declared
+evidence.
+
+See Formly's official guides for the underlying
+[custom type](https://formly.dev/docs/guide/custom-formly-field/) and
+[custom wrapper](https://formly.dev/docs/guide/custom-formly-wrapper/)
+patterns.
 
 :::caution[Keep the boundary Node-safe]
 Contract discovery evaluates the project and source import graph in Node. Keep

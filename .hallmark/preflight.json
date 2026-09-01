@@ -1,0 +1,9 @@
+{
+  "scannedAt": "2026-08-31",
+  "framework": "Astro 5 with Starlight",
+  "fontStack": "Avenir Next / Segoe UI with SFMono-Regular / Consolas",
+  "palette": "Cobalt OKLCH custom properties in apps/docs/tokens.css",
+  "motion": "motion-cut; CSS transitions only",
+  "spacing": "named 4-point-derived scale in apps/docs/tokens.css",
+  "preserve": ["font stack", "palette", "spacing scale", "docs shell"]
+}
