@@ -35,6 +35,8 @@ Options:
   --config <path>          Root config path (default: ${DEFAULT_ROOT_CONFIG_PATH})
   --output <path>          Override output for generate or check
   --fail-on <severity>     Fail on warning or error; generate or check only
+  --project <id>           Select a project ID; may be repeated
+  --project-config <path>  Select an exact project config; may be repeated
   --form-id <id>           Select a stable form ID; author-factory-inputs only
   -h, --help               Show this help
 `;
@@ -59,7 +61,7 @@ type GenerateWorkspace = (
 >;
 type ListWorkspace = (
   options: DiscoverWorkspaceProjectsOptions,
-) => Promise<Pick<DiscoveredWorkspace, 'inventory'>>;
+) => Promise<Pick<DiscoveredWorkspace, 'inventory' | 'failures'>>;
 type CheckWorkspace = (
   options: RunWorkspaceOptions,
 ) => Promise<WorkspaceCheckResult>;
@@ -89,6 +91,8 @@ interface ParsedWorkspaceCommand {
   readonly rootConfigPath: string;
   readonly outputDirectory?: string;
   readonly failOn?: readonly ('warning' | 'error')[];
+  readonly projectIds?: readonly string[];
+  readonly projectConfigPaths?: readonly string[];
   readonly formIds?: readonly string[];
 }
 
@@ -131,6 +135,8 @@ function parseWorkspaceCommand(
         config: { type: 'string' },
         output: { type: 'string' },
         'fail-on': { type: 'string', multiple: true },
+        project: { type: 'string', multiple: true },
+        'project-config': { type: 'string', multiple: true },
         'form-id': { type: 'string', multiple: true },
         help: { type: 'boolean', short: 'h' },
       },
@@ -153,6 +159,23 @@ function parseWorkspaceCommand(
     name !== 'check'
   ) {
     throw new CliUsageError(`Unsupported command: ${name}`);
+  }
+  if (
+    parsed.values.project !== undefined &&
+    parsed.values['project-config'] !== undefined
+  ) {
+    throw new CliUsageError(
+      '--project and --project-config cannot be combined.',
+    );
+  }
+  if (
+    name === 'author-factory-inputs' &&
+    (parsed.values.project !== undefined ||
+      parsed.values['project-config'] !== undefined)
+  ) {
+    throw new CliUsageError(
+      'Project selection is not accepted by author-factory-inputs.',
+    );
   }
   if (
     (name === 'list' || name === 'author-factory-inputs') &&
@@ -181,6 +204,12 @@ function parseWorkspaceCommand(
       ? {}
       : { outputDirectory: parsed.values.output }),
     ...(failOn === undefined ? {} : { failOn }),
+    ...(parsed.values.project === undefined
+      ? {}
+      : { projectIds: parsed.values.project }),
+    ...(parsed.values['project-config'] === undefined
+      ? {}
+      : { projectConfigPaths: parsed.values['project-config'] }),
     ...(parsed.values['form-id'] === undefined
       ? {}
       : { formIds: parsed.values['form-id'] }),
@@ -222,6 +251,12 @@ function workspaceOptions(
   return {
     workspaceRoot: command.workspaceRoot,
     rootConfigPath: command.rootConfigPath,
+    ...(command.projectIds === undefined
+      ? {}
+      : { selectedProjectIds: command.projectIds }),
+    ...(command.projectConfigPaths === undefined
+      ? {}
+      : { selectedProjectConfigPaths: command.projectConfigPaths }),
     ...(command.outputDirectory === undefined && command.failOn === undefined
       ? {}
       : {
@@ -235,6 +270,21 @@ function workspaceOptions(
           },
         }),
   };
+}
+
+function formatProjectDiscoveryFailures(
+  failures: DiscoveredWorkspace['failures'],
+): string {
+  if (failures === undefined || failures.length === 0) {
+    return '';
+  }
+  return [
+    ...failures.map(
+      ({ code, configPath }) =>
+        `Project unavailable [${code}] config=${JSON.stringify(configPath)}`,
+    ),
+    '',
+  ].join('\n');
 }
 
 function formatInventory(
@@ -386,8 +436,20 @@ export async function runWorkspaceCli(
       const result = await list({
         workspaceRoot: command.workspaceRoot,
         rootConfigPath: command.rootConfigPath,
+        continueOnProjectError: true,
+        ...(command.projectIds === undefined
+          ? {}
+          : { selectedProjectIds: command.projectIds }),
+        ...(command.projectConfigPaths === undefined
+          ? {}
+          : { selectedProjectConfigPaths: command.projectConfigPaths }),
       });
       stdout.write(formatInventory(result.inventory));
+      const failures = formatProjectDiscoveryFailures(result.failures);
+      if (failures.length > 0) {
+        stderr.write(failures);
+        return 1;
+      }
       return 0;
     } catch (error) {
       stderr.write(

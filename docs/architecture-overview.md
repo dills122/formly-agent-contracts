@@ -234,6 +234,14 @@ The compiler must not serialize live field objects. Built fields contain circula
 > `@formly-contract/workspace/in-process` — not via the child-process
 > protocol below.
 
+The current in-process runner preserves complete-workspace fail-closed
+generation. For recovery and diagnosis it also supports exact project-config
+selection before import and project-ID selection after import. Selected runs
+publish a deterministic scoped index rather than replacing the complete
+workspace index. `list` may return healthy inventory plus safe per-config load
+failures, but those failures never become a partially successful full-workspace
+generation.
+
 Trusted project configuration and future Formly/Angular execution must not run
 in the root orchestrator, Nx daemon, or MCP request process. The workspace
 package owns the framework-neutral orchestration boundary and a versioned,

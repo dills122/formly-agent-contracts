@@ -36,7 +36,9 @@ export type WorkspaceDiscoveryErrorCode =
   | 'CONFIG_PATH_OUTSIDE_WORKSPACE'
   | 'DUPLICATE_PROJECT_ID'
   | 'DUPLICATE_SOURCE_ID'
-  | 'PROJECT_CONFIG_SYMLINK_UNSUPPORTED';
+  | 'PROJECT_CONFIG_NOT_FOUND'
+  | 'PROJECT_CONFIG_SYMLINK_UNSUPPORTED'
+  | 'PROJECT_SELECTION_INVALID';
 
 export class WorkspaceDiscoveryError extends Error {
   readonly code: WorkspaceDiscoveryErrorCode;
@@ -63,6 +65,12 @@ export interface DiscoverWorkspaceProjectsOptions {
   readonly workspaceRoot: string;
   readonly rootConfigPath: string;
   readonly rootLoaderOptions?: WorkspaceConfigLoaderOptions;
+  /** Exact workspace-relative project-config paths to load. */
+  readonly selectedProjectConfigPaths?: readonly string[];
+  /** Stable project IDs to retain after project configs are loaded. */
+  readonly selectedProjectIds?: readonly string[];
+  /** Return safe per-config failures instead of aborting on the first one. */
+  readonly continueOnProjectError?: boolean;
 }
 
 export interface LoadedWorkspaceRootConfig {
@@ -100,6 +108,12 @@ export interface DiscoveredWorkspace {
   readonly root: LoadedWorkspaceRootConfig;
   readonly projects: readonly DiscoveredWorkspaceProject[];
   readonly inventory: WorkspaceDiscoveryInventory;
+  readonly failures?: readonly WorkspaceProjectDiscoveryFailure[];
+}
+
+export interface WorkspaceProjectDiscoveryFailure {
+  readonly code: 'PROJECT_CONFIG_LOAD_FAILED';
+  readonly configPath: string;
 }
 
 function normalizeWorkspacePath(path: string): string {
@@ -316,9 +330,62 @@ function assertUniqueIdentities(
   }
 }
 
+function selectProjectConfigPaths(
+  projectConfigPaths: readonly string[],
+  selectedPaths: readonly string[] | undefined,
+): readonly string[] {
+  if (selectedPaths === undefined || selectedPaths.length === 0) {
+    return projectConfigPaths;
+  }
+  const normalizedSelections = [...new Set(selectedPaths.map(normalizeWorkspacePath))]
+    .sort(compareCodeUnits);
+  const available = new Set(projectConfigPaths);
+  const missing = normalizedSelections.find((path) => !available.has(path));
+  if (missing !== undefined) {
+    throw new WorkspaceDiscoveryError(
+      'PROJECT_CONFIG_NOT_FOUND',
+      `Selected project config was not discovered: ${missing}`,
+      [missing],
+    );
+  }
+  return normalizedSelections;
+}
+
+function selectProjectsById(
+  projects: readonly DiscoveredWorkspaceProject[],
+  selectedIds: readonly string[] | undefined,
+): readonly DiscoveredWorkspaceProject[] {
+  if (selectedIds === undefined || selectedIds.length === 0) {
+    return projects;
+  }
+  const normalizedSelections = [...new Set(selectedIds)].sort(compareCodeUnits);
+  const available = new Set(projects.map(({ projectId }) => projectId));
+  const missing = normalizedSelections.find((projectId) => !available.has(projectId));
+  if (missing !== undefined) {
+    throw new WorkspaceDiscoveryError(
+      'PROJECT_CONFIG_NOT_FOUND',
+      `Selected project ID was not discovered: ${missing}`,
+      [],
+      missing,
+    );
+  }
+  const selected = new Set(normalizedSelections);
+  return projects.filter(({ projectId }) => selected.has(projectId));
+}
+
 export async function discoverWorkspaceProjects(
   options: DiscoverWorkspaceProjectsOptions,
 ): Promise<DiscoveredWorkspace> {
+  if (
+    (options.selectedProjectConfigPaths?.length ?? 0) > 0 &&
+    (options.selectedProjectIds?.length ?? 0) > 0
+  ) {
+    throw new WorkspaceDiscoveryError(
+      'PROJECT_SELECTION_INVALID',
+      'Project ID and project-config path selection cannot be combined.',
+      [],
+    );
+  }
   const workspaceRoot = await realpath(resolve(options.workspaceRoot));
   const absoluteRootConfigPath = resolve(workspaceRoot, options.rootConfigPath);
   const rootConfigPath = normalizeWorkspacePath(
@@ -335,44 +402,58 @@ export async function discoverWorkspaceProjects(
     options.rootLoaderOptions,
   );
   const ignoredProjectConfigPatterns = projectConfigIgnorePatterns(rootConfig);
-  await rejectMatchedProjectConfigSymlinks(
-    rootConfig.projectConfigs,
-    ignoredProjectConfigPatterns,
-    workspaceRoot,
-  );
-  const projectConfigPaths = [
+  if ((options.selectedProjectConfigPaths?.length ?? 0) === 0) {
+    await rejectMatchedProjectConfigSymlinks(
+      rootConfig.projectConfigs,
+      ignoredProjectConfigPatterns,
+      workspaceRoot,
+    );
+  }
+  const discoveredProjectConfigPaths = [
     ...(await expandProjectConfigPatterns(
       rootConfig.projectConfigs,
       ignoredProjectConfigPatterns,
       workspaceRoot,
     )),
   ].sort(compareCodeUnits);
+  const projectConfigPaths = selectProjectConfigPaths(
+    discoveredProjectConfigPaths,
+    options.selectedProjectConfigPaths,
+  );
   const tsconfigPath =
     rootConfig.tsconfigPath === undefined
       ? undefined
       : resolve(workspaceRoot, rootConfig.tsconfigPath);
 
   const projects: DiscoveredWorkspaceProject[] = [];
+  const failures: WorkspaceProjectDiscoveryFailure[] = [];
   for (const configPath of projectConfigPaths) {
-    const absoluteConfigPath = resolve(workspaceRoot, configPath);
-    await rejectProjectConfigSymlink(absoluteConfigPath, configPath);
-    await assertPathWithinWorkspace(
-      workspaceRoot,
-      absoluteConfigPath,
-      configPath,
-    );
-    const config = await loadWorkspaceProjectConfig(
-      absoluteConfigPath,
-      tsconfigPath === undefined ? {} : { tsconfigPath },
-    );
-    projects.push({
-      configPath,
-      projectId: config.projectId,
-      sourceIds: (config.sources ?? [])
-        .map(({ sourceId }) => sourceId)
-        .sort(compareCodeUnits),
-      config,
-    });
+    try {
+      const absoluteConfigPath = resolve(workspaceRoot, configPath);
+      await rejectProjectConfigSymlink(absoluteConfigPath, configPath);
+      await assertPathWithinWorkspace(
+        workspaceRoot,
+        absoluteConfigPath,
+        configPath,
+      );
+      const config = await loadWorkspaceProjectConfig(
+        absoluteConfigPath,
+        tsconfigPath === undefined ? {} : { tsconfigPath },
+      );
+      projects.push({
+        configPath,
+        projectId: config.projectId,
+        sourceIds: (config.sources ?? [])
+          .map(({ sourceId }) => sourceId)
+          .sort(compareCodeUnits),
+        config,
+      });
+    } catch (error) {
+      if (options.continueOnProjectError !== true) {
+        throw error;
+      }
+      failures.push({ code: 'PROJECT_CONFIG_LOAD_FAILED', configPath });
+    }
   }
   projects.sort(
     (left, right) =>
@@ -380,20 +461,25 @@ export async function discoverWorkspaceProjects(
       compareCodeUnits(left.projectId, right.projectId),
   );
   assertUniqueIdentities(projects);
+  const selectedProjects = selectProjectsById(
+    projects,
+    options.selectedProjectIds,
+  );
 
   const plugins = clonePluginIdentities(rootConfig);
   return {
     root: { configPath: rootConfigPath, config: rootConfig },
-    projects,
+    projects: selectedProjects,
     inventory: {
       schemaVersion: WORKSPACE_CONFIG_SCHEMA_VERSION,
       rootConfigPath,
       plugins,
-      projects: projects.map(({ configPath, projectId, sourceIds }) => ({
+      projects: selectedProjects.map(({ configPath, projectId, sourceIds }) => ({
         configPath,
         projectId,
         sourceIds,
       })),
     },
+    ...(failures.length === 0 ? {} : { failures }),
   };
 }

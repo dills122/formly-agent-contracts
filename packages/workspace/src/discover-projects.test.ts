@@ -444,6 +444,127 @@ describe('workspace project discovery', () => {
     });
   });
 
+  it('reports project-local load failures while retaining healthy inventory', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.ts',
+      `export default { projectConfigs: ['projects/*.project.ts'] };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/broken.project.ts',
+      `throw new Error('private Angular loader detail');`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/healthy.project.ts',
+      `export default { projectId: 'healthy', sources: [{ sourceId: 'healthy/forms', list: () => [] }] };`,
+    );
+
+    const discovered = await discoverWorkspaceProjects({
+      workspaceRoot,
+      rootConfigPath: 'formly-contracts.config.ts',
+      continueOnProjectError: true,
+    });
+
+    expect(discovered.inventory.projects).toEqual([
+      {
+        configPath: 'projects/healthy.project.ts',
+        projectId: 'healthy',
+        sourceIds: ['healthy/forms'],
+      },
+    ]);
+    expect(discovered.failures).toEqual([
+      {
+        code: 'PROJECT_CONFIG_LOAD_FAILED',
+        configPath: 'projects/broken.project.ts',
+      },
+    ]);
+    expect(canonicalStringify(discovered.failures)).not.toContain(
+      'private Angular loader detail',
+    );
+  });
+
+  it('loads only explicitly selected project-config paths', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.ts',
+      `export default { projectConfigs: ['projects/*.project.ts'] };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/broken.project.ts',
+      `throw new Error('must not be imported');`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/healthy.project.ts',
+      `export default { projectId: 'healthy' };`,
+    );
+
+    await expect(
+      discoverWorkspaceProjects({
+        workspaceRoot,
+        rootConfigPath: 'formly-contracts.config.ts',
+        selectedProjectConfigPaths: ['projects/healthy.project.ts'],
+      }),
+    ).resolves.toMatchObject({
+      inventory: { projects: [{ projectId: 'healthy' }] },
+    });
+  });
+
+  it('selects loaded projects by stable ID and rejects unknown selections', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.ts',
+      `export default { projectConfigs: ['projects/*.project.ts'] };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/alpha.project.ts',
+      `export default { projectId: 'alpha' };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/beta.project.ts',
+      `export default { projectId: 'beta' };`,
+    );
+
+    await expect(
+      discoverWorkspaceProjects({
+        workspaceRoot,
+        rootConfigPath: 'formly-contracts.config.ts',
+        selectedProjectIds: ['beta'],
+      }),
+    ).resolves.toMatchObject({
+      inventory: { projects: [{ projectId: 'beta' }] },
+    });
+    await expect(
+      discoverWorkspaceProjects({
+        workspaceRoot,
+        rootConfigPath: 'formly-contracts.config.ts',
+        selectedProjectIds: ['missing'],
+      }),
+    ).rejects.toMatchObject({
+      code: 'PROJECT_CONFIG_NOT_FOUND',
+      identity: 'missing',
+    });
+  });
+
+  it('rejects mixed project ID and config-path selection', async () => {
+    await expect(
+      discoverWorkspaceProjects({
+        workspaceRoot: '/unused',
+        rootConfigPath: 'formly-contracts.config.ts',
+        selectedProjectIds: ['healthy'],
+        selectedProjectConfigPaths: ['projects/healthy.project.ts'],
+      }),
+    ).rejects.toMatchObject({ code: 'PROJECT_SELECTION_INVALID' });
+  });
+
   it.each(['angular-monorepo', 'nx-workspace'])(
     'discovers the %s consumer fixture through its declared tsconfig aliases',
     async (fixtureName) => {

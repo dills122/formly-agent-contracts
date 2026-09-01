@@ -502,6 +502,66 @@ describe("runWorkspace", () => {
     expect(firstIndexBytes).toBe(`${canonicalStringify(first.index)}\n`);
   });
 
+  it("generates an exact selected config without importing a broken sibling project", async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      "projects/broken.project.mjs",
+      `throw new Error('Angular browser barrel must not be imported');`
+    );
+    await writeModule(
+      workspaceRoot,
+      "projects/healthy.project.mjs",
+      `export default {
+        projectId: 'healthy/forms',
+        sources: [{
+          sourceId: 'healthy/source',
+          list: () => [{
+            id: 'healthy.form',
+            create: () => ({ fields: [{ key: 'name', type: 'input' }] })
+          }]
+        }]
+      };`
+    );
+
+    await expect(runWorkspace(runnerOptions(workspaceRoot))).rejects.toMatchObject({
+      code: "WORKSPACE_DISCOVERY_FAILED",
+      phase: "inventory",
+    });
+    await expect(
+      runWorkspace({
+        ...runnerOptions(workspaceRoot),
+        continueOnProjectError: true,
+      })
+    ).rejects.toMatchObject({
+      code: "WORKSPACE_DISCOVERY_FAILED",
+      phase: "inventory",
+    });
+
+    const options = {
+      ...runnerOptions(workspaceRoot),
+      selectedProjectConfigPaths: ["projects/healthy.project.mjs"],
+    } as const;
+    const first = await runWorkspace(options);
+    const second = await runWorkspace(options);
+
+    expect(first.index.projects.map(({ projectId }) => projectId)).toEqual([
+      "healthy/forms",
+    ]);
+    expect(first.index.forms.map(({ formId }) => formId)).toEqual([
+      "healthy.form",
+    ]);
+    expect(first.indexPath).toMatch(
+      /^dist\/formly-contracts\/scopes\/projects\/[a-f0-9]{64}\/workspace-index\.json$/u
+    );
+    expect(second.indexPath).toBe(first.indexPath);
+    expect(second.index.contentHash).toBe(first.index.contentHash);
+    expect(first.indexPath).not.toBe(
+      "dist/formly-contracts/workspace-index.json"
+    );
+  });
+
   it("publishes and checks an opted-in source-usage catalog as a separate deterministic artifact", async () => {
     const workspaceRoot = await createTemporaryWorkspace();
     await seedSourceUsageWorkspace(workspaceRoot);

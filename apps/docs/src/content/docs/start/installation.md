@@ -65,6 +65,21 @@ pnpm exec formly-contracts --help
 A successful check begins with
 `Usage: formly-contracts <command> [options]`.
 
+## Pack a portable workplace pilot bundle
+
+When a sibling checkout is not available on the consuming machine, build and
+retain all three required tarballs plus a checksum/install manifest:
+
+```sh
+pnpm pilot:pack
+```
+
+Copy `artifacts/pilot/` to the consumer, then run the `pnpm` command described
+by `formly-contract-pilot.json`. The bundle includes the private experimental
+workspace CLI without adding it to the public npm release. Third-party Angular,
+Formly, TypeScript, and pnpm dependencies still require the consumer's normal
+registry or package cache; this is not an offline dependency bundle.
+
 :::caution[Keep Node-only discovery out of browser barrels]
 Config loading evaluates imports. Export form factories and source descriptors
 from a Node-safe secondary entry point such as `@work/forms-kit/contracts`.

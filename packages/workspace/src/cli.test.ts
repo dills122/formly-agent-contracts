@@ -287,12 +287,106 @@ describe('workspace CLI', () => {
     expect(list).toHaveBeenCalledWith({
       workspaceRoot: '/workspace',
       rootConfigPath: 'config/formly.ts',
+      continueOnProjectError: true,
     });
     expect(captured.stdout.join('')).toBe(
       'Discovered 1 project and 2 sources.\n' +
         'Project: claims config="apps/claims/formly-contracts.project.ts" sources=claims/core,claims/shared\n',
     );
     expect(captured.stderr).toEqual([]);
+  });
+
+  it('reports healthy inventory and safe project-load failures together', async () => {
+    const captured = captureIo();
+    const list = vi.fn().mockResolvedValue({
+      inventory: {
+        schemaVersion: '0.2.0',
+        rootConfigPath: 'formly-contracts.config.ts',
+        plugins: [],
+        projects: [
+          {
+            configPath: 'projects/healthy.project.ts',
+            projectId: 'healthy',
+            sourceIds: [],
+          },
+        ],
+      },
+      failures: [
+        {
+          code: 'PROJECT_CONFIG_LOAD_FAILED',
+          configPath: 'projects/broken.project.ts',
+        },
+      ],
+    });
+
+    await expect(
+      runWorkspaceCli(['list'], { ...captured.io, list }),
+    ).resolves.toBe(1);
+
+    expect(captured.stdout.join('')).toContain('Project: healthy');
+    expect(captured.stderr.join('')).toBe(
+      'Project unavailable [PROJECT_CONFIG_LOAD_FAILED] config="projects/broken.project.ts"\n',
+    );
+  });
+
+  it('forwards exact project-config selection to list and generation', async () => {
+    const listed = captureIo();
+    const list = vi.fn().mockResolvedValue({
+      inventory: {
+        schemaVersion: '0.2.0',
+        rootConfigPath: 'formly-contracts.config.ts',
+        plugins: [],
+        projects: [],
+      },
+    });
+    await expect(
+      runWorkspaceCli(
+        ['list', '--project-config', 'projects/healthy.project.ts'],
+        { ...listed.io, list },
+      ),
+    ).resolves.toBe(0);
+    expect(list).toHaveBeenCalledWith({
+      workspaceRoot: process.cwd(),
+      rootConfigPath: 'formly-contracts.config.ts',
+      continueOnProjectError: true,
+      selectedProjectConfigPaths: ['projects/healthy.project.ts'],
+    });
+
+    const generated = captureIo();
+    const generate = vi.fn().mockResolvedValue({
+      indexPath: 'dist/scopes/projects/hash/workspace-index.json',
+      artifactPaths: [],
+    });
+    await expect(
+      runWorkspaceCli(
+        ['generate', '--project-config', 'projects/healthy.project.ts'],
+        { ...generated.io, generate },
+      ),
+    ).resolves.toBe(0);
+    expect(generate).toHaveBeenCalledWith({
+      workspaceRoot: process.cwd(),
+      rootConfigPath: 'formly-contracts.config.ts',
+      selectedProjectConfigPaths: ['projects/healthy.project.ts'],
+    });
+  });
+
+  it('rejects ambiguous mixed project selectors', async () => {
+    const captured = captureIo();
+    await expect(
+      runWorkspaceCli(
+        [
+          'generate',
+          '--project',
+          'healthy',
+          '--project-config',
+          'projects/healthy.project.ts',
+        ],
+        captured.io,
+      ),
+    ).resolves.toBe(2);
+    expect(captured.stderr.join('')).toContain(
+      '--project and --project-config cannot be combined',
+    );
   });
 
   it('reports a current artifact set from check', async () => {

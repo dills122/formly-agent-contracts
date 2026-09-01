@@ -423,6 +423,8 @@ pnpm exec formly-contracts generate \
   --workspace-root ../claims-workspace \
   --config formly-contracts.config.ts \
   --output dist/formly-contracts-pilot
+pnpm exec formly-contracts generate \
+  --project-config libs/forms-kit/formly-contracts.project.ts
 pnpm exec formly-contracts check \
   --workspace-root ../claims-workspace \
   --config formly-contracts.config.ts \
@@ -436,6 +438,20 @@ and diagnostics. `check` executes the same trusted source inventory, factories,
 extraction, hashing, and optional source indexing as generation, but only reads
 and exact-compares expected bytes; it never repairs or rewrites output. Missing
 or stale output returns status `1`.
+
+Project selection is repeatable. `--project <id>` filters after every matched
+project config has loaded. When another project cannot be imported at all, use
+the exact workspace-relative `--project-config <path>` selector; discovery then
+loads only those matched configs. The two selector forms cannot be combined.
+Selected generation/check runs publish their index and optional source-usage
+catalog beneath `scopes/projects/<selection-hash>/` rather than replacing the
+complete workspace index. Content-addressed form artifacts retain their normal
+paths.
+
+`list` continues across project-local config-load failures, prints every healthy
+project, reports only safe config-path failure records, and exits `1` when any
+matched project was unavailable. An exact healthy `--project-config` selection
+can therefore list or generate without importing a known browser-only sibling.
 
 Usage failures exit with status `2`; discovery, generation, and check failures
 exit with status `1` and omit stack traces and underlying callback errors.
