@@ -1,5 +1,10 @@
 import { FIELD_TYPE_PROFILE_SCHEMA_VERSION } from './field-type-profile-version.js';
-import type { FieldTypeProfile, FieldTypeWrapperProfile } from './field-type-profile.js';
+import type {
+  FieldTypeProfileDriver,
+  FieldTypeProfileInteraction,
+  FieldTypeProfilePart,
+  FieldTypeWrapperPrecondition,
+} from './field-type-interaction.js';
 
 const STABLE_TOKEN_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:-]*$/u;
 const NAMESPACED_ID_PATTERN = /^[a-z][a-z0-9]*(?:[.-][a-z0-9]+)+$/u;
@@ -201,13 +206,49 @@ export interface GeneratedFieldTypeProfileRegistry {
   readonly schemaVersion: typeof FIELD_TYPE_PROFILE_SCHEMA_VERSION;
   readonly id: string;
   readonly version: number;
-  readonly profiles: readonly FieldTypeProfile[];
+  readonly profiles: readonly GeneratedFieldTypeProfile[];
   readonly registrations: readonly {
     readonly formlyType: string;
     readonly defaultProfile: ContractedFieldTypeProfileReference;
     readonly variants: readonly [];
   }[];
-  readonly wrappers: readonly FieldTypeWrapperProfile[];
+  readonly wrappers: readonly GeneratedFieldTypeWrapperProfile[];
+}
+
+export interface GeneratedFieldTypeProfile {
+  readonly identity: ContractedFieldTypeProfileReference;
+  readonly semanticType: string;
+  readonly valueShape: 'scalar' | 'array' | 'object';
+  readonly evidence: 'declared';
+  readonly parts: readonly FieldTypeProfilePart[];
+  readonly interaction: FieldTypeProfileInteraction;
+  readonly valueDomain:
+    | {
+        readonly kind: 'projected';
+        readonly source: 'adapter';
+        readonly completeness: 'complete' | 'scenario';
+        readonly collectionPath: string;
+        readonly labelPath: string;
+        readonly valuePath: string;
+        readonly disabledPath?: string;
+        readonly evidence: 'declared';
+      }
+    | { readonly kind: 'not-applicable'; readonly evidence: 'declared' };
+  readonly driver: FieldTypeProfileDriver;
+  readonly effectCapabilities: {
+    readonly targetProperties: readonly ['options'] | readonly [];
+    readonly readiness: readonly [];
+  };
+  readonly unknowns: readonly [];
+}
+
+export interface GeneratedFieldTypeWrapperProfile {
+  readonly identity: ContractedFieldTypeProfileReference;
+  readonly wrapperName: string;
+  readonly evidence: 'declared';
+  readonly parts: readonly FieldTypeProfilePart[];
+  readonly preconditions: readonly FieldTypeWrapperPrecondition[];
+  readonly unknowns: readonly [];
 }
 
 const RADIO_CHOICE_OPTION_KEYS = new Set([
@@ -820,7 +861,7 @@ function projectedValueDomain(
     | ChoiceControlBehavior
     | AutocompleteChoiceBehavior
     | RowSelectionBehavior,
-): FieldTypeProfile['valueDomain'] {
+): GeneratedFieldTypeProfile['valueDomain'] {
   return {
     kind: 'projected',
     source: 'adapter',
@@ -843,7 +884,7 @@ function profileIdentity(
 
 function lowerTypedInput(
   type: ContractedFormlyTypeDefinition & { behavior: TypedInputBehavior },
-): FieldTypeProfile {
+): GeneratedFieldTypeProfile {
   return {
     identity: profileIdentity(type),
     semanticType: type.behavior.semanticType,
@@ -876,7 +917,7 @@ function lowerTypedInput(
 
 function lowerChoiceControl(
   type: ContractedFormlyTypeDefinition & { behavior: ChoiceControlBehavior },
-): FieldTypeProfile {
+): GeneratedFieldTypeProfile {
   const { behavior } = type;
   const operation =
     behavior.presentation === 'radio' || behavior.presentation === 'checkbox'
@@ -890,7 +931,7 @@ function lowerChoiceControl(
       : behavior.presentation === 'checkbox'
         ? 'checkbox'
         : 'option';
-  const parts: FieldTypeProfile['parts'] = [
+  const parts: GeneratedFieldTypeProfile['parts'] = [
     {
       name: 'option',
       role: optionRole,
@@ -944,7 +985,7 @@ function lowerAutocompleteChoice(
   type: ContractedFormlyTypeDefinition & {
     behavior: AutocompleteChoiceBehavior;
   },
-): FieldTypeProfile {
+): GeneratedFieldTypeProfile {
   return {
     identity: profileIdentity(type),
     semanticType: 'single-choice',
@@ -991,7 +1032,7 @@ function lowerAutocompleteChoice(
 
 function lowerRowSelection(
   type: ContractedFormlyTypeDefinition & { behavior: RowSelectionBehavior },
-): FieldTypeProfile {
+): GeneratedFieldTypeProfile {
   return {
     identity: profileIdentity(type),
     semanticType: type.behavior.multiple
@@ -1033,7 +1074,7 @@ function lowerRowSelection(
 
 function lowerRepeater(
   type: ContractedFormlyTypeDefinition & { behavior: RepeaterBehavior },
-): FieldTypeProfile {
+): GeneratedFieldTypeProfile {
   return {
     identity: profileIdentity(type),
     semanticType: 'repeater',
@@ -1087,7 +1128,7 @@ function lowerRepeater(
 
 function lowerStepper(
   type: ContractedFormlyTypeDefinition & { behavior: StepperBehavior },
-): FieldTypeProfile {
+): GeneratedFieldTypeProfile {
   return {
     identity: profileIdentity(type),
     semanticType: 'stepper',
@@ -1153,7 +1194,7 @@ function lowerStepper(
 
 function lowerContractedType(
   type: ContractedFormlyTypeDefinition,
-): FieldTypeProfile {
+): GeneratedFieldTypeProfile {
   switch (type.behavior.kind) {
     case 'radio-choice':
       return lowerRadioChoice(type as ContractedFormlyTypeDefinition & {
@@ -1263,7 +1304,7 @@ export function buildFieldTypeProfileRegistry(
       variants: [] as const,
     }))
     .sort((left, right) => compareText(left.formlyType, right.formlyType));
-  const wrapperProfiles: FieldTypeWrapperProfile[] = wrappers
+  const wrapperProfiles: GeneratedFieldTypeWrapperProfile[] = wrappers
     .map((wrapper) => {
       const activation = wrapper.activation;
       return {
@@ -1288,7 +1329,7 @@ export function buildFieldTypeProfileRegistry(
                 operation: activation.operation!,
                 evidence: 'declared' as const,
               }],
-        unknowns: [],
+        unknowns: [] as const,
       };
     })
     .sort((left, right) => compareText(left.wrapperName, right.wrapperName));
