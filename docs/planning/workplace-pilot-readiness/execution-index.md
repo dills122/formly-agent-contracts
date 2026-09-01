@@ -1,6 +1,6 @@
 # Workplace Pilot Readiness Execution Index
 
-- Status: Active
+- Status: Complete; ready for coordinated PRs
 - Integration branch: `codex/pilot-readiness`
 - Base: current `origin/main` after the merged CTX-2D1 / DRV-0C2 checkpoint
 - Completion boundary: make the next private-workspace pilot easier to run,
@@ -39,8 +39,8 @@ and representative producer evidence.
 | `READY-1` | Assess a browser-free rehearsal for the real Nx source/form/hash producer and the adjacent synthetic query/validation/binding boundary | Internal subagent; Nx/integration-test paths | `READY-0` | complete; no retained code | Defer the same-form rehearsal: current workspace output has no journey/resolved-scenario/execution-authority join, and existing Nx plus Playwright tests already cover each honest boundary; `pnpm test:examples` and focused binding tests pass |
 | `READY-2` | Harden the standalone public validated-plan hash helper against hostile/unparsed values while preserving valid canonical hashes | Internal subagent; schema hash/parser paths | `READY-0` | complete | RED proved proxy input was accepted; GREEN passes 21 focused tests plus schema typecheck/build and lint, with valid hashes unchanged and hostile properties rejected before semantic reads |
 | `READY-3` | Assess whether current linked/packed-consumer tooling already supplies a reproducible workplace install path | Internal research subagent; read-only | `READY-0` | complete | Defer a new bundle: `pnpm check:workspace-consumers` already proves linked and packed three-package consumers; add a retained pnpm-specific `pilot:pack` only if the workplace rejects sibling links |
-| `READY-4` | Improve the maintained docs-site example and synchronize the workplace guide/report through query, validation, plan, and binding | Existing independent task: `Add end-to-end Formly example` | `READY-0` | in progress | Maintained fixture-backed walkthrough is exact; docs retain that invocation/browser execution is unshipped; sanitized report captures actionable/refused outcomes and bound calls |
-| `READY-5` | Reconcile all handoffs and run integration verification | Lead task | retained parts of `READY-1` through `READY-4` | pending | Focused gates, documentation checks for retained docs, and `pnpm check` pass; each retained branch/commit has an explicit PR destination |
+| `READY-4` | Improve the maintained docs-site example and synchronize the workplace guide/report through query, validation, plan, and binding | Existing independent task: `Add end-to-end Formly example` | `READY-0` | complete | Commit `5e320f890607e8cc499669758a67768314089d05`; docs checks and 20-route build pass; light/dark plus 320/375/414/768/desktop browser QA passes without page overflow |
+| `READY-5` | Reconcile all handoffs and run integration verification | Lead task | retained parts of `READY-1` through `READY-4` | complete | Code commit `88373ba`: 1,126 tests, all package/application/Angular/Nx builds, linked and packed consumers, release/pack/demo gates, 141-file docs validation, and 20-page docs build pass; both branches target `main` through separate PRs |
 
 ## Parallel ownership
 
@@ -77,6 +77,19 @@ The sanitized workplace evidence selects the next vertical:
 
 No result from this readiness checkpoint alone promotes those downstream
 statuses.
+
+## Delivery checkpoints
+
+- Code and planning: `codex/pilot-readiness` at `88373ba`, targeting `main`.
+- Docs site, examples, API/README, and workplace guide:
+  `codex/end-to-end-example` at
+  `5e320f890607e8cc499669758a67768314089d05`, targeting `main` independently.
+
+The code branch's full gate first encountered a network-denied cache miss in
+the temporary packed-consumer install after lint, 1,126 tests, and all builds
+had passed. The exact blocked `pnpm check:workspace-consumers` gate then passed
+with network access, followed by the release, pack, demo, and documentation
+gates. No repository failure was hidden or skipped.
 
 ## Package-readiness decision
 
