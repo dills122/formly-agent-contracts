@@ -149,9 +149,11 @@ plan/call ABI now completed by `CTX-2D1`/`DRV-0C2`. The task packet
 records the discovered value-semantics authority gap rather than permitting
 the validator to infer codecs, runtime enumeration, or invalid-value
 construction. Its CTX-2A/B/C MVP checkpoint is complete; executable wrapper
-preconditions, hostile-input hardening for the standalone plan-hash helper,
-CTX-2V/2D2, and browser/runtime parity are explicit fast follows, with no pivot
-currently required. `HOST-1`, `ANG-0`, and `FAC-1` are also
+preconditions, CTX-2V/2D2, and browser/runtime parity are explicit fast
+follows, with no pivot currently required. Hostile-input hardening for the
+standalone plan-hash helper is complete and preserves valid canonical hashes
+while keeping revalidation as the semantic authority boundary. `HOST-1`,
+`ANG-0`, and `FAC-1` are also
 dependency-ready, but they remain separate producer task packets and must not
 freeze named-environment or adapter-authority APIs beyond the accepted
 `AUTH-PILOT` surface before `AUTH-0` is accepted. `LIN-PILOT` is complete;

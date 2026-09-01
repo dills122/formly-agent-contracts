@@ -216,9 +216,6 @@ fail closed until implemented:
 
 - execute declared wrapper activation preconditions as lossless plan
   expansions instead of returning `UNSUPPORTED_INTERACTION`;
-- make the standalone public plan-hash helper preflight hostile values, or
-  narrow its API to an already parsed plan brand; callers must currently hash
-  only parser/validator output;
 - complete `CTX-2V` rich runtime value, codec, candidate, and constructed
   violation authority;
 - complete `CTX-2D2` repeater, action, transition, outcome, and executable
@@ -228,6 +225,13 @@ fail closed until implemented:
 
 These are tracked as fast follows. None may be inferred, emulated, or promoted
 to authority by the v0.1 validator.
+
+The standalone public plan-hash hardening follow-up is complete. The helper
+strict-parses unknown input before canonicalization, rejects hostile property
+graphs without executing proxy traps or accessors, and preserves the exact
+canonical hash for valid parser/validator output. This remains content identity,
+not semantic authorization; executable binding still requires full
+revalidation.
 
 ## Verification commands
 
