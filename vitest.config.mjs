@@ -39,6 +39,21 @@ export default defineConfig({
         ),
       },
       {
+        find: /^@formly-contract\/workspace\/cli$/u,
+        replacement: fileURLToPath(
+          new URL('./packages/workspace/src/cli.ts', import.meta.url),
+        ),
+      },
+      {
+        find: /^@formly-contract\/workspace\/runtime-host$/u,
+        replacement: fileURLToPath(
+          new URL(
+            './packages/workspace/src/runtime-host/index.ts',
+            import.meta.url,
+          ),
+        ),
+      },
+      {
         find: /^@formly-contract\/synthetic-form$/u,
         replacement: fileURLToPath(
           new URL('./fixtures/synthetic-form/src/index.ts', import.meta.url),
