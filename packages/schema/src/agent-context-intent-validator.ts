@@ -1690,7 +1690,7 @@ function buildPlan(
 
 export function computeAgentContextValidatedPlanHash(input: unknown): Sha256Digest {
   return `sha256:${createHash('sha256')
-    .update(canonicalStringify(input))
+    .update(canonicalizeAgentContextValidatedPlan(input))
     .digest('hex')}`;
 }
 
