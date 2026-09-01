@@ -8,8 +8,10 @@ The pilot is intentionally configuration-first. It proves that a consuming
 repository can identify its form-owning project boundaries, expose trusted form
 factories in bulk, link one supported Angular component call to the exact
 generated contract, describe one custom radio through a compact reviewed
-declaration, and generate deterministic artifacts. It does not generate
-Playwright tests, prove route reachability, or inspect a live browser DOM.
+declaration, generate deterministic artifacts, resolve a hash-pinned context,
+validate supported typed intent, and bind an approved canonical plan to exact
+trusted driver calls. It does not generate Playwright tests, invoke those
+calls, prove route reachability, or inspect a live browser DOM.
 
 ## What this pilot can answer
 
@@ -28,7 +30,13 @@ The current `main` branch can show:
   be resolved safely;
 - a static, symbol-resolved link from one supported direct factory call to a
   stable form ID and exact generated contract hash;
-- source-usage lookup by workspace-relative source path or stable form ID; and
+- source-usage lookup by workspace-relative source path or stable form ID;
+- whether an exact hash-pinned field is actionable or refused by current
+  context authority;
+- positive and negative typed-intent validation with canonical intent and plan
+  content identities; and
+- exact, all-or-nothing binding of an approved plan to an authenticated local
+  driver implementation allowlist, without invoking the implementations;
 - whether generated artifacts are current at byte level.
 
 The pilot cannot yet prove:
@@ -37,7 +45,7 @@ The pilot cannot yet prove:
 - runtime-only option values or lifecycle behavior that the controlled scenario
   compiler did not resolve;
 - the real DOM/ARIA output of an undeclared custom Angular component;
-- executable application-specific Playwright driver behavior;
+- browser-conformant application driver behavior or invocation;
 - automatic discovery of arbitrary form exports or routes;
 - indirect, wrapped, callback, dynamic-dispatch, or multi-program form usages;
   or
@@ -70,6 +78,7 @@ pnpm install --frozen-lockfile
 pnpm --filter @formly-contract/schema build
 pnpm --filter @formly-contract/compiler build
 pnpm --filter @formly-contract/workspace build
+pnpm --filter @formly-contract/playwright build
 ```
 
 Run `pnpm check` when the machine can afford the complete repository gate. It
@@ -90,7 +99,7 @@ fixture directories deliberately do not pretend to be independent dependency
 workspaces with their own lockfiles. Run the CLI against the real workplace
 workspace root, where its canonical `pnpm-lock.yaml` is present.
 
-## 2. Link the three pilot packages
+## 2. Link the four pilot packages
 
 Until the first npm release, add sibling links to the workplace repository.
 Adjust the relative path to match the two checkouts:
@@ -102,14 +111,16 @@ Adjust the relative path to match the two checkouts:
   },
   "devDependencies": {
     "@formly-contract/compiler": "link:../formly-contract/packages/compiler",
-    "@formly-contract/workspace": "link:../formly-contract/packages/workspace"
+    "@formly-contract/workspace": "link:../formly-contract/packages/workspace",
+    "@formly-contract/playwright": "link:../formly-contract/packages/playwright"
   }
 }
 ```
 
 `schema` must be a regular dependency when the Angular application imports the
-browser-safe field-type-authoring subpath. Compiler and workspace remain
-Node-side dev dependencies.
+browser-safe field-type-authoring subpath. Compiler, workspace, and the private
+Playwright binding experiment remain Node-side dev dependencies. The latter
+does not depend on Playwright or invoke a browser despite its package name.
 
 Install with the workplace repository's normal pnpm workflow, then verify the
 linked binary:
@@ -564,7 +575,71 @@ content-addressed contract is an integrity failure and generation will not
 overwrite it: inspect the mismatch, remove the corrupt artifact only after
 confirming it is safe to do so, then regenerate.
 
-## 7. Troubleshoot common pilot failures
+## 7. Exercise the current query, validation, and binding boundary
+
+The CLI stops at generated artifacts and source linkage. The next boundary is
+a library-level pilot: assemble and strictly parse the agent-context artifact
+set, source-usage catalog, contracts, execution authority, driver manifest, and
+live-owner hashes before calling the pure query and validation APIs. Do not
+invent missing journey, driver, state, or runtime-value authority merely to
+make the exercise pass.
+
+Use `executeAgentContextQuery` twice—once by the workspace-relative component
+path and once by stable `formId`. Both searches must resolve the same exact
+usage, form, project, and contract hash. Open the resulting E2E slice only when
+the candidate is exact and current; a stale owner, ambiguous usage, refused
+field, incomplete slice, or mismatched artifact-set hash is a negative result,
+not a prompt to broaden the query.
+
+Run at least two typed intents against that pinned context:
+
+1. a positive intent that targets an actionable field, legal value, supported
+   operation, exact state, and manifest-authorized driver capability; and
+2. a negative intent that deliberately crosses one known boundary, such as a
+   refused field, value outside a complete domain, stale context hash, missing
+   driver capability, or unsupported wrapper precondition.
+
+`validateAgentContextTestIntent` must return a canonical plan only for the
+positive case and stable blocking diagnostics with no plan for the negative
+case. Retain the exact source intent beside the plan. Its intent and plan hashes
+are deterministic content identities—not signatures or authorization tokens.
+`computeAgentContextValidatedPlanHash` strict-parses before hashing and rejects
+proxy, accessor, hidden, cyclic, and unknown-key values.
+
+Finally, create the local implementation registry, bind it to the exact driver
+manifest with `bindAgentContextDriverImplementationRegistry`, and pass that
+authentic binding plus the complete revalidation input to
+`bindAgentContextValidatedPlanDriverCalls`. Record:
+
+- the exact usage, project, form, artifact-set hash, and contract hash;
+- the actionable field and any refused comparison field;
+- the positive plan hash and negative diagnostic codes;
+- each bound plan-step ID, driver ID/version, required capability, physical
+  target, and argument shape; and
+- confirmation that the implementation invocation count remained zero.
+
+Binding is all-or-nothing. A stale plan, changed current authority, incompatible
+allowlist, unauthentic binding object, or unresolved implementation returns no
+partial call set. The package deliberately returns data-only call descriptions
+paired with opaque callable identities and does not invoke them. Browser
+execution, application-driver conformance, remaining repeaters/transitions,
+and automatic dataset assembly are still implementation gaps.
+
+The retained schema walkthrough and Playwright binding tests are the canonical
+public-data rehearsal for this step:
+
+```sh
+pnpm exec vitest run \
+  packages/schema/src/agent-context-walkthrough-fixtures.test.ts \
+  packages/schema/src/agent-context-test-intent.test.ts \
+  packages/playwright/src/validated-plan-driver-call-binding.test.ts
+```
+
+Keep the corresponding workplace harness and detailed output private. Share
+only the sanitized identities, counts, result classes, diagnostic codes, and
+implementation gaps described below.
+
+## 8. Troubleshoot common pilot failures
 
 The pilot CLI reports stable workspace-generation codes and deliberately hides
 underlying stack traces and callback details. The lower-level config loader APIs
@@ -599,7 +674,7 @@ Discovery, generation, stale-check, and check failures exit with code `1`;
 command-usage failures exit with code `2`. The CLI intentionally omits stack
 traces and underlying callback details.
 
-## 8. Capture a useful, sanitized report
+## 9. Capture a useful, sanitized report
 
 Keep the detailed report in the private workplace repository. Share only
 sanitized conclusions with this public project.
@@ -637,6 +712,28 @@ sanitized conclusions with this public project.
 - Query by source path / form ID:
 - Fail-closed source diagnostics:
 
+## Agent-context query
+
+- Artifact-set and workspace-index hash:
+- Exact usage / project / form / contract hash:
+- Source-path and form-ID queries agree: yes/no
+- Actionable field and authority basis:
+- Refused field and refusal reason:
+
+## Typed intent and plan
+
+- Positive intent operation and result:
+- Canonical intent hash / plan hash:
+- Negative intent boundary and diagnostic codes:
+- Revalidation result against current authority:
+
+## Trusted driver-call binding
+
+- Manifest and implementation allowlist identity:
+- Bound step / driver / capability / physical target summary:
+- Partial calls on refusal: none/issue
+- Implementation invocation count: 0/issue
+
 ## Custom-field coverage
 
 - Formly type:
@@ -653,7 +750,8 @@ sanitized conclusions with this public project.
 - Unexpected diagnostics:
 - Cross-field effects the contract could not configure or resolve:
 - Runtime-only behavior:
-- Information that would have helped Playwright authoring:
+- Remaining dataset-assembly, semantic-plan, driver, or browser-execution gap:
+- Information that would have helped deterministic Playwright execution:
 
 ## Usability
 
@@ -684,7 +782,14 @@ matches reviewed behavior; record other types as unknown. Add one colocated form
 definition with an explicit root symbol, one direct component call under a
 discovered project root, and the leaf Angular source-usage tsconfig. Generate,
 inspect the index/catalog/contracts, query by source path and form ID, rerun for
-determinism, and report remaining Playwright-authoring gaps.
+determinism, and assemble one hash-pinned E2E context without inventing missing
+authority. Validate one supported positive intent and one deliberate negative
+intent, revalidate the positive canonical plan, then bind it through an
+authenticated local driver implementation registry. Record exact
+usage/form/hash resolution, actionable and refused fields, validation outcomes,
+bound call identities/capabilities/physical targets, and proof that no
+implementation was invoked. Report remaining dataset, semantic-plan, driver,
+and browser-execution gaps.
 ```
 
 ## Pilot completion checklist
@@ -697,10 +802,24 @@ determinism, and report remaining Playwright-authoring gaps.
 - [ ] Every indexed consuming library has a discovered project ownership root.
 - [ ] The source catalog contains no source text, arguments, or absolute paths.
 - [ ] Source-path and form-ID queries return the same exact candidate.
+- [ ] The query is pinned to the exact artifact-set, workspace-index, usage,
+      form, and contract hashes.
+- [ ] One supported field is actionable and one known boundary remains
+      explicitly refused.
+- [ ] A positive typed intent produces a canonical plan; a negative intent
+      produces stable blocking diagnostics and no plan.
+- [ ] Revalidation accepts the unchanged current authority and refuses a stale
+      or mutated comparison.
+- [ ] Every approved plan step binds to the exact allowlisted driver identity,
+      capability, physical target, and argument shape.
+- [ ] Binding refusal returns no partial calls, and implementation invocation
+      count remains zero.
 - [ ] One custom radio drives both real registration and generated profile data.
 - [ ] Static values are enumerated and dynamic values remain explicitly dynamic.
 - [ ] The workspace index and every referenced artifact validate by generation.
 - [ ] Two unchanged runs produce identical paths and hashes.
 - [ ] No private model/form-state data or executable callbacks appear in output.
 - [ ] Remaining effects, runtime behavior, and DOM uncertainty are documented.
+- [ ] Remaining dataset assembly, semantic operations, application drivers,
+      and browser invocation gaps are documented.
 - [ ] The sanitized feedback report is ready for the next implementation pass.

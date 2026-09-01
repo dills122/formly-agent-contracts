@@ -14,8 +14,10 @@ The site follows the reader’s decision sequence:
    fields, artifacts, CLI, and APIs.
 4. **Resources** — troubleshoot, navigate research, and contribute.
 
-The first production vertical is
-[workspace to Playwright context](../start/end-to-end.md). Other pages exist to
+The primary learning vertical is
+[one maintained Formly form from source to contract](../start/end-to-end.md).
+It leads with the rendered form, then reveals workspace wiring, repeatable
+generation, contract anatomy, and the current execution boundary. Other pages
 support that path rather than simulate a complete API encyclopedia.
 
 ## Framework decision: Astro Starlight

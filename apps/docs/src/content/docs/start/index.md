@@ -25,8 +25,8 @@ selectors.
    pnpm demo
    ```
 
-4. Follow the [end-to-end workspace vertical](./end-to-end.md) in a consuming
-   Angular or Nx repository.
+4. Follow [one maintained Formly form end to end](./end-to-end.md), from its
+   Angular code through repeatable contract generation and inspection.
 
 The strongest tested pairing is Angular `20.3.29` with Formly `6.1.8`. Angular
 20+ and Formly 6.x are the intended range, but other combinations do not carry
@@ -57,7 +57,7 @@ is the canonical private-repository evaluation path.
 ## Choose your next path
 
 - First integration: [install the local packages](./installation.md).
-- Real monorepo wiring: [run the end-to-end vertical](./end-to-end.md).
+- Real monorepo wiring: [follow one form end to end](./end-to-end.md).
 - Programmatic integration: [choose a public API entry point](../reference/api.md).
 - Architecture review: [understand the evidence model](../concepts/architecture.md).
 - Current versus future: [read the capability matrix](./product-status.md).

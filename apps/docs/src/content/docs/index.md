@@ -6,7 +6,7 @@ hero:
   title: Know the form before the browser.
   tagline: Compile application-owned Formly configuration into versioned evidence that engineers, tests, and coding agents can inspect without inventing selectors.
   actions:
-    - text: Run the end-to-end vertical
+    - text: Follow one real form
       link: ./start/end-to-end/
       icon: right-arrow
       variant: primary
@@ -29,8 +29,8 @@ hero:
   </a>
   <a class="home-index__row" href="./start/end-to-end/">
     <span class="home-index__number">02</span>
-    <span class="home-index__title">Integrate</span>
-    <span class="home-index__description">Configure a workspace, expose a form, profile a custom field, generate artifacts, and consume one in Playwright.</span>
+    <span class="home-index__title">Walk through</span>
+    <span class="home-index__description">Watch one maintained Angular Formly form become a generated, inspectable contract from start to finish.</span>
   </a>
   <a class="home-index__row" href="./concepts/architecture/">
     <span class="home-index__number">03</span>

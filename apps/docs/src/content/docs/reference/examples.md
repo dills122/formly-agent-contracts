@@ -7,6 +7,12 @@ The repository maintains three executable Angular examples as a compliance
 suite. Each uses the same public configuration, source, schema, compiler, and
 workspace APIs that a consumer uses.
 
+:::tip[Start with one form, not the fixture matrix]
+The [end-to-end walkthrough](../start/end-to-end.md) follows one maintained
+Formly fragment through its source, project, workspace, generated index, and
+contract anatomy. Return here when you need to choose a repository layout.
+:::
+
 | Example                                                                                                        | Layout                                                                | Forms | Primary evidence                                                                                                                                                                                  |
 | -------------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | [`apps/formly-test-app`](https://github.com/dills122/formly-contract/tree/main/apps/formly-test-app)           | One Angular CLI application and one contract project                  |    12 | broad Formly authoring corpus, browser rendering, declared generation, reviewed custom interactions, explicit opaque diagnostics                                                                  |

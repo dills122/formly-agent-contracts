@@ -84,7 +84,7 @@ assembly.
 | `validateAgentContextTestIntent(input)` | Purely join intent to one pinned current CTX-1 E2E slice and return either a canonical plan or blocking diagnostics. |
 | `parseAgentContextValidatedExecutionPlan(value)` | Strictly parse the closed plan union and reject unreviewed authority fields. |
 | `computeAgentContextTestIntentHash(value)` | Compute the canonical source-intent content identity retained by a validated plan. |
-| `computeAgentContextValidatedPlanHash(value)` | Compute canonical content identity for an already parsed or validated plan; this helper is not an untrusted-input parser, and the hash does not grant semantic authority. |
+| `computeAgentContextValidatedPlanHash(value)` | Strictly parse a candidate plan, reject hostile or unknown structure, and compute its canonical content identity; the hash does not grant semantic authority. |
 | `revalidateAgentContextExecutionPlan(input)` | Require the exact source intent, verify intent/plan hashes, rerun validation against current authority, require a complete E2E slice, and compare the rebuilt plan exactly. |
 
 The first validator slice covers the maintained synthetic positive/negative
@@ -95,8 +95,9 @@ work. The supported pure length classifier follows Angular's optional-empty
 value invalidity. Declared wrapper activation preconditions also fail closed
 until lossless wrapper-plan expansion is implemented. These APIs never load
 Angular, Formly, driver implementations,
-or the DOM, and their strict parsers reject accessor/coercion-based input rather
-than executing caller code.
+or the DOM. Their strict parsers and standalone plan-hash helper reject proxy,
+accessor, hidden, cyclic, unknown-key, and coercion-based input rather than
+executing caller code.
 
 The intent and plan hashes are deterministic content identities, not
 signatures or authorization tokens. A trusted caller must retain the exact
