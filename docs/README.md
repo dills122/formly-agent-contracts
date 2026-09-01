@@ -30,6 +30,10 @@ their presence does not mean a feature is available. Check the
 [product status page](../apps/docs/src/content/docs/start/product-status.md) and
 package entry points before describing behavior as shipped.
 
+Current integration-friction observations from the maintained walkthrough are
+kept in the [setup and wiring DX notes](./research/setup-wiring-dx-notes.md).
+They are research inputs, not accepted API commitments.
+
 ## Contributor rules
 
 - Update the canonical specification or ADR when a public contract or ownership

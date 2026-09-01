@@ -39,7 +39,7 @@ an expansion-panel wrapper.
       <span>Maintained fixture</span>
       <strong>Claim contact preferences</strong>
     </span>
-    <span>Controls from the fixture · illustrative application shell</span>
+    <span>Fixture-backed controls · illustrative populated state and application shell</span>
   </figcaption>
   <div class="form-specimen__surface">
     <header class="form-specimen__header">
@@ -76,18 +76,21 @@ an expansion-panel wrapper.
       </section>
     </div>
     <footer class="form-specimen__model">
-      <span>Sample model</span>
+      <span>Illustrative after-interaction model</span>
       <code>{ claimant: { name: 'Maya Chen', contactPreference: 'email' } }</code>
     </footer>
   </div>
 </figure>
 
-The shell around the controls is intentionally presentational. The fields,
-labels, required state, option labels, values, selected sample value, and
-wrapper state all come from the maintained example. This is the same separation
-you see in Formly's official advanced-layout and Material stepper examples:
-Formly owns field configuration and state; the application or UI package owns
-the visual composition.
+The shell around the controls is intentionally presentational. The field
+structure, labels, required state, option labels and values, type alias, and
+wrapper configuration come from the maintained example. The populated name,
+selected radio value, and expanded panel deliberately show an illustrative
+**after-interaction** state. They are not fixture or contract evidence: the
+maintained source starts with `model: {}`, and its wrapper starts collapsed.
+This is the same separation you see in Formly's official advanced-layout and
+Material stepper examples: Formly owns field configuration and state; the
+application or UI package owns the visual composition.
 
 The application owns this definition. Formly Contract does not replace the
 form, add a parallel DSL, or scrape the rendered DOM:
@@ -332,56 +335,124 @@ export default defineFormContractProject({
 ```
 
 The custom `cool-radio-btn-grp` is meaningful only because the project also
-declares its interaction profile. The important part is:
+declares its interaction profile **and maps the Formly alias to it**. The
+wrapper name needs its own profile because it contributes a required activation
+step. The maintained fixture predates the compact contracted-type helper, so it
+uses the verbose legacy registry shown here with unrelated fixture entries
+omitted:
 
-```ts title="field-type-profiles.ts (focused excerpt)"
-{
-  identity: { id: 'fixture.cool-radio', version: 1 },
-  semanticType: 'single-choice',
-  valueShape: 'scalar',
-  evidence: 'declared',
-  parts: [
+```ts title="field-type-profiles.ts (complete join for this field)"
+import type { FormContractProjectConfig } from '@formly-contract/workspace';
+
+type FieldTypeProfiles = NonNullable<
+  FormContractProjectConfig['fieldTypeProfiles']
+>;
+
+export const FIXTURE_FIELD_TYPE_PROFILES: FieldTypeProfiles = {
+  schemaVersion: '0.4.0',
+  id: 'fixture.angular-fields',
+  version: 1,
+  profiles: [
     {
-      name: 'group',
-      role: 'radiogroup',
-      cardinality: 'one',
+      identity: { id: 'fixture.cool-radio', version: 1 },
+      semanticType: 'single-choice',
+      valueShape: 'scalar',
       evidence: 'declared',
+      parts: [
+        {
+          name: 'group',
+          role: 'radiogroup',
+          cardinality: 'one',
+          evidence: 'declared',
+        },
+        {
+          name: 'option',
+          role: 'radio',
+          cardinality: 'many',
+          evidence: 'declared',
+        },
+      ],
+      interaction: {
+        kind: 'choice',
+        operation: 'check',
+        optionPart: 'option',
+      },
+      driver: {
+        kind: 'generic',
+        id: 'generic.choice',
+        version: 1,
+        capabilities: ['check'],
+      },
+      valueDomain: {
+        kind: 'projected',
+        source: 'adapter',
+        completeness: 'complete',
+        collectionPath: 'props.options',
+        labelPath: 'label',
+        valuePath: 'value',
+        evidence: 'declared',
+      },
+      effectCapabilities: { targetProperties: ['options'], readiness: [] },
+      unknowns: [],
     },
+    // Other maintained fixture profiles are omitted here.
+  ],
+  registrations: [
     {
-      name: 'option',
-      role: 'radio',
-      cardinality: 'many',
+      formlyType: 'cool-radio-btn-grp',
+      defaultProfile: { id: 'fixture.cool-radio', version: 1 },
+      variants: [],
+    },
+    // Other maintained fixture registrations are omitted here.
+  ],
+  wrappers: [
+    {
+      identity: { id: 'fixture.expansion-panel-wrapper', version: 1 },
+      wrapperName: 'fixture-expansion-panel',
       evidence: 'declared',
+      parts: [
+        {
+          name: 'wrapper-expand',
+          role: 'button',
+          cardinality: 'one',
+          evidence: 'declared',
+        },
+      ],
+      preconditions: [
+        {
+          kind: 'activate',
+          part: 'wrapper-expand',
+          operation: 'click',
+          evidence: 'declared',
+        },
+      ],
+      unknowns: [],
     },
   ],
-  interaction: {
-    kind: 'choice',
-    operation: 'check',
-    optionPart: 'option',
-  },
-  driver: {
-    kind: 'generic',
-    id: 'generic.choice',
-    version: 1,
-    capabilities: ['check'],
-  },
-  valueDomain: {
-    kind: 'projected',
-    source: 'adapter',
-    completeness: 'complete',
-    collectionPath: 'props.options',
-    labelPath: 'label',
-    valuePath: 'value',
-    evidence: 'declared',
-  },
-  effectCapabilities: { targetProperties: ['options'], readiness: [] },
-  unknowns: [],
-}
+};
 ```
 
-The wrapper profile adds one precondition: activate its `wrapper-expand`
-button before interacting with the radio options. Profiles describe reviewed
-semantics; they are not executable Playwright implementations.
+That registry makes both joins explicit:
+
+1. `type: 'cool-radio-btn-grp'` → `registrations[].formlyType` →
+   `fixture.cool-radio` → the single-choice profile.
+2. `wrappers: ['fixture-expansion-panel']` → `wrappers[].wrapperName` → the
+   `wrapper-expand` activation precondition.
+
+Without the first mapping, compilation reports `UNMAPPED_FIELD_TYPE` and the
+generated node will not contain the interaction profile shown later. Without
+the wrapper profile, the contract cannot preserve the required expansion step.
+Profiles describe reviewed semantics; they are not executable Playwright
+implementations.
+
+:::tip[Prefer one declaration for new radio controls]
+For a new radio-style custom type, use
+`defineContractedFormlyType({ behavior: radioChoice() })`, build the registry
+with `buildFieldTypeProfileRegistry(...)`, and register the same definition in
+Angular with `toFormlyTypeRegistration(...)`. That removes the duplicated type
+name and profile reference. Wrapper profiles still use the explicit registry
+surface today. See [Custom field profiles](../reference/field-profiles.md).
+:::
 
 ### Let the root discover projects
 
