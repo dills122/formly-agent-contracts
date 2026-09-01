@@ -481,6 +481,9 @@ const PROFILE_OPERATIONS = [
   'select-row',
   'add-item',
   'expand-item',
+  'next-step',
+  'previous-step',
+  'submit-stepper',
 ] as const satisfies readonly FieldTypeProfileOperation[];
 
 const PROFILE_UNKNOWN_ASPECTS = [
@@ -519,6 +522,14 @@ const CONTRACT_INTERACTION_KEYS = {
     'addPart',
     'itemPart',
     'expandPart',
+  ]),
+  stepper: new Set([
+    'kind',
+    'operation',
+    'stepPart',
+    'nextPart',
+    'previousPart',
+    'submitPart',
   ]),
 } as const;
 
@@ -673,6 +684,35 @@ function assertInteraction(
       }
       if (value.operation === 'expand-item' && value.expandPart === undefined) {
         throw new TypeError(`${path} expand-item requires expandPart`);
+      }
+      return;
+    case 'stepper':
+      if (
+        value.operation !== 'next-step' &&
+        value.operation !== 'previous-step' &&
+        value.operation !== 'submit-stepper'
+      ) {
+        throw new TypeError(`${path}.operation is unsupported for stepper`);
+      }
+      for (const property of ['stepPart', 'nextPart'] as const) {
+        assertPartReference(value[property], `${path}.${property}`, partNames);
+      }
+      for (const property of ['previousPart', 'submitPart'] as const) {
+        if (value[property] !== undefined) {
+          assertPartReference(value[property], `${path}.${property}`, partNames);
+        }
+      }
+      if (
+        value.operation === 'previous-step' &&
+        value.previousPart === undefined
+      ) {
+        throw new TypeError(`${path} previous-step requires previousPart`);
+      }
+      if (
+        value.operation === 'submit-stepper' &&
+        value.submitPart === undefined
+      ) {
+        throw new TypeError(`${path} submit-stepper requires submitPart`);
       }
       return;
   }

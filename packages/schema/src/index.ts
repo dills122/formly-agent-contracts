@@ -1,4 +1,39 @@
 export {
+  ANGULAR_HOST_COMPATIBILITY_CASE_IDS,
+  ANGULAR_HOST_COMPATIBILITY_SCHEMA_VERSION,
+  canonicalizeAngularHostCompatibilityResult,
+  computeAngularHostCompatibilityHash,
+  createAngularHostCompatibilityResult,
+  parseAngularHostCompatibilityResult,
+} from './angular-host-compatibility.js';
+export type {
+  AngularHostCompatibilityCase,
+  AngularHostCompatibilityCaseId,
+  AngularHostCompatibilityDiagnostic,
+  AngularHostCompatibilityEnvironment,
+  AngularHostCompatibilityResult,
+  AngularHostCompatibilityResultDraft,
+} from './angular-host-compatibility.js';
+export {
+  DYNAMIC_SEMANTICS_CANDIDATE_SCHEMA_VERSION,
+  DYNAMIC_SEMANTICS_MODEL_OUTPUT_JSON_SCHEMA,
+  canonicalizeDynamicSemanticsCandidate,
+  computeDynamicSemanticsCandidateHash,
+  createDynamicSemanticsCandidate,
+  parseDynamicSemanticsCandidate,
+} from './dynamic-semantics-candidate.js';
+export type {
+  DynamicSemanticsCandidate,
+  DynamicSemanticsCandidateDraft,
+  DynamicSemanticsConditionClause,
+  DynamicSemanticsConditionProposal,
+  DynamicSemanticsEffectProposal,
+  DynamicSemanticsEvidenceSpan,
+  DynamicSemanticsOptionDomainProposal,
+  DynamicSemanticsProposal,
+  DynamicSemanticsScalar,
+} from './dynamic-semantics-candidate.js';
+export {
   canonicalStringify,
   computeContentHash,
   createFormContract,

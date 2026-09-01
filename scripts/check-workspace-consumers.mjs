@@ -22,11 +22,6 @@ import {
 } from "./tarball.mjs";
 
 const execFile = promisify(execFileCallback);
-// packages/workspace stays private (see docs/releasing.md) and never shows
-// up in loadReleaseManifest()'s publishable list, but the packed-consumer
-// smoke test still needs to pack and install its CLI, so it's added back
-// explicitly here.
-const WORKSPACE_PACKAGE_DIRECTORY = "packages/workspace";
 const WORKSPACE_PACKAGE_NAME = "@formly-contract/workspace";
 const CLI_RELATIVE_PATH = "dist/cli-main.js";
 
@@ -603,10 +598,7 @@ async function runPackedSmoke(rootDirectory, temporaryDirectory) {
   const tarballDirectory = join(temporaryDirectory, "tarballs");
   await mkdir(tarballDirectory, { recursive: true });
   const release = await loadReleaseManifest({ rootDirectory });
-  const packageDirectories = [
-    ...release.packages.map(({ directory }) => directory),
-    WORKSPACE_PACKAGE_DIRECTORY,
-  ];
+  const packageDirectories = release.packages.map(({ directory }) => directory);
   const packages = [];
   for (const packageDirectory of packageDirectories) {
     packages.push(

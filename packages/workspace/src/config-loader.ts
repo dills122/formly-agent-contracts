@@ -30,6 +30,10 @@ export class WorkspaceConfigLoadError extends Error {
 
 export interface WorkspaceConfigLoaderOptions {
   readonly tsconfigPath?: string;
+  /** Runtime packages that must use Node's native loader without Jiti fallback. */
+  readonly nativeModules?: readonly string[];
+  /** Disposable workers may retain one config graph across inventory/compile. */
+  readonly moduleCache?: boolean;
 }
 
 /** @internal Shared Jiti runtime used for config evaluation and resolution parity. */
@@ -85,7 +89,10 @@ export function createWorkspaceConfigModuleRuntime(
   const jiti = createJiti(absoluteConfigPath, {
     fsCache: false,
     interopDefault: false,
-    moduleCache: false,
+    moduleCache: options.moduleCache ?? false,
+    ...(options.nativeModules === undefined
+      ? {}
+      : { nativeModules: [...options.nativeModules] }),
     ...(tsconfigPath === undefined
       ? { tsconfigPaths: false }
       : {

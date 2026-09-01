@@ -73,9 +73,23 @@ export interface DiscoverWorkspaceProjectsOptions {
   readonly continueOnProjectError?: boolean;
 }
 
+export interface DiscoverWorkspaceProjectConfigsOptions {
+  readonly workspaceRoot: string;
+  readonly rootConfigPath: string;
+  readonly rootLoaderOptions?: WorkspaceConfigLoaderOptions;
+  readonly selectedProjectConfigPaths?: readonly string[];
+}
+
 export interface LoadedWorkspaceRootConfig {
   readonly configPath: string;
   readonly config: WorkspaceRootConfig;
+}
+
+export interface DiscoveredWorkspaceProjectConfigs {
+  /** Canonical local root. This is execution input, not portable output. */
+  readonly workspaceRoot: string;
+  readonly root: LoadedWorkspaceRootConfig;
+  readonly configPaths: readonly string[];
 }
 
 export interface DiscoveredWorkspaceProject {
@@ -386,40 +400,10 @@ export async function discoverWorkspaceProjects(
       [],
     );
   }
-  const workspaceRoot = await realpath(resolve(options.workspaceRoot));
-  const absoluteRootConfigPath = resolve(workspaceRoot, options.rootConfigPath);
-  const rootConfigPath = normalizeWorkspacePath(
-    relative(workspaceRoot, absoluteRootConfigPath),
-  );
-  await assertPathWithinWorkspace(
-    workspaceRoot,
-    absoluteRootConfigPath,
-    rootConfigPath,
-  );
-
-  const rootConfig = await loadWorkspaceRootConfig(
-    absoluteRootConfigPath,
-    options.rootLoaderOptions,
-  );
-  const ignoredProjectConfigPatterns = projectConfigIgnorePatterns(rootConfig);
-  if ((options.selectedProjectConfigPaths?.length ?? 0) === 0) {
-    await rejectMatchedProjectConfigSymlinks(
-      rootConfig.projectConfigs,
-      ignoredProjectConfigPatterns,
-      workspaceRoot,
-    );
-  }
-  const discoveredProjectConfigPaths = [
-    ...(await expandProjectConfigPatterns(
-      rootConfig.projectConfigs,
-      ignoredProjectConfigPatterns,
-      workspaceRoot,
-    )),
-  ].sort(compareCodeUnits);
-  const projectConfigPaths = selectProjectConfigPaths(
-    discoveredProjectConfigPaths,
-    options.selectedProjectConfigPaths,
-  );
+  const discoveredConfigs = await discoverWorkspaceProjectConfigs(options);
+  const { workspaceRoot, configPaths: projectConfigPaths } = discoveredConfigs;
+  const { configPath: rootConfigPath, config: rootConfig } =
+    discoveredConfigs.root;
   const tsconfigPath =
     rootConfig.tsconfigPath === undefined
       ? undefined
@@ -481,5 +465,60 @@ export async function discoverWorkspaceProjects(
       })),
     },
     ...(failures.length === 0 ? {} : { failures }),
+  };
+}
+
+/**
+ * Expands and validates project-config paths without evaluating any project
+ * config. This is the parent-side discovery boundary used before workers are
+ * allowed to import trusted project code.
+ */
+export async function discoverWorkspaceProjectConfigs(
+  options: DiscoverWorkspaceProjectConfigsOptions,
+): Promise<DiscoveredWorkspaceProjectConfigs> {
+  const workspaceRoot = await realpath(resolve(options.workspaceRoot));
+  const absoluteRootConfigPath = resolve(workspaceRoot, options.rootConfigPath);
+  const rootConfigPath = normalizeWorkspacePath(
+    relative(workspaceRoot, absoluteRootConfigPath),
+  );
+  await assertPathWithinWorkspace(
+    workspaceRoot,
+    absoluteRootConfigPath,
+    rootConfigPath,
+  );
+
+  const rootConfig = await loadWorkspaceRootConfig(
+    absoluteRootConfigPath,
+    options.rootLoaderOptions,
+  );
+  const ignoredProjectConfigPatterns = projectConfigIgnorePatterns(rootConfig);
+  if ((options.selectedProjectConfigPaths?.length ?? 0) === 0) {
+    await rejectMatchedProjectConfigSymlinks(
+      rootConfig.projectConfigs,
+      ignoredProjectConfigPatterns,
+      workspaceRoot,
+    );
+  }
+  const discoveredProjectConfigPaths = [
+    ...(await expandProjectConfigPatterns(
+      rootConfig.projectConfigs,
+      ignoredProjectConfigPatterns,
+      workspaceRoot,
+    )),
+  ].sort(compareCodeUnits);
+  const configPaths = selectProjectConfigPaths(
+    discoveredProjectConfigPaths,
+    options.selectedProjectConfigPaths,
+  );
+  for (const configPath of configPaths) {
+    const absoluteConfigPath = resolve(workspaceRoot, configPath);
+    await rejectProjectConfigSymlink(absoluteConfigPath, configPath);
+    await assertPathWithinWorkspace(workspaceRoot, absoluteConfigPath, configPath);
+  }
+
+  return {
+    workspaceRoot,
+    root: { configPath: rootConfigPath, config: rootConfig },
+    configPaths,
   };
 }

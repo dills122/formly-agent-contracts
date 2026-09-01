@@ -472,11 +472,11 @@ deterministically emits the existing canonical `FieldTypeProfileRegistry` for
 the compiler. Missing or conflicting adapters, registrations, codecs, drivers,
 examples, or scopes remain non-actionable.
 
-The MVP implements the first narrow authoring slice: one browser-safe
-`radioChoice()` declaration can supply the exact Formly type name to production
-registration and lower to the existing canonical registry DTO. It does not
-inspect Angular templates, infer behavior from a type/component name, or cover
-other widget families.
+The compact authoring slice now covers radio and other single/multi choice
+presentations, typed inputs, autocomplete, row selection, repeaters, steppers,
+and reviewed wrapper activation. Each declaration supplies the exact Formly
+type or wrapper name and lowers to the existing canonical registry DTO. It does
+not inspect Angular templates or infer behavior from a component name.
 
 The `fieldTypeProfiles` example below documents the currently implemented
 legacy input. It remains useful for migration and preserves the current v0.4
@@ -487,7 +487,7 @@ unless `AUTH-MIG-1` records measured evidence and an explicit ADR amendment.
 When named environments land, a project will select an environment or provide
 this legacy registry, never both; no merge or precedence fallback is planned.
 
-### Compact radio-choice authoring
+### Compact field and wrapper authoring
 
 Keep the contracted descriptor data-only beside the custom field library:
 

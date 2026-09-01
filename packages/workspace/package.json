@@ -1,9 +1,31 @@
 {
   "name": "@formly-contract/workspace",
   "version": "0.1.0",
-  "private": true,
   "description": "Deterministic Formly Contract workspace discovery, generation, and CLI tooling.",
+  "author": "Dylan Steele <dylansteele57@gmail.com>",
   "license": "MIT",
+  "homepage": "https://github.com/dills122/formly-contract#readme",
+  "bugs": {
+    "url": "https://github.com/dills122/formly-contract/issues"
+  },
+  "keywords": [
+    "angular",
+    "formly",
+    "contract",
+    "workspace",
+    "e2e",
+    "testing",
+    "agents"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dills122/formly-contract.git",
+    "directory": "packages/workspace"
+  },
+  "publishConfig": {
+    "access": "public",
+    "registry": "https://registry.npmjs.org/"
+  },
   "type": "module",
   "bin": {
     "formly-contracts": "./dist/cli-main.js"
@@ -12,6 +34,14 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./dist/index.js"
+    },
+    "./runtime-host": {
+      "types": "./dist/runtime-host/index.d.ts",
+      "default": "./dist/runtime-host/index.js"
+    },
+    "./cli": {
+      "types": "./dist/cli.d.ts",
+      "default": "./dist/cli.js"
     }
   },
   "files": [

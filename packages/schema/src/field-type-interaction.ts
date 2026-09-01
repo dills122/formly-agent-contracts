@@ -23,7 +23,10 @@ export type FieldTypeProfileOperation =
   | 'type-and-pick'
   | 'select-row'
   | 'add-item'
-  | 'expand-item';
+  | 'expand-item'
+  | 'next-step'
+  | 'previous-step'
+  | 'submit-stepper';
 
 export type FieldTypeProfileInteraction =
   | {
@@ -60,6 +63,14 @@ export type FieldTypeProfileInteraction =
       readonly addPart: string;
       readonly itemPart: string;
       readonly expandPart?: string;
+    }
+  | {
+      readonly kind: 'stepper';
+      readonly operation: 'next-step' | 'previous-step' | 'submit-stepper';
+      readonly stepPart: string;
+      readonly nextPart: string;
+      readonly previousPart?: string;
+      readonly submitPart?: string;
     };
 
 export type GenericFieldTypeDriverId =
@@ -67,7 +78,8 @@ export type GenericFieldTypeDriverId =
   | 'generic.choice'
   | 'generic.autocomplete'
   | 'generic.row-selection'
-  | 'generic.repeater';
+  | 'generic.repeater'
+  | 'generic.stepper';
 
 export type FieldTypeProfileDriver =
   | {

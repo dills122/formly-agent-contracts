@@ -22,6 +22,12 @@
       "@formly-contract/workspace": [
         "./packages/workspace/src/index.ts"
       ],
+      "@formly-contract/workspace/cli": [
+        "./packages/workspace/src/cli.ts"
+      ],
+      "@formly-contract/workspace/runtime-host": [
+        "./packages/workspace/src/runtime-host/index.ts"
+      ],
       "@formly-contract/synthetic-form": [
         "./fixtures/synthetic-form/src/index.ts"
       ]

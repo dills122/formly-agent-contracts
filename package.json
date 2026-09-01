@@ -14,12 +14,12 @@
     "app:serve": "pnpm --filter @formly-contract/formly-test-app serve",
     "audit": "pnpm audit --audit-level=high",
     "build": "pnpm build:demo && pnpm --filter @formly-contract/formly-test-app build && pnpm build:fixtures",
-    "build:demo": "pnpm --filter @formly-contract/schema build && pnpm --filter @formly-contract/playwright build && pnpm --filter @formly-contract/compiler build && pnpm --filter @formly-contract/workspace build && pnpm --filter @formly-contract/synthetic-form build && pnpm --filter @formly-contract/demo-cli build",
+    "build:demo": "pnpm --filter @formly-contract/schema build && pnpm --filter @formly-contract/playwright build && pnpm --filter @formly-contract/compiler build && pnpm --filter @formly-contract/workspace build && pnpm --filter @formly-contract/angular build && pnpm --filter @formly-contract/synthetic-form build && pnpm --filter @formly-contract/demo-cli build",
     "build:fixture": "pnpm build:fixtures",
     "build:fixtures": "pnpm --filter @formly-contract/angular-monorepo-fixture build && pnpm --filter @formly-contract/nx-workspace-fixture build",
     "fixture:angular:serve": "pnpm --filter @formly-contract/angular-monorepo-fixture serve",
     "fixture:nx:serve": "pnpm --filter @formly-contract/nx-workspace-fixture serve",
-    "check": "pnpm lint && pnpm test && pnpm build && pnpm check:workspace-consumers && pnpm release:check && pnpm pack:check && pnpm check:demo && pnpm check:docs",
+    "check": "pnpm lint && pnpm test && pnpm build && pnpm test:angular-jit-host && pnpm check:workspace-consumers && pnpm release:check && pnpm pack:check && pnpm check:demo && pnpm check:docs",
     "check:demo": "node .github/scripts/check-demo.mjs",
     "check:docs": "node .github/scripts/check-docs.mjs && pnpm docs:build",
     "check:workspace-consumers": "node scripts/check-workspace-consumers.mjs",
@@ -35,6 +35,7 @@
     "release:pack": "pnpm build:demo && node scripts/pack-release.mjs --destination artifacts/releases",
     "test": "vitest run",
     "test:examples": "vitest run apps/formly-test-app/workspace-fixture.test.ts fixtures/angular-monorepo/workspace-fixture.test.ts fixtures/nx-workspace/workspace-fixture.test.ts",
+    "test:angular-jit-host": "node scripts/research/angular-worker-host-smoke.mjs",
     "test:watch": "vitest"
   },
   "devDependencies": {

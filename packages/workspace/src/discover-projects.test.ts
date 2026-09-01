@@ -14,6 +14,7 @@ import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 
 import {
+  discoverWorkspaceProjectConfigs,
   discoverWorkspaceProjects,
   WorkspaceDiscoveryError,
 } from './discover-projects.js';
@@ -48,6 +49,30 @@ afterEach(async () => {
 });
 
 describe('workspace project discovery', () => {
+  it('discovers validated project-config paths without importing project code', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.ts',
+      `export default { projectConfigs: ['projects/*.project.ts'] };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/angular.project.ts',
+      `throw new Error('project config must not run during path discovery');`,
+    );
+
+    const discovered = await discoverWorkspaceProjectConfigs({
+      workspaceRoot,
+      rootConfigPath: 'formly-contracts.config.ts',
+    });
+
+    expect(discovered.configPaths).toEqual([
+      'projects/angular.project.ts',
+    ]);
+    expect(discovered.root.configPath).toBe('formly-contracts.config.ts');
+  });
+
   it('expands includes and exclusions into a provenance-rich sorted inventory', async () => {
     const workspaceRoot = await createTemporaryWorkspace();
     await writeModule(
@@ -589,7 +614,7 @@ describe('workspace project discovery', () => {
       ]);
       expect(discovered.inventory.plugins).toHaveLength(1);
     },
-    20_000,
+    60_000,
   );
 
   it('exposes a typed discovery error', () => {

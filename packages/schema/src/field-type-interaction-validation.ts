@@ -39,6 +39,7 @@ const GENERIC_DRIVER_BY_INTERACTION = {
   autocomplete: 'generic.autocomplete',
   'row-selection': 'generic.row-selection',
   repeater: 'generic.repeater',
+  stepper: 'generic.stepper',
 } as const satisfies Readonly<
   Record<FieldTypeProfileInteraction['kind'], GenericFieldTypeDriverId>
 >;
@@ -55,6 +56,11 @@ const GENERIC_DRIVER_CAPABILITIES = {
   'generic.repeater': new Set<FieldTypeProfileOperation>([
     'add-item',
     'expand-item',
+  ]),
+  'generic.stepper': new Set<FieldTypeProfileOperation>([
+    'next-step',
+    'previous-step',
+    'submit-stepper',
   ]),
 } as const satisfies Readonly<
   Record<GenericFieldTypeDriverId, ReadonlySet<FieldTypeProfileOperation>>
@@ -271,6 +277,61 @@ function validateGenericCapabilitySurface(
         'many',
       );
       return;
+    case 'next-step':
+      if (interaction.kind !== 'stepper') {
+        throw new TypeError(
+          `${path}: capability "next-step" requires stepper interaction`,
+        );
+      }
+      requireGenericPartSurface(
+        parts,
+        interaction.stepPart,
+        driverId,
+        ['group'],
+        'many',
+      );
+      requireGenericPartSurface(
+        parts,
+        interaction.nextPart,
+        driverId,
+        ['button'],
+        'one',
+      );
+      return;
+    case 'previous-step':
+      if (
+        interaction.kind !== 'stepper' ||
+        interaction.previousPart === undefined
+      ) {
+        throw new TypeError(
+          `${path}: capability "previous-step" requires stepper interaction with previousPart`,
+        );
+      }
+      requireGenericPartSurface(
+        parts,
+        interaction.previousPart,
+        driverId,
+        ['button'],
+        'one',
+      );
+      return;
+    case 'submit-stepper':
+      if (
+        interaction.kind !== 'stepper' ||
+        interaction.submitPart === undefined
+      ) {
+        throw new TypeError(
+          `${path}: capability "submit-stepper" requires stepper interaction with submitPart`,
+        );
+      }
+      requireGenericPartSurface(
+        parts,
+        interaction.submitPart,
+        driverId,
+        ['button'],
+        'one',
+      );
+      return;
   }
 }
 
@@ -308,7 +369,9 @@ export function validateGenericDriverSemantics({
       ? 'scalar'
       : interaction.kind === 'row-selection' || interaction.kind === 'repeater'
         ? 'array'
-        : undefined;
+        : interaction.kind === 'stepper'
+          ? 'object'
+          : undefined;
   if (requiredValueShape !== undefined && valueShape !== requiredValueShape) {
     throw new TypeError(
       `${path}: generic driver ${expected} requires valueShape ${requiredValueShape}`,

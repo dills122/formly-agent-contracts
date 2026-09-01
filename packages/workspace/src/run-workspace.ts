@@ -6,6 +6,7 @@ import {
   type ContractDiagnostic,
   type ContractNode,
   type FormContract,
+  type JsonValue,
   type RuntimeDependencySnapshot,
   type RuntimeProvenance,
   type Sha256Digest,
@@ -18,6 +19,7 @@ import {
 import {
   lstat,
   mkdir,
+  open,
   readFile,
   realpath,
   rename,
@@ -29,6 +31,7 @@ import { relative, resolve } from "node:path";
 import { posix } from "node:path";
 
 import {
+  discoverWorkspaceProjectConfigs,
   discoverWorkspaceProjects,
   type DiscoverWorkspaceProjectsOptions,
   type DiscoveredWorkspace,
@@ -37,6 +40,7 @@ import {
 import {
   resolveWorkspaceProjectConfig,
   toPluginIdentity,
+  WORKSPACE_CONFIG_SCHEMA_VERSION,
   type ResolvedWorkspaceProjectConfig,
   type WorkspaceCliOverrides,
 } from "./config.js";
@@ -74,6 +78,16 @@ import {
   errnoCode,
   isWithinWorkspace,
 } from "./workspace-paths.js";
+import {
+  parseProjectExecutionResult,
+  type ProjectExecutionResult,
+  type SerializableResolvedProject,
+} from './project-execution.js';
+import {
+  spawnProjectWorker,
+  type ProjectWorkerSession,
+} from './runtime-host/worker-supervisor.js';
+import type { RuntimeHostModuleDescriptor } from './runtime-host/protocol.js';
 
 export type WorkspaceGenerationErrorCode =
   | "WORKSPACE_DISCOVERY_FAILED"
@@ -89,6 +103,8 @@ export type WorkspaceGenerationErrorCode =
   | "SOURCE_USAGE_INDEX_FAILED"
   | "DIAGNOSTIC_POLICY_FAILED"
   | "DEPENDENCY_SNAPSHOT_UNAVAILABLE"
+  | "DEPENDENCY_SNAPSHOT_CHANGED"
+  | "GENERATION_LOCKED"
   | "RUNTIME_PROVENANCE_UNAVAILABLE"
   | "OUTPUT_PATH_OUTSIDE_WORKSPACE"
   | "OUTPUT_SYMLINK_UNSUPPORTED"
@@ -120,6 +136,9 @@ const ERROR_MESSAGES: Readonly<Record<WorkspaceGenerationErrorCode, string>> = {
   DIAGNOSTIC_POLICY_FAILED: "A generated contract violates diagnostic policy.",
   DEPENDENCY_SNAPSHOT_UNAVAILABLE:
     "A pnpm dependency snapshot could not be selected.",
+  DEPENDENCY_SNAPSHOT_CHANGED:
+    "The dependency snapshot changed during generation.",
+  GENERATION_LOCKED: "Another workspace generation is already active.",
   RUNTIME_PROVENANCE_UNAVAILABLE:
     "Runtime toolchain provenance could not be determined.",
   OUTPUT_PATH_OUTSIDE_WORKSPACE: "An output path is outside the workspace.",
@@ -164,6 +183,13 @@ export interface RunWorkspaceOptions extends DiscoverWorkspaceProjectsOptions {
   readonly cliOverrides?: WorkspaceCliOverrides;
   /** Trusted parent override used by versioned runtime-host composition. */
   readonly runtimeProvenance?: RuntimeProvenance;
+  /** Opt-in disposable project workers; selected by trusted composition code. */
+  readonly projectExecution?: {
+    readonly kind: 'workers';
+    readonly runtimeHost?: RuntimeHostModuleDescriptor;
+    readonly timeoutMs?: number;
+    readonly workerModuleUrl?: string;
+  };
 }
 
 export interface WorkspaceRunResult {
@@ -172,6 +198,12 @@ export interface WorkspaceRunResult {
   readonly index: WorkspaceContractIndex;
   readonly sourceUsageCatalogPath?: string;
   readonly sourceUsageDiagnostics?: readonly WorkspaceSourceUsageDiagnostic[];
+  readonly projectFailures?: readonly WorkspaceProjectExecutionFailure[];
+}
+
+export interface WorkspaceProjectExecutionFailure {
+  readonly configPath: string;
+  readonly phase: 'inventory' | 'compile';
 }
 
 export interface WorkspaceCheckDifference {
@@ -185,6 +217,7 @@ export interface WorkspaceCheckResult {
   readonly differences: readonly WorkspaceCheckDifference[];
   readonly sourceUsageCatalogPath?: string;
   readonly sourceUsageDiagnostics?: readonly WorkspaceSourceUsageDiagnostic[];
+  readonly projectFailures?: readonly WorkspaceProjectExecutionFailure[];
 }
 
 interface ResolvedProject {
@@ -254,6 +287,57 @@ async function findPnpmDependencySnapshot(
   }
 }
 
+async function withGenerationLock<T>(
+  workspaceRoot: string,
+  action: () => Promise<T>,
+): Promise<T> {
+  const lockPath = resolve(workspaceRoot, '.formly-contract-generation.lock');
+  let handle;
+  try {
+    handle = await open(lockPath, 'wx');
+  } catch (error) {
+    if (errnoCode(error) === 'EEXIST') {
+      throw new WorkspaceGenerationError('GENERATION_LOCKED', 'inventory', {
+        outputPath: '.formly-contract-generation.lock',
+      }, error);
+    }
+    throw new WorkspaceGenerationError('OUTPUT_WRITE_FAILED', 'inventory', {
+      outputPath: '.formly-contract-generation.lock',
+    }, error);
+  }
+  try {
+    await handle.writeFile(`${process.pid}\n`, { encoding: 'utf8' });
+  } catch (error) {
+    await handle.close();
+    await unlink(lockPath).catch(() => undefined);
+    throw new WorkspaceGenerationError('OUTPUT_WRITE_FAILED', 'inventory', {
+      outputPath: '.formly-contract-generation.lock',
+    }, error);
+  }
+  try {
+    return await action();
+  } finally {
+    await handle.close();
+    try {
+      await unlink(lockPath);
+    } catch (error) {
+      if (errnoCode(error) !== 'ENOENT') throw error;
+    }
+  }
+}
+
+function assertDependencySnapshotUnchanged(
+  before: RuntimeDependencySnapshot,
+  after: RuntimeDependencySnapshot,
+): void {
+  if (canonicalStringify(before) !== canonicalStringify(after)) {
+    throw new WorkspaceGenerationError(
+      'DEPENDENCY_SNAPSHOT_CHANGED',
+      'output',
+    );
+  }
+}
+
 async function createInProcessRuntimeProvenance(
   workspaceRoot: string,
   tsconfigPaths: RuntimeProvenance["loader"]["options"]["tsconfigPaths"]
@@ -315,8 +399,82 @@ async function createInProcessRuntimeProvenance(
   });
 }
 
+async function createWorkerRuntimeProvenance(
+  workspaceRoot: string,
+  rootTsconfigConfigured: boolean,
+  descriptor: RuntimeHostModuleDescriptor | undefined,
+  runtimePackages: RuntimeProvenance['runtimePackages'],
+): Promise<RuntimeProvenance> {
+  const dependencySnapshot = await findPnpmDependencySnapshot(workspaceRoot);
+  let toolVersions;
+  try {
+    toolVersions = await readRuntimeToolVersions();
+  } catch (error) {
+    throw new WorkspaceGenerationError(
+      'RUNTIME_PROVENANCE_UNAVAILABLE',
+      'inventory',
+      {},
+      error,
+    );
+  }
+  const { workspaceVersion, compilerVersion, schemaVersion, jitiVersion } =
+    toolVersions;
+  return parseRuntimeProvenance({
+    schemaVersion: '1.0.0',
+    worker: {
+      id: '@formly-contract/workspace/project-worker',
+      version: workspaceVersion,
+      protocolVersion: '1',
+    },
+    adapter: {
+      id: descriptor?.id ?? '@formly-contract/compiler/declared',
+      version: descriptor?.version ?? compilerVersion,
+      mode: descriptor === undefined ? 'declared' : 'jit',
+    },
+    tools: [
+      { name: '@formly-contract/workspace', version: workspaceVersion },
+      { name: '@formly-contract/compiler', version: compilerVersion },
+      { name: '@formly-contract/schema', version: schemaVersion },
+    ],
+    loader: {
+      id: 'jiti',
+      version: jitiVersion,
+      options: {
+        fsCache: false,
+        interopDefault: false,
+        moduleCache: true,
+        tsconfigPaths: {
+          rootConfig: 'disabled',
+          projectConfigs: rootTsconfigConfigured ? 'configured' : 'disabled',
+        },
+        nativeModules:
+          descriptor === undefined
+            ? []
+            : ['@angular/compiler', '@angular/core'],
+      },
+    },
+    node: {
+      version: process.versions.node,
+      platform: process.platform,
+      architecture: process.arch,
+    },
+    executionProfile: {
+      id: 'trusted-local-v1',
+      version: '1',
+      network: 'not-enforced',
+    },
+    dependencySnapshot,
+    runtimePackages,
+  });
+}
+
 function normalizeRelativePath(path: string): string {
   return path.split(/[\\/]/u).join("/");
+}
+
+function cloneJsonValue(input: unknown): JsonValue {
+  const parsed: unknown = JSON.parse(canonicalStringify(input));
+  return parsed as JsonValue;
 }
 
 function canonicalOutputDirectory(path: string): string {
@@ -335,12 +493,22 @@ function scopedAggregateOutputDirectory(
   projects: readonly ResolvedProject[],
   options: RunWorkspaceOptions
 ): string {
+  return scopedAggregateOutputDirectoryForProjectIds(
+    outputDirectory,
+    projects.map(({ resolved }) => resolved.projectId),
+    options,
+  );
+}
+
+function scopedAggregateOutputDirectoryForProjectIds(
+  outputDirectory: string,
+  projectIdsInput: readonly string[],
+  options: RunWorkspaceOptions,
+): string {
   if (!isScopedRun(options)) {
     return outputDirectory;
   }
-  const projectIds = projects
-    .map(({ resolved }) => resolved.projectId)
-    .sort(compareCodeUnits);
+  const projectIds = [...projectIdsInput].sort(compareCodeUnits);
   const scopeHash = createHash("sha256")
     .update(canonicalStringify(projectIds))
     .digest("hex");
@@ -846,6 +1014,459 @@ function buildIndex(
   });
 }
 
+interface WorkerExecutionOutput {
+  readonly discovered: DiscoveredWorkspace;
+  readonly projects: readonly SerializableResolvedProject[];
+  readonly results: readonly ProjectExecutionResult[];
+  readonly runtimeProvenance: RuntimeProvenance;
+  readonly failures: readonly WorkspaceProjectExecutionFailure[];
+}
+
+/** Inventories project configs in disposable workers without invoking form factories. */
+export async function discoverWorkspaceProjectsInWorkers(
+  options: RunWorkspaceOptions,
+): Promise<Pick<DiscoveredWorkspace, 'inventory' | 'failures'>> {
+  const execution = options.projectExecution;
+  if (execution?.kind !== 'workers') {
+    throw new TypeError('Worker project execution was not selected.');
+  }
+  const discoveredConfigs = await discoverWorkspaceProjectConfigs({
+    workspaceRoot: options.workspaceRoot,
+    rootConfigPath: options.rootConfigPath,
+    ...(options.rootLoaderOptions === undefined ? {} : { rootLoaderOptions: options.rootLoaderOptions }),
+    ...(options.selectedProjectConfigPaths === undefined ? {} : { selectedProjectConfigPaths: options.selectedProjectConfigPaths }),
+  });
+  const rootPolicy = cloneJsonValue(discoveredConfigs.root.config);
+  const workerModuleUrl = execution.workerModuleUrl ?? new URL('./project-worker.js', import.meta.url).href;
+  const sessions: ProjectWorkerSession[] = [];
+  try {
+    const spawned = await Promise.allSettled(
+      discoveredConfigs.configPaths.map((configPath, index) => {
+        const projectRoot = posix.dirname(configPath) || '.';
+        return spawnProjectWorker({
+          protocolVersion: '1', requestId: `inventory:${index + 1}`, operation: 'inventory',
+          workspaceRoot: discoveredConfigs.workspaceRoot,
+          rootConfigPath: discoveredConfigs.root.configPath,
+          configPath, projectRoot, runtimeResolutionBase: projectRoot,
+          ...(discoveredConfigs.root.config.tsconfigPath === undefined ? {} : { tsconfigPath: discoveredConfigs.root.config.tsconfigPath }),
+          rootPolicy,
+          ...(execution.runtimeHost === undefined ? {} : { runtimeHost: execution.runtimeHost }),
+        }, {
+          workerModuleUrl,
+          ...(execution.timeoutMs === undefined ? {} : { timeoutMs: execution.timeoutMs }),
+        });
+      }),
+    );
+    sessions.push(...spawned.flatMap((outcome) => outcome.status === 'fulfilled' ? [outcome.value] : []));
+    const rejected = spawned.find((outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected');
+    if (rejected !== undefined && options.continueOnProjectError !== true) throw rejected.reason;
+    rejectDuplicateWorkerInventory(sessions);
+    const selected = selectWorkerSessions(sessions, options.selectedProjectIds);
+    const plugins = [...(discoveredConfigs.root.config.plugins ?? [])]
+      .sort((left, right) => compareCodeUnits(left.id, right.id))
+      .map(({ id, version, configSchemaVersion }) => ({ id, version, configSchemaVersion }));
+    return {
+      inventory: {
+        schemaVersion: WORKSPACE_CONFIG_SCHEMA_VERSION,
+        rootConfigPath: discoveredConfigs.root.configPath,
+        plugins,
+        projects: selected.map((session) => ({
+          configPath: session.request.configPath,
+          projectId: session.inventory.projectId,
+          sourceIds: session.inventory.sourceIds,
+        })),
+      },
+      ...(rejected === undefined ? {} : {
+        failures: spawned.flatMap((outcome, index) => outcome.status === 'rejected' ? [{
+          code: 'PROJECT_CONFIG_LOAD_FAILED' as const,
+          configPath: discoveredConfigs.configPaths[index]!,
+        }] : []),
+      }),
+    };
+  } finally {
+    await Promise.allSettled(sessions.map((session) => session.abort()));
+  }
+}
+
+function rejectDuplicateWorkerInventory(
+  sessions: readonly ProjectWorkerSession[],
+): void {
+  const identities = new Map<string, string>();
+  const record = (kind: string, identity: string, configPath: string) => {
+    const key = `${kind}:${identity}`;
+    const prior = identities.get(key);
+    if (prior !== undefined) {
+      throw new WorkspaceGenerationError('WORKSPACE_DISCOVERY_FAILED', 'inventory', {
+        outputPath: `${prior},${configPath}`,
+      });
+    }
+    identities.set(key, configPath);
+  };
+  for (const session of sessions) {
+    const configPath = session.request.configPath;
+    record('project', session.inventory.projectId, configPath);
+    for (const sourceId of session.inventory.sourceIds) {
+      record('source', sourceId, configPath);
+    }
+    for (const formId of session.inventory.formIds) {
+      record('form', formId, configPath);
+    }
+  }
+}
+
+function selectWorkerSessions(
+  sessions: readonly ProjectWorkerSession[],
+  selectedProjectIds: readonly string[] | undefined,
+): readonly ProjectWorkerSession[] {
+  if (selectedProjectIds === undefined || selectedProjectIds.length === 0) {
+    return sessions;
+  }
+  const selected = new Set(selectedProjectIds);
+  const available = new Set(sessions.map(({ inventory }) => inventory.projectId));
+  const missing = [...selected].sort(compareCodeUnits).find((id) => !available.has(id));
+  if (missing !== undefined) {
+    throw new WorkspaceGenerationError('WORKSPACE_DISCOVERY_FAILED', 'inventory', {
+      projectId: missing,
+    });
+  }
+  return sessions.filter(({ inventory }) => selected.has(inventory.projectId));
+}
+
+async function executeProjectsInWorkers(
+  options: RunWorkspaceOptions,
+  operation: 'generate' | 'check',
+): Promise<WorkerExecutionOutput> {
+  const execution = options.projectExecution;
+  if (execution?.kind !== 'workers') {
+    throw new TypeError('Worker project execution was not selected.');
+  }
+  const discoveredConfigs = await discoverWorkspaceProjectConfigs({
+    workspaceRoot: options.workspaceRoot,
+    rootConfigPath: options.rootConfigPath,
+    ...(options.rootLoaderOptions === undefined
+      ? {}
+      : { rootLoaderOptions: options.rootLoaderOptions }),
+    ...(options.selectedProjectConfigPaths === undefined
+      ? {}
+      : { selectedProjectConfigPaths: options.selectedProjectConfigPaths }),
+  });
+  const rootConfig = discoveredConfigs.root.config;
+  const rootPolicy = cloneJsonValue(rootConfig);
+  const cliOverrides =
+    options.cliOverrides === undefined
+      ? undefined
+      : cloneJsonValue(options.cliOverrides);
+  const workerModuleUrl =
+    execution.workerModuleUrl ?? new URL('./project-worker.js', import.meta.url).href;
+  const sessions: ProjectWorkerSession[] = [];
+  const failures: WorkspaceProjectExecutionFailure[] = [];
+  try {
+    const spawned = await Promise.allSettled(
+      discoveredConfigs.configPaths.map(async (configPath, index) => {
+        const projectRoot = posix.dirname(configPath) || '.';
+        return spawnProjectWorker(
+          {
+            protocolVersion: '1',
+            requestId: `project:${index + 1}`,
+            operation,
+            workspaceRoot: discoveredConfigs.workspaceRoot,
+            rootConfigPath: discoveredConfigs.root.configPath,
+            configPath,
+            projectRoot,
+            runtimeResolutionBase: projectRoot,
+            ...(rootConfig.tsconfigPath === undefined
+              ? {}
+              : { tsconfigPath: rootConfig.tsconfigPath }),
+            rootPolicy,
+            ...(cliOverrides === undefined ? {} : { cliOverrides }),
+            ...(execution.runtimeHost === undefined
+              ? {}
+              : { runtimeHost: execution.runtimeHost }),
+          },
+          {
+            workerModuleUrl,
+            ...(execution.timeoutMs === undefined
+              ? {}
+              : { timeoutMs: execution.timeoutMs }),
+          },
+        );
+      }),
+    );
+    sessions.push(
+      ...spawned.flatMap((outcome) =>
+        outcome.status === 'fulfilled' ? [outcome.value] : [],
+      ),
+    );
+    spawned.forEach((outcome, index) => {
+      if (outcome.status === 'rejected') {
+        failures.push({
+          configPath: discoveredConfigs.configPaths[index]!,
+          phase: 'inventory',
+        });
+      }
+    });
+    const failedSpawn = spawned.find(
+      (outcome): outcome is PromiseRejectedResult =>
+        outcome.status === 'rejected',
+    );
+    if (failedSpawn !== undefined && options.continueOnProjectError !== true) {
+      throw failedSpawn.reason;
+    }
+    if (sessions.length === 0 && failedSpawn !== undefined) {
+      throw failedSpawn.reason;
+    }
+    rejectDuplicateWorkerInventory(sessions);
+    const selected = selectWorkerSessions(sessions, options.selectedProjectIds);
+    const selectedSet = new Set(selected);
+    await Promise.all(
+      sessions
+        .filter((session) => !selectedSet.has(session))
+        .map((session) => session.abort()),
+    );
+    const compiled = await Promise.allSettled(
+      selected.map((session) => session.approve()),
+    );
+    compiled.forEach((outcome, index) => {
+      if (outcome.status === 'rejected') {
+        failures.push({
+          configPath: selected[index]!.request.configPath,
+          phase: 'compile',
+        });
+      }
+    });
+    const failedCompile = compiled.find(
+      (outcome): outcome is PromiseRejectedResult => outcome.status === 'rejected',
+    );
+    if (failedCompile !== undefined && options.continueOnProjectError !== true) {
+      throw failedCompile.reason;
+    }
+    const rawResults = compiled.flatMap((outcome) =>
+      outcome.status === 'fulfilled' ? [outcome.value] : [],
+    );
+    if (rawResults.length === 0 && failedCompile !== undefined) {
+      throw failedCompile.reason;
+    }
+    const results = rawResults.map(parseProjectExecutionResult).sort((left, right) =>
+      compareCodeUnits(left.project.configPath, right.project.configPath),
+    );
+    const runtimePackageRepresentations = new Set(
+      results.map((result) =>
+        canonicalStringify(result.runtimePackages ?? []),
+      ),
+    );
+    if (runtimePackageRepresentations.size > 1) {
+      throw new WorkspaceGenerationError(
+        'RUNTIME_PROVENANCE_UNAVAILABLE',
+        'inventory',
+      );
+    }
+    const runtimePackages = (results[0]?.runtimePackages ?? []) as RuntimeProvenance['runtimePackages'];
+    const runtimeProvenance =
+      options.runtimeProvenance ??
+      (await createWorkerRuntimeProvenance(
+        discoveredConfigs.workspaceRoot,
+        rootConfig.tsconfigPath !== undefined,
+        execution.runtimeHost,
+        runtimePackages,
+      ));
+    const projects = results.map(({ project }) => project);
+    const plugins = [...(rootConfig.plugins ?? [])]
+      .sort((left, right) => compareCodeUnits(left.id, right.id))
+      .map(({ id, version, configSchemaVersion }) => ({
+        id,
+        version,
+        configSchemaVersion,
+      }));
+    const discovered: DiscoveredWorkspace = {
+      root: discoveredConfigs.root,
+      projects: projects.map((project) => ({
+        configPath: project.configPath,
+        projectId: project.projectId,
+        sourceIds: project.sourceIds,
+        config: { projectId: project.projectId },
+      })),
+      inventory: {
+        schemaVersion: WORKSPACE_CONFIG_SCHEMA_VERSION,
+        rootConfigPath: discoveredConfigs.root.configPath,
+        plugins,
+        projects: projects.map(({ configPath, projectId, sourceIds }) => ({
+          configPath,
+          projectId,
+          sourceIds,
+        })),
+      },
+    };
+    return {
+      discovered,
+      projects,
+      results,
+      runtimeProvenance,
+      failures: failures.sort((left, right) =>
+        compareCodeUnits(left.configPath, right.configPath) ||
+        compareCodeUnits(left.phase, right.phase),
+      ),
+    };
+  } catch (error) {
+    await Promise.allSettled(sessions.map((session) => session.abort()));
+    throw error;
+  }
+}
+
+function projectIdentityFromWorker(
+  project: SerializableResolvedProject,
+  runtimeProvenance: RuntimeProvenance,
+): WorkspaceIndexProject {
+  const configurationHash = computeWorkspaceConfigurationHash({
+    schemaVersion: project.schemaVersion,
+    projectId: project.projectId,
+    outputDirectory: project.outputDirectory,
+    testIdAttributes: project.testIdAttributes,
+    failOn: project.failOn,
+    plugins: project.plugins,
+    sourceIds: project.sourceIds,
+    ...(project.fieldTypeProfileRegistry === undefined
+      ? {}
+      : { fieldTypeProfileRegistry: project.fieldTypeProfileRegistry }),
+    ...(project.crossFieldEffectRegistry === undefined
+      ? {}
+      : { crossFieldEffectRegistry: project.crossFieldEffectRegistry }),
+    effectCyclePolicy: project.effectCyclePolicy,
+    runtimeProvenance,
+  });
+  return {
+    configPath: project.configPath,
+    projectId: project.projectId,
+    sourceIds: project.sourceIds,
+    outputDirectory: normalizeRelativePath(project.outputDirectory),
+    configurationHash,
+    runtimeProvenance,
+    ...(project.fieldTypeProfileRegistry === undefined
+      ? {}
+      : {
+          fieldTypeProfileRegistry:
+            project.fieldTypeProfileRegistry as WorkspaceIndexFieldTypeProfileRegistryIdentity,
+        }),
+    ...(project.crossFieldEffectRegistry === undefined
+      ? {}
+      : {
+          crossFieldEffectRegistry:
+            project.crossFieldEffectRegistry as WorkspaceIndexCrossFieldEffectRegistryIdentity,
+        }),
+  };
+}
+
+function extractWorkerResults(
+  workspaceRoot: string,
+  results: readonly ProjectExecutionResult[],
+): ExtractionOutput {
+  const artifacts: PendingArtifact[] = [];
+  const forms: WorkspaceContractIndexDraft['forms'][number][] = [];
+  for (const result of results) {
+    for (const item of result.forms) {
+      const relativePath = workspaceRelativePath(
+        workspaceRoot,
+        workspaceContractArtifactPath({
+          outputDirectory: result.project.outputDirectory,
+          projectId: result.project.projectId,
+          formId: item.contract.formId,
+          contentHash: item.contract.contentHash,
+        }),
+        'extraction',
+      );
+      artifacts.push({
+        relativePath,
+        bytes: `${canonicalStringify(item.contract)}\n`,
+        replace: false,
+      });
+      const provenance = {
+        projectId: result.project.projectId,
+        sourceId: item.sourceId,
+        formId: item.formId,
+      };
+      const formlyTypesByNodeId = indexNodeFormlyTypes(item.contract.nodes);
+      forms.push({
+        ...provenance,
+        evidence: 'declared',
+        artifactPath: relativePath,
+        contractSchemaVersion: item.contract.schemaVersion,
+        contentHash: item.contract.contentHash,
+        diagnostics: item.contract.diagnostics.map((diagnostic) =>
+          indexDiagnostic(diagnostic, formlyTypesByNodeId),
+        ),
+        ...(item.contract.crossFieldEffectRegistry === undefined
+          ? {}
+          : {
+              declaredEffects: item.contract.declaredEffects!,
+              effectAnalysis: item.contract.effectAnalysis!,
+            }),
+      });
+    }
+  }
+  return {
+    artifacts: artifacts.sort((left, right) =>
+      compareCodeUnits(left.relativePath, right.relativePath),
+    ),
+    forms: forms.sort(
+      (left, right) =>
+        compareCodeUnits(left.formId, right.formId) ||
+        compareCodeUnits(left.projectId, right.projectId),
+    ),
+  };
+}
+
+function buildWorkerIndex(
+  discovered: DiscoveredWorkspace,
+  projects: readonly SerializableResolvedProject[],
+  forms: WorkspaceContractIndexDraft['forms'],
+  aggregateOutputDirectory: string,
+  runtimeProvenance: RuntimeProvenance,
+): WorkspaceContractIndex {
+  const indexedProjects = projects.map((project) =>
+    projectIdentityFromWorker(project, runtimeProvenance),
+  );
+  const configurationPlugins = [...(discovered.root.config.plugins ?? [])]
+    .sort((left, right) => compareCodeUnits(left.id, right.id))
+    .map((plugin) => toPluginIdentity(plugin));
+  return createWorkspaceContractIndex({
+    schemaVersion: WORKSPACE_INDEX_SCHEMA_VERSION,
+    workspaceConfigSchemaVersion: discovered.inventory.schemaVersion,
+    rootConfigPath: discovered.inventory.rootConfigPath,
+    configurationHash: computeWorkspaceConfigurationHash({
+      schemaVersion: discovered.inventory.schemaVersion,
+      rootConfigPath: discovered.inventory.rootConfigPath,
+      projectConfigs: [...discovered.root.config.projectConfigs].sort(compareCodeUnits),
+      excludeProjectConfigs: [
+        ...(discovered.root.config.excludeProjectConfigs ?? []),
+      ].sort(compareCodeUnits),
+      ...(discovered.root.config.tsconfigPath === undefined
+        ? {}
+        : { tsconfigPath: discovered.root.config.tsconfigPath }),
+      ...(discovered.root.config.sourceUsage === undefined
+        ? {}
+        : { sourceUsage: discovered.root.config.sourceUsage }),
+      outputDirectory: aggregateOutputDirectory,
+      ...(discovered.root.config.locators === undefined
+        ? {}
+        : { testIdAttributes: discovered.root.config.locators.testIdAttributes }),
+      ...(discovered.root.config.diagnostics === undefined
+        ? {}
+        : { failOn: discovered.root.config.diagnostics.failOn }),
+      effectCyclePolicy: discovered.root.config.effects?.cyclePolicy ?? 'error',
+      plugins: configurationPlugins,
+      runtimeProvenance,
+      projects: indexedProjects.map(({ configPath, projectId, configurationHash }) => ({
+        configPath,
+        projectId,
+        configurationHash,
+      })),
+    }),
+    runtimeProvenance,
+    plugins: discovered.inventory.plugins,
+    projects: indexedProjects,
+    forms,
+  });
+}
+
 export async function prepareSourceUsagePrograms(
   workspaceRoot: string,
   discovered: DiscoveredWorkspace
@@ -1236,8 +1857,116 @@ async function publishOutputs(
   }
 }
 
+async function planWorkerWorkspaceRun(
+  options: RunWorkspaceOptions,
+  operation: 'generate' | 'check',
+  workspaceRoot: string,
+): Promise<PlannedWorkspaceRun> {
+  let executed: WorkerExecutionOutput;
+  try {
+    executed = await executeProjectsInWorkers(
+      { ...options, workspaceRoot },
+      operation,
+    );
+  } catch (error) {
+    if (error instanceof WorkspaceGenerationError) throw error;
+    if (isOutsideWorkspaceOutputConfigError(error)) {
+      throw new WorkspaceGenerationError(
+        'OUTPUT_PATH_OUTSIDE_WORKSPACE',
+        'inventory',
+        {},
+        error,
+      );
+    }
+    throw new WorkspaceGenerationError(
+      'WORKSPACE_DISCOVERY_FAILED',
+      'inventory',
+      {},
+      error,
+    );
+  }
+
+  const { discovered, projects, results, runtimeProvenance, failures } = executed;
+  const sourceUsagePrograms = await prepareSourceUsagePrograms(
+    workspaceRoot,
+    discovered,
+  );
+  const extracted = extractWorkerResults(workspaceRoot, results);
+  const aggregateOutputDirectory = canonicalOutputDirectory(
+    options.cliOverrides?.outputDirectory ??
+      discovered.root.config.output?.directory ??
+      DEFAULT_OUTPUT_DIRECTORY,
+  );
+  const scopedOutputDirectory = scopedAggregateOutputDirectoryForProjectIds(
+    aggregateOutputDirectory,
+    projects.map(({ projectId }) => projectId),
+    options,
+  );
+  const indexPath = workspaceRelativePath(
+    workspaceRoot,
+    posix.join(
+      normalizeRelativePath(scopedOutputDirectory),
+      'workspace-index.json',
+    ),
+    'extraction',
+  );
+  const index = buildWorkerIndex(
+    discovered,
+    projects,
+    extracted.forms,
+    scopedOutputDirectory,
+    runtimeProvenance,
+  );
+  const sourceUsage = planSourceUsage(
+    workspaceRoot,
+    discovered,
+    index,
+    scopedOutputDirectory,
+    sourceUsagePrograms,
+  );
+  const retiredPaths =
+    sourceUsage === undefined
+      ? [sourceUsageCatalogRelativePath(workspaceRoot, scopedOutputDirectory)]
+      : [];
+  const artifacts = [
+    ...extracted.artifacts,
+    ...(sourceUsage === undefined ? [] : [sourceUsage.artifact]),
+  ].sort((left, right) =>
+    compareCodeUnits(left.relativePath, right.relativePath),
+  );
+  const plannedOutputPaths = [
+    ...artifacts.map(({ relativePath }) => relativePath),
+    indexPath,
+  ].sort(compareCodeUnits);
+  const duplicateOutputPath = plannedOutputPaths.find(
+    (path, outputIndex) =>
+      outputIndex > 0 && plannedOutputPaths[outputIndex - 1] === path,
+  );
+  if (duplicateOutputPath !== undefined) {
+    throw new WorkspaceGenerationError('OUTPUT_WRITE_FAILED', 'extraction', {
+      outputPath: duplicateOutputPath,
+    });
+  }
+  return {
+    workspaceRoot,
+    indexPath,
+    artifactPaths: extracted.artifacts.map(({ relativePath }) => relativePath),
+    index,
+    artifacts,
+    retiredPaths,
+    ...(failures.length === 0 ? {} : { projectFailures: failures }),
+    ...(sourceUsage === undefined
+      ? {}
+      : {
+          sourceUsageCatalogPath: sourceUsage.artifact.relativePath,
+          sourceUsageDiagnostics: sourceUsage.diagnostics,
+        }),
+  };
+}
+
 async function planWorkspaceRun(
-  options: RunWorkspaceOptions
+  options: RunWorkspaceOptions,
+  operation: 'generate' | 'check',
 ): Promise<PlannedWorkspaceRun> {
   let workspaceRoot: string;
   try {
@@ -1249,6 +1978,9 @@ async function planWorkspaceRun(
       {},
       error
     );
+  }
+  if (options.projectExecution?.kind === 'workers') {
+    return planWorkerWorkspaceRun(options, operation, workspaceRoot);
   }
   let discovered: DiscoveredWorkspace;
   try {
@@ -1423,7 +2155,7 @@ async function compareRetiredOutput(
 export async function checkWorkspace(
   options: RunWorkspaceOptions
 ): Promise<WorkspaceCheckResult> {
-  const planned = await planWorkspaceRun(options);
+  const planned = await planWorkspaceRun(options, 'check');
   const expectedOutputs = [
     ...planned.artifacts,
     {
@@ -1455,29 +2187,62 @@ export async function checkWorkspace(
           sourceUsageCatalogPath: planned.sourceUsageCatalogPath,
           sourceUsageDiagnostics: planned.sourceUsageDiagnostics ?? [],
         }),
+    ...(planned.projectFailures === undefined
+      ? {}
+      : { projectFailures: planned.projectFailures }),
   };
 }
 
 export async function runWorkspace(
   options: RunWorkspaceOptions
 ): Promise<WorkspaceRunResult> {
-  const planned = await planWorkspaceRun(options);
-  await publishOutputs(
-    planned.workspaceRoot,
-    planned.artifacts,
-    planned.retiredPaths,
-    planned.indexPath,
-    planned.index
-  );
-  return {
-    indexPath: planned.indexPath,
-    artifactPaths: planned.artifactPaths,
-    index: planned.index,
-    ...(planned.sourceUsageCatalogPath === undefined
-      ? {}
-      : {
-          sourceUsageCatalogPath: planned.sourceUsageCatalogPath,
-          sourceUsageDiagnostics: planned.sourceUsageDiagnostics ?? [],
-        }),
-  };
+  let workspaceRoot: string;
+  try {
+    workspaceRoot = await realpath(resolve(options.workspaceRoot));
+  } catch (error) {
+    throw new WorkspaceGenerationError(
+      'WORKSPACE_DISCOVERY_FAILED',
+      'inventory',
+      {},
+      error,
+    );
+  }
+  return withGenerationLock(workspaceRoot, async () => {
+    const dependencySnapshotBefore =
+      options.runtimeProvenance === undefined
+        ? await findPnpmDependencySnapshot(workspaceRoot)
+        : undefined;
+    const planned = await planWorkspaceRun(
+      { ...options, workspaceRoot },
+      'generate',
+    );
+    if (dependencySnapshotBefore !== undefined) {
+      const dependencySnapshotAfter = await findPnpmDependencySnapshot(workspaceRoot);
+      assertDependencySnapshotUnchanged(
+        dependencySnapshotBefore,
+        dependencySnapshotAfter,
+      );
+    }
+    await publishOutputs(
+      planned.workspaceRoot,
+      planned.artifacts,
+      planned.retiredPaths,
+      planned.indexPath,
+      planned.index,
+    );
+    return {
+      indexPath: planned.indexPath,
+      artifactPaths: planned.artifactPaths,
+      index: planned.index,
+      ...(planned.sourceUsageCatalogPath === undefined
+        ? {}
+        : {
+            sourceUsageCatalogPath: planned.sourceUsageCatalogPath,
+            sourceUsageDiagnostics: planned.sourceUsageDiagnostics ?? [],
+          }),
+      ...(planned.projectFailures === undefined
+        ? {}
+        : { projectFailures: planned.projectFailures }),
+    };
+  });
 }

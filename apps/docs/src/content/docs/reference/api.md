@@ -111,8 +111,12 @@ Node-oriented schema root:
 
 | API | Purpose |
 | --- | --- |
-| `radioChoice(options?)` | Declare the shipped radio-choice behavior preset and option projection paths. |
+| `radioChoice(options?)` / `choiceControl(options?)` | Declare single- or multi-choice controls and projected option paths. |
+| `typedInput(options)` | Declare typed text, search, or numeric input semantics. |
+| `autocompleteChoice(options?)` / `rowSelection(options?)` | Declare overlay autocomplete and row-selection interactions. |
+| `repeater(options?)` / `stepper(options?)` | Declare structural add/expand and multi-step navigation interactions. |
 | `defineContractedFormlyType(definition)` | Validate and freeze one compact Formly type declaration. |
+| `defineContractedFormlyWrapper(definition)` | Declare an optional reviewed wrapper activation precondition. |
 | `toFormlyTypeRegistration(type, component)` | Bind the same declared type name to the real Angular component registration. |
 | `buildFieldTypeProfileRegistry(input)` | Lower reviewed declarations into the canonical profile registry consumed by generation. |
 
@@ -142,9 +146,8 @@ const formlyRegistration = toFormlyTypeRegistration(
 );
 ```
 
-`radioChoice()` is the only compact behavior preset currently shipped. The
-helper validates declared intent; it does not inspect the component template or
-invent interaction semantics.
+The compact helpers validate declared intent; they do not inspect component
+templates or invent interaction semantics.
 
 ## Compiler
 
@@ -218,9 +221,18 @@ deliberately exposed as standalone roots.
 | API | Purpose |
 | --- | --- |
 | `discoverWorkspaceProjects(options)` | Resolve root policy and inventory project/source IDs without executing source lists or form factories. |
+| `discoverWorkspaceProjectConfigs(options)` | Expand and validate project-config paths without importing any project. |
 | `runWorkspace(options)` | Execute trusted factories, validate contracts, and publish content-addressed artifacts plus the workspace index. |
 | `checkWorkspace(options)` | Regenerate expected canonical bytes in memory and report missing or stale artifacts without writing. |
 | `parseWorkspaceContractIndex(value)` | Strictly validate stored workspace index JSON. |
+| `createDynamicSemanticsContextPack(input)` | Read only explicit workspace-confined source spans for a separate model-enrichment workflow. |
+| `createDynamicSemanticsCandidateFromModelOutput(context, output)` | Strictly validate proposal output and require its evidence spans to match the trusted context pack exactly. |
+| `evaluateDynamicSemanticsCandidates(items)` | Score provider-neutral proposal outputs; no model call is performed. |
+| `runDynamicSemanticsEnrichment(input)` | Invoke one explicitly supplied local or hosted provider outside generation and bind model provenance/evidence. |
+
+`@formly-contract/angular/jit` exports `runAngularWorkspace` and
+`checkAngularWorkspace`. They force disposable project workers and preload the
+selected project's matching Angular compiler before project config imports.
 
 ```ts
 import {
