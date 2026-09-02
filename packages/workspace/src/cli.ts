@@ -19,6 +19,9 @@ import {
   type WorkspaceCheckResult,
   type WorkspaceRunResult,
 } from './run-workspace.js';
+import { createRuntimeHostFailureExplanation } from './runtime-host/failure-explanation.js';
+import { ProjectWorkerSupervisorError } from './runtime-host/worker-supervisor.js';
+import type { RuntimeHostFailureExplanation } from './runtime-host/protocol.js';
 
 const DEFAULT_ROOT_CONFIG_PATH = 'formly-contracts.config.ts';
 
@@ -37,6 +40,7 @@ Options:
   --fail-on <severity>     Fail on warning or error; generate or check only
   --project <id>           Select a project ID; may be repeated
   --project-config <path>  Select an exact project config; may be repeated
+  --explain                Show bounded, workspace-local failure details
   --form-id <id>           Select a stable form ID; author-factory-inputs only
   -h, --help               Show this help
 `;
@@ -94,6 +98,7 @@ interface ParsedWorkspaceCommand {
   readonly projectIds?: readonly string[];
   readonly projectConfigPaths?: readonly string[];
   readonly formIds?: readonly string[];
+  readonly explain: boolean;
 }
 
 class CliUsageError extends Error {
@@ -138,6 +143,7 @@ function parseWorkspaceCommand(
         project: { type: 'string', multiple: true },
         'project-config': { type: 'string', multiple: true },
         'form-id': { type: 'string', multiple: true },
+        explain: { type: 'boolean' },
         help: { type: 'boolean', short: 'h' },
       },
     });
@@ -177,6 +183,11 @@ function parseWorkspaceCommand(
       'Project selection is not accepted by author-factory-inputs.',
     );
   }
+  if (name === 'author-factory-inputs' && parsed.values.explain === true) {
+    throw new CliUsageError(
+      '--explain is accepted only by list, generate, and check.',
+    );
+  }
   if (
     (name === 'list' || name === 'author-factory-inputs') &&
     (parsed.values.output !== undefined ||
@@ -200,6 +211,7 @@ function parseWorkspaceCommand(
     name,
     workspaceRoot: parsed.values['workspace-root'] ?? cwd(),
     rootConfigPath: parsed.values.config ?? DEFAULT_ROOT_CONFIG_PATH,
+    explain: parsed.values.explain === true,
     ...(parsed.values.output === undefined
       ? {}
       : { outputDirectory: parsed.values.output }),
@@ -219,6 +231,8 @@ function parseWorkspaceCommand(
 function formatWorkspaceError(
   operation: 'Authoring' | 'Generation' | 'Check',
   error: WorkspaceGenerationError,
+  explain = false,
+  workspaceRoot = process.cwd(),
 ): string {
   const provenance = [
     `phase=${error.phase}`,
@@ -230,7 +244,51 @@ function formatWorkspaceError(
       : [`output=${JSON.stringify(error.outputPath)}`]),
   ].join(' ');
   const hint = configLoadHint(error);
-  return `${operation} failed [${error.code}] ${provenance}\n${error.message}\n${hint}`;
+  const explanation = explain
+    ? formatFailureExplanation(
+        createRuntimeHostFailureExplanation(error, workspaceRoot),
+      )
+    : '';
+  return `${operation} failed [${error.code}] ${provenance}\n${error.message}\n${hint}${explanation}`;
+}
+
+function formatFailureExplanation(
+  explanation: RuntimeHostFailureExplanation | undefined,
+): string {
+  if (explanation === undefined) return '';
+  return [
+    'Explanation (local only):',
+    ...explanation.causes.map(
+      (cause, index) =>
+        `  Cause ${index + 1}: ${cause.name}: ${cause.message}`,
+    ),
+    ...explanation.frames.map(
+      (frame) => `  at ${frame.path}:${frame.line}:${frame.column}`,
+    ),
+    '',
+  ].join('\n');
+}
+
+function formatProjectWorkerError(
+  operation: 'Generation' | 'Check',
+  error: ProjectWorkerSupervisorError,
+  explain: boolean,
+): string {
+  const code = error.workerFailureCode ?? error.code;
+  const provenance = [
+    ...(error.workerFailurePhase === undefined
+      ? []
+      : [`phase=${error.workerFailurePhase}`]),
+    ...(error.configPath === undefined
+      ? []
+      : [`config=${JSON.stringify(error.configPath)}`]),
+  ];
+  return (
+    `${operation} failed [${code}]${
+      provenance.length === 0 ? '' : ` ${provenance.join(' ')}`
+    }\nProject worker failed.\n` +
+    (explain ? formatFailureExplanation(error.explanation) : '')
+  );
 }
 
 function configLoadHint(error: unknown): string {
@@ -257,6 +315,7 @@ function workspaceOptions(
     ...(command.projectConfigPaths === undefined
       ? {}
       : { selectedProjectConfigPaths: command.projectConfigPaths }),
+    ...(command.explain ? { explain: true } : {}),
     ...(command.outputDirectory === undefined && command.failOn === undefined
       ? {}
       : {
@@ -274,15 +333,18 @@ function workspaceOptions(
 
 function formatProjectDiscoveryFailures(
   failures: DiscoveredWorkspace['failures'],
+  explain: boolean,
 ): string {
   if (failures === undefined || failures.length === 0) {
     return '';
   }
   return [
-    ...failures.map(
-      ({ code, configPath }) =>
-        `Project unavailable [${code}] config=${JSON.stringify(configPath)}`,
-    ),
+    ...failures
+      .flatMap(({ code, configPath, phase, explanation }) => [
+        `Project unavailable [${code}] phase=${phase} config=${JSON.stringify(configPath)}`,
+        ...(explain ? [formatFailureExplanation(explanation).trimEnd()] : []),
+      ])
+      .filter((line) => line.length > 0),
     '',
   ].join('\n');
 }
@@ -437,6 +499,7 @@ export async function runWorkspaceCli(
         workspaceRoot: command.workspaceRoot,
         rootConfigPath: command.rootConfigPath,
         continueOnProjectError: true,
+        ...(command.explain ? { explain: true } : {}),
         ...(command.projectIds === undefined
           ? {}
           : { selectedProjectIds: command.projectIds }),
@@ -445,15 +508,23 @@ export async function runWorkspaceCli(
           : { selectedProjectConfigPaths: command.projectConfigPaths }),
       });
       stdout.write(formatInventory(result.inventory));
-      const failures = formatProjectDiscoveryFailures(result.failures);
+      const failures = formatProjectDiscoveryFailures(
+        result.failures,
+        command.explain,
+      );
       if (failures.length > 0) {
         stderr.write(failures);
         return 1;
       }
       return 0;
     } catch (error) {
+      const explanation = command.explain
+        ? formatFailureExplanation(
+            createRuntimeHostFailureExplanation(error, command.workspaceRoot),
+          )
+        : '';
       stderr.write(
-        `List failed [WORKSPACE_DISCOVERY_FAILED]\nWorkspace discovery failed.\n${configLoadHint(error)}`,
+        `List failed [WORKSPACE_DISCOVERY_FAILED]\nWorkspace discovery failed.\n${configLoadHint(error)}${explanation}`,
       );
       return 1;
     }
@@ -514,13 +585,26 @@ export async function runWorkspaceCli(
         formatWorkspaceError(
           command.name === 'check' ? 'Check' : 'Generation',
           error,
+          command.explain,
+          command.workspaceRoot,
         ),
       );
       return 1;
     }
     const operation = command.name === 'check' ? 'Check' : 'Generation';
+    if (error instanceof ProjectWorkerSupervisorError) {
+      stderr.write(
+        formatProjectWorkerError(operation, error, command.explain),
+      );
+      return 1;
+    }
+    const explanation = command.explain
+      ? formatFailureExplanation(
+          createRuntimeHostFailureExplanation(error, command.workspaceRoot),
+        )
+      : '';
     stderr.write(
-      `${operation} failed [UNEXPECTED]\nWorkspace ${operation.toLowerCase()} failed.\n`,
+      `${operation} failed [UNEXPECTED]\nWorkspace ${operation.toLowerCase()} failed.\n${explanation}`,
     );
     return 1;
   }

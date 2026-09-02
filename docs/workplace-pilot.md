@@ -156,6 +156,17 @@ The selected index is written beneath a deterministic
 index untouched. Run unfiltered `list` to see both healthy inventory and safe
 per-config failure records.
 
+Normal output reports each unavailable project's stable failure code, phase,
+and workspace-relative config path without exposing exception text. During a
+local diagnosis, opt into a bounded cause chain and workspace-relative frames:
+
+```sh
+pnpm exec formly-contracts-angular list --explain
+```
+
+`--explain` is also accepted by `generate` and `check`. It does not stream raw
+worker stderr or add causes and frames to generated contract artifacts.
+
 Repository CI packs every publishable package and runs the workspace CLI in an
 isolated temporary consumer. Workspace and Angular now participate in the same
 release-readiness and tarball boundary checks as schema and compiler.
@@ -381,6 +392,15 @@ dependencies such as NgRx or Apollo Angular, plain Node may request the Angular
 JIT compiler before the form factories are reached. The durable fix is a
 secondary entry point that exports only Node-safe source descriptors, form
 factories, types, constants, and pure utilities.
+
+The Angular-aware worker preloads the selected project's compiler, but that
+does not repair arbitrary JavaScript initialization cycles. If a component
+refers to itself directly in decorator provider metadata, use Angular's
+`forwardRef(() => Component)` pattern for that specific edge. Still keep the
+contract definition's entire runtime dependency closure out of the browser
+barrel. The user-facing [Node-safe Angular libraries
+guide](../apps/docs/src/content/docs/reference/node-safe-angular-libraries.md)
+contains the complete supported layout and verification flow.
 
 When a secondary entry point cannot be published during the pilot, use a
 tool-only shim and a dedicated TypeScript config. The shim must import safe

@@ -9,7 +9,7 @@ hosted documentation site.
 | Reader or task | Start here |
 | --- | --- |
 | Evaluating the product | [Hosted documentation](https://dills122.github.io/formly-contract/) and the [product status page](../apps/docs/src/content/docs/start/product-status.md) |
-| Integrating a repository | [Workplace pilot](./workplace-pilot.md), then [workspace configuration](./workspace-configuration.md) |
+| Integrating a repository | [Node-safe Angular library setup](../apps/docs/src/content/docs/reference/node-safe-angular-libraries.md), [workplace pilot](./workplace-pilot.md), then [workspace configuration](./workspace-configuration.md) |
 | Understanding architecture | [Architecture overview](./architecture-overview.md) and accepted [decisions](./decisions/) |
 | Contributing code | Root [`CONTRIBUTING.md`](../CONTRIBUTING.md), then the owning package README under [`packages/`](../packages/README.md) |
 | Maintaining the docs site | [`apps/docs/README.md`](../apps/docs/README.md) and the [docs contributor guide](../apps/docs/src/content/docs/resources/contributing.md) |
@@ -33,6 +33,12 @@ package entry points before describing behavior as shipped.
 Current integration-friction observations from the maintained walkthrough are
 kept in the [setup and wiring DX notes](./research/setup-wiring-dx-notes.md).
 They are research inputs, not accepted API commitments.
+
+The sanitized [2026-09-02 workplace pilot feedback
+record](./planning/workplace-pilot-feedback-2026-09-02.md) preserves the latest
+pilot findings, their code-level dispositions, recommended delivery order, and
+a concrete Node-safe Angular/Formly integration example. It is an investigation
+and planning record, not a shipped-capability claim.
 
 ## Contributor rules
 

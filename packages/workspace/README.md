@@ -39,13 +39,32 @@ workspace index.
 Trusted compositions can select worker execution. All workers inventory first,
 so cross-project duplicates fail before any form factory runs. With
 `continueOnProjectError`, failed projects are skipped and returned as safe
-`projectFailures`; healthy projects still produce a deterministic index. A
-single-writer lock spans generation through index-last publication, and the
-selected pnpm lockfile is rechecked immediately before commit.
+`projectFailures` with their stable worker code, phase, and config path; healthy
+projects still produce a deterministic index. Set `explain: true` through the
+programmatic runner or pass `--explain` to `list`, `generate`, or `check` to
+request bounded cause summaries and workspace-only frames. Explanations are
+local runtime results only and never enter artifacts or hashes. A single-writer
+lock spans generation through index-last publication, and the selected pnpm
+lockfile is rechecked immediately before commit.
+
+The runtime-host protocol is a strict package-lockstep IPC contract, not an
+independently compatible plugin protocol. Optional fields are additive only for
+the parent and worker shipped with the same `@formly-contract/workspace`
+version; strict parsers reject fields they do not know. A custom
+`projectExecution.workerModuleUrl` must therefore be built and tested against
+that exact workspace package version.
 
 Configuration and form factories are executable application code. Run this
 package only against trusted workspaces. Generated artifacts are the portable,
 strictly validated boundary intended for downstream consumers.
+
+Project configs should import a dedicated Node-safe contracts entry point, not
+an Angular/browser package root. Config evaluation follows the entire runtime
+import graph and does not tree-shake unused browser exports. See the
+[Node-safe Angular libraries
+guide](../../apps/docs/src/content/docs/reference/node-safe-angular-libraries.md)
+for the recommended browser/factory/contracts split and selected-project
+verification flow.
 
 ## What it does not own
 

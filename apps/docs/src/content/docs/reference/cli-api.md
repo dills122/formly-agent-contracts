@@ -22,6 +22,7 @@ Options:
   --project <id>           Select a project ID; may be repeated
   --project-config <path>  Select an exact project config; may be repeated
   --form-id <id>           Select a stable form ID; author-factory-inputs only
+  --explain                Print bounded local failure causes and workspace-relative frames
   -h, --help               Show this help
 ```
 
@@ -29,6 +30,20 @@ Use repeatable `--fail-on` flags to select both severities. `list` rejects
 `--output` and `--fail-on` because it does not generate contracts.
 `author-factory-inputs` also rejects those write-oriented options and accepts a
 repeatable `--form-id` filter instead.
+
+`--explain` is available for `list`, `generate`, and `check`. Default output
+shows stable project failure codes and phases but withholds underlying causes.
+The opt-in view prints at most three single-line cause summaries and five stack
+frames that resolve inside the workspace. It does not expose raw worker stderr,
+and explanation data is never written into contracts, indexes, or hashes.
+Treat it as local diagnostic output because bounded cause messages can still
+contain application identifiers.
+
+```sh
+pnpm exec formly-contracts-angular list \
+  --project-config libs/forms-kit/formly-contracts.project.ts \
+  --explain
+```
 
 Use repeatable `--project` for IDs when the whole project-config inventory is
 Node-loadable. If a browser-only project config fails during import, select the

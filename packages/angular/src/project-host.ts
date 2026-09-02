@@ -1,8 +1,9 @@
-import type {
-  RuntimePackageResolution,
-  WorkspaceRuntimeBootstrapContext,
-  WorkspaceRuntimeBootstrapResult,
-  WorkspaceRuntimeHost,
+import {
+  RUNTIME_HOST_PROTOCOL_VERSION,
+  type RuntimePackageResolution,
+  type WorkspaceRuntimeBootstrapContext,
+  type WorkspaceRuntimeBootstrapResult,
+  type WorkspaceRuntimeHost,
 } from '@formly-contract/workspace/runtime-host';
 
 import {
@@ -52,7 +53,7 @@ function ambientCompilerFacadePresent(): boolean {
 
 export function createWorkspaceRuntimeHost(): WorkspaceRuntimeHost {
   return {
-    protocolVersion: '1',
+    protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
     id: ANGULAR_JIT_RUNTIME_HOST_ID,
     version: ANGULAR_JIT_RUNTIME_HOST_VERSION,
     async beforeConfigLoad(

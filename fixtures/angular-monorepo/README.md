@@ -80,6 +80,7 @@ From the repository root:
 ```sh
 pnpm exec vitest run fixtures/angular-monorepo/workspace-fixture.test.ts
 pnpm --filter @formly-contract/angular-monorepo-fixture build
+pnpm test:angular-jit-host
 pnpm fixture:angular:serve
 ```
 
@@ -96,3 +97,9 @@ layout and when those files may be updated.
 
 The production build verifies the complete app → feature-lib → forms-kit →
 formly-kit browser composition.
+
+The Angular worker-host smoke also executes the built CLI against intentionally
+failing project fixtures. It covers inventory and compile failures through both
+`check` and `generate`, verifies default diagnostics stay concise, verifies
+`--explain` retains only workspace-relative evidence, rejects sensitive UNC and
+Windows namespace paths, and confirms failed generation leaves no output.

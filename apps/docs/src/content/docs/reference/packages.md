@@ -61,6 +61,22 @@ maps configuration, discovery, generation, source indexing, and CLI ownership.
 The [workspace API](./api.md#workspace) and [CLI reference](./cli-api.md) are
 the current consumer lookup surfaces.
 
+## `@formly-contract/angular`
+
+Use for the guarded Angular JIT runtime host and the
+`formly-contracts-angular` CLI. It resolves the selected project's Angular and
+Formly peers, reserves `@angular/compiler` before partially compiled Angular
+modules load, and evaluates each selected project in a disposable child.
+
+It does not make every application browser barrel safe to evaluate under Node.
+A consuming forms library must still expose a Node-safe contracts entry point
+whose runtime imports exclude Angular components, browser integrations, and
+eager application initialization. Follow
+[Node-safe Angular libraries](./node-safe-angular-libraries.md) for the complete
+consumer setup and [the Angular package
+README](https://github.com/dills122/formly-contract/blob/main/packages/angular/README.md)
+for the programmatic host boundary.
+
 ## Private `@formly-contract/playwright` experiment
 
 The repository contains a private `0.0.0` package that binds validated driver

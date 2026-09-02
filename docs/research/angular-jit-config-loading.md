@@ -255,6 +255,7 @@ interface ProjectExecutionRequest {
 
   readonly rootPolicy: SerializableResolvedRootPolicy;
   readonly cliOverrides?: WorkspaceCliOverrides;
+  readonly explain?: boolean;
 }
 
 interface RuntimeHostModuleDescriptor {
@@ -266,6 +267,12 @@ interface RuntimeHostModuleDescriptor {
   readonly options?: JsonValue;
 }
 ```
+
+Protocol version `1` is strict and package-lockstep. It identifies the IPC
+shape shipped by one exact `@formly-contract/workspace` release; it is not an
+independent compatibility promise between separately upgraded parents,
+workers, or custom worker modules. Unknown keys are rejected, so a custom
+worker must be compiled and tested against the exact parent package version.
 
 `projectId` and `sourceIds` are intentionally absent because they are unknown
 until the child evaluates the project config. The generic defaults are the

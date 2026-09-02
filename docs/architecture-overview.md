@@ -262,6 +262,20 @@ serializable runtime-host protocol:
    completion order, and performs content-addressed artifact publication with
    the workspace index replaced last.
 
+Worker failures retain a validated stable code and `bootstrap`, `inventory`, or
+`compile` phase across IPC and aggregation. Default CLI output exposes only
+that safe classification and the workspace-relative project config. The
+opt-in `--explain` path asks the worker for at most three bounded cause summaries
+and five workspace-relative stack frames. Those local diagnostics never enter
+contract artifacts, workspace indexes, hashes, or raw child stderr.
+
+This runtime-host protocol is strict and package-lockstep. Its version labels
+the IPC shape shipped together inside one `@formly-contract/workspace`
+release; it does not promise that independently upgraded parents, workers, or
+custom worker modules accept additive fields. Strict parsers reject unknown
+keys, so custom `workerModuleUrl` integrations must target and test against the
+exact workspace package version.
+
 Optional Nx integration must preserve that single orchestration and publication
 owner. The first Nx contract therefore attaches one aggregate target to an
 explicitly selected coordinator project and delegates one complete workspace

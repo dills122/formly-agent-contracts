@@ -8,7 +8,11 @@ export {
 } from './protocol.js';
 export type {
   ProjectExecutionRequest,
+  RuntimeHostFailureCause,
   RuntimeHostFailureCode,
+  RuntimeHostFailureExplanation,
+  RuntimeHostFailureFrame,
+  RuntimeHostFailurePhase,
   RuntimeHostModuleDescriptor,
   RuntimeHostOperation,
   RuntimeHostParentMessage,

@@ -1,4 +1,7 @@
-import type { WorkspaceRuntimeHost } from '@formly-contract/workspace/runtime-host';
+import {
+  RUNTIME_HOST_PROTOCOL_VERSION,
+  type WorkspaceRuntimeHost,
+} from '@formly-contract/workspace/runtime-host';
 
 import {
   ANGULAR_AUTHORING_RUNTIME_HOST_ID,
@@ -8,7 +11,7 @@ import {
 /** Stable refusal until the distinct browser/AOT authoring host is implemented. */
 export function createWorkspaceRuntimeHost(): WorkspaceRuntimeHost {
   return {
-    protocolVersion: '1',
+    protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
     id: ANGULAR_AUTHORING_RUNTIME_HOST_ID,
     version: ANGULAR_AUTHORING_RUNTIME_HOST_VERSION,
     beforeConfigLoad() {

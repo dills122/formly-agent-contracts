@@ -84,10 +84,12 @@ import {
   type SerializableResolvedProject,
 } from './project-execution.js';
 import {
+  ProjectWorkerSupervisorError,
   spawnProjectWorker,
   type ProjectWorkerSession,
 } from './runtime-host/worker-supervisor.js';
 import type { RuntimeHostModuleDescriptor } from './runtime-host/protocol.js';
+import type { WorkspaceProjectFailure } from './project-failure.js';
 
 export type WorkspaceGenerationErrorCode =
   | "WORKSPACE_DISCOVERY_FAILED"
@@ -201,10 +203,7 @@ export interface WorkspaceRunResult {
   readonly projectFailures?: readonly WorkspaceProjectExecutionFailure[];
 }
 
-export interface WorkspaceProjectExecutionFailure {
-  readonly configPath: string;
-  readonly phase: 'inventory' | 'compile';
-}
+export type WorkspaceProjectExecutionFailure = WorkspaceProjectFailure;
 
 export interface WorkspaceCheckDifference {
   readonly path: string;
@@ -1022,6 +1021,28 @@ interface WorkerExecutionOutput {
   readonly failures: readonly WorkspaceProjectExecutionFailure[];
 }
 
+function workspaceProjectFailure(
+  configPath: string,
+  error: unknown,
+  fallbackPhase: 'inventory' | 'compile',
+): WorkspaceProjectExecutionFailure {
+  if (error instanceof ProjectWorkerSupervisorError) {
+    return {
+      code: error.workerFailureCode ?? error.code,
+      configPath,
+      phase: error.workerFailurePhase ?? fallbackPhase,
+      ...(error.explanation === undefined
+        ? {}
+        : { explanation: error.explanation }),
+    };
+  }
+  return {
+    code: 'WORKER_FAILURE',
+    configPath,
+    phase: fallbackPhase,
+  };
+}
+
 /** Inventories project configs in disposable workers without invoking form factories. */
 export async function discoverWorkspaceProjectsInWorkers(
   options: RunWorkspaceOptions,
@@ -1048,6 +1069,7 @@ export async function discoverWorkspaceProjectsInWorkers(
           workspaceRoot: discoveredConfigs.workspaceRoot,
           rootConfigPath: discoveredConfigs.root.configPath,
           configPath, projectRoot, runtimeResolutionBase: projectRoot,
+          ...(options.explain === true ? { explain: true } : {}),
           ...(discoveredConfigs.root.config.tsconfigPath === undefined ? {} : { tsconfigPath: discoveredConfigs.root.config.tsconfigPath }),
           rootPolicy,
           ...(execution.runtimeHost === undefined ? {} : { runtimeHost: execution.runtimeHost }),
@@ -1077,10 +1099,17 @@ export async function discoverWorkspaceProjectsInWorkers(
         })),
       },
       ...(rejected === undefined ? {} : {
-        failures: spawned.flatMap((outcome, index) => outcome.status === 'rejected' ? [{
-          code: 'PROJECT_CONFIG_LOAD_FAILED' as const,
-          configPath: discoveredConfigs.configPaths[index]!,
-        }] : []),
+        failures: spawned.flatMap((outcome, index) =>
+          outcome.status === 'rejected'
+            ? [
+                workspaceProjectFailure(
+                  discoveredConfigs.configPaths[index]!,
+                  outcome.reason,
+                  'inventory',
+                ),
+              ]
+            : [],
+        ),
       }),
     };
   } finally {
@@ -1174,6 +1203,7 @@ async function executeProjectsInWorkers(
             configPath,
             projectRoot,
             runtimeResolutionBase: projectRoot,
+            ...(options.explain === true ? { explain: true } : {}),
             ...(rootConfig.tsconfigPath === undefined
               ? {}
               : { tsconfigPath: rootConfig.tsconfigPath }),
@@ -1199,10 +1229,13 @@ async function executeProjectsInWorkers(
     );
     spawned.forEach((outcome, index) => {
       if (outcome.status === 'rejected') {
-        failures.push({
-          configPath: discoveredConfigs.configPaths[index]!,
-          phase: 'inventory',
-        });
+        failures.push(
+          workspaceProjectFailure(
+            discoveredConfigs.configPaths[index]!,
+            outcome.reason,
+            'inventory',
+          ),
+        );
       }
     });
     const failedSpawn = spawned.find(
@@ -1228,10 +1261,13 @@ async function executeProjectsInWorkers(
     );
     compiled.forEach((outcome, index) => {
       if (outcome.status === 'rejected') {
-        failures.push({
-          configPath: selected[index]!.request.configPath,
-          phase: 'compile',
-        });
+        failures.push(
+          workspaceProjectFailure(
+            selected[index]!.request.configPath,
+            outcome.reason,
+            'compile',
+          ),
+        );
       }
     });
     const failedCompile = compiled.find(
@@ -1870,6 +1906,7 @@ async function planWorkerWorkspaceRun(
     );
   } catch (error) {
     if (error instanceof WorkspaceGenerationError) throw error;
+    if (error instanceof ProjectWorkerSupervisorError) throw error;
     if (isOutsideWorkspaceOutputConfigError(error)) {
       throw new WorkspaceGenerationError(
         'OUTPUT_PATH_OUTSIDE_WORKSPACE',

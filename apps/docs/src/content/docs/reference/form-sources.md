@@ -89,6 +89,14 @@ Prefer a secondary entry point such as:
 ```
 
 Config loading evaluates imports; it does not tree-shake a browser barrel.
+The `/contracts` entry point must not re-export or import the package root. Its
+entire runtime dependency closure—not only its top-level file—must remain safe
+to evaluate under Node. Type-only imports are erased, but an ordinary import in
+a nested form factory can still pull the browser graph into the worker.
+
+Use the [Node-safe Angular libraries](./node-safe-angular-libraries.md) guide for
+a complete factory, descriptor, path-alias, project-config, and verification
+example.
 
 ## Source-usage boundary
 
@@ -120,4 +128,10 @@ or Jiti module snapshots and retains a short config-loading-to-Program window.
 See the [Nx form definition](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/src/lib/deployment.contract.ts),
 [source descriptor](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/src/lib/deployment.source.ts),
 and [project config](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/feature-lib/formly-contracts.project.ts).
+The fixture's separate
+[`index.ts`](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/forms-kit/src/index.ts),
+[`forms.ts`](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/forms-kit/src/forms.ts),
+and
+[`contracts.ts`](https://github.com/dills122/formly-contract/blob/main/fixtures/nx-workspace/libs/forms-kit/src/contracts.ts)
+retain the recommended browser/factory/contracts boundary.
 :::

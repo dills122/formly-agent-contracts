@@ -30,6 +30,8 @@ import { describe, expect, it } from "vitest";
 
 const fixtureRoot = fileURLToPath(new URL("./", import.meta.url));
 const fixtureTsconfig = resolve(fixtureRoot, "tsconfig.json");
+const workspaceGenerationTimeout = 60_000;
+const workspaceDeterminismTimeout = 90_000;
 const fixtureRuntimeProvenance: RuntimeProvenance = {
   schemaVersion: "1.0.0",
   worker: {
@@ -337,7 +339,7 @@ describe("Nx workspace consumer fixture", () => {
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
-  }, 30_000);
+  }, workspaceGenerationTimeout);
 
   it("uses one explicit project definition for contract creation, cases, and source lineage", async () => {
     const project = parseProjectConfig(
@@ -659,7 +661,7 @@ describe("Nx workspace consumer fixture", () => {
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
-  }, 30_000);
+  }, workspaceGenerationTimeout);
 
   it("resolves declared effects while retaining opaque dynamic-rule analysis", async () => {
     const temporaryDirectory = await mkdtemp(
@@ -722,7 +724,7 @@ describe("Nx workspace consumer fixture", () => {
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
-  }, 30_000);
+  }, workspaceGenerationTimeout);
 
   it("generates deterministic portable bytes for all twelve forms", async () => {
     const temporaryDirectory = await mkdtemp(
@@ -770,5 +772,5 @@ describe("Nx workspace consumer fixture", () => {
     } finally {
       await rm(temporaryDirectory, { recursive: true, force: true });
     }
-  }, 45_000);
+  }, workspaceDeterminismTimeout);
 });

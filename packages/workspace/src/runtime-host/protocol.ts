@@ -1,5 +1,10 @@
 import { canonicalStringify, type JsonValue } from '@formly-contract/schema';
 
+/**
+ * Strict package-lockstep IPC schema, not an independently compatible extension
+ * protocol. Custom workers must be built against the exact workspace package
+ * version because additive fields are rejected unless both peers know them.
+ */
 export const RUNTIME_HOST_PROTOCOL_VERSION = '1' as const;
 
 export type RuntimeHostOperation = 'inventory' | 'generate' | 'check';
@@ -28,6 +33,8 @@ export interface ProjectExecutionRequest {
   readonly rootPolicy: JsonValue;
   readonly cliOverrides?: JsonValue;
   readonly runtimeHost?: RuntimeHostModuleDescriptor;
+  /** Include bounded local-only failure details in worker responses. */
+  readonly explain?: boolean;
 }
 
 export interface RuntimeHostProjectInventory {
@@ -71,8 +78,27 @@ export type RuntimeHostWorkerMessage =
       readonly kind: 'failure';
       readonly requestId: string;
       readonly code: RuntimeHostFailureCode;
-      readonly phase: 'bootstrap' | 'inventory' | 'compile';
+      readonly phase: RuntimeHostFailurePhase;
+      readonly explanation?: RuntimeHostFailureExplanation;
     };
+
+export type RuntimeHostFailurePhase = 'bootstrap' | 'inventory' | 'compile';
+
+export interface RuntimeHostFailureCause {
+  readonly name: string;
+  readonly message: string;
+}
+
+export interface RuntimeHostFailureFrame {
+  readonly path: string;
+  readonly line: number;
+  readonly column: number;
+}
+
+export interface RuntimeHostFailureExplanation {
+  readonly causes: readonly RuntimeHostFailureCause[];
+  readonly frames: readonly RuntimeHostFailureFrame[];
+}
 
 export type RuntimeHostFailureCode =
   | 'HOST_DESCRIPTOR_INVALID'
@@ -110,6 +136,7 @@ const REQUEST_KEYS = new Set([
   'rootPolicy',
   'cliOverrides',
   'runtimeHost',
+  'explain',
 ]);
 const INVENTORY_KEYS = new Set(['projectId', 'sourceIds', 'formIds']);
 const PARENT_KEYS = new Set([
@@ -126,7 +153,36 @@ const WORKER_KEYS = new Set([
   'result',
   'code',
   'phase',
+  'explanation',
 ]);
+const WORKER_INVENTORY_KEYS = new Set([
+  'protocolVersion',
+  'kind',
+  'requestId',
+  'inventory',
+]);
+const WORKER_RESULT_KEYS = new Set([
+  'protocolVersion',
+  'kind',
+  'requestId',
+  'result',
+]);
+const WORKER_FAILURE_KEYS = new Set([
+  'protocolVersion',
+  'kind',
+  'requestId',
+  'code',
+  'phase',
+  'explanation',
+]);
+const EXPLANATION_KEYS = new Set(['causes', 'frames']);
+const EXPLANATION_CAUSE_KEYS = new Set(['name', 'message']);
+const EXPLANATION_FRAME_KEYS = new Set(['path', 'line', 'column']);
+const MAX_EXPLANATION_CAUSES = 3;
+const MAX_EXPLANATION_FRAMES = 5;
+const MAX_EXPLANATION_NAME_LENGTH = 64;
+const MAX_EXPLANATION_MESSAGE_LENGTH = 400;
+const MAX_EXPLANATION_PATH_LENGTH = 240;
 const OPERATIONS = new Set<RuntimeHostOperation>([
   'inventory',
   'generate',
@@ -176,6 +232,16 @@ function record(
 function required(value: DataRecord, key: string, path: string): unknown {
   if (!Object.hasOwn(value, key)) fail(`${path}.${key}`, 'is required.');
   return value[key];
+}
+
+function exactKeys(
+  value: DataRecord,
+  path: string,
+  keys: ReadonlySet<string>,
+): void {
+  for (const key of Object.keys(value)) {
+    if (!keys.has(key)) fail(`${path}.${key}`, 'is not supported.');
+  }
 }
 
 function stringValue(input: unknown, path: string): string {
@@ -241,6 +307,113 @@ function stringArray(input: unknown, path: string): readonly string[] {
   );
   if (new Set(values).size !== values.length) fail(path, 'must not contain duplicates.');
   return values;
+}
+
+function booleanValue(input: unknown, path: string): boolean {
+  if (typeof input !== 'boolean') fail(path, 'must be a boolean.');
+  return input;
+}
+
+function positiveSafeInteger(input: unknown, path: string): number {
+  if (!Number.isSafeInteger(input) || Number(input) <= 0) {
+    fail(path, 'must be a positive safe integer.');
+  }
+  return input as number;
+}
+
+function boundedArray(
+  input: unknown,
+  path: string,
+  maximumLength: number,
+  requireItem: boolean,
+): readonly unknown[] {
+  if (!Array.isArray(input)) fail(path, 'must be an array.');
+  if ((requireItem && input.length === 0) || input.length > maximumLength) {
+    fail(
+      path,
+      `must contain ${requireItem ? '1 to ' : 'at most '}${maximumLength} items.`,
+    );
+  }
+  const values: unknown[] = [];
+  for (let index = 0; index < input.length; index += 1) {
+    const descriptor = Object.getOwnPropertyDescriptor(input, String(index));
+    if (descriptor === undefined || !('value' in descriptor)) {
+      fail(`${path}[${index}]`, 'must be an own data property.');
+    }
+    values.push(descriptor.value);
+  }
+  return values;
+}
+
+function boundedSingleLineString(
+  input: unknown,
+  path: string,
+  maximumLength: number,
+): string {
+  const value = stringValue(input, path);
+  if (
+    Array.from(value).length > maximumLength ||
+    /[\u0000-\u001f\u007f]/u.test(value)
+  ) {
+    fail(path, `must be a single line of at most ${maximumLength} characters.`);
+  }
+  return value;
+}
+
+function parseFailureExplanation(
+  input: unknown,
+  path: string,
+): RuntimeHostFailureExplanation {
+  const value = record(input, path, EXPLANATION_KEYS);
+  const causes = boundedArray(
+    required(value, 'causes', path),
+    `${path}.causes`,
+    MAX_EXPLANATION_CAUSES,
+    true,
+  ).map((inputCause, index) => {
+    const causePath = `${path}.causes[${index}]`;
+    const cause = record(inputCause, causePath, EXPLANATION_CAUSE_KEYS);
+    return {
+      name: boundedSingleLineString(
+        required(cause, 'name', causePath),
+        `${causePath}.name`,
+        MAX_EXPLANATION_NAME_LENGTH,
+      ),
+      message: boundedSingleLineString(
+        required(cause, 'message', causePath),
+        `${causePath}.message`,
+        MAX_EXPLANATION_MESSAGE_LENGTH,
+      ),
+    };
+  });
+  const frames = boundedArray(
+    required(value, 'frames', path),
+    `${path}.frames`,
+    MAX_EXPLANATION_FRAMES,
+    false,
+  ).map((inputFrame, index) => {
+    const framePath = `${path}.frames[${index}]`;
+    const frame = record(inputFrame, framePath, EXPLANATION_FRAME_KEYS);
+    return {
+      path: relativePath(
+        boundedSingleLineString(
+          required(frame, 'path', framePath),
+          `${framePath}.path`,
+          MAX_EXPLANATION_PATH_LENGTH,
+        ),
+        `${framePath}.path`,
+      ),
+      line: positiveSafeInteger(
+        required(frame, 'line', framePath),
+        `${framePath}.line`,
+      ),
+      column: positiveSafeInteger(
+        required(frame, 'column', framePath),
+        `${framePath}.column`,
+      ),
+    };
+  });
+  return { causes, frames };
 }
 
 export function parseRuntimeHostModuleDescriptor(
@@ -317,6 +490,9 @@ export function parseProjectExecutionRequest(
     ...(Object.hasOwn(value, 'runtimeHost')
       ? { runtimeHost: parseRuntimeHostModuleDescriptor(value.runtimeHost) }
       : {}),
+    ...(Object.hasOwn(value, 'explain')
+      ? { explain: booleanValue(value.explain, `${path}.explain`) }
+      : {}),
   };
 }
 
@@ -366,6 +542,7 @@ export function parseRuntimeHostWorkerMessage(
   }
   const parsedRequestId = requestId(required(value, 'requestId', path), `${path}.requestId`);
   if (value.kind === 'inventory') {
+    exactKeys(value, path, WORKER_INVENTORY_KEYS);
     return {
       protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
       kind: 'inventory',
@@ -374,6 +551,7 @@ export function parseRuntimeHostWorkerMessage(
     };
   }
   if (value.kind === 'result') {
+    exactKeys(value, path, WORKER_RESULT_KEYS);
     return {
       protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
       kind: 'result',
@@ -382,6 +560,7 @@ export function parseRuntimeHostWorkerMessage(
     };
   }
   if (value.kind === 'failure') {
+    exactKeys(value, path, WORKER_FAILURE_KEYS);
     const code = required(value, 'code', path);
     const phase = required(value, 'phase', path);
     if (!FAILURE_CODES.has(code as RuntimeHostFailureCode)) fail(`${path}.code`, 'is unsupported.');
@@ -394,6 +573,14 @@ export function parseRuntimeHostWorkerMessage(
       requestId: parsedRequestId,
       code: code as RuntimeHostFailureCode,
       phase,
+      ...(Object.hasOwn(value, 'explanation')
+        ? {
+            explanation: parseFailureExplanation(
+              value.explanation,
+              `${path}.explanation`,
+            ),
+          }
+        : {}),
     };
   }
   fail(`${path}.kind`, 'is unsupported.');

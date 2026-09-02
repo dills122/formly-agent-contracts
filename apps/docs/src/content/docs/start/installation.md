@@ -75,14 +75,27 @@ pnpm pilot:pack
 
 Copy `artifacts/pilot/` to the consumer, then run the `pnpm` command described
 by `formly-contract-pilot.json`. The pilot remains a retained evaluation
-handoff even though workspace and Angular are now on the public release path. Third-party Angular,
-Formly, TypeScript, and pnpm dependencies still require the consumer's normal
-registry or package cache; this is not an offline dependency bundle.
+handoff even though workspace and Angular are now on the public release path.
+The current manifest contains schema, compiler, and workspace; an Angular CLI
+pilot must continue to provide `@formly-contract/angular` through the sibling
+link above or a separately packed installation until the four-package pilot
+bundle lands. Third-party Angular, Formly, TypeScript, and pnpm dependencies
+still require the consumer's normal registry or package cache; this is not an
+offline dependency bundle.
 
 :::caution[Keep Node-only discovery out of browser barrels]
-Config loading evaluates imports. Export form factories and source descriptors
-from a Node-safe secondary entry point such as `@work/forms-kit/contracts`.
-Do not re-export workspace tooling from an Angular module barrel.
+Config loading evaluates the complete runtime import graph. Give a reusable
+forms library separate browser, pure-factory, and contracts entry points:
+
+```text
+@work/forms-kit            Angular modules and components
+@work/forms-kit/forms      reusable pure form factories
+@work/forms-kit/contracts  Node-safe descriptors and profile data
+```
+
+Project configs import only `/contracts`; browser code never imports it. See
+[Node-safe Angular libraries](../reference/node-safe-angular-libraries.md) for
+the complete layout, configuration, verification, and temporary-shim pattern.
 :::
 
 ## Repository contributors

@@ -83,6 +83,11 @@ three cross-field effects, two sanitized typed-input authoring cases, deliberate
 async/opaque diagnostics, nested repeaters, object-valued options, and
 byte-identical repeated generation.
 
+The forms-kit library is also the maintained example for the recommended
+browser/factory/contracts split. See
+[Node-safe Angular libraries](./node-safe-angular-libraries.md) for the setup
+explained as a consumer workflow.
+
 ## Reading support claims
 
 Examples are executable evidence for the exact pinned Angular `20.3.29` and

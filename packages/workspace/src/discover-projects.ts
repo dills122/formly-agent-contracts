@@ -20,6 +20,8 @@ import {
   errnoCode,
   isWithinWorkspace,
 } from './workspace-paths.js';
+import { createRuntimeHostFailureExplanation } from './runtime-host/failure-explanation.js';
+import type { WorkspaceProjectFailure } from './project-failure.js';
 
 const INTERNAL_PROJECT_TREE_IGNORES = [
   '.git',
@@ -71,6 +73,8 @@ export interface DiscoverWorkspaceProjectsOptions {
   readonly selectedProjectIds?: readonly string[];
   /** Return safe per-config failures instead of aborting on the first one. */
   readonly continueOnProjectError?: boolean;
+  /** Include bounded local-only causes and workspace-relative frames. */
+  readonly explain?: boolean;
 }
 
 export interface DiscoverWorkspaceProjectConfigsOptions {
@@ -125,10 +129,7 @@ export interface DiscoveredWorkspace {
   readonly failures?: readonly WorkspaceProjectDiscoveryFailure[];
 }
 
-export interface WorkspaceProjectDiscoveryFailure {
-  readonly code: 'PROJECT_CONFIG_LOAD_FAILED';
-  readonly configPath: string;
-}
+export type WorkspaceProjectDiscoveryFailure = WorkspaceProjectFailure;
 
 function normalizeWorkspacePath(path: string): string {
   return path.split(sep).join('/');
@@ -436,7 +437,19 @@ export async function discoverWorkspaceProjects(
       if (options.continueOnProjectError !== true) {
         throw error;
       }
-      failures.push({ code: 'PROJECT_CONFIG_LOAD_FAILED', configPath });
+      failures.push({
+        code: 'PROJECT_CONFIG_LOAD_FAILED',
+        configPath,
+        phase: 'inventory',
+        ...(options.explain === true
+          ? {
+              explanation: createRuntimeHostFailureExplanation(
+                error,
+                workspaceRoot,
+              ),
+            }
+          : {}),
+      });
     }
   }
   projects.sort(

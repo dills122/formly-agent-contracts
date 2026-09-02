@@ -19,6 +19,47 @@ For load failures:
    `paths` objects do not merge entry by entry through `extends`.
 4. Run `pnpm exec formly-contracts list` before `generate`.
 
+Use the Angular-aware binary when selected project configs legitimately load
+partially compiled Angular code:
+
+```sh
+pnpm exec formly-contracts-angular list \
+  --project-config libs/forms-kit/formly-contracts.project.ts \
+  --explain
+```
+
+Default output retains the stable worker code and phase while hiding the
+underlying exception. `--explain` requests a bounded local cause chain and only
+stack frames inside the workspace. It never enables raw child stderr or writes
+the explanation into generated artifacts. Review before sharing: an
+application-thrown message may still contain private identifiers.
+
+## A browser barrel fails before a component is initialized
+
+An error such as `Cannot access 'NumberComponent' before initialization` is a
+JavaScript module initialization failure. It is different from Angular's
+missing-JIT-compiler error and can remain after switching to
+`formly-contracts-angular`.
+
+If an Angular component refers to itself in decorator provider metadata, use
+Angular's documented deferred reference:
+
+```ts
+import { forwardRef } from '@angular/core';
+
+{
+  provide: FORM_FIELD_CONTROL,
+  useExisting: forwardRef(() => NumberComponent),
+}
+```
+
+Apply that change only when the failing edge is the component self-reference;
+`forwardRef` is not a generic repair for every circular import. Then keep the
+contract worker out of the broader browser graph by importing a dedicated
+`@work/forms-kit/contracts` entry point. The
+[Node-safe Angular libraries](../reference/node-safe-angular-libraries.md)
+guide shows the full boundary and a temporary leaf-import shim.
+
 ## Discovery finds the wrong files
 
 Project patterns are relative to the workspace root. Use
