@@ -34,6 +34,12 @@ Current integration-friction observations from the maintained walkthrough are
 kept in the [setup and wiring DX notes](./research/setup-wiring-dx-notes.md).
 They are research inputs, not accepted API commitments.
 
+The sanitized [2026-09-02 workplace pilot feedback
+record](./planning/workplace-pilot-feedback-2026-09-02.md) preserves the latest
+pilot findings, their code-level dispositions, recommended delivery order, and
+a concrete Node-safe Angular/Formly integration example. It is an investigation
+and planning record, not a shipped-capability claim.
+
 ## Contributor rules
 
 - Update the canonical specification or ADR when a public contract or ownership
