@@ -100,7 +100,12 @@ Stable loader errors are:
 - `CONFIG_EXPORT_INVALID`
 
 Start with `formly-contracts list`. If loading fails, confirm the TypeScript
-config and move discovery exports out of Angular browser barrels.
+config and move discovery exports out of Angular browser barrels. Preloading
+the Angular compiler makes compatible partially compiled Angular libraries
+loadable; it cannot repair arbitrary JavaScript initialization cycles or make
+browser integrations safe under Node. Follow the
+[Node-safe Angular library setup](./node-safe-angular-libraries.md) when a
+project owns reusable Angular/Formly components.
 
 Use the [workspace API reference](./api.md#workspace) for programmatic
 discovery, generation, checking, authoring inspection, and index parsing. Use

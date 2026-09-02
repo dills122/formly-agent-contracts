@@ -47,6 +47,14 @@ Configuration and form factories are executable application code. Run this
 package only against trusted workspaces. Generated artifacts are the portable,
 strictly validated boundary intended for downstream consumers.
 
+Project configs should import a dedicated Node-safe contracts entry point, not
+an Angular/browser package root. Config evaluation follows the entire runtime
+import graph and does not tree-shake unused browser exports. See the
+[Node-safe Angular libraries
+guide](../../apps/docs/src/content/docs/reference/node-safe-angular-libraries.md)
+for the recommended browser/factory/contracts split and selected-project
+verification flow.
+
 ## What it does not own
 
 - Contract DTOs and canonical serialization belong to

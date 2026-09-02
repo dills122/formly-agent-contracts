@@ -64,6 +64,10 @@ export default defineConfig({
             { label: 'Public API', slug: 'reference/api' },
             { label: 'CLI', slug: 'reference/cli-api' },
             { label: 'Workspace configuration', slug: 'reference/workspace' },
+            {
+              label: 'Node-safe Angular libraries',
+              slug: 'reference/node-safe-angular-libraries',
+            },
             { label: 'Maintained examples', slug: 'reference/examples' },
             { label: 'Form sources', slug: 'reference/form-sources' },
             { label: 'Custom field profiles', slug: 'reference/field-profiles' },

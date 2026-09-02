@@ -799,6 +799,11 @@ separate `fixtures/nx-workspace` anchor proves the same configuration approach
 inside a real four-project Nx graph without making Nx a prerequisite for the
 generic workspace package.
 
+The user-facing [Node-safe Angular libraries
+guide](../apps/docs/src/content/docs/reference/node-safe-angular-libraries.md)
+provides the complete factory, profile, source, path-alias, project-config,
+selected-command, and temporary-shim setup.
+
 ## Resolution and replacement rules
 
 Supported policy resolves in this order:

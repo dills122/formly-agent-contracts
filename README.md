@@ -11,6 +11,7 @@ form without loading Formly runtime objects or inventing selectors.
 
 [Read the documentation](https://dills122.github.io/formly-contract/) ·
 [See current product status](apps/docs/src/content/docs/start/product-status.md) ·
+[Integrate an Angular forms library](apps/docs/src/content/docs/reference/node-safe-angular-libraries.md) ·
 [Run a workplace pilot](docs/workplace-pilot.md)
 
 ## What you get

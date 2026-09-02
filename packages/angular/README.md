@@ -32,3 +32,28 @@ rejected.
 
 The child process is a trusted-code isolation boundary for module/cache state,
 crashes, and timeouts. It is not an untrusted-code or network sandbox.
+
+## Consumer library boundary
+
+Compiler preload solves Angular's partially compiled library prerequisite. It
+does not make an application's complete browser barrel safe under Node or
+repair JavaScript temporal-dead-zone cycles.
+
+Reusable form libraries should expose separate entry points:
+
+```text
+@work/forms-kit            Angular modules and components
+@work/forms-kit/forms      pure form factories
+@work/forms-kit/contracts  source descriptors and profile data
+```
+
+Import only `/contracts` from `formly-contracts.project.ts`. Ensure its entire
+runtime dependency closure excludes Angular components, browser integrations,
+and application initialization. If a component directly self-references in
+decorator provider metadata, repair that component with Angular's
+`forwardRef(() => Component)` pattern separately.
+
+The complete consumer layout, TypeScript paths, project config, selected CLI
+commands, boundary tests, and temporary-shim fallback are documented in the
+[Node-safe Angular libraries
+guide](../../apps/docs/src/content/docs/reference/node-safe-angular-libraries.md).
