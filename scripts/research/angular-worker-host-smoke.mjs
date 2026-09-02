@@ -1,5 +1,5 @@
 import { spawnSync } from 'node:child_process';
-import { readFile } from 'node:fs/promises';
+import { access, readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import {
@@ -7,19 +7,30 @@ import {
   discoverAngularWorkspace,
 } from '../../packages/angular/dist/jit.js';
 
-const fixtureRoot = resolve('fixtures/angular-monorepo');
+const repositoryRoot = resolve('.');
+const fixtureRoot = resolve(repositoryRoot, 'fixtures/angular-monorepo');
 const angularCli = resolve('packages/angular/dist/cli-main.js');
+const failingGenerateOutput =
+  'fixtures/angular-monorepo/dist/failing-angular-cli-output';
 
-function runFailingAngularCheck(configPath, explain = false) {
+function runFailingAngularCommand(
+  command,
+  configPath,
+  explain = false,
+  workspaceRoot = fixtureRoot,
+) {
   const result = spawnSync(
     process.execPath,
     [
       angularCli,
-      'check',
+      command,
       '--workspace-root',
-      fixtureRoot,
+      workspaceRoot,
       '--config',
       configPath,
+      ...(command === 'generate'
+        ? ['--output', failingGenerateOutput]
+        : []),
       ...(explain ? ['--explain'] : []),
     ],
     { encoding: 'utf8' },
@@ -27,10 +38,20 @@ function runFailingAngularCheck(configPath, explain = false) {
   if (result.error !== undefined) throw result.error;
   if (result.status !== 1 || result.stdout !== '') {
     throw new Error(
-      `Expected fail-closed Angular check for ${configPath}; received status ${result.status}.`,
+      `Expected fail-closed Angular ${command} for ${configPath}; received status ${result.status}.`,
     );
   }
   return result.stderr;
+}
+
+async function assertPathMissing(path) {
+  try {
+    await access(path);
+  } catch (error) {
+    if (error?.code === 'ENOENT') return;
+    throw error;
+  }
+  throw new Error(`Fail-closed Angular generation published ${path}.`);
 }
 
 const browserBarrel = await discoverAngularWorkspace({
@@ -74,7 +95,8 @@ if (
 }
 process.stdout.write('PASS one bad Angular project is isolated and reported\n');
 
-const defaultInventoryFailure = runFailingAngularCheck(
+const defaultInventoryFailure = runFailingAngularCommand(
+  'check',
   'formly-contracts.angular-jit-isolation.config.ts',
 );
 if (
@@ -87,7 +109,8 @@ if (
   throw new Error('Default Angular CLI output did not preserve safe inventory classification.');
 }
 
-const explainedInventoryFailure = runFailingAngularCheck(
+const explainedInventoryFailure = runFailingAngularCommand(
+  'check',
   'formly-contracts.angular-jit-isolation.config.ts',
   true,
 );
@@ -104,7 +127,8 @@ if (
   throw new Error('Explained Angular CLI output lost inventory diagnostics.');
 }
 
-const explainedCompileFailure = runFailingAngularCheck(
+const explainedCompileFailure = runFailingAngularCommand(
+  'check',
   'formly-contracts.angular-jit-compile-failure.config.ts',
   true,
 );
@@ -113,14 +137,61 @@ if (
     'Check failed [PROJECT_COMPILE_FAILED] phase=compile config="angular-jit-compile-bad.project.ts"',
   ) ||
   !explainedCompileFailure.includes(
-    'TypeError: Intentional retained Angular compile failure.',
+    'TypeError: Intentional retained Angular compile failure: path=<external-path>; namespace=<external-path>',
   ) ||
   !explainedCompileFailure.includes('at angular-jit-compile-bad.project.ts:') ||
-  explainedCompileFailure.includes(fixtureRoot)
+  explainedCompileFailure.includes(fixtureRoot) ||
+  explainedCompileFailure.includes('corp-server') ||
+  explainedCompileFailure.includes('Private') ||
+  explainedCompileFailure.includes('worker.mjs')
 ) {
   throw new Error('Explained Angular CLI output lost compile diagnostics.');
 }
-process.stdout.write('PASS fail-closed Angular CLI preserves inventory and compile diagnostics\n');
+
+const defaultGenerateFailure = runFailingAngularCommand(
+  'generate',
+  'fixtures/angular-monorepo/formly-contracts.angular-jit-compile-failure.repo-root.config.ts',
+  false,
+  repositoryRoot,
+);
+if (
+  !defaultGenerateFailure.includes(
+    'Generation failed [PROJECT_COMPILE_FAILED] phase=compile config="fixtures/angular-monorepo/angular-jit-compile-bad.project.ts"',
+  ) ||
+  defaultGenerateFailure.includes('Intentional retained Angular compile failure') ||
+  defaultGenerateFailure.includes('Explanation (local only):') ||
+  defaultGenerateFailure.includes('corp-server')
+) {
+  throw new Error('Default Angular generate output exposed compile diagnostics.');
+}
+
+const explainedGenerateFailure = runFailingAngularCommand(
+  'generate',
+  'fixtures/angular-monorepo/formly-contracts.angular-jit-compile-failure.repo-root.config.ts',
+  true,
+  repositoryRoot,
+);
+if (
+  !explainedGenerateFailure.includes(
+    'Generation failed [PROJECT_COMPILE_FAILED] phase=compile config="fixtures/angular-monorepo/angular-jit-compile-bad.project.ts"',
+  ) ||
+  !explainedGenerateFailure.includes(
+    'TypeError: Intentional retained Angular compile failure: path=<external-path>; namespace=<external-path>',
+  ) ||
+  !explainedGenerateFailure.includes(
+    'at fixtures/angular-monorepo/angular-jit-compile-bad.project.ts:',
+  ) ||
+  explainedGenerateFailure.includes(fixtureRoot) ||
+  explainedGenerateFailure.includes('corp-server') ||
+  explainedGenerateFailure.includes('Private') ||
+  explainedGenerateFailure.includes('worker.mjs')
+) {
+  throw new Error('Explained Angular generate output lost safe compile diagnostics.');
+}
+await assertPathMissing(resolve(repositoryRoot, failingGenerateOutput));
+process.stdout.write(
+  'PASS fail-closed Angular CLI preserves inventory and compile diagnostics for check and generate\n',
+);
 
 const checked = await checkAngularWorkspace({
   workspaceRoot: fixtureRoot,

@@ -12,6 +12,23 @@ process.on('message', (message) => {
     }
     if (request.rootPolicy?.fixture === 'crash') process.exit(3);
     if (request.rootPolicy?.fixture === 'timeout') return;
+    if (request.rootPolicy?.fixture === 'cross-variant') {
+      process.send?.({
+        protocolVersion,
+        kind: 'inventory',
+        requestId: request.requestId,
+        inventory: {
+          projectId: 'fixture',
+          sourceIds: ['fixture/forms'],
+          formIds: ['fixture.form'],
+        },
+        explanation: {
+          causes: [{ name: 'Error', message: 'must not be accepted' }],
+          frames: [],
+        },
+      });
+      return;
+    }
     if (
       request.rootPolicy?.fixture === 'failure' ||
       request.rootPolicy?.fixture === 'unsolicited-failure'

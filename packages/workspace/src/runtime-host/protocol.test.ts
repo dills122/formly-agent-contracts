@@ -75,6 +75,55 @@ describe('runtime-host protocol', () => {
     ).toThrow('request.protocolVersion');
   });
 
+  it.each([
+    {
+      message: {
+        protocolVersion: '1',
+        kind: 'inventory',
+        requestId: 'project:claims',
+        inventory: {
+          projectId: 'claims',
+          sourceIds: ['claims/forms'],
+          formIds: ['claims.intake'],
+        },
+        explanation: {
+          causes: [{ name: 'Error', message: 'must not be ignored' }],
+          frames: [],
+        },
+      },
+      rejectedPath: 'workerMessage.explanation',
+    },
+    {
+      message: {
+        protocolVersion: '1',
+        kind: 'result',
+        requestId: 'project:claims',
+        result: { artifacts: [] },
+        code: 'PROJECT_COMPILE_FAILED',
+        phase: 'compile',
+      },
+      rejectedPath: 'workerMessage.code',
+    },
+    {
+      message: {
+        protocolVersion: '1',
+        kind: 'failure',
+        requestId: 'project:claims',
+        code: 'PROJECT_COMPILE_FAILED',
+        phase: 'compile',
+        result: { artifacts: [] },
+      },
+      rejectedPath: 'workerMessage.result',
+    },
+  ])(
+    'rejects fields from another worker-message variant',
+    ({ message, rejectedPath }) => {
+      expect(() => parseRuntimeHostWorkerMessage(message)).toThrow(
+        rejectedPath,
+      );
+    },
+  );
+
   it('accepts inventory and JSON-safe result messages', () => {
     expect(
       parseRuntimeHostWorkerMessage({

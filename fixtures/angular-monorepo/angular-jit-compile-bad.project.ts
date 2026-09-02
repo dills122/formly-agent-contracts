@@ -9,7 +9,11 @@ const source = defineFormContractSource({
     {
       id: 'fixture-angular-jit-compile-bad.form',
       create: () => {
-        throw new TypeError('Intentional retained Angular compile failure.');
+        throw new TypeError(
+          'Intentional retained Angular compile failure: ' +
+            'path=\\\\corp-server\\Private Share\\source.ts; ' +
+            'namespace=\\\\?\\C:\\Private\\worker.mjs',
+        );
       },
     },
   ],

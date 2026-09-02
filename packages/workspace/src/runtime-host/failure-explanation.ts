@@ -14,15 +14,15 @@ const MAX_MESSAGE_LENGTH = 400;
 const MAX_PATH_LENGTH = 240;
 const ANSI_ESCAPE_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]/gu;
 const DOUBLE_QUOTED_ABSOLUTE_PATH_PATTERN =
-  /"(?:file:\/\/\/|\/|[A-Za-z]:[\\/])[^"\u0000-\u001f\u007f]*"/gu;
+  /"(?:file:\/\/|\/|[A-Za-z]:[\\/]|\\\\)[^"\u0000-\u001f\u007f]*"/gu;
 const SINGLE_QUOTED_ABSOLUTE_PATH_PATTERN =
-  /'(?:file:\/\/\/|\/|[A-Za-z]:[\\/])[^'\u0000-\u001f\u007f]*'/gu;
+  /'(?:file:\/\/|\/|[A-Za-z]:[\\/]|\\\\)[^'\u0000-\u001f\u007f]*'/gu;
 const KEY_VALUE_ABSOLUTE_PATH_PATTERN =
-  /(^|[\s(,;])([A-Za-z][A-Za-z0-9_.-]*\s*[=:]\s*)(?:file:\/\/\/|\/|[A-Za-z]:[\\/])[^\u0000-\u001f\u007f;,)\]}]+/gu;
+  /(^|[\s(,;])([A-Za-z][A-Za-z0-9_.-]*\s*[=:]\s*)(?:file:\/\/|\/|[A-Za-z]:[\\/]|\\\\)[^\u0000-\u001f\u007f;,)\]}]+/gu;
 const LABELED_ABSOLUTE_PATH_PATTERN =
-  /(^|[\s(,;])((?:at|cache|cwd|directory|file|from|in|path|root)\s+)(?:file:\/\/\/|\/|[A-Za-z]:[\\/])[^\u0000-\u001f\u007f;,)\]}]+/giu;
+  /(^|[\s(,;])((?:at|cache|cwd|directory|file|from|in|path|root)\s+)(?:file:\/\/|\/|[A-Za-z]:[\\/]|\\\\)[^\u0000-\u001f\u007f;,)\]}]+/giu;
 const UNQUOTED_ABSOLUTE_PATH_PATTERN =
-  /(^|[\s'"(=,:])(?:file:\/\/\/|\/(?!\/)|[A-Za-z]:[\\/])[^\s'"(),;)\]}]+/gu;
+  /(^|[\s'"(=,:])(?:file:\/\/|\/|[A-Za-z]:[\\/]|\\\\)[^\s'"(),;)\]}]+/gu;
 
 function truncate(input: string, maximumLength: number): string {
   const characters = Array.from(input);

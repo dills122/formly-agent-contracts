@@ -64,6 +64,16 @@ describe('project worker supervisor', () => {
       code: 'WORKER_MESSAGE_INVALID',
     } satisfies Partial<ProjectWorkerSupervisorError>);
     await expect(
+      spawnProjectWorker(request('cross-variant'), {
+        workerModuleUrl: fixtureWorker,
+        timeoutMs: 2_000,
+      }),
+    ).rejects.toMatchObject({
+      code: 'WORKER_MESSAGE_INVALID',
+      configPath: 'fixtures/project.ts',
+      workerFailurePhase: 'inventory',
+    } satisfies Partial<ProjectWorkerSupervisorError>);
+    await expect(
       spawnProjectWorker(request('crash'), {
         workerModuleUrl: fixtureWorker,
         timeoutMs: 2_000,

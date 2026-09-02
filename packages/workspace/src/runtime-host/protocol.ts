@@ -155,6 +155,26 @@ const WORKER_KEYS = new Set([
   'phase',
   'explanation',
 ]);
+const WORKER_INVENTORY_KEYS = new Set([
+  'protocolVersion',
+  'kind',
+  'requestId',
+  'inventory',
+]);
+const WORKER_RESULT_KEYS = new Set([
+  'protocolVersion',
+  'kind',
+  'requestId',
+  'result',
+]);
+const WORKER_FAILURE_KEYS = new Set([
+  'protocolVersion',
+  'kind',
+  'requestId',
+  'code',
+  'phase',
+  'explanation',
+]);
 const EXPLANATION_KEYS = new Set(['causes', 'frames']);
 const EXPLANATION_CAUSE_KEYS = new Set(['name', 'message']);
 const EXPLANATION_FRAME_KEYS = new Set(['path', 'line', 'column']);
@@ -212,6 +232,16 @@ function record(
 function required(value: DataRecord, key: string, path: string): unknown {
   if (!Object.hasOwn(value, key)) fail(`${path}.${key}`, 'is required.');
   return value[key];
+}
+
+function exactKeys(
+  value: DataRecord,
+  path: string,
+  keys: ReadonlySet<string>,
+): void {
+  for (const key of Object.keys(value)) {
+    if (!keys.has(key)) fail(`${path}.${key}`, 'is not supported.');
+  }
 }
 
 function stringValue(input: unknown, path: string): string {
@@ -512,6 +542,7 @@ export function parseRuntimeHostWorkerMessage(
   }
   const parsedRequestId = requestId(required(value, 'requestId', path), `${path}.requestId`);
   if (value.kind === 'inventory') {
+    exactKeys(value, path, WORKER_INVENTORY_KEYS);
     return {
       protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
       kind: 'inventory',
@@ -520,6 +551,7 @@ export function parseRuntimeHostWorkerMessage(
     };
   }
   if (value.kind === 'result') {
+    exactKeys(value, path, WORKER_RESULT_KEYS);
     return {
       protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
       kind: 'result',
@@ -528,6 +560,7 @@ export function parseRuntimeHostWorkerMessage(
     };
   }
   if (value.kind === 'failure') {
+    exactKeys(value, path, WORKER_FAILURE_KEYS);
     const code = required(value, 'code', path);
     const phase = required(value, 'phase', path);
     if (!FAILURE_CODES.has(code as RuntimeHostFailureCode)) fail(`${path}.code`, 'is unsupported.');

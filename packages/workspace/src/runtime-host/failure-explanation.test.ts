@@ -101,6 +101,34 @@ describe("runtime-host failure explanation", () => {
     );
   });
 
+  it("redacts UNC, network-share, and Windows namespace paths", () => {
+    const error = new Error(
+      "unc=\\\\corp-server\\Private Share\\source.ts; " +
+        "forward=//corp-server/Private Share/source.ts; " +
+        "url=file://corp-server/Private%20Share/source.ts; " +
+        'quoted="\\\\corp-server\\Quoted Share\\file.ts"; ' +
+        "from \\\\?\\C:\\Private Files\\worker.mjs; " +
+        "device=\\\\.\\C:\\Private\\worker.mjs"
+    );
+
+    const explanation = createRuntimeHostFailureExplanation(
+      error,
+      process.cwd()
+    );
+
+    expect(explanation.causes[0]!.message).toBe(
+      "unc=<external-path>; " +
+        "forward=<external-path>; " +
+        "url=<external-path>; " +
+        'quoted="<external-path>"; ' +
+        "from <external-path>; " +
+        "device=<external-path>"
+    );
+    expect(explanation.causes[0]!.message).not.toMatch(
+      /corp-server|private|quoted share|worker\.mjs/iu
+    );
+  });
+
   it("represents non-Error throws without inspecting arbitrary properties", () => {
     expect(
       createRuntimeHostFailureExplanation(

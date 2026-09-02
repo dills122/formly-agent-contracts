@@ -148,6 +148,14 @@ forms. Protocol version `1` is documented and tested as a strict
 package-lockstep IPC shape: custom workers must target the exact workspace
 package version rather than assuming unknown additive fields are accepted.
 
+The second independent review found two non-blocking hardening gaps: UNC and
+Windows namespace paths were not recognized by the cause-message sanitizer,
+and the worker parser used one union-wide key allowlist that accepted fields
+from the wrong discriminated message variant. The follow-up redacts those path
+families, validates exact keys per worker message kind, and extends the built
+Angular CLI smoke from `check` to fail-closed `generate` while asserting that no
+output directory is published.
+
 ### Compact profiles exist; application adoption remains
 
 [`field-type-authoring.ts`](../../packages/schema/src/field-type-authoring.ts)
