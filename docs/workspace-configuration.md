@@ -425,6 +425,9 @@ pnpm exec formly-contracts generate \
   --output dist/formly-contracts-pilot
 pnpm exec formly-contracts generate \
   --project-config libs/forms-kit/formly-contracts.project.ts
+pnpm exec formly-contracts-angular list \
+  --project-config libs/forms-kit/formly-contracts.project.ts \
+  --explain
 pnpm exec formly-contracts check \
   --workspace-root ../claims-workspace \
   --config formly-contracts.config.ts \
@@ -449,12 +452,20 @@ complete workspace index. Content-addressed form artifacts retain their normal
 paths.
 
 `list` continues across project-local config-load failures, prints every healthy
-project, reports only safe config-path failure records, and exits `1` when any
-matched project was unavailable. An exact healthy `--project-config` selection
-can therefore list or generate without importing a known browser-only sibling.
+project, reports the stable worker code, phase, and safe config path, and exits
+`1` when any matched project was unavailable. An exact healthy
+`--project-config` selection can therefore list or generate without importing
+a known browser-only sibling.
 
 Usage failures exit with status `2`; discovery, generation, and check failures
-exit with status `1` and omit stack traces and underlying callback errors.
+exit with status `1`. Default output omits stack traces and underlying callback
+errors. `--explain` is accepted by `list`, `generate`, and `check`; it prints a
+local-only cause chain capped at three entries plus at most five stack frames
+whose paths resolve inside the workspace. Cause text is single-line and
+bounded. The details are requested only when the flag is present, raw child
+stderr remains suppressed, and explanations are never serialized into
+contracts, indexes, or hashes. Treat the output as local diagnostic material:
+bounded messages can still contain application identifiers.
 `--fail-on warning` and `--fail-on error` may be repeated for `generate` or
 `check` to override diagnostic policy. `list` does not accept output or
 diagnostic overrides because it never generates contracts.

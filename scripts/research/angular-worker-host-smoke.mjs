@@ -30,11 +30,19 @@ const isolated = await checkAngularWorkspace({
   workspaceRoot: fixtureRoot,
   rootConfigPath: 'formly-contracts.angular-jit-isolation.config.ts',
   continueOnProjectError: true,
+  explain: true,
   runtimeProvenance: golden.runtimeProvenance,
 });
 if (
   isolated.projectFailures?.length !== 1 ||
   isolated.projectFailures[0]?.configPath !== 'angular-jit-bad.project.ts' ||
+  isolated.projectFailures[0]?.code !== 'PROJECT_CONFIG_LOAD_FAILED' ||
+  isolated.projectFailures[0]?.phase !== 'inventory' ||
+  isolated.projectFailures[0]?.explanation?.causes[1]?.message !==
+    'Intentional retained project-isolation failure.' ||
+  isolated.projectFailures[0]?.explanation?.frames.some(({ path }) =>
+    path.startsWith('/'),
+  ) ||
   isolated.indexPath !== 'dist/formly-contracts/workspace-index.json'
 ) {
   throw new Error('Angular worker did not isolate and report the bad project.');

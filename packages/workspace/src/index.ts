@@ -103,6 +103,10 @@ export {
   WorkspaceGenerationError,
 } from "./run-workspace.js";
 export type {
+  WorkspaceProjectFailure,
+  WorkspaceProjectFailureCode,
+} from './project-failure.js';
+export type {
   RunWorkspaceOptions,
   WorkspaceCheckDifference,
   WorkspaceCheckResult,
@@ -135,7 +139,11 @@ export {
 } from './runtime-host/index.js';
 export type {
   ProjectExecutionRequest,
+  RuntimeHostFailureCause,
   RuntimeHostFailureCode,
+  RuntimeHostFailureExplanation,
+  RuntimeHostFailureFrame,
+  RuntimeHostFailurePhase,
   RuntimeHostModuleDescriptor,
   RuntimeHostOperation,
   RuntimeHostParentMessage,

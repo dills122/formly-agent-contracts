@@ -286,7 +286,8 @@ export default defineConfig({
 
 ```sh
 pnpm exec formly-contracts-angular list \
-  --project-config libs/forms-kit/formly-contracts.project.ts
+  --project-config libs/forms-kit/formly-contracts.project.ts \
+  --explain
 
 pnpm exec formly-contracts-angular generate \
   --project-config libs/forms-kit/formly-contracts.project.ts
@@ -294,6 +295,11 @@ pnpm exec formly-contracts-angular generate \
 pnpm exec formly-contracts-angular check \
   --project-config libs/forms-kit/formly-contracts.project.ts
 ```
+
+Use `--explain` only while diagnosing a failure. The default retains the
+stable worker code and phase but withholds causes. The opt-in output is bounded
+and workspace-relative, is never serialized into artifacts, and may still
+contain application identifiers in an exception message.
 
 Retain consumer tests that prove:
 

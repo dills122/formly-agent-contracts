@@ -1,6 +1,7 @@
 # Workplace Pilot Feedback Record — 2026-09-02
 
-- Status: investigation complete; follow-up changes proposed
+- Status: investigation complete; worker diagnostics follow-up implemented on
+  `codex/document-workplace-feedback`
 - Repository baseline: `7242045145a77590b87ed8243a194d63a721ec3b`
 - Baseline relationship: local `main` and `origin/main` were identical before
   this record was created
@@ -27,7 +28,7 @@ be completed outside this repository, and some became stale after
 | --- | --- | --- |
 | One bad project prevents all workspace discovery (historical shortcoming #2) | Resolved by PR #119. Import-free discovery continues across a rejected project, exact `--project` and `--project-config` selection isolate a run, and selected output is scoped by a stable selection hash. | Retain the failure-isolation tests; do not reopen this as a product gap. |
 | Angular browser barrels cannot be loaded (historical #1) | Narrowed, not universally solved. PR #120 supplies a guarded Angular worker and preloads the selected project's compiler. The reported `Cannot access ... before initialization` failure is now an application module-graph temporal-dead-zone failure, not the earlier missing-JIT-compiler failure. | Give contract discovery its own Node-safe import graph. Repair genuine Angular self-reference defects, but do not require the contract tool to evaluate the complete browser barrel. |
-| Project failures hide their cause | Confirmed and high leverage. The worker has phase/code data, but the supervisor and aggregator collapse it to generic classifications. | Preserve stable code and phase end to end; add an opt-in, bounded local `--explain` view without putting private exception text in artifacts. |
+| Project failures hide their cause | Confirmed and addressed on this branch. The worker, supervisor, workspace result, and CLI now preserve stable code/phase data. | Use the redacted default for normal runs and opt into bounded local `--explain` output during diagnosis; never put explanation data in artifacts. |
 | Phone, date, number, stepper, and other custom types remain unmapped (historical #3/#4) | Compact authoring primitives now exist in PR #120: typed input, choice, autocomplete, row selection, repeater, and stepper. The consuming repository still has to adopt them for its actual type names. | Migrate the application's type catalog to the compact presets and verify every registration with generated-contract and Angular conformance tests. |
 | Many Formly aliases cannot share one authored profile (historical #5) | Confirmed authoring limitation. The canonical registry can register several Formly names to one profile, but `buildFieldTypeProfileRegistry` currently rejects a repeated profile identity. | Permit repeated identity only when the lowered profile is byte-identical, deduplicate the profile, emit one registration per Formly name, and reject semantic conflicts. |
 | Dynamic option domains are not enumerable (historical #6) | Confirmed product-value gap for declared-only workspace output. The low-level scenario compiler can resolve synchronous options, but workspace generation does not execute `definition.scenarios`. | Implement the planned portable named-case and trusted resolved-scenario producer instead of subscribing generically to arbitrary application streams. |
@@ -98,10 +99,11 @@ runtime dependency closure must be Node-safe. A type-only import helps only
 when TypeScript erases it. It does not help when the form factory implementation
 itself imports the browser barrel at runtime.
 
-### Failure classification is discarded at three boundaries
+### Failure classification and safe explanations are now retained
 
-The current runtime protocol already permits a worker failure to carry a stable
-`code` and `phase`. The useful data is then lost:
+The audit found that the runtime protocol permitted a worker failure to carry a
+stable `code` and `phase`, but the useful data was then lost at three
+boundaries:
 
 1. [`project-worker.ts`](../../packages/workspace/src/project-worker.ts)
    catches config loading and inventory together and emits
@@ -113,9 +115,9 @@ The current runtime protocol already permits a worker failure to carry a stable
    converts every rejected project spawn to `PROJECT_CONFIG_LOAD_FAILED` in
    continue-on-error inventory.
 
-This explains the observed generic output: the presentation layer cannot show
-the real phase because the parent no longer has it. The recommended diagnostic
-slice is a separate small change:
+This explained the observed generic output: the presentation layer could not
+show the real phase because the parent no longer had it. The implemented
+diagnostic slice now:
 
 - split config-load, inventory, and compile catches;
 - preserve the validated worker failure code and phase on the supervisor error;
@@ -130,7 +132,10 @@ slice is a separate small change:
 This yields useful pilot output such as `PROJECT_INVENTORY_FAILED
 (phase=inventory)` by default and a local explanation such as `ReferenceError:
 Cannot access component before initialization` only when the operator requests
-it. It does not turn the child into an untrusted-code sandbox.
+it. Explanation payloads are protocol-validated, limited to three cause
+summaries and five workspace-relative frames, and remain runtime-only. The
+worker's stdout/stderr stay suppressed. This does not turn the child into an
+untrusted-code sandbox.
 
 ### Compact profiles exist; application adoption remains
 
@@ -223,6 +228,7 @@ gate audit.
 ## Recommended delivery order
 
 1. Preserve worker failure code/phase and add safe `--explain` output.
+   **Completed on this branch.**
 2. Establish the consumer-owned Node-safe contracts entry point described
    below.
 3. Add profile alias reuse and migrate the application's custom types to the

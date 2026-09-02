@@ -10,6 +10,7 @@ import {
   createWorkspaceRuntimeBootstrapContext,
   loadWorkspaceRuntimeHost,
 } from './runtime-host/bootstrap.js';
+import { createRuntimeHostFailureExplanation } from './runtime-host/failure-explanation.js';
 import {
   parseRuntimeHostParentMessage,
   RUNTIME_HOST_PROTOCOL_VERSION,
@@ -30,13 +31,18 @@ function send(message: object): void {
   process.send(message);
 }
 
-function failure(code: RuntimeHostFailureCode): never {
+function failure(code: RuntimeHostFailureCode, cause?: unknown): never {
+  const explanation =
+    request?.explain === true
+      ? createRuntimeHostFailureExplanation(cause, request.workspaceRoot)
+      : undefined;
   send({
     protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
     kind: 'failure',
     requestId: request?.requestId ?? 'worker:uninitialized',
     code,
     phase,
+    ...(explanation === undefined ? {} : { explanation }),
   });
   process.disconnect();
   process.exit(1);
@@ -68,14 +74,20 @@ async function initialize(nextRequest: ProjectExecutionRequest): Promise<void> {
       nativeModules = bootstrap?.nativeModules;
       runtimePackages = bootstrap?.runtimePackages;
     }
-  } catch {
-    failure('HOST_LOAD_FAILED');
+  } catch (error) {
+    failure('HOST_LOAD_FAILED', error);
   }
 
   phase = 'inventory';
+  let rootConfig: ReturnType<typeof parseRootConfig>;
   try {
-    const rootConfig = parseRootConfig(request.rootPolicy);
-    const projectConfig = await loadWorkspaceProjectConfig(
+    rootConfig = parseRootConfig(request.rootPolicy);
+  } catch (error) {
+    failure('PROJECT_INVENTORY_FAILED', error);
+  }
+  let projectConfig: Awaited<ReturnType<typeof loadWorkspaceProjectConfig>>;
+  try {
+    projectConfig = await loadWorkspaceProjectConfig(
       resolve(request.workspaceRoot, request.configPath),
       {
         ...(request.tsconfigPath === undefined
@@ -90,6 +102,10 @@ async function initialize(nextRequest: ProjectExecutionRequest): Promise<void> {
         moduleCache: true,
       },
     );
+  } catch (error) {
+    failure('PROJECT_CONFIG_LOAD_FAILED', error);
+  }
+  try {
     project = await inventoryProjectExecution({
       configPath: request.configPath,
       rootConfig,
@@ -98,8 +114,8 @@ async function initialize(nextRequest: ProjectExecutionRequest): Promise<void> {
         ? {}
         : { cliOverrides: request.cliOverrides as WorkspaceCliOverrides }),
     });
-  } catch {
-    failure('PROJECT_INVENTORY_FAILED');
+  } catch (error) {
+    failure('PROJECT_INVENTORY_FAILED', error);
   }
   send({
     protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
@@ -147,8 +163,8 @@ async function handle(input: unknown): Promise<void> {
       result,
     });
     process.disconnect();
-  } catch {
-    failure('PROJECT_COMPILE_FAILED');
+  } catch (error) {
+    failure('PROJECT_COMPILE_FAILED', error);
   }
 }
 

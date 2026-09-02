@@ -8,6 +8,9 @@ import {
   parseRuntimeHostWorkerMessage,
   RUNTIME_HOST_PROTOCOL_VERSION,
   type ProjectExecutionRequest,
+  type RuntimeHostFailureCode,
+  type RuntimeHostFailureExplanation,
+  type RuntimeHostFailurePhase,
   type RuntimeHostProjectInventory,
   type RuntimeHostWorkerMessage,
 } from './protocol.js';
@@ -23,17 +26,41 @@ export type ProjectWorkerSupervisorErrorCode =
 export class ProjectWorkerSupervisorError extends Error {
   readonly code: ProjectWorkerSupervisorErrorCode;
   readonly requestId: string;
+  readonly configPath?: string;
+  readonly workerFailureCode?: RuntimeHostFailureCode;
+  readonly workerFailurePhase?: RuntimeHostFailurePhase;
+  readonly explanation?: RuntimeHostFailureExplanation;
 
   constructor(
     code: ProjectWorkerSupervisorErrorCode,
     requestId: string,
     cause?: unknown,
+    context: {
+      readonly configPath?: string;
+      readonly workerFailure?: Extract<
+        RuntimeHostWorkerMessage,
+        { readonly kind: 'failure' }
+      >;
+      readonly phase?: RuntimeHostFailurePhase;
+    } = {},
   ) {
     super(`Project worker failed [${code}].`,
       cause === undefined ? undefined : { cause });
     this.name = 'ProjectWorkerSupervisorError';
     this.code = code;
     this.requestId = requestId;
+    if (context.configPath !== undefined) {
+      this.configPath = context.configPath;
+    }
+    if (context.workerFailure !== undefined) {
+      this.workerFailureCode = context.workerFailure.code;
+      this.workerFailurePhase = context.workerFailure.phase;
+      if (context.workerFailure.explanation !== undefined) {
+        this.explanation = context.workerFailure.explanation;
+      }
+    } else if (context.phase !== undefined) {
+      this.workerFailurePhase = context.phase;
+    }
   }
 }
 
@@ -160,6 +187,10 @@ class WorkerChannel {
       const fail = (
         code: ProjectWorkerSupervisorErrorCode,
         cause?: unknown,
+        workerFailure?: Extract<
+          RuntimeHostWorkerMessage,
+          { readonly kind: 'failure' }
+        >,
       ) => {
         this.#settled = true;
         finish({
@@ -168,6 +199,11 @@ class WorkerChannel {
             code,
             this.request.requestId,
             cause,
+            {
+              configPath: this.request.configPath,
+              ...(workerFailure === undefined ? {} : { workerFailure }),
+              phase: expectedKind === 'result' ? 'compile' : 'inventory',
+            },
           ),
         });
         void terminate(this.child);
@@ -185,7 +221,19 @@ class WorkerChannel {
           return;
         }
         if (message.kind === 'failure') {
-          fail('WORKER_FAILURE');
+          fail(
+            'WORKER_FAILURE',
+            undefined,
+            this.request.explain === true
+              ? message
+              : {
+                  protocolVersion: message.protocolVersion,
+                  kind: message.kind,
+                  requestId: message.requestId,
+                  code: message.code,
+                  phase: message.phase,
+                },
+          );
           return;
         }
         if (message.kind !== expectedKind) {
@@ -217,6 +265,11 @@ class WorkerChannel {
       throw new ProjectWorkerSupervisorError(
         'WORKER_MESSAGE_INVALID',
         this.request.requestId,
+        undefined,
+        {
+          configPath: this.request.configPath,
+          phase: 'compile',
+        },
       );
     }
     return message.result;
@@ -269,6 +322,8 @@ export async function spawnProjectWorker(
       throw new ProjectWorkerSupervisorError(
         'WORKER_MESSAGE_INVALID',
         request.requestId,
+        undefined,
+        { configPath: request.configPath, phase: 'inventory' },
       );
     }
     return {

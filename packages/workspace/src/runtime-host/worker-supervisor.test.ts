@@ -8,7 +8,7 @@ import {
 
 const fixtureWorker = new URL('./fixtures/echo-worker.mjs', import.meta.url).href;
 
-function request(fixture?: string) {
+function request(fixture?: string, explain = false) {
   return {
     protocolVersion: '1' as const,
     requestId: 'fixture:worker',
@@ -19,6 +19,7 @@ function request(fixture?: string) {
     projectRoot: 'fixtures',
     runtimeResolutionBase: 'fixtures',
     rootPolicy: fixture === undefined ? {} : { fixture },
+    ...(explain ? { explain: true } : {}),
   };
 }
 
@@ -53,7 +54,7 @@ describe('project worker supervisor', () => {
     await expect(session.approve()).resolves.toEqual({ artifacts: [] });
   });
 
-  it('terminates malformed and timed-out workers', async () => {
+  it('classifies malformed, crashed, and timed-out workers', async () => {
     await expect(
       spawnProjectWorker(request('malformed'), {
         workerModuleUrl: fixtureWorker,
@@ -63,12 +64,94 @@ describe('project worker supervisor', () => {
       code: 'WORKER_MESSAGE_INVALID',
     } satisfies Partial<ProjectWorkerSupervisorError>);
     await expect(
+      spawnProjectWorker(request('crash'), {
+        workerModuleUrl: fixtureWorker,
+        timeoutMs: 2_000,
+      }),
+    ).rejects.toMatchObject({
+      code: 'WORKER_CRASHED',
+      configPath: 'fixtures/project.ts',
+      workerFailurePhase: 'inventory',
+    } satisfies Partial<ProjectWorkerSupervisorError>);
+    await expect(
       spawnProjectWorker(request('timeout'), {
         workerModuleUrl: fixtureWorker,
         timeoutMs: 25,
       }),
     ).rejects.toMatchObject({
       code: 'WORKER_TIMEOUT',
+      configPath: 'fixtures/project.ts',
+      workerFailurePhase: 'inventory',
+    } satisfies Partial<ProjectWorkerSupervisorError>);
+  });
+
+  it('preserves validated worker failure code, phase, and opted-in details', async () => {
+    await expect(
+      spawnProjectWorker(request('failure', true), {
+        workerModuleUrl: fixtureWorker,
+        timeoutMs: 2_000,
+      }),
+    ).rejects.toMatchObject({
+      code: 'WORKER_FAILURE',
+      configPath: 'fixtures/project.ts',
+      workerFailureCode: 'PROJECT_CONFIG_LOAD_FAILED',
+      workerFailurePhase: 'inventory',
+      explanation: {
+        causes: [
+          {
+            name: 'ReferenceError',
+            message: "Cannot access 'NumberComponent' before initialization",
+          },
+        ],
+        frames: [
+          {
+            path: 'libs/forms-kit/src/lib/number.component.ts',
+            line: 12,
+            column: 7,
+          },
+        ],
+      },
+    } satisfies Partial<ProjectWorkerSupervisorError>);
+
+    await expect(
+      spawnProjectWorker(request('failure'), {
+        workerModuleUrl: fixtureWorker,
+        timeoutMs: 2_000,
+      }),
+    ).rejects.toMatchObject({
+      workerFailureCode: 'PROJECT_CONFIG_LOAD_FAILED',
+      workerFailurePhase: 'inventory',
+      explanation: undefined,
+    });
+
+    await expect(
+      spawnProjectWorker(request('unsolicited-failure'), {
+        workerModuleUrl: fixtureWorker,
+        timeoutMs: 2_000,
+      }),
+    ).rejects.toMatchObject({
+      workerFailureCode: 'PROJECT_CONFIG_LOAD_FAILED',
+      workerFailurePhase: 'inventory',
+      explanation: undefined,
+    });
+
+    const session = await spawnProjectWorker(
+      request('compile-failure', true),
+      {
+        workerModuleUrl: fixtureWorker,
+        timeoutMs: 2_000,
+      },
+    );
+    await expect(session.approve()).rejects.toMatchObject({
+      code: 'WORKER_FAILURE',
+      workerFailureCode: 'PROJECT_COMPILE_FAILED',
+      workerFailurePhase: 'compile',
+      explanation: {
+        causes: [
+          { name: 'Error', message: 'Factory failed during compilation' },
+        ],
+        frames: [],
+      },
     } satisfies Partial<ProjectWorkerSupervisorError>);
   });
 });

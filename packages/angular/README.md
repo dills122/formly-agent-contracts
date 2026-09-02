@@ -19,7 +19,10 @@ await runAngularWorkspace({
 `checkAngularWorkspace` uses the identical isolated runtime without writing
 artifacts. Both APIs preserve exact project selection and
 `continueOnProjectError`; skipped inventory/compile failures are returned as
-safe `projectFailures` records.
+safe `projectFailures` records with stable code and phase. `explain: true` (or
+CLI `--explain`) requests a bounded local cause chain and workspace-relative
+frames. These details are omitted by default and never enter artifacts or
+hashes.
 
 The `angularAuthoringRuntimeHost` identifier is reserved for the separate
 browser/AOT authoring lane. Loading it currently fails with an explicit stable

@@ -504,11 +504,33 @@ describe('workspace project discovery', () => {
       {
         code: 'PROJECT_CONFIG_LOAD_FAILED',
         configPath: 'projects/broken.project.ts',
+        phase: 'inventory',
       },
     ]);
     expect(canonicalStringify(discovered.failures)).not.toContain(
       'private Angular loader detail',
     );
+
+    const explained = await discoverWorkspaceProjects({
+      workspaceRoot,
+      rootConfigPath: 'formly-contracts.config.ts',
+      continueOnProjectError: true,
+      explain: true,
+    });
+    expect(explained.failures).toMatchObject([
+      {
+        code: 'PROJECT_CONFIG_LOAD_FAILED',
+        configPath: 'projects/broken.project.ts',
+        phase: 'inventory',
+        explanation: {
+          causes: [
+            { name: 'WorkspaceConfigLoadError' },
+            { name: 'Error', message: 'private Angular loader detail' },
+          ],
+        },
+      },
+    ]);
+    expect(canonicalStringify(explained.failures)).not.toContain(workspaceRoot);
   });
 
   it('loads only explicitly selected project-config paths', async () => {

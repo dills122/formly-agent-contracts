@@ -24,8 +24,15 @@ partially compiled Angular code:
 
 ```sh
 pnpm exec formly-contracts-angular list \
-  --project-config libs/forms-kit/formly-contracts.project.ts
+  --project-config libs/forms-kit/formly-contracts.project.ts \
+  --explain
 ```
+
+Default output retains the stable worker code and phase while hiding the
+underlying exception. `--explain` requests a bounded local cause chain and only
+stack frames inside the workspace. It never enables raw child stderr or writes
+the explanation into generated artifacts. Review before sharing: an
+application-thrown message may still contain private identifiers.
 
 ## A browser barrel fails before a component is initialized
 

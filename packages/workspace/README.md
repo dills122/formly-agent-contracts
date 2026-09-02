@@ -39,9 +39,13 @@ workspace index.
 Trusted compositions can select worker execution. All workers inventory first,
 so cross-project duplicates fail before any form factory runs. With
 `continueOnProjectError`, failed projects are skipped and returned as safe
-`projectFailures`; healthy projects still produce a deterministic index. A
-single-writer lock spans generation through index-last publication, and the
-selected pnpm lockfile is rechecked immediately before commit.
+`projectFailures` with their stable worker code, phase, and config path; healthy
+projects still produce a deterministic index. Set `explain: true` through the
+programmatic runner or pass `--explain` to `list`, `generate`, or `check` to
+request bounded cause summaries and workspace-only frames. Explanations are
+local runtime results only and never enter artifacts or hashes. A single-writer
+lock spans generation through index-last publication, and the selected pnpm
+lockfile is rechecked immediately before commit.
 
 Configuration and form factories are executable application code. Run this
 package only against trusted workspaces. Generated artifacts are the portable,

@@ -156,6 +156,17 @@ The selected index is written beneath a deterministic
 index untouched. Run unfiltered `list` to see both healthy inventory and safe
 per-config failure records.
 
+Normal output reports each unavailable project's stable failure code, phase,
+and workspace-relative config path without exposing exception text. During a
+local diagnosis, opt into a bounded cause chain and workspace-relative frames:
+
+```sh
+pnpm exec formly-contracts-angular list --explain
+```
+
+`--explain` is also accepted by `generate` and `check`. It does not stream raw
+worker stderr or add causes and frames to generated contract artifacts.
+
 Repository CI packs every publishable package and runs the workspace CLI in an
 isolated temporary consumer. Workspace and Angular now participate in the same
 release-readiness and tarball boundary checks as schema and compiler.

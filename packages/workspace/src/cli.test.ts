@@ -14,6 +14,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { runWorkspaceCli } from './cli.js';
 import { WorkspaceConfigLoadError } from './config-loader.js';
 import { WorkspaceGenerationError } from './run-workspace.js';
+import { ProjectWorkerSupervisorError } from './runtime-host/worker-supervisor.js';
 
 const temporaryDirectories: string[] = [];
 
@@ -102,7 +103,23 @@ describe('workspace CLI', () => {
     expect(captured.stdout.join('')).toContain('list');
     expect(captured.stdout.join('')).toContain('check');
     expect(captured.stdout.join('')).toContain('author-factory-inputs');
+    expect(captured.stdout.join('')).toContain('--explain');
     expect(captured.stderr).toEqual([]);
+  });
+
+  it('rejects --explain for factory-input authoring', async () => {
+    const captured = captureIo();
+
+    await expect(
+      runWorkspaceCli(
+        ['author-factory-inputs', '--explain'],
+        captured.io,
+      ),
+    ).resolves.toBe(2);
+
+    expect(captured.stderr.join('')).toContain(
+      '--explain is accepted only by list, generate, and check.',
+    );
   });
 
   it('prints deterministic local factory-input drafts without writing them', async () => {
@@ -315,6 +332,7 @@ describe('workspace CLI', () => {
         {
           code: 'PROJECT_CONFIG_LOAD_FAILED',
           configPath: 'projects/broken.project.ts',
+          phase: 'inventory',
         },
       ],
     });
@@ -325,7 +343,59 @@ describe('workspace CLI', () => {
 
     expect(captured.stdout.join('')).toContain('Project: healthy');
     expect(captured.stderr.join('')).toBe(
-      'Project unavailable [PROJECT_CONFIG_LOAD_FAILED] config="projects/broken.project.ts"\n',
+      'Project unavailable [PROJECT_CONFIG_LOAD_FAILED] phase=inventory config="projects/broken.project.ts"\n',
+    );
+  });
+
+  it('shows bounded project failure details only with --explain', async () => {
+    const captured = captureIo();
+    const list = vi.fn().mockResolvedValue({
+      inventory: {
+        schemaVersion: '0.2.0',
+        rootConfigPath: 'formly-contracts.config.ts',
+        plugins: [],
+        projects: [],
+      },
+      failures: [
+        {
+          code: 'PROJECT_CONFIG_LOAD_FAILED',
+          configPath: 'projects/broken.project.ts',
+          phase: 'inventory',
+          explanation: {
+            causes: [
+              {
+                name: 'TypeError',
+                message: 'Cannot initialize NumberComponent.',
+              },
+            ],
+            frames: [
+              {
+                path: 'libs/forms/number.component.ts',
+                line: 12,
+                column: 7,
+              },
+            ],
+          },
+        },
+      ],
+    });
+
+    await expect(
+      runWorkspaceCli(['list', '--explain'], { ...captured.io, list }),
+    ).resolves.toBe(1);
+
+    expect(list).toHaveBeenCalledWith({
+      workspaceRoot: process.cwd(),
+      rootConfigPath: 'formly-contracts.config.ts',
+      continueOnProjectError: true,
+      explain: true,
+    });
+    expect(captured.stderr.join('')).toContain('Explanation (local only):');
+    expect(captured.stderr.join('')).toContain(
+      'Cause 1: TypeError: Cannot initialize NumberComponent.',
+    );
+    expect(captured.stderr.join('')).toContain(
+      'at libs/forms/number.component.ts:12:7',
     );
   });
 
@@ -577,6 +647,99 @@ describe('workspace CLI', () => {
     expect(captured.stderr.join('')).not.toContain('private factory detail');
     expect(captured.stderr.join('').split('\n')).toHaveLength(3);
     expect(captured.stderr.join('')).not.toContain(' at ');
+  });
+
+  it('sanitizes local failure details when generation uses --explain', async () => {
+    const captured = captureIo();
+    const workspaceRoot = '/workspace/private-client';
+    const cause = new Error(
+      `Factory failed in ${workspaceRoot}/apps/claims/form.ts and /private/vendor/loader.js`,
+    );
+    cause.stack =
+      `Error: factory failed\n` +
+      `    at create (${workspaceRoot}/apps/claims/form.ts:12:3)\n` +
+      '    at load (/private/vendor/loader.js:4:2)';
+    const generate = vi.fn().mockRejectedValue(
+      new WorkspaceGenerationError(
+        'FORM_FACTORY_FAILED',
+        'extraction',
+        { projectId: 'claims' },
+        cause,
+      ),
+    );
+
+    await expect(
+      runWorkspaceCli(
+        ['generate', '--workspace-root', workspaceRoot, '--explain'],
+        { ...captured.io, generate },
+      ),
+    ).resolves.toBe(1);
+
+    const output = captured.stderr.join('');
+    expect(output).toContain('Explanation (local only):');
+    expect(output).toContain('Cause 2: Error: Factory failed in ./apps/claims/form.ts');
+    expect(output).toContain('at apps/claims/form.ts:12:3');
+    expect(output).not.toContain(workspaceRoot);
+    expect(output).not.toContain('/private/vendor');
+  });
+
+  it('preserves worker code and phase while gating worker details behind --explain', async () => {
+    const workerError = new ProjectWorkerSupervisorError(
+      'WORKER_FAILURE',
+      'project:1',
+      undefined,
+      {
+        configPath: 'projects/broken.project.ts',
+        workerFailure: {
+          protocolVersion: '1',
+          kind: 'failure',
+          requestId: 'project:1',
+          code: 'PROJECT_CONFIG_LOAD_FAILED',
+          phase: 'inventory',
+          explanation: {
+            causes: [
+              {
+                name: 'ReferenceError',
+                message: 'Cannot access NumberComponent before initialization.',
+              },
+            ],
+            frames: [
+              {
+                path: 'libs/forms/number.component.ts',
+                line: 20,
+                column: 5,
+              },
+            ],
+          },
+        },
+      },
+    );
+    const generate = vi.fn().mockRejectedValue(workerError);
+    const redacted = captureIo();
+
+    await expect(
+      runWorkspaceCli(['generate'], { ...redacted.io, generate }),
+    ).resolves.toBe(1);
+
+    expect(redacted.stderr.join('')).toBe(
+      'Generation failed [PROJECT_CONFIG_LOAD_FAILED] phase=inventory config="projects/broken.project.ts"\n' +
+        'Project worker failed.\n',
+    );
+    expect(redacted.stderr.join('')).not.toContain('NumberComponent');
+
+    const explained = captureIo();
+    await expect(
+      runWorkspaceCli(['generate', '--explain'], {
+        ...explained.io,
+        generate,
+      }),
+    ).resolves.toBe(1);
+    expect(explained.stderr.join('')).toContain(
+      'Cause 1: ReferenceError: Cannot access NumberComponent before initialization.',
+    );
+    expect(explained.stderr.join('')).toContain(
+      'at libs/forms/number.component.ts:20:5',
+    );
   });
 
   it('suggests Node-safe contract imports for config-load failures without exposing the cause', async () => {

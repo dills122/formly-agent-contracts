@@ -32,6 +32,7 @@ function request() {
     rootPolicy: { failOn: ['error'] },
     cliOverrides: { outputDirectory: 'dist/contracts' },
     runtimeHost: descriptor(),
+    explain: true,
   };
 }
 
@@ -73,6 +74,34 @@ describe('runtime-host protocol', () => {
         result: { artifacts: [] },
       }),
     ).toMatchObject({ kind: 'result' });
+    expect(
+      parseRuntimeHostWorkerMessage({
+        protocolVersion: '1',
+        kind: 'failure',
+        requestId: 'project:claims',
+        code: 'PROJECT_CONFIG_LOAD_FAILED',
+        phase: 'inventory',
+        explanation: {
+          causes: [
+            {
+              name: 'ReferenceError',
+              message: "Cannot access 'NumberComponent' before initialization",
+            },
+          ],
+          frames: [
+            {
+              path: 'libs/forms-kit/src/lib/number.component.ts',
+              line: 12,
+              column: 7,
+            },
+          ],
+        },
+      }),
+    ).toMatchObject({
+      kind: 'failure',
+      code: 'PROJECT_CONFIG_LOAD_FAILED',
+      phase: 'inventory',
+    });
   });
 
   it.each([
@@ -96,6 +125,9 @@ describe('runtime-host protocol', () => {
       }),
     ).toThrow('request.rootPolicy');
     expect(() =>
+      parseProjectExecutionRequest({ ...request(), explain: 'yes' }),
+    ).toThrow('request.explain');
+    expect(() =>
       parseRuntimeHostWorkerMessage({
         protocolVersion: '1',
         kind: 'failure',
@@ -104,5 +136,34 @@ describe('runtime-host protocol', () => {
         phase: 'compile',
       }),
     ).toThrow('workerMessage.code');
+  });
+
+  it.each([
+    {
+      causes: [{ name: 'Error', message: 'forged\nline' }],
+      frames: [],
+    },
+    {
+      causes: [{ name: 'Error', message: 'safe' }],
+      frames: [{ path: '/private/file.ts', line: 1, column: 1 }],
+    },
+    {
+      causes: Array.from({ length: 4 }, () => ({
+        name: 'Error',
+        message: 'safe',
+      })),
+      frames: [],
+    },
+  ])('rejects malformed or over-broad failure explanations', (explanation) => {
+    expect(() =>
+      parseRuntimeHostWorkerMessage({
+        protocolVersion: '1',
+        kind: 'failure',
+        requestId: 'project:claims',
+        code: 'PROJECT_CONFIG_LOAD_FAILED',
+        phase: 'inventory',
+        explanation,
+      }),
+    ).toThrow('workerMessage.explanation');
   });
 });
