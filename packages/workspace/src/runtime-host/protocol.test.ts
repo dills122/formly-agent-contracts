@@ -53,6 +53,28 @@ describe('runtime-host protocol', () => {
     });
   });
 
+  it('treats protocol 1 as a strict package-lockstep schema', () => {
+    expect(() =>
+      parseProjectExecutionRequest({
+        ...request(),
+        futureCapability: true,
+      }),
+    ).toThrow('request.futureCapability');
+    expect(() =>
+      parseRuntimeHostWorkerMessage({
+        protocolVersion: '1',
+        kind: 'failure',
+        requestId: 'project:claims',
+        code: 'PROJECT_CONFIG_LOAD_FAILED',
+        phase: 'inventory',
+        futureDetail: {},
+      }),
+    ).toThrow('workerMessage.futureDetail');
+    expect(() =>
+      parseProjectExecutionRequest({ ...request(), protocolVersion: '2' }),
+    ).toThrow('request.protocolVersion');
+  });
+
   it('accepts inventory and JSON-safe result messages', () => {
     expect(
       parseRuntimeHostWorkerMessage({

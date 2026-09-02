@@ -1,5 +1,10 @@
 import { canonicalStringify, type JsonValue } from '@formly-contract/schema';
 
+/**
+ * Strict package-lockstep IPC schema, not an independently compatible extension
+ * protocol. Custom workers must be built against the exact workspace package
+ * version because additive fields are rejected unless both peers know them.
+ */
 export const RUNTIME_HOST_PROTOCOL_VERSION = '1' as const;
 
 export type RuntimeHostOperation = 'inventory' | 'generate' | 'check';

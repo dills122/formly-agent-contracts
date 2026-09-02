@@ -13,10 +13,16 @@ const MAX_NAME_LENGTH = 64;
 const MAX_MESSAGE_LENGTH = 400;
 const MAX_PATH_LENGTH = 240;
 const ANSI_ESCAPE_PATTERN = /\u001b\[[0-?]*[ -/]*[@-~]/gu;
-const POSIX_ABSOLUTE_PATH_PATTERN = /(^|[\s'"(])\/(?:[^\s'"()]+\/?)+/gu;
-const WINDOWS_ABSOLUTE_PATH_PATTERN =
-  /(^|[\s'"(])[A-Za-z]:\\(?:[^\s'"()]+\\?)+/gu;
-const FILE_URL_PATTERN = /file:\/\/\/[^\s)'"\]]+/gu;
+const DOUBLE_QUOTED_ABSOLUTE_PATH_PATTERN =
+  /"(?:file:\/\/\/|\/|[A-Za-z]:[\\/])[^"\u0000-\u001f\u007f]*"/gu;
+const SINGLE_QUOTED_ABSOLUTE_PATH_PATTERN =
+  /'(?:file:\/\/\/|\/|[A-Za-z]:[\\/])[^'\u0000-\u001f\u007f]*'/gu;
+const KEY_VALUE_ABSOLUTE_PATH_PATTERN =
+  /(^|[\s(,;])([A-Za-z][A-Za-z0-9_.-]*\s*[=:]\s*)(?:file:\/\/\/|\/|[A-Za-z]:[\\/])[^\u0000-\u001f\u007f;,)\]}]+/gu;
+const LABELED_ABSOLUTE_PATH_PATTERN =
+  /(^|[\s(,;])((?:at|cache|cwd|directory|file|from|in|path|root)\s+)(?:file:\/\/\/|\/|[A-Za-z]:[\\/])[^\u0000-\u001f\u007f;,)\]}]+/giu;
+const UNQUOTED_ABSOLUTE_PATH_PATTERN =
+  /(^|[\s'"(=,:])(?:file:\/\/\/|\/(?!\/)|[A-Za-z]:[\\/])[^\s'"(),;)\]}]+/gu;
 
 function truncate(input: string, maximumLength: number): string {
   const characters = Array.from(input);
@@ -50,9 +56,11 @@ function sanitizeText(input: string, workspaceRoot: string): string {
     value = replaceAllLiteral(value, spelling, ".");
   }
   value = value
-    .replace(FILE_URL_PATTERN, "<external-path>")
-    .replace(POSIX_ABSOLUTE_PATH_PATTERN, "$1<external-path>")
-    .replace(WINDOWS_ABSOLUTE_PATH_PATTERN, "$1<external-path>")
+    .replace(DOUBLE_QUOTED_ABSOLUTE_PATH_PATTERN, '"<external-path>"')
+    .replace(SINGLE_QUOTED_ABSOLUTE_PATH_PATTERN, "'<external-path>'")
+    .replace(KEY_VALUE_ABSOLUTE_PATH_PATTERN, "$1$2<external-path>")
+    .replace(LABELED_ABSOLUTE_PATH_PATTERN, "$1$2<external-path>")
+    .replace(UNQUOTED_ABSOLUTE_PATH_PATTERN, "$1<external-path>")
     .replace(/[\u0000-\u001f\u007f]+/gu, " ")
     .replace(/\s+/gu, " ")
     .trim();

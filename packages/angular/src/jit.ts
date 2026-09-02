@@ -9,6 +9,7 @@ import {
 } from '@formly-contract/workspace';
 import {
   defineRuntimeHostModuleDescriptor,
+  RUNTIME_HOST_PROTOCOL_VERSION,
   type RuntimeHostModuleDescriptor,
 } from '@formly-contract/workspace/runtime-host';
 
@@ -24,7 +25,7 @@ export function angularJitRuntimeHost(
   options?: RuntimeHostModuleDescriptor['options'],
 ): RuntimeHostModuleDescriptor {
   return defineRuntimeHostModuleDescriptor({
-    protocolVersion: '1',
+    protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
     id: ANGULAR_JIT_RUNTIME_HOST_ID,
     version: ANGULAR_JIT_RUNTIME_HOST_VERSION,
     moduleUrl: new URL('./project-host.js', import.meta.url).href,

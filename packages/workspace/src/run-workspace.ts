@@ -1906,6 +1906,7 @@ async function planWorkerWorkspaceRun(
     );
   } catch (error) {
     if (error instanceof WorkspaceGenerationError) throw error;
+    if (error instanceof ProjectWorkerSupervisorError) throw error;
     if (isOutsideWorkspaceOutputConfigError(error)) {
       throw new WorkspaceGenerationError(
         'OUTPUT_PATH_OUTSIDE_WORKSPACE',

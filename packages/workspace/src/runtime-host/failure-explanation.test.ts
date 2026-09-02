@@ -71,6 +71,36 @@ describe("runtime-host failure explanation", () => {
     ]);
   });
 
+  it("redacts common absolute-path forms including spaces and Windows separators", () => {
+    const error = new Error(
+      "loader path=/private/Client Secret/source.ts; " +
+        "cwd=C:\\Private\\Client Secret\\source.ts; " +
+        "cache=C:/Users/Private Client/cache/file.js; " +
+        'quoted="/Applications/Client Tools/loader.js"; ' +
+        "single='/opt/Client Files/worker.mjs'; " +
+        "from /var/Client Data/runtime.ts; " +
+        "url=file:///Users/Private%20Client/module.ts"
+    );
+
+    const explanation = createRuntimeHostFailureExplanation(
+      error,
+      process.cwd()
+    );
+
+    expect(explanation.causes[0]!.message).toBe(
+      "loader path=<external-path>; " +
+        "cwd=<external-path>; " +
+        "cache=<external-path>; " +
+        'quoted="<external-path>"; ' +
+        "single='<external-path>'; " +
+        "from <external-path>; " +
+        "url=<external-path>"
+    );
+    expect(explanation.causes[0]!.message).not.toMatch(
+      /private|client|applications|users|worker\.mjs/iu
+    );
+  });
+
   it("represents non-Error throws without inspecting arbitrary properties", () => {
     expect(
       createRuntimeHostFailureExplanation(

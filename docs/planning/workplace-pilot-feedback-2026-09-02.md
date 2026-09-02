@@ -137,6 +137,17 @@ summaries and five workspace-relative frames, and remain runtime-only. The
 worker's stdout/stderr stay suppressed. This does not turn the child into an
 untrusted-code sandbox.
 
+The first independent review found two last-mile gaps in that implementation:
+fail-closed Angular `generate`/`check` wrapped the typed supervisor error before
+the CLI could render it, and common `path=...`, Windows, and quoted paths with
+spaces escaped the cause-message sanitizer. Both are now covered by retained
+regressions. Built Angular CLI checks exercise inventory and compile failures
+without `continueOnProjectError`; privacy-negative unit cases cover key/value,
+quoted, labeled, POSIX, Windows-backslash, Windows-forward-slash, and file-URL
+forms. Protocol version `1` is documented and tested as a strict
+package-lockstep IPC shape: custom workers must target the exact workspace
+package version rather than assuming unknown additive fields are accepted.
+
 ### Compact profiles exist; application adoption remains
 
 [`field-type-authoring.ts`](../../packages/schema/src/field-type-authoring.ts)

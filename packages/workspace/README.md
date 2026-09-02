@@ -47,6 +47,13 @@ local runtime results only and never enter artifacts or hashes. A single-writer
 lock spans generation through index-last publication, and the selected pnpm
 lockfile is rechecked immediately before commit.
 
+The runtime-host protocol is a strict package-lockstep IPC contract, not an
+independently compatible plugin protocol. Optional fields are additive only for
+the parent and worker shipped with the same `@formly-contract/workspace`
+version; strict parsers reject fields they do not know. A custom
+`projectExecution.workerModuleUrl` must therefore be built and tested against
+that exact workspace package version.
+
 Configuration and form factories are executable application code. Run this
 package only against trusted workspaces. Generated artifacts are the portable,
 strictly validated boundary intended for downstream consumers.
