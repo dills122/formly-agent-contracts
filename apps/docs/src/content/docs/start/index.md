@@ -10,7 +10,7 @@ selectors.
 
 <div class="status-line">
   <span class="status status--current">Current product</span>
-  <span>Parser, contract, workspace runner, and generic CLI</span>
+  <span>Parser, contract, workspace runner, Angular JIT host, and CLIs</span>
 </div>
 
 ## The shortest honest evaluation
@@ -56,7 +56,7 @@ is the canonical private-repository evaluation path.
 
 ## Choose your next path
 
-- First integration: [install the local packages](./installation.md).
+- First integration: [choose a GitHub pilot RC or local install](./installation.md).
 - Real monorepo wiring: [follow one form end to end](./end-to-end.md).
 - Programmatic integration: [choose a public API entry point](../reference/api.md).
 - Architecture review: [understand the evidence model](../concepts/architecture.md).

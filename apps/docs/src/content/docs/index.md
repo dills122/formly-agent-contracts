@@ -16,7 +16,7 @@ hero:
 ---
 
 <div class="status-line" aria-label="Product capability status">
-  <span class="status status--current">Schema · compiler · workspace · CLI</span>
+  <span class="status status--current">Schema · compiler · workspace · Angular JIT host · CLI</span>
   <span class="status status--planned">MCP · Playwright · browser</span>
 </div>
 
@@ -52,7 +52,7 @@ hero:
 <section class="capability-band" aria-label="Current and planned boundaries">
   <div>
     <h2>Usable now</h2>
-    <p>Strict schema v0.4, declared extraction, controlled scenario compilation, custom-field profiles, deterministic workspace discovery, and <code>list</code>, <code>generate</code>, <code>check</code>, and read-only factory-input authoring.</p>
+    <p>Strict schema v0.4, declared extraction, controlled scenario compilation, custom-field profiles, deterministic workspace discovery, guarded Angular JIT project workers, and <code>list</code>, <code>generate</code>, <code>check</code>, and read-only factory-input authoring.</p>
   </div>
   <div>
     <h2>Not shipped</h2>

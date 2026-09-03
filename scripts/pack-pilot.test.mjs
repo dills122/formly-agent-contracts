@@ -37,7 +37,7 @@ describe("createPilotBundleManifest", () => {
   it("creates deterministic metadata and a copy-pasteable pnpm install", () => {
     const manifest = createPilotBundleManifest(packages);
 
-    expect(manifest.schemaVersion).toBe("2");
+    expect(manifest.schemaVersion).toBe("3");
     expect(manifest.packages.map(({ name }) => name)).toEqual([
       "@formly-contract/angular",
       "@formly-contract/compiler",
@@ -46,6 +46,7 @@ describe("createPilotBundleManifest", () => {
     ]);
     expect(manifest.install).toEqual({
       packageManager: "pnpm",
+      packageManagerVersion: "10.23.0",
       pnpmfile: {
         filename: "formly-contract-pilot.pnpmfile.cjs",
         sha256: expect.stringMatching(/^sha256:[a-f0-9]{64}$/u),
@@ -73,6 +74,7 @@ describe("createPilotBundleManifest", () => {
 
 describe("createPilotConsumerManifest", () => {
   it("pins the tested Angular and Formly compatibility stack", () => {
+    expect(createPilotConsumerManifest().packageManager).toBe("pnpm@10.23.0");
     expect(createPilotConsumerManifest().dependencies).toEqual({
       "@angular/common": "20.3.29",
       "@angular/compiler": "20.3.29",

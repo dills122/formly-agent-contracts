@@ -14,8 +14,9 @@ publication, and CLI behavior belong to
 The package is prepared for public release but is not yet published to npm.
 Follow the repository
 [installation guide](../../apps/docs/src/content/docs/start/installation.md) to
-build and link it from a sibling checkout. After the first release, installation
-will use `pnpm add --save-dev @formly-contract/compiler`.
+use the GitHub pilot RC or build and link it from a sibling checkout. After npm
+publication, installation will use
+`pnpm add --save-dev @formly-contract/compiler`.
 
 The package declares peer compatibility with `@ngx-formly/core` 6.x and is
 intended for Angular 20 or newer applications. The compatibility suite is

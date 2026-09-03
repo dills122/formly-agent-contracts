@@ -1,6 +1,6 @@
 ---
 title: Public API reference
-description: Choose the supported Formly Contract entry point for schema data, Formly compilation, workspace orchestration, or custom-field authoring.
+description: Choose the supported Formly Contract entry point for schema data, Formly compilation, workspace orchestration, Angular JIT hosting, or custom-field authoring.
 ---
 
 Formly Contract is pre-release. This page documents the supported package entry
@@ -20,12 +20,15 @@ the exhaustive authority for overloads and types.
 - **`@formly-contract/workspace`** — trusted Node tooling for configuration,
   discovery, source definitions, artifact generation, checking, source
   linkage, and local factory-input inspection.
+- **`@formly-contract/angular`** and **`@formly-contract/angular/jit`** —
+  guarded Angular JIT runtime-host composition and disposable project-worker
+  execution using the selected project's Angular and Formly peers.
 - **`@formly-contract/playwright`** — private experiment for reviewed
   driver-implementation binding only; it does not execute Playwright or launch
   a browser.
 
-Do not import package-internal files. The package roots and the one documented
-schema subpath are the compatibility boundary.
+Do not import package-internal files. Package roots and documented export
+subpaths are the compatibility boundary.
 
 ## Schema
 
@@ -290,6 +293,27 @@ const result = await inspectWorkspaceFactoryInputs({
 See the [CLI reference](./cli-api.md) for the matching
 `author-factory-inputs` command and its refusal behavior.
 
+## Angular runtime host
+
+| API | Purpose |
+| --- | --- |
+| `discoverAngularWorkspace(options)` | Inventory selected Angular projects through the guarded JIT worker composition. |
+| `runAngularWorkspace(options)` | Generate artifacts with project-local Angular compiler preload and disposable project workers. |
+| `checkAngularWorkspace(options)` | Run the identical composition without writing artifacts. |
+| `angularJitRuntimeHost` | Supply the built-in Angular JIT runtime-host descriptor to workspace orchestration. |
+
+Import operational APIs from `@formly-contract/angular/jit`. The package root
+also exposes the reserved authoring-host descriptor, but that separate
+browser/AOT lane currently fails with an explicit refusal and is not a JIT
+fallback.
+
+Selected Angular and Formly peers resolve from each project's runtime base.
+The child boundary isolates module/cache state, crashes, and timeouts; it does
+not sandbox hostile code or block network access. See the
+[Angular package README](https://github.com/dills122/formly-contract/blob/main/packages/angular/README.md)
+and [Node-safe Angular libraries](./node-safe-angular-libraries.md) before
+loading application-owned configuration.
+
 ## Private Playwright experiment
 
 `@formly-contract/playwright` currently exports
@@ -355,5 +379,6 @@ For exhaustive current exports, read the package entry points for
 [`schema/field-type-authoring`](https://github.com/dills122/formly-contract/blob/main/packages/schema/src/field-type-authoring.ts),
 [`compiler`](https://github.com/dills122/formly-contract/blob/main/packages/compiler/src/index.ts),
 [`workspace`](https://github.com/dills122/formly-contract/blob/main/packages/workspace/src/index.ts),
+[`angular`](https://github.com/dills122/formly-contract/blob/main/packages/angular/src/index.ts),
 and the private
 [`playwright` experiment](https://github.com/dills122/formly-contract/blob/main/packages/playwright/src/index.ts).

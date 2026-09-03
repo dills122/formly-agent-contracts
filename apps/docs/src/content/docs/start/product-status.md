@@ -26,6 +26,11 @@ mean “available in the package.”
   `author-factory-inputs` commands.
 - Programmatic workspace discovery, local factory-input inspection, generation,
   checking, index parsing, and contract parsing APIs.
+- `@formly-contract/angular` guarded JIT composition through disposable
+  project workers, project-local Angular compiler preload, safe per-project
+  failure records, and the `formly-contracts-angular` CLI. The worker boundary
+  isolates module/cache state, crashes, and timeouts; it is not an untrusted
+  code or network sandbox.
 - Pure `executeAgentContextQuery` over caller-assembled agent-context
   artifacts, including source-usage search by source path or form ID.
 - Strict typed test-intent and diagnostic DTOs plus a pure validator that turns

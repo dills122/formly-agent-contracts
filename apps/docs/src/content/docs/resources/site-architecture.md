@@ -59,8 +59,9 @@ preference, and leaves product packages independent of the docs runtime.
 **Docusaurus** has the strongest built-in multi-version documentation workflow.
 Its own [versioning guide](https://docusaurus.io/docs/versioning) also warns that
 versioning duplicates content, increases build time, and complicates
-contributions. The project is pre-release and does not need snapshot copies yet;
-adding a React site and version lifecycle now would be premature.
+contributions. The project has no stable npm release or compatibility promise
+and does not need snapshot copies yet; adding a React site and version lifecycle
+now would be premature.
 
 **VitePress** is a lean static Markdown option with local search, Shiki, and
 strong navigation. It would fit technically, but Starlight provides the desired
@@ -70,9 +71,10 @@ content collection.
 ## Versioning policy
 
 The site documents the current default branch until a public compatibility
-promise requires retained release docs. At that point, create version-prefixed
-content collections or publish immutable site builds from release tags. Do not
-copy today’s pages into `v0` directories before the first release.
+promise requires retained release docs. An artifact-only pilot RC does not
+create that promise. At the first stable compatibility release, create
+version-prefixed content collections or publish immutable site builds from
+release tags; do not copy today's pages into `v0` directories earlier.
 
 ## API reference policy
 

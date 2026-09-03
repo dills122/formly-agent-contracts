@@ -17,10 +17,23 @@ production custom-field registration.
 
 The compatibility suite is pinned to Angular `20.3.29` and Formly `6.1.8`.
 
-## Link the packages before the first release
+## Evaluate the GitHub pilot release candidate
 
-The packages are prepared for their first public release but may still need to
-be linked before the npm bootstrap completes. Clone this repository beside the
+Before npm publication, download every asset from the newest
+[`pilot-rc.*` GitHub prerelease](https://github.com/dills122/formly-contract/releases).
+Keep the four package tarballs, `formly-contract-pilot.json`, and
+`formly-contract-pilot.pnpmfile.cjs` in one directory. The manifest records
+each package SHA-256, the pnpm-hook SHA-256, exact pnpm version, and install
+arguments verified by the release candidate's temporary consumer smoke test.
+
+The pilot RC is installable evaluation evidence, not an npm publication or a
+stable compatibility promise. Third-party Angular, Formly, TypeScript, and
+pnpm dependencies still come from the consumer's registry or package cache.
+
+## Link the packages before npm publication
+
+The packages are prepared for public npm release but may still need to be
+linked before the npm bootstrap completes. Clone this repository beside the
 consumer and build the four publishable packages:
 
 ```sh

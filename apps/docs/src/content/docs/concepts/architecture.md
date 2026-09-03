@@ -12,7 +12,10 @@ Angular/Formly application code
         │ explicit sources + profiles
         ▼
 @formly-contract/workspace
-        │ trusted discovery + policy + publication
+        │ trusted discovery + policy + worker orchestration + publication
+        ├── Node-safe project execution
+        └── @formly-contract/angular/jit
+                │ project-local compiler preload + disposable worker
         ▼
 @formly-contract/compiler
         │ declared or scenario-resolved projection
@@ -26,7 +29,7 @@ workspace-index.json + content-addressed contracts
         └── planned: MCP query → typed intent → Playwright driver
 ```
 
-## The three current package boundaries
+## The four current package boundaries
 
 **Schema owns portable contracts.** DTOs, runtime parsing, canonicalization,
 hashing, diagnostics, field profiles, effects, and runtime provenance belong in
@@ -39,6 +42,12 @@ compilation, field-profile resolution, and allowlisted projection belong in
 **Workspace owns trusted orchestration.** Root/project/source configuration,
 config loading, discovery, policy resolution, index generation, artifact
 publication, and CLI commands belong in `@formly-contract/workspace`.
+
+**Angular owns guarded JIT composition.** Project-local Angular compiler
+preload, disposable-child runtime hosting, and the Angular CLI belong in
+`@formly-contract/angular`. This isolates module/cache state, crashes, and
+timeouts; it does not turn trusted application code into untrusted sandboxed
+code.
 
 The repository also contains a private `@formly-contract/playwright` experiment
 for trusted-local driver implementation binding and exact validated-plan call

@@ -17,6 +17,8 @@ import { verifyPackedWorkspaceManifest } from "./check-workspace-consumers.mjs";
 import { verifyPackedPackage } from "./pack-release.mjs";
 import { loadReleaseManifest } from "./release-manifest.mjs";
 import {
+  PINNED_PNPM_PACKAGE_MANAGER,
+  PINNED_PNPM_VERSION,
   PNPM_EXECUTABLE,
   hasWorkspaceDependency,
   readPackedManifest,
@@ -49,6 +51,7 @@ export function createPilotConsumerManifest() {
     version: "0.0.0",
     private: true,
     type: "module",
+    packageManager: PINNED_PNPM_PACKAGE_MANAGER,
     dependencies: { ...PILOT_CONSUMER_DEPENDENCIES },
   };
 }
@@ -67,7 +70,7 @@ export function createPilotBundleManifest(packages) {
   }
   const pnpmfileBytes = createPilotPnpmfile(sorted);
   return {
-    schemaVersion: "2",
+    schemaVersion: "3",
     packages: sorted.map(({ filename, name, sha256, version }) => ({
       name,
       version,
@@ -76,6 +79,7 @@ export function createPilotBundleManifest(packages) {
     })),
     install: {
       packageManager: "pnpm",
+      packageManagerVersion: PINNED_PNPM_VERSION,
       pnpmfile: {
         filename: PILOT_PNPMFILE,
         sha256: `sha256:${createHash("sha256")
