@@ -126,10 +126,10 @@ does not depend on Playwright or invoke a browser despite its package name.
 If a sibling checkout is not portable to the work machine, run
 `pnpm pilot:pack` in Formly Contract and copy `artifacts/pilot/` for the
 portable pilot. Its `formly-contract-pilot.json` records the schema, compiler,
-workspace, and Angular tarballs, SHA-256 digests, and exact pnpm install
-arguments. Keep the checksummed `formly-contract-pilot.pnpmfile.cjs` beside the
-tarballs; it redirects only dependencies among the four bundled packages so
-pnpm does not fall back to unpublished registry entries. The separate
+workspace, and Angular tarballs, SHA-256 digests, exact pnpm version, and
+install arguments. Keep the checksummed `formly-contract-pilot.pnpmfile.cjs`
+beside the tarballs; it redirects only dependencies among the four bundled
+packages so pnpm does not fall back to unpublished registry entries. The separate
 Playwright experiment is not part of that compiler bundle.
 
 Install with the workplace repository's normal pnpm workflow, then verify the

@@ -114,6 +114,32 @@ the npm and GitHub release assets are identical.
 Never move or reuse a published version tag. npm package name/version pairs are
 immutable even when unpublished.
 
+## Artifact-only GitHub pilot prerelease
+
+Use the existing portable pilot bundle when reviewers need installable bytes
+before npm bootstrap. This is an evaluation prerelease, not an npm publication
+or the provenance source for a later registry release.
+
+1. Start from a clean, current `main`, run `pnpm check`, then retain the tested
+   bundle:
+
+   ```sh
+   pnpm pilot:pack
+   ```
+
+2. Inspect `artifacts/pilot/formly-contract-pilot.json`. Keep its four package
+   tarballs and `formly-contract-pilot.pnpmfile.cjs` together; the manifest
+   records their SHA-256 identities, exact pnpm version, and install arguments
+   exercised by the temporary consumer smoke test.
+3. Create an annotated `pilot-rc.N` tag on that same `main` commit and a GitHub
+   prerelease attaching every file under `artifacts/pilot/`.
+
+The `pilot-` prefix is deliberate. Never use `v*` for an artifact-only
+candidate: every `v*` tag starts the npm publication workflow. Do not promote,
+move, or reuse a pilot tag. The later production `v*` workflow rebuilds and
+preserves its own verified release tarballs; those workflow bytes, not a pilot
+bundle rebuilt on another machine, remain the npm bootstrap authority.
+
 ## Local release checks
 
 - `pnpm changeset status` shows pending changesets and the version bumps they

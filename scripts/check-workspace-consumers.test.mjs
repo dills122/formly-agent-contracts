@@ -84,6 +84,7 @@ describe("workspace consumer smoke helpers", () => {
     ];
 
     expect(createPackedConsumerManifest(packages)).toMatchObject({
+      packageManager: "pnpm@10.23.0",
       private: true,
       dependencies: {
         "@angular/compiler": "20.3.29",

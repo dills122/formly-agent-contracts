@@ -16,6 +16,7 @@ import { fileURLToPath } from "node:url";
 
 import { loadReleaseManifest } from "./release-manifest.mjs";
 import {
+  PINNED_PNPM_PACKAGE_MANAGER,
   PNPM_EXECUTABLE,
   hasWorkspaceDependency,
   readPackedManifest,
@@ -60,6 +61,7 @@ export function createPackedConsumerManifest(packages) {
     version: "0.0.0",
     private: true,
     type: "module",
+    packageManager: PINNED_PNPM_PACKAGE_MANAGER,
     dependencies: {
       "@angular/common": "20.3.29",
       "@angular/compiler": "20.3.29",

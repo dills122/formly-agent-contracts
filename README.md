@@ -4,10 +4,11 @@ Formly Contract turns selected Angular Formly configurations into deterministic,
 versioned JSON. Test authors and coding agents can use that JSON to understand a
 form without loading Formly runtime objects or inventing selectors.
 
-> **Pre-release status:** the schema and compiler are prepared for an initial npm
-> release but are not published yet. The workspace tooling is still private and
-> experimental. A production MCP server, automatic Playwright generation, and
-> live-browser observation are not shipped.
+> **Pre-release status:** schema, compiler, workspace, and Angular runtime-host
+> packages are prepared for an initial npm release but are not published yet.
+> A private driver-binding experiment exists, but a production MCP server,
+> automatic Playwright generation/execution, and live-browser observation are
+> not shipped.
 
 [Read the documentation](https://dills122.github.io/formly-contract/) ·
 [See current product status](apps/docs/src/content/docs/start/product-status.md) ·
@@ -188,9 +189,9 @@ known browser-only sibling. Selected runs publish a separate deterministic
 scoped index.
 
 The packages are not available from npm yet. Follow the
-[installation guide](apps/docs/src/content/docs/start/installation.md) to build
-and link them from a sibling checkout or create a portable `pnpm pilot:pack`
-tarball bundle, then use the
+[installation guide](apps/docs/src/content/docs/start/installation.md) to use
+the latest GitHub pilot RC, build and link a sibling checkout, or create a
+portable `pnpm pilot:pack` tarball bundle, then use the
 [end-to-end workspace guide](apps/docs/src/content/docs/start/end-to-end.md) for
 configuration and form registration.
 
@@ -200,14 +201,15 @@ configuration and form registration.
 | --- | --- | --- |
 | [`@formly-contract/schema`](packages/schema/README.md) | Versioned DTOs, strict parsers, canonical JSON, hashing, profiles, effects, and pure query data | `0.4.0`; prepared for first npm release |
 | [`@formly-contract/compiler`](packages/compiler/README.md) | Allowlisted declared extraction and trusted Formly scenario compilation | `0.4.0`; prepared for first npm release |
-| [`@formly-contract/workspace`](packages/workspace/README.md) | Trusted config loading, discovery, generation, checking, source usage, and CLI tooling | `0.1.0`; private and experimental |
+| [`@formly-contract/workspace`](packages/workspace/README.md) | Trusted config loading, discovery, generation, checking, source usage, and CLI tooling | `0.1.0`; prepared for first npm release |
+| [`@formly-contract/angular`](packages/angular/README.md) | Guarded project-local Angular JIT runtime hosting and disposable worker composition | `0.1.0`; prepared for first npm release |
 | [`@formly-contract/playwright`](packages/playwright/README.md) | Trusted-local driver inventory and validated-plan call-binding experiment | `0.0.0`; private, no browser execution |
 
 The main dependency direction is:
 
 ```text
-workspace -> compiler -> schema
-playwright -----------> schema
+angular -> workspace -> compiler -> schema
+playwright -----------------------> schema
 ```
 
 See the [package guide](packages/README.md) for ownership boundaries and public

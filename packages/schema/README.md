@@ -17,8 +17,8 @@ its canonicalizer sorts identity collections before hashing.
 The package is prepared for public release but is not yet published to npm.
 Follow the repository
 [installation guide](../../apps/docs/src/content/docs/start/installation.md) to
-build and link it from a sibling checkout. After the first release, installation
-will use `pnpm add @formly-contract/schema`.
+use the GitHub pilot RC or build and link it from a sibling checkout. After npm
+publication, installation will use `pnpm add @formly-contract/schema`.
 
 Use a regular dependency when production Angular code imports the browser-safe
 `@formly-contract/schema/field-type-authoring` subpath. Tooling-only consumers
