@@ -52,6 +52,15 @@ exact discovered config path, to set `projectRoot`, `runtimeResolutionBase`, or
 `tsconfigPath`. Fields fall back independently to config-directory defaults or
 root `tsconfigPath`; parent and child canonicalize and confine effective paths.
 
+Worker execution defaults to `trusted-local-v1`. It spawns `process.execPath`
+directly with a scrubbed environment, strict IPC, bounded teardown, and—when
+the current Node runtime supports it—read-only filesystem permissions for the
+workspace and trusted package roots. It grants no filesystem-write,
+child-process, or worker-thread permission. This is a trusted-code guardrail,
+not a hostile-code sandbox: network access remains `not-enforced` in portable
+provenance. Requesting `isolated-ci-v1` fails closed until an external isolation
+provider is available.
+
 The runtime-host protocol is a strict package-lockstep IPC contract, not an
 independently compatible plugin protocol. Optional fields are additive only for
 the parent and worker shipped with the same `@formly-contract/workspace`

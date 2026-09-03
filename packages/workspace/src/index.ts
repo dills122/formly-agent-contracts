@@ -157,9 +157,12 @@ export {
   createProjectWorkerEnvironment,
   ProjectWorkerSupervisorError,
   spawnProjectWorker,
+  WorkspaceRuntimeHostLoadError,
 } from './runtime-host/index.js';
 export type {
+  ProjectWorkerExecutionProfile,
   ProjectWorkerSession,
   ProjectWorkerSupervisorErrorCode,
   SpawnProjectWorkerOptions,
+  WorkspaceRuntimeHostLoadErrorCode,
 } from './runtime-host/index.js';

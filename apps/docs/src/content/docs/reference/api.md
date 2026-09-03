@@ -254,12 +254,20 @@ import {
 const options = {
   workspaceRoot: process.cwd(),
   rootConfigPath: 'formly-contracts.config.ts',
+  projectExecution: {
+    kind: 'workers' as const,
+    executionProfile: 'trusted-local-v1' as const,
+  },
 };
 
 const discovered = await discoverWorkspaceProjects(options);
 const generated = await runWorkspace(options);
 const checked = await checkWorkspace(options);
 ```
+
+`trusted-local-v1` uses a direct, read-only-guarded Node worker and records
+`network: not-enforced`; it is not an untrusted-code sandbox. The reserved
+`isolated-ci-v1` profile currently fails closed before importing project code.
 
 ### Read-only factory-input authoring
 

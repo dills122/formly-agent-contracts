@@ -255,9 +255,11 @@ serializable runtime-host protocol:
    config-directory defaults and root tsconfig; unmatched keys, traversal, and
    realpath escapes fail before spawn. The child repeats confinement checks
    before host or config evaluation.
-2. One fresh child process per project imports the trusted host module by its
-   already resolved file URL, evaluates the project config, inventories IDs, and
-   waits. No executable module URL may come from config data.
+2. One fresh `process.execPath` child per project starts without a shell, with a
+   scrubbed environment and read-only Node permissions when supported. It
+   imports the trusted host module by its already resolved file URL, evaluates
+   the project config, inventories IDs, and waits. No executable module URL may
+   come from config data.
 3. The parent rejects cross-project duplicate identities before allowing form
    factories to run. Children then compile and return only JSON-safe artifacts,
    diagnostics, and provenance; live configs, injectors, modules, and functions
@@ -302,13 +304,15 @@ until a retained compatibility gate proves otherwise.
 
 A project child contains compiler-facade/module-cache state, crashes, timeouts,
 and failed-import contamination, but it is not a hostile-code or network
-sandbox. Trusted local execution uses a scrubbed environment and records that
-network denial is not enforced. Reproducible CI generation requires a configured
-external isolation provider and fails closed when network denial is requested
-but unavailable. Portable provenance records exact tool/loader/runtime versions,
-the worker and execution-profile versions, and a canonical dependency-lock
-digest; machine paths, module URLs, PIDs, timings, and raw environment never
-enter hashes.
+sandbox. Trusted-local execution grants no filesystem-write, child-process, or
+worker-thread permission when Node's permission model is available; it keeps
+one persistent validated channel across inventory, approval, and compile so a
+failure or exit between phases cannot be lost. Network denial is not enforced.
+Requesting the unavailable `isolated-ci-v1` external provider fails before any
+project config import. Portable provenance records exact tool/loader/runtime
+versions, the worker and execution-profile versions, and a canonical
+dependency-lock digest; machine paths, module URLs, PIDs, timings, and raw
+environment never enter hashes.
 
 The portable contract starts at runtime-provenance schema `1.0.0`. It records
 the worker ID/version/protocol, adapter ID/version/mode, exact workspace,

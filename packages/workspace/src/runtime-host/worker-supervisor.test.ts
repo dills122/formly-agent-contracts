@@ -1,4 +1,9 @@
-import { describe, expect, it } from 'vitest';
+import { spawn, type ChildProcess, type SpawnOptions } from 'node:child_process';
+import { access, mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import {
   createProjectWorkerEnvironment,
@@ -7,13 +12,22 @@ import {
 } from './worker-supervisor.js';
 
 const fixtureWorker = new URL('./fixtures/echo-worker.mjs', import.meta.url).href;
+const permissionProbeWorker = new URL(
+  './fixtures/permission-probe-worker.mjs',
+  import.meta.url,
+).href;
+const temporaryDirectories: string[] = [];
 
-function request(fixture?: string, explain = false) {
+function request(
+  fixture?: string,
+  explain = false,
+  workspaceRoot = process.cwd(),
+) {
   return {
     protocolVersion: '1' as const,
     requestId: 'fixture:worker',
     operation: 'generate' as const,
-    workspaceRoot: process.cwd(),
+    workspaceRoot,
     rootConfigPath: 'formly-contracts.config.ts',
     configPath: 'fixtures/project.ts',
     projectRoot: 'fixtures',
@@ -22,6 +36,14 @@ function request(fixture?: string, explain = false) {
     ...(explain ? { explain: true } : {}),
   };
 }
+
+afterEach(async () => {
+  await Promise.all(
+    temporaryDirectories
+      .splice(0)
+      .map((directory) => rm(directory, { recursive: true, force: true })),
+  );
+});
 
 describe('project worker supervisor', () => {
   it('scrubs credentials and loader overrides from the worker environment', () => {
@@ -53,6 +75,120 @@ describe('project worker supervisor', () => {
     });
     await expect(session.approve()).resolves.toEqual({ artifacts: [] });
   });
+
+  it('uses direct Node spawning with read-only permission guardrails', async () => {
+    let invocation:
+      | {
+          readonly command: string;
+          readonly args: readonly string[];
+          readonly options: SpawnOptions;
+          readonly child: ChildProcess;
+        }
+      | undefined;
+    const captureSpawn = ((
+      command: string,
+      args: readonly string[],
+      options: SpawnOptions,
+    ) => {
+      const child = spawn(command, [...args], options);
+      invocation = { command, args, options, child };
+      return child;
+    }) as typeof spawn;
+
+    const session = await spawnProjectWorker(request(), {
+      workerModuleUrl: fixtureWorker,
+      timeoutMs: 2_000,
+      spawnProcess: captureSpawn,
+    });
+    await session.abort();
+
+    expect(invocation).toBeDefined();
+    expect(invocation?.command).toBe(process.execPath);
+    expect(invocation?.args[0]).toBe('--permission');
+    expect(
+      invocation?.args.some((argument) =>
+        argument.startsWith('--allow-fs-read='),
+      ),
+    ).toBe(true);
+    expect(
+      invocation?.args.some(
+        (argument) =>
+          argument.startsWith('--allow-fs-write=') ||
+          argument === '--allow-child-process' ||
+          argument === '--allow-worker',
+      ),
+    ).toBe(false);
+    expect(invocation?.options.shell).toBe(false);
+    expect(invocation?.options.stdio).toEqual([
+      'ignore',
+      'ignore',
+      'ignore',
+      'ipc',
+    ]);
+    expect(
+      invocation?.child.exitCode !== null ||
+        invocation?.child.signalCode !== null,
+    ).toBe(true);
+  });
+
+  it.each([
+    'permission-write',
+    'permission-child',
+    'permission-worker',
+  ] as const)('denies the %s capability inside trusted-local workers', async (fixture) => {
+    const workspaceRoot = await mkdtemp(
+      join(tmpdir(), 'formly worker permission '),
+    );
+    temporaryDirectories.push(workspaceRoot);
+    const session = await spawnProjectWorker(
+      request(fixture, false, workspaceRoot),
+      {
+        workerModuleUrl: permissionProbeWorker,
+        timeoutMs: 2_000,
+      },
+    );
+
+    expect(session.inventory.projectId).toBe('denied');
+    await session.abort();
+    await expect(
+      access(join(workspaceRoot, 'permission-probe-output')),
+    ).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('fails closed before spawn when isolated CI is unavailable', async () => {
+    const spawnProcess = vi.fn() as typeof spawn;
+    await expect(
+      spawnProjectWorker(request(), {
+        workerModuleUrl: fixtureWorker,
+        executionProfile: 'isolated-ci-v1',
+        spawnProcess,
+      }),
+    ).rejects.toMatchObject({
+      code: 'WORKER_ISOLATION_UNAVAILABLE',
+      workerFailurePhase: 'inventory',
+    } satisfies Partial<ProjectWorkerSupervisorError>);
+    expect(spawnProcess).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    ['late-failure', 'WORKER_FAILURE'],
+    ['early-result', 'WORKER_MESSAGE_INVALID'],
+    ['exit-after-inventory', 'WORKER_CRASHED'],
+  ] as const)(
+    'retains a terminal %s event between inventory and approval',
+    async (fixture, code) => {
+      const session = await spawnProjectWorker(request(fixture), {
+        workerModuleUrl: fixtureWorker,
+        timeoutMs: 2_000,
+      });
+      await new Promise((resolve) => setTimeout(resolve, 40));
+
+      await expect(session.approve()).rejects.toMatchObject({
+        code,
+        workerFailurePhase: 'compile',
+      });
+    },
+  );
 
   it('classifies malformed, crashed, and timed-out workers', async () => {
     await expect(

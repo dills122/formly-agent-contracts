@@ -52,6 +52,24 @@ export type WorkspaceRuntimeHostFactory = (
   options: JsonValue | undefined,
 ) => WorkspaceRuntimeHost | Promise<WorkspaceRuntimeHost>;
 
+export type WorkspaceRuntimeHostLoadErrorCode =
+  | 'HOST_LOAD_FAILED'
+  | 'HOST_IDENTITY_MISMATCH';
+
+export class WorkspaceRuntimeHostLoadError extends TypeError {
+  readonly code: WorkspaceRuntimeHostLoadErrorCode;
+
+  constructor(
+    code: WorkspaceRuntimeHostLoadErrorCode,
+    message: string,
+    cause?: unknown,
+  ) {
+    super(message, cause === undefined ? undefined : { cause });
+    this.name = 'WorkspaceRuntimeHostLoadError';
+    this.code = code;
+  }
+}
+
 const PACKAGE_NAME_PATTERN = /^(?:@[^/]+\/[^/]+|[^/]+)$/u;
 
 async function findPackageJson(entryPath: string): Promise<string> {
@@ -148,15 +166,39 @@ export function createWorkspaceRuntimeBootstrapContext(input: {
 export async function loadWorkspaceRuntimeHost(
   descriptor: RuntimeHostModuleDescriptor,
 ): Promise<WorkspaceRuntimeHost> {
-  const imported: unknown = await import(descriptor.moduleUrl);
+  let imported: unknown;
+  try {
+    imported = await import(descriptor.moduleUrl);
+  } catch (error) {
+    throw new WorkspaceRuntimeHostLoadError(
+      'HOST_LOAD_FAILED',
+      'Runtime host module could not be loaded.',
+      error,
+    );
+  }
   if (typeof imported !== 'object' || imported === null) {
-    throw new TypeError('Runtime host module must export an object namespace.');
+    throw new WorkspaceRuntimeHostLoadError(
+      'HOST_LOAD_FAILED',
+      'Runtime host module must export an object namespace.',
+    );
   }
   const factory = Reflect.get(imported, descriptor.exportName) as unknown;
   if (typeof factory !== 'function') {
-    throw new TypeError('Runtime host module factory is unavailable.');
+    throw new WorkspaceRuntimeHostLoadError(
+      'HOST_LOAD_FAILED',
+      'Runtime host module factory is unavailable.',
+    );
   }
-  const host = await (factory as WorkspaceRuntimeHostFactory)(descriptor.options);
+  let host: WorkspaceRuntimeHost;
+  try {
+    host = await (factory as WorkspaceRuntimeHostFactory)(descriptor.options);
+  } catch (error) {
+    throw new WorkspaceRuntimeHostLoadError(
+      'HOST_LOAD_FAILED',
+      'Runtime host factory failed.',
+      error,
+    );
+  }
   if (
     typeof host !== 'object' ||
     host?.protocolVersion !== descriptor.protocolVersion ||
@@ -164,7 +206,10 @@ export async function loadWorkspaceRuntimeHost(
     host.version !== descriptor.version ||
     typeof host.beforeConfigLoad !== 'function'
   ) {
-    throw new TypeError('Runtime host identity does not match its descriptor.');
+    throw new WorkspaceRuntimeHostLoadError(
+      'HOST_IDENTITY_MISMATCH',
+      'Runtime host identity does not match its descriptor.',
+    );
   }
   return host;
 }

@@ -95,17 +95,16 @@ the portable provenance foundation consumed by `HOST-1`.
 | -------- | ---------------------- | ----------------------------------------------------------------------------- | -------------------- | ------------------ | ------- | -------------------------------------------------------------------------------------------------------------------- |
 | `HOST-1` | Task 7A.2              | Framework-neutral runtime-host protocol and public/private package boundaries | `packages/workspace` | `CTX-0A`           | complete | Strict IPC/host DTOs, Angular-free public composition, packed private worker, and non-hoisted consumer checks pass  |
 | `HOST-2` | Task 7B.1              | Discovery and inventory before project evaluation                             | `packages/workspace` | `HOST-1`           | complete | Import-free discovery, canonical exact override requests, duplicate rejection, and list-without-factory tests pass  |
-| `HOST-3` | Task 7B.2              | Trusted-local worker lifecycle                                                | `packages/workspace` | `HOST-2`           | ready   | Scrubbed spawn, validated IPC, bounded teardown, failure controls, and no-publication authority tests pass           |
-| `HOST-4` | Task 7B.3              | Failure-safe aggregation and publication                                      | `packages/workspace` | `HOST-3`, `CTX-0A` | pending | Parent revalidation, deterministic aggregation, atomic index-last publication, fault injection, and rerun tests pass |
+| `HOST-3` | Task 7B.2              | Trusted-local worker lifecycle                                                | `packages/workspace` | `HOST-2`           | complete | Scrubbed spawn, validated IPC, bounded teardown, failure controls, and no-publication authority tests pass          |
+| `HOST-4` | Task 7B.3              | Failure-safe aggregation and publication                                      | `packages/workspace` | `HOST-3`, `CTX-0A` | ready    | Parent revalidation, deterministic aggregation, atomic index-last publication, fault injection, and rerun tests pass |
 
-September 2 continuation promotes `HOST-2`. Exact root-owned project-config
-overrides now resolve `projectRoot`, `runtimeResolutionBase`, and
-`tsconfigPath` with independent precedence; stale keys, traversal, and symlink
-escapes fail before spawn, and children repeat canonical confinement. Import
-spies, exact selection, inventory ordering, duplicate-before-factory, full
-tests/builds, Angular host smoke, and linked/packed consumers pass. `HOST-3` is
-dependency-ready; `HOST-4` remains pending until every lifecycle and
-fault-control exit-gate clause passes.
+September 2 continuation promotes `HOST-3`. Trusted workers now use direct Node
+spawning, a scrubbed environment, read-only permission-model guardrails,
+persistent inventory-to-compile IPC, bounded teardown, and explicit
+unavailable-isolation refusal. Failure/exit timing, host identity, forbidden
+authority, reversed completion, full tests/builds, Angular host smoke, and
+linked/packed consumers pass. `HOST-4` is dependency-ready for its remaining
+publication fault-control matrix.
 
 ## Angular custom-field and scenario producer
 
@@ -168,8 +167,8 @@ construction. Its CTX-2A/B/C MVP checkpoint is complete; executable wrapper
 preconditions, CTX-2V/2D2, and browser/runtime parity are explicit fast
 follows, with no pivot currently required. Hostile-input hardening for the
 standalone plan-hash helper is complete and preserves valid canonical hashes
-while keeping revalidation as the semantic authority boundary. `HOST-1` and
-`HOST-2` are complete; `HOST-3`, `ANG-0`, and `FAC-1` are dependency-ready, but they remain
+while keeping revalidation as the semantic authority boundary. `HOST-1` through
+`HOST-3` are complete; `HOST-4`, `ANG-0`, and `FAC-1` are dependency-ready, but they remain
 separate producer task packets and must not
 freeze named-environment or adapter-authority APIs beyond the accepted
 `AUTH-PILOT` surface before `AUTH-0` is accepted. `LIN-PILOT` is complete;

@@ -1,3 +1,5 @@
+import { setImmediate, setTimeout } from 'node:timers';
+
 const protocolVersion = '1';
 let currentRequest;
 
@@ -75,6 +77,30 @@ process.on('message', (message) => {
         formIds: ['fixture.form'],
       },
     });
+    if (request.rootPolicy?.fixture === 'late-failure') {
+      setTimeout(() => {
+        process.send?.({
+          protocolVersion,
+          kind: 'failure',
+          requestId: request.requestId,
+          code: 'PROJECT_COMPILE_FAILED',
+          phase: 'compile',
+        });
+      }, 10);
+    }
+    if (request.rootPolicy?.fixture === 'early-result') {
+      setImmediate(() => {
+        process.send?.({
+          protocolVersion,
+          kind: 'result',
+          requestId: request.requestId,
+          result: { artifacts: [] },
+        });
+      });
+    }
+    if (request.rootPolicy?.fixture === 'exit-after-inventory') {
+      setImmediate(() => process.exit(4));
+    }
     return;
   }
   if (message.kind === 'approve') {

@@ -29,6 +29,11 @@ const outputRenameFault = vi.hoisted(() => ({
   workspaceIndexFailuresRemaining: 0,
 }));
 
+const orderedWorker = new URL(
+  './runtime-host/fixtures/ordered-worker.mjs',
+  import.meta.url,
+).href;
+
 vi.mock("node:fs/promises", async () => {
   const actual = await vi.importActual<typeof import("node:fs/promises")>(
     "node:fs/promises"
@@ -1299,6 +1304,94 @@ describe("runWorkspace", () => {
       })
     );
     expect(await pathExists(join(workspaceRoot, "dist"))).toBe(false);
+  });
+
+  it('keeps validated project ordering stable when worker completion reverses', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\n",
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/alpha.project.mjs',
+      `throw new Error('ordered fixture worker owns project evaluation');`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/beta.project.mjs',
+      `throw new Error('ordered fixture worker owns project evaluation');`,
+    );
+    const writeRoot = (reverse: boolean) =>
+      writeModule(
+        workspaceRoot,
+        'formly-contracts.config.mjs',
+        `export default {
+          projectConfigs: ['projects/*.project.mjs'],
+          plugins: [{
+            id: 'fixture/order',
+            version: '1',
+            configSchemaVersion: '1',
+            options: { reverse: ${String(reverse)} }
+          }]
+        };`,
+      );
+    const options = {
+      workspaceRoot,
+      rootConfigPath: 'formly-contracts.config.mjs',
+      projectExecution: {
+        kind: 'workers' as const,
+        workerModuleUrl: orderedWorker,
+      },
+    };
+
+    await writeRoot(false);
+    const forward = await runWorkspace(options);
+    await writeRoot(true);
+    const reverse = await runWorkspace(options);
+    const identities = (result: typeof forward) =>
+      result.index.projects.map(({ configPath, projectId }) => ({
+        configPath,
+        projectId,
+      }));
+
+    expect(identities(forward)).toEqual([
+      { configPath: 'projects/alpha.project.mjs', projectId: 'alpha' },
+      { configPath: 'projects/beta.project.mjs', projectId: 'beta' },
+    ]);
+    expect(identities(reverse)).toEqual(identities(forward));
+    expect(forward.index.runtimeProvenance.executionProfile).toEqual({
+      id: 'trusted-local-v1',
+      version: '1',
+      network: 'not-enforced',
+    });
+  });
+
+  it('fails closed before project import when isolated CI is unavailable', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `throw new Error('project config must not load without isolation');`,
+    );
+
+    await expect(
+      runWorkspace({
+        ...runnerOptions(workspaceRoot),
+        projectExecution: {
+          kind: 'workers',
+          executionProfile: 'isolated-ci-v1',
+          workerModuleUrl: orderedWorker,
+        },
+      }),
+    ).rejects.toMatchObject({
+      name: 'WorkspaceGenerationError',
+      code: 'WORKER_ISOLATION_UNAVAILABLE',
+      phase: 'inventory',
+    });
+    expect(await pathExists(join(workspaceRoot, 'dist'))).toBe(false);
   });
 
   it.each([

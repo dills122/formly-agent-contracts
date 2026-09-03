@@ -111,6 +111,7 @@ export type WorkspaceGenerationErrorCode =
   | "DEPENDENCY_SNAPSHOT_CHANGED"
   | "GENERATION_LOCKED"
   | "RUNTIME_PROVENANCE_UNAVAILABLE"
+  | "WORKER_ISOLATION_UNAVAILABLE"
   | "OUTPUT_PATH_OUTSIDE_WORKSPACE"
   | "OUTPUT_SYMLINK_UNSUPPORTED"
   | "OUTPUT_WRITE_FAILED";
@@ -146,6 +147,8 @@ const ERROR_MESSAGES: Readonly<Record<WorkspaceGenerationErrorCode, string>> = {
   GENERATION_LOCKED: "Another workspace generation is already active.",
   RUNTIME_PROVENANCE_UNAVAILABLE:
     "Runtime toolchain provenance could not be determined.",
+  WORKER_ISOLATION_UNAVAILABLE:
+    "The requested worker isolation profile is unavailable.",
   OUTPUT_PATH_OUTSIDE_WORKSPACE: "An output path is outside the workspace.",
   OUTPUT_SYMLINK_UNSUPPORTED: "Symlinked output paths are not supported.",
   OUTPUT_WRITE_FAILED: "Workspace contract output could not be written.",
@@ -191,6 +194,9 @@ export interface RunWorkspaceOptions extends DiscoverWorkspaceProjectsOptions {
   /** Opt-in disposable project workers; selected by trusted composition code. */
   readonly projectExecution?: {
     readonly kind: 'workers';
+    readonly executionProfile?:
+      | 'trusted-local-v1'
+      | 'isolated-ci-v1';
     readonly runtimeHost?: RuntimeHostModuleDescriptor;
     readonly timeoutMs?: number;
     readonly workerModuleUrl?: string;
@@ -207,6 +213,20 @@ export interface WorkspaceRunResult {
 }
 
 export type WorkspaceProjectExecutionFailure = WorkspaceProjectFailure;
+
+function assertWorkerExecutionProfileAvailable(
+  execution: NonNullable<RunWorkspaceOptions['projectExecution']>,
+): void {
+  if (
+    execution.executionProfile !== undefined &&
+    execution.executionProfile !== 'trusted-local-v1'
+  ) {
+    throw new WorkspaceGenerationError(
+      'WORKER_ISOLATION_UNAVAILABLE',
+      'inventory',
+    );
+  }
+}
 
 export interface WorkspaceCheckDifference {
   readonly path: string;
@@ -1060,6 +1080,7 @@ export async function discoverWorkspaceProjectsInWorkers(
   if (execution?.kind !== 'workers') {
     throw new TypeError('Worker project execution was not selected.');
   }
+  assertWorkerExecutionProfileAvailable(execution);
   const discoveredConfigs = await discoverWorkspaceProjectConfigs({
     workspaceRoot: options.workspaceRoot,
     rootConfigPath: options.rootConfigPath,
@@ -1092,6 +1113,9 @@ export async function discoverWorkspaceProjectsInWorkers(
           ...(execution.runtimeHost === undefined ? {} : { runtimeHost: execution.runtimeHost }),
         }, {
           workerModuleUrl,
+          ...(execution.executionProfile === undefined
+            ? {}
+            : { executionProfile: execution.executionProfile }),
           ...(execution.timeoutMs === undefined ? {} : { timeoutMs: execution.timeoutMs }),
         });
       }),
@@ -1186,6 +1210,7 @@ async function executeProjectsInWorkers(
   if (execution?.kind !== 'workers') {
     throw new TypeError('Worker project execution was not selected.');
   }
+  assertWorkerExecutionProfileAvailable(execution);
   const discoveredConfigs = await discoverWorkspaceProjectConfigs({
     workspaceRoot: options.workspaceRoot,
     rootConfigPath: options.rootConfigPath,
@@ -1236,6 +1261,9 @@ async function executeProjectsInWorkers(
           },
           {
             workerModuleUrl,
+            ...(execution.executionProfile === undefined
+              ? {}
+              : { executionProfile: execution.executionProfile }),
             ...(execution.timeoutMs === undefined
               ? {}
               : { timeoutMs: execution.timeoutMs }),

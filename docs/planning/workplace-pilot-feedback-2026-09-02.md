@@ -234,10 +234,10 @@ long-term distribution mechanism.
 
 ### Scheduler state is reconciled against exit gates
 
-The continuation promotes `HOST-2` to complete and makes `HOST-3` ready. Exact
-project root, runtime-base, and tsconfig precedence now has canonical request,
-selection, traversal, symlink-escape, and packed-consumer coverage; `HOST-4`
-remains pending on its predecessor and full publication fault matrix. Angular status does not advance: `ANG-0` and
+The continuation promotes `HOST-3` to complete and makes `HOST-4` ready.
+Trusted-local worker spawning, permission guardrails, lifecycle IPC, failure
+timing, host identity, deterministic completion order, and packed-consumer
+coverage now pass; `HOST-4` retains the full publication fault matrix. Angular status does not advance: `ANG-0` and
 `ANG-1` compatibility artifacts are absent, `ANG-2` lacks the retained peer
 install matrix, and `ANG-3` lacks Task 7C's complete resolver/private-copy
 matrix. Existing worker and JIT paths are retained partial evidence, not

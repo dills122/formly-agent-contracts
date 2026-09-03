@@ -10,6 +10,7 @@ import {
 import {
   createWorkspaceRuntimeBootstrapContext,
   loadWorkspaceRuntimeHost,
+  WorkspaceRuntimeHostLoadError,
 } from './runtime-host/bootstrap.js';
 import { createRuntimeHostFailureExplanation } from './runtime-host/failure-explanation.js';
 import {
@@ -115,7 +116,12 @@ async function initialize(nextRequest: ProjectExecutionRequest): Promise<void> {
       runtimePackages = bootstrap?.runtimePackages;
     }
   } catch (error) {
-    failure('HOST_LOAD_FAILED', error);
+    failure(
+      error instanceof WorkspaceRuntimeHostLoadError
+        ? error.code
+        : 'HOST_LOAD_FAILED',
+      error,
+    );
   }
 
   phase = 'inventory';

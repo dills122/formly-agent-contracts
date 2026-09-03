@@ -131,6 +131,14 @@ independently compatible plugin API. Custom worker modules must use the exact
 `@formly-contract/workspace` version as the parent because unknown optional
 fields are rejected.
 
+Programmatic worker execution defaults to `trusted-local-v1`: direct Node
+spawn, no shell, scrubbed environment, strict IPC, bounded teardown, and
+read-only filesystem permissions when the current Node runtime supports them.
+Filesystem writes, child processes, and worker threads are not granted, but
+network access is not blocked; this remains a trusted-code guardrail rather
+than an untrusted-code sandbox. Selecting `isolated-ci-v1` fails closed before
+project import until its external provider is installed.
+
 Use the [workspace API reference](./api.md#workspace) for programmatic
 discovery, generation, checking, authoring inspection, and index parsing. Use
 the [CLI reference](./cli-api.md) for command options and refusal behavior.

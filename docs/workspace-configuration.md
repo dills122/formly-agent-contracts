@@ -75,7 +75,7 @@ Trusted execution is split by purpose:
 
 | Mode                         | Workspace responsibility                                                                                  | Status and limit                                                                                                                              |
 | ---------------------------- | --------------------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------- |
-| Config/JIT worker            | Resolve the project runtime base, validate a parent-selected host, and carry JSON-safe results/provenance | Generic trusted config loading exists; Angular scenario compilation remains a separate planned host and is not an untrusted-code sandbox      |
+| Config/JIT worker            | Resolve the project runtime base, validate a parent-selected host, and carry JSON-safe results/provenance | `trusted-local-v1` uses direct Node spawning, scrubbed environment, strict IPC, bounded teardown, and read-only Node permissions when supported; network is not enforced |
 | AOT authoring browser worker | Point a future Angular integration at an application-owned build target and configured authoring scopes   | Planned; browser isolation and interception improve determinism but are not OS containment                                                    |
 | Rootless OCI factory runner  | Stage a code-free registration sidecar and receive only allowlisted, structurally bound output            | Blocked until `oci-rootless-v1` conformance, a runner-owned violation ledger, structural identity checks, and retained negative controls pass |
 
@@ -84,6 +84,18 @@ The generic loader evaluates trusted workspace configuration; it does not
 authorize arbitrary application-factory execution. Angular JIT resolution and
 AOT observation produce different evidence, and an ordinary child process is
 not the containment boundary required by the factory runner.
+
+Programmatic worker callers may set
+`projectExecution.executionProfile` to `trusted-local-v1` (the default) or
+`isolated-ci-v1`. Trusted-local workers use `process.execPath` without a shell,
+an allowlisted environment, strict package-lockstep IPC, and a single
+inventory/approve/compile lifecycle. On Node versions that expose the
+permission model, the parent grants only read access to the selected workspace
+and trusted package roots; it does not grant filesystem-write, child-process,
+or worker-thread permission. Network access remains available and provenance
+therefore reports `network: not-enforced`. `isolated-ci-v1` is reserved for an
+external isolation provider and currently fails with
+`WORKER_ISOLATION_UNAVAILABLE` before project configuration is imported.
 
 ## Root and project ownership
 

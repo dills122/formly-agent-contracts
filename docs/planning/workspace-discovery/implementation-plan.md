@@ -10,8 +10,8 @@ runtime/dependency provenance foundation.
 The RH-01 through RH-05 research packets are approved planning evidence, not
 implemented product behavior. `RH06-DOC` and `CTX-0A` through `CTX-0D` are
 complete. Under the reconciled dependency order, `CTX-1`, `DRV-0`, and Task
-7B.2 (`HOST-3`) are ready; Tasks 7A.2 (`HOST-1`) and 7B.1 (`HOST-2`) are
-complete. `AUTH-0` is also ready for explicit maintainer
+7B.3 (`HOST-4`) are ready; Tasks 7A.2 (`HOST-1`), 7B.1 (`HOST-2`), and 7B.2
+(`HOST-3`) are complete. `AUTH-0` is also ready for explicit maintainer
 approval of proposed ADR 0011; AUTH-dependent implementation remains gated
 until that approval. Each other producer's exact prerequisites and status
 remain in the execution index. Application
@@ -267,7 +267,7 @@ contains explicit effects only.
 
 | Requirement                                                                                                     | Decision                                                                                                                                                                                     | Tasks                                                                                                              | Verification                                                                                                                                                                                                                   | Status                                                                                                                               |
 | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery                                                        | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host                                                                                    | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3                                                                   | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks                                                                        | Implemented through `HOST-2`; `HOST-3` is ready and `HOST-4` remains pending                                                        |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery                                                        | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host                                                                                    | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3                                                                   | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks                                                                        | Implemented through `HOST-3`; `HOST-4` is ready                                                                                    |
 | `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics                               | The implemented canonical registry remains the compiler IR; proposed ADR 0011 makes compact library-owned adapters the normal semantic authoring authority; executable drivers stay separate | Tasks 3A–3B plus `AUTH-0`, adapter lowering, and environment publication                                           | Existing strict DTO/resolution/hash tests plus compact-to-canonical parity, conflict, exact environment binding, and conformance tests                                                                                         | Tasks 3A–3B and Tasks 5.0–5.1 implemented for the canonical/legacy boundary; `AUTH-0` is ready and the new authoring path is pending |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority                      | A schema-owned compatibility result and retained AOT gate precede named-environment inventory; reviewed adapters remain semantic authority and required conformance gates actionability      | `AUTH-0`, `ANG-0`, `ANG-1`, `ANG-2`/Task 7A.3, `ANG-2P`/Task 7D, `ANG-2R`/Task 8B.1, `ANG-4`–`ANG-6`/Tasks 8B.2–8C | Angular CLI/Nx application-target gate, strict environment/adapter/registry/report schemas, configured-scope coverage, compact-lowering parity, required controlled conformance, negative inference, and workplace value pilot | Proposed ADR 0011 plus approved retained Angular research; production gates pending                                                  |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing                              | Explicit declared graph; derived references/deltas remain non-authoritative evidence                                                                                                         | Tasks 3C and 5A                                                                                                    | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike                                                                                                                                                    | Implemented with schema/config/compiler/workspace/anchor-fixture evidence                                                            |
@@ -1092,27 +1092,29 @@ Children repeat realpath confinement before host or config evaluation.
 
 #### Task 7B.2 (`HOST-3`): Enforce the trusted-local worker lifecycle
 
-**Current status:** Ready. Current worker spawning, environment
-scrubbing, strict IPC, timeout, crash, and teardown tests are partial evidence;
-the full forbidden-authority and lifecycle matrix remains an exit gate.
+**Current status:** Complete. Direct Node spawning, environment scrubbing,
+permission-model denial, persistent lifecycle IPC, host identity, timeout,
+crash, cleanup, and deterministic ordering tests pass. Trusted-local
+provenance retains its explicit non-enforced network claim; unavailable
+isolated CI fails before project import.
 
 **Acceptance criteria:**
 
-- [ ] Workers use direct `process.execPath` spawning with no shell, a scrubbed
+- [x] Workers use direct `process.execPath` spawning with no shell, a scrubbed
       allowlisted environment, validated IPC, explicit timeout/termination, and
       no authority to write final outputs.
-- [ ] Inventory/approve/compile is one lifecycle; live configs and factories do
+- [x] Inventory/approve/compile is one lifecycle; live configs and factories do
       not cross IPC or reload between phases.
-- [ ] Malformed messages, early exit, late failure, timeout, or host mismatch
+- [x] Malformed messages, early exit, late failure, timeout, or host mismatch
       terminate the child and prevent publication.
-- [ ] `trusted-local-v1` provenance says network is not enforced; selecting
+- [x] `trusted-local-v1` provenance says network is not enforced; selecting
       unavailable `isolated-ci-v1` fails closed.
 
 **Verification:**
 
-- [ ] Environment-secret, forbidden write/child/worker, malformed IPC, timeout,
+- [x] Environment-secret, forbidden write/child/worker, malformed IPC, timeout,
       crash, and cleanup tests pass without weakening the trusted-code caveat.
-- [ ] Reversed child completion produces identical validated result ordering.
+- [x] Reversed child completion produces identical validated result ordering.
 
 **Dependencies:** `HOST-2` (Task 7B.1)
 
@@ -1127,7 +1129,7 @@ the full forbidden-authority and lifecycle matrix remains an exit gate.
 
 #### Task 7B.3 (`HOST-4`): Make aggregation and publication failure-safe
 
-**Current status:** Pending on `HOST-3`. Generation locking, dependency
+**Current status:** Ready. Generation locking, dependency
 snapshot checks, deterministic sorting, atomic index-last writes, and selected
 rollback tests exist, but the complete artifact/index fault-injection, orphan
 cleanup, and rerun matrix has not passed.

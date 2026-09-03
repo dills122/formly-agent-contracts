@@ -3,7 +3,6 @@ import {
   chmod,
   mkdir,
   mkdtemp,
-  readFile,
   rm,
   symlink,
   writeFile,
@@ -26,6 +25,14 @@ const requestCaptureWorker = new URL(
   './runtime-host/fixtures/request-capture-worker.mjs',
   import.meta.url,
 ).href;
+
+function capturedPath(sourceIds: readonly string[], name: string): string {
+  const encoded = sourceIds
+    .find((sourceId) => sourceId.startsWith(`${name}/`))
+    ?.slice(name.length + 1);
+  if (encoded === undefined) throw new Error(`Missing captured path: ${name}`);
+  return Buffer.from(encoded, 'base64url').toString();
+}
 const temporaryDirectories: string[] = [];
 
 async function createTemporaryWorkspace(): Promise<string> {
@@ -116,7 +123,7 @@ describe('workspace project discovery', () => {
       recursive: true,
     });
 
-    await discoverWorkspaceProjectsInWorkers({
+    const overriddenInventory = await discoverWorkspaceProjectsInWorkers({
       workspaceRoot,
       rootConfigPath: 'formly-contracts.config.ts',
       selectedProjectConfigPaths: ['configs/claims.project.ts'],
@@ -125,21 +132,22 @@ describe('workspace project discovery', () => {
         workerModuleUrl: requestCaptureWorker,
       },
     });
-    const overridden = JSON.parse(
-      await readFile(
-        join(workspaceRoot, '.captured-project-request.json'),
-        'utf8',
-      ),
-    ) as Record<string, unknown>;
-    expect(overridden).toMatchObject({
-      rootConfigPath: 'formly-contracts.config.ts',
-      configPath: 'configs/claims.project.ts',
-      projectRoot: 'apps/claims',
-      runtimeResolutionBase: 'packages/claims-runtime',
-      tsconfigPath: 'apps/claims/tsconfig.app.json',
-    });
+    const overridden = overriddenInventory.inventory.projects[0]!.sourceIds;
+    expect(capturedPath(overridden, 'root-config')).toBe(
+      'formly-contracts.config.ts',
+    );
+    expect(capturedPath(overridden, 'config')).toBe(
+      'configs/claims.project.ts',
+    );
+    expect(capturedPath(overridden, 'project-root')).toBe('apps/claims');
+    expect(capturedPath(overridden, 'runtime-base')).toBe(
+      'packages/claims-runtime',
+    );
+    expect(capturedPath(overridden, 'tsconfig')).toBe(
+      'apps/claims/tsconfig.app.json',
+    );
 
-    await discoverWorkspaceProjectsInWorkers({
+    const partialInventory = await discoverWorkspaceProjectsInWorkers({
       workspaceRoot,
       rootConfigPath: 'formly-contracts.config.ts',
       selectedProjectConfigPaths: ['configs/billing.project.ts'],
@@ -148,18 +156,13 @@ describe('workspace project discovery', () => {
         workerModuleUrl: requestCaptureWorker,
       },
     });
-    const partial = JSON.parse(
-      await readFile(
-        join(workspaceRoot, '.captured-project-request.json'),
-        'utf8',
-      ),
-    ) as Record<string, unknown>;
-    expect(partial).toMatchObject({
-      configPath: 'configs/billing.project.ts',
-      projectRoot: 'apps/billing',
-      runtimeResolutionBase: 'configs',
-      tsconfigPath: 'tsconfig.base.json',
-    });
+    const partial = partialInventory.inventory.projects[0]!.sourceIds;
+    expect(capturedPath(partial, 'config')).toBe(
+      'configs/billing.project.ts',
+    );
+    expect(capturedPath(partial, 'project-root')).toBe('apps/billing');
+    expect(capturedPath(partial, 'runtime-base')).toBe('configs');
+    expect(capturedPath(partial, 'tsconfig')).toBe('tsconfig.base.json');
   });
 
   it('loads a centralized project config with its exact tsconfig override', async () => {
