@@ -1,4 +1,5 @@
-import { isAbsolute, relative, sep } from 'node:path';
+import { realpath } from 'node:fs/promises';
+import { isAbsolute, relative, resolve, sep } from 'node:path';
 
 /**
  * @internal Shared by discover-projects.ts and run-workspace.ts: the
@@ -24,6 +25,30 @@ export function isWithinWorkspace(
       !relativePath.startsWith(`..${sep}`) &&
       !isAbsolute(relativePath))
   );
+}
+
+/**
+ * @internal Resolves an existing workspace path through symlinks and returns
+ * its canonical workspace-relative spelling. Throws when either lexical or
+ * real path escapes the canonical workspace root.
+ */
+export async function canonicalWorkspaceRelativePath(
+  workspaceRoot: string,
+  workspacePath: string,
+): Promise<string> {
+  const canonicalRoot = await realpath(resolve(workspaceRoot));
+  const absolutePath = resolve(canonicalRoot, workspacePath);
+  if (!isWithinWorkspace(canonicalRoot, absolutePath)) {
+    throw new RangeError('Workspace path is outside the workspace root.');
+  }
+  const canonicalPath = await realpath(absolutePath);
+  if (!isWithinWorkspace(canonicalRoot, canonicalPath)) {
+    throw new RangeError('Workspace path resolves outside the workspace root.');
+  }
+  const relativePath = relative(canonicalRoot, canonicalPath)
+    .split(sep)
+    .join('/');
+  return relativePath === '' ? '.' : relativePath;
 }
 
 /**

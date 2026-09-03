@@ -14,6 +14,7 @@ import {
   defineFormContractProject,
   parseProjectConfig,
   parseRootConfig,
+  resolveWorkspaceProjectExecutionPaths,
   resolveWorkspaceProjectConfig,
   WORKSPACE_CONFIG_SCHEMA_VERSION,
   type WorkspacePlugin,
@@ -200,6 +201,13 @@ describe('workspace configuration', () => {
       ],
       excludeProjectConfigs: ['apps/legacy/**'],
       tsconfigPath: 'tsconfig.base.json',
+      projectConfigOverrides: {
+        'configs/claims.project.ts': {
+          projectRoot: 'apps/claims',
+          runtimeResolutionBase: 'apps/claims',
+          tsconfigPath: 'apps/claims/tsconfig.app.json',
+        },
+      },
       sourceUsage: {
         convention: 'direct-root-call-v1',
         tsconfigPath: 'apps/test-app/tsconfig.app.json',
@@ -219,6 +227,64 @@ describe('workspace configuration', () => {
 
     expect(parseRootConfig(root)).toBe(root);
     expect(parseProjectConfig(project)).toBe(project);
+  });
+
+  it('resolves exact project execution overrides before independent root defaults', () => {
+    const root = defineConfig({
+      projectConfigs: ['configs/*.project.ts'],
+      tsconfigPath: 'tsconfig.base.json',
+      projectConfigOverrides: {
+        './configs/claims.project.ts': {
+          projectRoot: 'apps/claims',
+          runtimeResolutionBase: 'packages/claims-runtime',
+          tsconfigPath: 'apps/claims/tsconfig.app.json',
+        },
+        'configs/billing.project.ts': {
+          projectRoot: 'apps/billing',
+        },
+      },
+    });
+
+    expect(
+      resolveWorkspaceProjectExecutionPaths(
+        root,
+        'configs/claims.project.ts',
+      ),
+    ).toEqual({
+      configPath: 'configs/claims.project.ts',
+      projectRoot: 'apps/claims',
+      runtimeResolutionBase: 'packages/claims-runtime',
+      tsconfigPath: 'apps/claims/tsconfig.app.json',
+    });
+    expect(
+      resolveWorkspaceProjectExecutionPaths(
+        root,
+        'configs/billing.project.ts',
+      ),
+    ).toEqual({
+      configPath: 'configs/billing.project.ts',
+      projectRoot: 'apps/billing',
+      runtimeResolutionBase: 'configs',
+      tsconfigPath: 'tsconfig.base.json',
+    });
+    expect(
+      resolveWorkspaceProjectExecutionPaths(root, 'configs/plain.project.ts'),
+    ).toEqual({
+      configPath: 'configs/plain.project.ts',
+      projectRoot: 'configs',
+      runtimeResolutionBase: 'configs',
+      tsconfigPath: 'tsconfig.base.json',
+    });
+    expect(
+      resolveWorkspaceProjectExecutionPaths(
+        defineConfig({ projectConfigs: ['configs/*.project.ts'] }),
+        'configs/plain.project.ts',
+      ),
+    ).toEqual({
+      configPath: 'configs/plain.project.ts',
+      projectRoot: 'configs',
+      runtimeResolutionBase: 'configs',
+    });
   });
 
   it('resolves an explicit source-usage program without reusing the config-loader tsconfig', () => {
@@ -390,6 +456,52 @@ describe('workspace configuration', () => {
     [{ projectConfigs: ['../outside/config.ts'] }, 'root.projectConfigs[0]'],
     [
       {
+        projectConfigs: ['configs/*.project.ts'],
+        projectConfigOverrides: {
+          'configs/*.project.ts': { projectRoot: 'apps/claims' },
+        },
+      },
+      'root.projectConfigOverrides["configs/*.project.ts"].configPath',
+    ],
+    [
+      {
+        projectConfigs: ['configs/*.project.ts'],
+        projectConfigOverrides: {
+          'configs/claims.project.ts': { projectRoot: '../outside' },
+        },
+      },
+      'root.projectConfigOverrides["configs/claims.project.ts"].projectRoot',
+    ],
+    [
+      {
+        projectConfigs: ['configs/*.project.ts'],
+        projectConfigOverrides: {
+          'configs/claims.project.ts': { unexpected: true },
+        },
+      },
+      'root.projectConfigOverrides["configs/claims.project.ts"].unexpected',
+    ],
+    [
+      {
+        projectConfigs: ['configs/*.project.ts'],
+        projectConfigOverrides: {
+          'configs/claims.project.ts': {},
+        },
+      },
+      'root.projectConfigOverrides["configs/claims.project.ts"]',
+    ],
+    [
+      {
+        projectConfigs: ['configs/*.project.ts'],
+        projectConfigOverrides: {
+          'configs/claims.project.ts': { projectRoot: 'apps/claims' },
+          './configs/claims.project.ts': { tsconfigPath: 'tsconfig.json' },
+        },
+      },
+      'root.projectConfigOverrides["./configs/claims.project.ts"].configPath',
+    ],
+    [
+      {
         projectConfigs: ['apps/**/config.ts'],
         output: { directory: '../../outside' },
       },
@@ -544,6 +656,49 @@ describe('workspace configuration', () => {
       }),
     );
     expect(nestedInvoked).toBe(false);
+  });
+
+  it('rejects accessor-backed project config overrides without invoking them', () => {
+    let rootInvoked = false;
+    const root: Record<string, unknown> = {
+      projectConfigs: ['configs/*.project.ts'],
+    };
+    Object.defineProperty(root, 'projectConfigOverrides', {
+      enumerable: true,
+      get: () => {
+        rootInvoked = true;
+        return {};
+      },
+    });
+    expect(() => parseRootConfig(root)).toThrow(
+      expect.objectContaining({
+        code: 'CONFIG_INVALID',
+        path: 'root.projectConfigOverrides',
+      }),
+    );
+    expect(rootInvoked).toBe(false);
+
+    let entryInvoked = false;
+    const overrides: Record<string, unknown> = {};
+    Object.defineProperty(overrides, 'configs/claims.project.ts', {
+      enumerable: true,
+      get: () => {
+        entryInvoked = true;
+        return { projectRoot: 'apps/claims' };
+      },
+    });
+    expect(() =>
+      parseRootConfig({
+        projectConfigs: ['configs/*.project.ts'],
+        projectConfigOverrides: overrides,
+      }),
+    ).toThrow(
+      expect.objectContaining({
+        code: 'CONFIG_INVALID',
+        path: 'root.projectConfigOverrides["configs/claims.project.ts"]',
+      }),
+    );
+    expect(entryInvoked).toBe(false);
   });
 
   it.each([

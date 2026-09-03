@@ -1,6 +1,6 @@
 # Implementation Plan: Distributed Workspace Form Discovery
 
-Status: in progress. Tasks 1–6B, Checkpoint A, and Task 7A.1 are implemented
+Status: in progress. Tasks 1–6B, Checkpoint A, Task 7A.1, and Task 7A.2 are implemented
 and verified. Completed work includes project-owned field-type profiles and
 cross-field effects, resolved effect projection, deterministic workspace
 artifacts/indexes, all three generic CLI commands, canonical Angular-fixture
@@ -10,7 +10,8 @@ runtime/dependency provenance foundation.
 The RH-01 through RH-05 research packets are approved planning evidence, not
 implemented product behavior. `RH06-DOC` and `CTX-0A` through `CTX-0D` are
 complete. Under the reconciled dependency order, `CTX-1`, `DRV-0`, and Task
-7A.2 (`HOST-1`) are ready. `AUTH-0` is also ready for explicit maintainer
+7B.2 (`HOST-3`) are ready; Tasks 7A.2 (`HOST-1`) and 7B.1 (`HOST-2`) are
+complete. `AUTH-0` is also ready for explicit maintainer
 approval of proposed ADR 0011; AUTH-dependent implementation remains gated
 until that approval. Each other producer's exact prerequisites and status
 remain in the execution index. Application
@@ -266,7 +267,7 @@ contains explicit effects only.
 
 | Requirement                                                                                                     | Decision                                                                                                                                                                                     | Tasks                                                                                                              | Verification                                                                                                                                                                                                                   | Status                                                                                                                               |
 | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery                                                        | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host                                                                                    | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3                                                                   | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks                                                                        | Implemented through Task 6B; `HOST-1` is ready and `HOST-2`–`HOST-4` remain pending                                                  |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery                                                        | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host                                                                                    | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3                                                                   | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks                                                                        | Implemented through `HOST-2`; `HOST-3` is ready and `HOST-4` remains pending                                                        |
 | `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics                               | The implemented canonical registry remains the compiler IR; proposed ADR 0011 makes compact library-owned adapters the normal semantic authoring authority; executable drivers stay separate | Tasks 3A–3B plus `AUTH-0`, adapter lowering, and environment publication                                           | Existing strict DTO/resolution/hash tests plus compact-to-canonical parity, conflict, exact environment binding, and conformance tests                                                                                         | Tasks 3A–3B and Tasks 5.0–5.1 implemented for the canonical/legacy boundary; `AUTH-0` is ready and the new authoring path is pending |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority                      | A schema-owned compatibility result and retained AOT gate precede named-environment inventory; reviewed adapters remain semantic authority and required conformance gates actionability      | `AUTH-0`, `ANG-0`, `ANG-1`, `ANG-2`/Task 7A.3, `ANG-2P`/Task 7D, `ANG-2R`/Task 8B.1, `ANG-4`–`ANG-6`/Tasks 8B.2–8C | Angular CLI/Nx application-target gate, strict environment/adapter/registry/report schemas, configured-scope coverage, compact-lowering parity, required controlled conformance, negative inference, and workplace value pilot | Proposed ADR 0011 plus approved retained Angular research; production gates pending                                                  |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing                              | Explicit declared graph; derived references/deltas remain non-authoritative evidence                                                                                                         | Tasks 3C and 5A                                                                                                    | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike                                                                                                                                                    | Implemented with schema/config/compiler/workspace/anchor-fixture evidence                                                            |
@@ -916,27 +917,28 @@ to the publishable framework-neutral execution host. Add strict IPC and
 parent-selected host-module descriptors plus public composition subpaths and a
 packed private worker entry. No Angular dependency enters this package.
 
-**Current status:** Ready after `CTX-0A` completion. The earlier 7A.1 review
-completion did not by itself authorize this task; both dependencies now pass.
+**Current status:** Complete after the September 2 exit-gate reconciliation.
+The earlier 7A.1 review completion did not by itself authorize this task; both
+dependencies and every gate below now pass.
 
 **Acceptance criteria:**
 
-- [ ] The package has complete publish metadata and public runtime-host/CLI
+- [x] The package has complete publish metadata and public runtime-host/CLI
       composition subpaths; its private worker entry is included in the tarball
       but cannot be selected by project config.
-- [ ] Requests, inventory/approval/result messages, and host descriptors are
+- [x] Requests, inventory/approval/result messages, and host descriptors are
       strict versioned DTOs. Only the trusted parent resolves the absolute
       `file:` host URL used internally; it never enters portable output.
-- [ ] Protocol version, host ID/version, operation, and JSON-safety failures use
+- [x] Protocol version, host ID/version, operation, and JSON-safety failures use
       stable diagnostics before project code runs.
-- [ ] Generic CLI/programmatic consumers remain Angular-free.
+- [x] Generic CLI/programmatic consumers remain Angular-free.
 
 **Verification:**
 
-- [ ] Protocol round-trip/negative tests and package-export tests pass.
-- [ ] Linked and packed non-hoisted generic consumers load every public subpath
+- [x] Protocol round-trip/negative tests and package-export tests pass.
+- [x] Linked and packed non-hoisted generic consumers load every public subpath
       without repository aliases.
-- [ ] Dependency audit proves workspace depends only on framework-neutral
+- [x] Dependency audit proves workspace depends only on framework-neutral
       compiler/schema surfaces.
 
 **Dependencies:** `CTX-0A`. Task 7A.1 is already complete provenance work and
@@ -958,6 +960,11 @@ authoring behavior is implemented, promote the retained RH-03 substrate proof
 into a schema-owned compatibility result and a maintained application-target
 fixture. This prerequisite is intentionally named with execution-index IDs
 rather than retroactively inserting or renumbering Task 7A.1.
+
+**Current status:** `ANG-0` is ready and `ANG-1` is pending. Neither the strict
+schema-owned compatibility result nor the full retained application-target
+matrix exists. Current Angular build/JIT fixtures are useful partial evidence,
+not substitutes for these gates.
 
 **`ANG-0` acceptance criteria:**
 
@@ -1006,6 +1013,10 @@ shell and reserve separate Node-safe `./jit` and `./authoring` entry points. Fix
 peer ownership with a strict pnpm install matrix; the guarded compiler import
 belongs to Task 7C and the AOT browser implementation belongs to Task 8B.
 
+**Current status:** Pending on `ANG-1`. The package shell, Node-safe subpaths,
+and packed import smoke exist, but the required peer/install matrix is not
+retained and the prerequisite gate has not passed.
+
 **Acceptance criteria:**
 
 - [ ] `@formly-contract/angular` has a mandatory compatible workspace peer and
@@ -1046,22 +1057,27 @@ Node-safe authoring descriptors belong to Task 7D, not this worker task.
 
 #### Task 7B.1 (`HOST-2`): Split discovery and inventory before project evaluation
 
+**Current status:** Complete. Root-owned exact project-config overrides now
+resolve each execution path independently, reject stale keys and confined-path
+escapes before spawn, and reach workers as canonical workspace-relative paths.
+Children repeat realpath confinement before host or config evaluation.
+
 **Acceptance criteria:**
 
-- [ ] Stage-one discovery expands and validates project config paths without
+- [x] Stage-one discovery expands and validates project config paths without
       importing them or claiming to know project/source IDs.
-- [ ] Each serialized request carries canonical config/project/runtime-base and
+- [x] Each serialized request carries canonical config/project/runtime-base and
       effective-tsconfig paths plus root policy and the parent-selected host.
-- [ ] Exact root overrides support centralized configs with precedence: exact
+- [x] Exact root overrides support centralized configs with precedence: exact
       project override, root default, then absent.
-- [ ] A child loads its project once, returns inventory, and waits; the parent
+- [x] A child loads its project once, returns inventory, and waits; the parent
       rejects cross-project duplicate IDs before sending compile approval.
 
 **Verification:**
 
-- [ ] Import-spy, traversal/symlink, override-precedence, inventory-order, and
+- [x] Import-spy, traversal/symlink, override-precedence, inventory-order, and
       duplicate-before-factory tests pass.
-- [ ] `list` obtains inventory without invoking a form factory.
+- [x] `list` obtains inventory without invoking a form factory.
 
 **Dependencies:** `HOST-1` (Task 7A.2)
 
@@ -1075,6 +1091,10 @@ Node-safe authoring descriptors belong to Task 7D, not this worker task.
 **Estimated scope:** Medium
 
 #### Task 7B.2 (`HOST-3`): Enforce the trusted-local worker lifecycle
+
+**Current status:** Ready. Current worker spawning, environment
+scrubbing, strict IPC, timeout, crash, and teardown tests are partial evidence;
+the full forbidden-authority and lifecycle matrix remains an exit gate.
 
 **Acceptance criteria:**
 
@@ -1106,6 +1126,11 @@ Node-safe authoring descriptors belong to Task 7D, not this worker task.
 **Estimated scope:** Medium
 
 #### Task 7B.3 (`HOST-4`): Make aggregation and publication failure-safe
+
+**Current status:** Pending on `HOST-3`. Generation locking, dependency
+snapshot checks, deterministic sorting, atomic index-last writes, and selected
+rollback tests exist, but the complete artifact/index fault-injection, orphan
+cleanup, and rerun matrix has not passed.
 
 **Acceptance criteria:**
 
@@ -1145,6 +1170,11 @@ peer-correct Angular graphs without claiming complete transitive singleton
 enforcement. This is the guarded trusted config/JIT lane used by Task 8
 scenario compilation. It does not build the AOT authoring application, inspect
 rendered custom fields, or serve as a fallback for a failed `ANG-1` gate.
+
+**Current status:** Pending on `ANG-2` and `HOST-4`. The shipped bounded JIT
+pilot proves compiler preload, exact core/compiler version matching, project
+isolation, and teardown for maintained fixtures. It does not yet satisfy the
+complete resolver/alias/private-copy/install compatibility matrix below.
 
 #### Task 7C.1: Resolve and reserve the Angular runtime safely
 
@@ -2130,7 +2160,8 @@ maintainer review, remediate validated findings, and record final evidence.
       those sibling artifact families.
 - [ ] Pass `LIN-0` before implementing public source-lineage indexing.
 - [ ] Implement `ANG-0` and pass the retained Angular CLI/Nx `ANG-1` gate before
-      Task 7A.3 or any JIT/AOT Angular host behavior.
+      scheduler completion of Task 7A.3 or any broader JIT/AOT Angular host
+      claim. Existing bounded JIT pilot behavior remains partial evidence.
 - [ ] Approve `BHV-0`/`BHV-1` before Task 8 publishes scenario evidence.
 - [ ] Keep FAC-3/FAC-4 blocked until `oci-rootless-v1` and the catch-resistant
       negative controls pass; Task 11C cannot substitute for this gate.

@@ -64,10 +64,26 @@ export interface WorkspaceSourceUsageConfig {
   readonly tsconfigPath: string;
 }
 
+export interface WorkspaceProjectConfigOverride {
+  readonly projectRoot?: string;
+  readonly runtimeResolutionBase?: string;
+  readonly tsconfigPath?: string;
+}
+
+export interface ResolvedWorkspaceProjectExecutionPaths {
+  readonly configPath: string;
+  readonly projectRoot: string;
+  readonly runtimeResolutionBase: string;
+  readonly tsconfigPath?: string;
+}
+
 export interface WorkspaceRootConfig {
   readonly projectConfigs: readonly string[];
   readonly excludeProjectConfigs?: readonly string[];
   readonly tsconfigPath?: string;
+  readonly projectConfigOverrides?: Readonly<
+    Record<string, WorkspaceProjectConfigOverride>
+  >;
   readonly sourceUsage?: WorkspaceSourceUsageConfig;
   readonly output?: WorkspaceOutputConfig;
   readonly locators?: WorkspaceLocatorConfig;
@@ -165,6 +181,7 @@ const ROOT_KEYS = new Set([
   'projectConfigs',
   'excludeProjectConfigs',
   'tsconfigPath',
+  'projectConfigOverrides',
   'sourceUsage',
   'output',
   'locators',
@@ -186,6 +203,11 @@ const LOCATOR_KEYS = new Set(['testIdAttributes']);
 const DIAGNOSTIC_KEYS = new Set(['failOn']);
 const EFFECT_KEYS = new Set(['cyclePolicy']);
 const SOURCE_USAGE_KEYS = new Set(['convention', 'tsconfigPath']);
+const PROJECT_CONFIG_OVERRIDE_KEYS = new Set([
+  'projectRoot',
+  'runtimeResolutionBase',
+  'tsconfigPath',
+]);
 const PLUGIN_KEYS = new Set([
   'id',
   'version',
@@ -250,15 +272,128 @@ function requireRelativePath(value: unknown, path: string): string {
   return value;
 }
 
-function requireLiteralRelativePath(value: unknown, path: string): string {
+function requireLiteralRelativePath(
+  value: unknown,
+  path: string,
+  allowWorkspaceRoot = false,
+): string {
   const literalPath = requireRelativePath(value, path);
   const resolvesToWorkspaceRoot = literalPath
     .split(/[\\/]/u)
     .every((segment) => segment === '' || segment === '.');
-  if (resolvesToWorkspaceRoot || /[*?[\]{}]/u.test(literalPath)) {
+  if (
+    (!allowWorkspaceRoot && resolvesToWorkspaceRoot) ||
+    /[*?[\]{}]/u.test(literalPath)
+  ) {
     invalid(path, 'must be a literal workspace-relative path.');
   }
   return literalPath;
+}
+
+function canonicalRelativePath(value: string): string {
+  const segments = value
+    .split(/[\\/]/u)
+    .filter((segment) => segment !== '' && segment !== '.');
+  return segments.length === 0 ? '.' : segments.join('/');
+}
+
+function projectConfigOverridePath(path: string, configPath: string): string {
+  return `${path}[${JSON.stringify(configPath)}]`;
+}
+
+function validateProjectConfigOverrides(value: unknown, path: string): void {
+  const overrides = requireRecord(value, path);
+  const canonicalConfigPaths = new Set<string>();
+  for (const configPath of Object.keys(overrides)) {
+    const overridePath = projectConfigOverridePath(path, configPath);
+    const parsedConfigPath = requireLiteralRelativePath(
+      configPath,
+      `${overridePath}.configPath`,
+    );
+    const canonicalConfigPath = canonicalRelativePath(parsedConfigPath);
+    if (canonicalConfigPaths.has(canonicalConfigPath)) {
+      invalid(
+        `${overridePath}.configPath`,
+        `duplicates project config path "${canonicalConfigPath}".`,
+      );
+    }
+    canonicalConfigPaths.add(canonicalConfigPath);
+
+    const override = requireRecord(
+      readOptionalOwnDataProperty(overrides, configPath, overridePath),
+      overridePath,
+    );
+    rejectUnknownKeys(override, PROJECT_CONFIG_OVERRIDE_KEYS, overridePath);
+    if (Object.keys(override).length === 0) {
+      invalid(overridePath, 'must configure at least one override.');
+    }
+    if (Object.hasOwn(override, 'projectRoot')) {
+      requireLiteralRelativePath(
+        readOptionalOwnDataProperty(
+          override,
+          'projectRoot',
+          `${overridePath}.projectRoot`,
+        ),
+        `${overridePath}.projectRoot`,
+        true,
+      );
+    }
+    if (Object.hasOwn(override, 'runtimeResolutionBase')) {
+      requireLiteralRelativePath(
+        readOptionalOwnDataProperty(
+          override,
+          'runtimeResolutionBase',
+          `${overridePath}.runtimeResolutionBase`,
+        ),
+        `${overridePath}.runtimeResolutionBase`,
+        true,
+      );
+    }
+    if (Object.hasOwn(override, 'tsconfigPath')) {
+      requireLiteralRelativePath(
+        readOptionalOwnDataProperty(
+          override,
+          'tsconfigPath',
+          `${overridePath}.tsconfigPath`,
+        ),
+        `${overridePath}.tsconfigPath`,
+      );
+    }
+  }
+}
+
+export function resolveWorkspaceProjectExecutionPaths(
+  rootInput: WorkspaceRootConfig,
+  configPathInput: string,
+): ResolvedWorkspaceProjectExecutionPaths {
+  const root = parseRootConfig(rootInput);
+  const configPath = canonicalRelativePath(
+    requireLiteralRelativePath(configPathInput, 'projectConfigPath'),
+  );
+  const overrideEntry = Object.entries(root.projectConfigOverrides ?? {}).find(
+    ([candidate]) => canonicalRelativePath(candidate) === configPath,
+  );
+  const override = overrideEntry?.[1];
+  const configDirectory = canonicalRelativePath(
+    configPath.includes('/')
+      ? configPath.slice(0, configPath.lastIndexOf('/'))
+      : '.',
+  );
+  const projectRoot = canonicalRelativePath(
+    override?.projectRoot ?? configDirectory,
+  );
+  const runtimeResolutionBase = canonicalRelativePath(
+    override?.runtimeResolutionBase ?? configDirectory,
+  );
+  const tsconfigPath = override?.tsconfigPath ?? root.tsconfigPath;
+  return {
+    configPath,
+    projectRoot,
+    runtimeResolutionBase,
+    ...(tsconfigPath === undefined
+      ? {}
+      : { tsconfigPath: canonicalRelativePath(tsconfigPath) }),
+  };
 }
 
 function requireGlob(value: unknown, path: string): string {
@@ -431,6 +566,17 @@ export function parseRootConfig(value: unknown): WorkspaceRootConfig {
   }
   if (root.tsconfigPath !== undefined) {
     requireLiteralRelativePath(root.tsconfigPath, 'root.tsconfigPath');
+  }
+  const projectConfigOverrides = readOptionalOwnDataProperty(
+    root,
+    'projectConfigOverrides',
+    'root.projectConfigOverrides',
+  );
+  if (projectConfigOverrides !== undefined) {
+    validateProjectConfigOverrides(
+      projectConfigOverrides,
+      'root.projectConfigOverrides',
+    );
   }
   const sourceUsage = readOptionalOwnDataProperty(
     root,

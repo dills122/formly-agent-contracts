@@ -3,6 +3,7 @@ import {
   chmod,
   mkdir,
   mkdtemp,
+  readFile,
   rm,
   symlink,
   writeFile,
@@ -18,8 +19,13 @@ import {
   discoverWorkspaceProjects,
   WorkspaceDiscoveryError,
 } from './discover-projects.js';
+import { discoverWorkspaceProjectsInWorkers } from './run-workspace.js';
 
 const repositoryRoot = fileURLToPath(new URL('../../../', import.meta.url));
+const requestCaptureWorker = new URL(
+  './runtime-host/fixtures/request-capture-worker.mjs',
+  import.meta.url,
+).href;
 const temporaryDirectories: string[] = [];
 
 async function createTemporaryWorkspace(): Promise<string> {
@@ -71,6 +77,197 @@ describe('workspace project discovery', () => {
       'projects/angular.project.ts',
     ]);
     expect(discovered.root.configPath).toBe('formly-contracts.config.ts');
+  });
+
+  it('sends canonical exact overrides to selected workers with independent fallback', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.ts',
+      `export default {
+        projectConfigs: ['configs/*.project.ts'],
+        tsconfigPath: 'tsconfig.base.json',
+        projectConfigOverrides: {
+          './configs/claims.project.ts': {
+            projectRoot: 'apps/claims',
+            runtimeResolutionBase: 'packages/claims-runtime',
+            tsconfigPath: 'apps/claims/tsconfig.app.json'
+          },
+          'configs/billing.project.ts': {
+            projectRoot: 'apps/billing'
+          }
+        }
+      };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'configs/claims.project.ts',
+      `throw new Error('capture worker must own project evaluation');`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'configs/billing.project.ts',
+      `throw new Error('unselected project must not run');`,
+    );
+    await writeModule(workspaceRoot, 'tsconfig.base.json', '{}');
+    await writeModule(workspaceRoot, 'apps/claims/tsconfig.app.json', '{}');
+    await mkdir(join(workspaceRoot, 'apps/billing'), { recursive: true });
+    await mkdir(join(workspaceRoot, 'packages/claims-runtime'), {
+      recursive: true,
+    });
+
+    await discoverWorkspaceProjectsInWorkers({
+      workspaceRoot,
+      rootConfigPath: 'formly-contracts.config.ts',
+      selectedProjectConfigPaths: ['configs/claims.project.ts'],
+      projectExecution: {
+        kind: 'workers',
+        workerModuleUrl: requestCaptureWorker,
+      },
+    });
+    const overridden = JSON.parse(
+      await readFile(
+        join(workspaceRoot, '.captured-project-request.json'),
+        'utf8',
+      ),
+    ) as Record<string, unknown>;
+    expect(overridden).toMatchObject({
+      rootConfigPath: 'formly-contracts.config.ts',
+      configPath: 'configs/claims.project.ts',
+      projectRoot: 'apps/claims',
+      runtimeResolutionBase: 'packages/claims-runtime',
+      tsconfigPath: 'apps/claims/tsconfig.app.json',
+    });
+
+    await discoverWorkspaceProjectsInWorkers({
+      workspaceRoot,
+      rootConfigPath: 'formly-contracts.config.ts',
+      selectedProjectConfigPaths: ['configs/billing.project.ts'],
+      projectExecution: {
+        kind: 'workers',
+        workerModuleUrl: requestCaptureWorker,
+      },
+    });
+    const partial = JSON.parse(
+      await readFile(
+        join(workspaceRoot, '.captured-project-request.json'),
+        'utf8',
+      ),
+    ) as Record<string, unknown>;
+    expect(partial).toMatchObject({
+      configPath: 'configs/billing.project.ts',
+      projectRoot: 'apps/billing',
+      runtimeResolutionBase: 'configs',
+      tsconfigPath: 'tsconfig.base.json',
+    });
+  });
+
+  it('loads a centralized project config with its exact tsconfig override', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.ts',
+      `export default {
+        projectConfigs: ['configs/*.project.ts'],
+        tsconfigPath: 'tsconfig.base.json',
+        projectConfigOverrides: {
+          'configs/claims.project.ts': {
+            projectRoot: 'apps/claims',
+            tsconfigPath: 'apps/claims/tsconfig.app.json'
+          }
+        }
+      };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'configs/claims.project.ts',
+      `import { projectId } from '@fixture/project-id';
+      export default { projectId };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'tsconfig.base.json',
+      JSON.stringify({
+        compilerOptions: {
+          baseUrl: '.',
+          paths: { '@fixture/project-id': ['missing.ts'] },
+        },
+      }),
+    );
+    await writeModule(
+      workspaceRoot,
+      'apps/claims/tsconfig.app.json',
+      JSON.stringify({
+        compilerOptions: {
+          baseUrl: '../..',
+          paths: { '@fixture/project-id': ['apps/claims/project-id.ts'] },
+        },
+      }),
+    );
+    await writeModule(
+      workspaceRoot,
+      'apps/claims/project-id.ts',
+      `export const projectId = 'claims';`,
+    );
+
+    await expect(
+      discoverWorkspaceProjects({
+        workspaceRoot,
+        rootConfigPath: 'formly-contracts.config.ts',
+      }),
+    ).resolves.toMatchObject({
+      inventory: { projects: [{ projectId: 'claims' }] },
+    });
+  });
+
+  it('rejects unmatched and symlink-escaping project config overrides before workers start', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    const outsideRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'configs/claims.project.ts',
+      `export default { projectId: 'claims' };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.ts',
+      `export default {
+        projectConfigs: ['configs/*.project.ts'],
+        projectConfigOverrides: {
+          'configs/missing.project.ts': { projectRoot: 'apps/claims' }
+        }
+      };`,
+    );
+    await expect(
+      discoverWorkspaceProjectConfigs({
+        workspaceRoot,
+        rootConfigPath: 'formly-contracts.config.ts',
+      }),
+    ).rejects.toMatchObject({
+      code: 'PROJECT_CONFIG_OVERRIDE_NOT_FOUND',
+      configPaths: ['configs/missing.project.ts'],
+    });
+
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.ts',
+      `export default {
+        projectConfigs: ['configs/*.project.ts'],
+        projectConfigOverrides: {
+          'configs/claims.project.ts': { runtimeResolutionBase: 'linked' }
+        }
+      };`,
+    );
+    await symlink(outsideRoot, join(workspaceRoot, 'linked'));
+    await expect(
+      discoverWorkspaceProjectConfigs({
+        workspaceRoot,
+        rootConfigPath: 'formly-contracts.config.ts',
+      }),
+    ).rejects.toMatchObject({
+      code: 'CONFIG_PATH_OUTSIDE_WORKSPACE',
+      configPaths: ['configs/claims.project.ts'],
+    });
   });
 
   it('expands includes and exclusions into a provenance-rich sorted inventory', async () => {

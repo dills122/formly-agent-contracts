@@ -47,6 +47,11 @@ local runtime results only and never enter artifacts or hashes. A single-writer
 lock spans generation through index-last publication, and the selected pnpm
 lockfile is rechecked immediately before commit.
 
+Centralized project configs can use root `projectConfigOverrides`, keyed by an
+exact discovered config path, to set `projectRoot`, `runtimeResolutionBase`, or
+`tsconfigPath`. Fields fall back independently to config-directory defaults or
+root `tsconfigPath`; parent and child canonicalize and confine effective paths.
+
 The runtime-host protocol is a strict package-lockstep IPC contract, not an
 independently compatible plugin protocol. Optional fields are additive only for
 the parent and worker shipped with the same `@formly-contract/workspace`

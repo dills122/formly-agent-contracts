@@ -33,12 +33,14 @@ import { posix } from "node:path";
 import {
   discoverWorkspaceProjectConfigs,
   discoverWorkspaceProjects,
+  resolveCanonicalWorkspaceProjectExecutionPaths,
   type DiscoverWorkspaceProjectsOptions,
   type DiscoveredWorkspace,
   type DiscoveredWorkspaceProject,
 } from "./discover-projects.js";
 import {
   resolveWorkspaceProjectConfig,
+  resolveWorkspaceProjectExecutionPaths,
   toPluginIdentity,
   WORKSPACE_CONFIG_SCHEMA_VERSION,
   type ResolvedWorkspaceProjectConfig,
@@ -74,6 +76,7 @@ import {
 } from "./workspace-index.js";
 import {
   DEFAULT_OUTPUT_DIRECTORY,
+  canonicalWorkspaceRelativePath,
   compareCodeUnits,
   errnoCode,
   isWithinWorkspace,
@@ -980,6 +983,12 @@ function buildIndex(
       ...(discovered.root.config.tsconfigPath === undefined
         ? {}
         : { tsconfigPath: discovered.root.config.tsconfigPath }),
+      ...(discovered.root.config.projectConfigOverrides === undefined
+        ? {}
+        : {
+            projectConfigOverrides:
+              discovered.root.config.projectConfigOverrides,
+          }),
       ...(discovered.root.config.sourceUsage === undefined
         ? {}
         : {
@@ -1057,20 +1066,28 @@ export async function discoverWorkspaceProjectsInWorkers(
     ...(options.rootLoaderOptions === undefined ? {} : { rootLoaderOptions: options.rootLoaderOptions }),
     ...(options.selectedProjectConfigPaths === undefined ? {} : { selectedProjectConfigPaths: options.selectedProjectConfigPaths }),
   });
+  const rootConfigPath = await canonicalWorkspaceRelativePath(
+    discoveredConfigs.workspaceRoot,
+    discoveredConfigs.root.configPath,
+  );
   const rootPolicy = cloneJsonValue(discoveredConfigs.root.config);
   const workerModuleUrl = execution.workerModuleUrl ?? new URL('./project-worker.js', import.meta.url).href;
   const sessions: ProjectWorkerSession[] = [];
   try {
     const spawned = await Promise.allSettled(
-      discoveredConfigs.configPaths.map((configPath, index) => {
-        const projectRoot = posix.dirname(configPath) || '.';
+      discoveredConfigs.configPaths.map(async (configPath, index) => {
+        const executionPaths =
+          await resolveCanonicalWorkspaceProjectExecutionPaths(
+            discoveredConfigs.workspaceRoot,
+            discoveredConfigs.root.config,
+            configPath,
+          );
         return spawnProjectWorker({
           protocolVersion: '1', requestId: `inventory:${index + 1}`, operation: 'inventory',
           workspaceRoot: discoveredConfigs.workspaceRoot,
-          rootConfigPath: discoveredConfigs.root.configPath,
-          configPath, projectRoot, runtimeResolutionBase: projectRoot,
+          rootConfigPath,
+          ...executionPaths,
           ...(options.explain === true ? { explain: true } : {}),
-          ...(discoveredConfigs.root.config.tsconfigPath === undefined ? {} : { tsconfigPath: discoveredConfigs.root.config.tsconfigPath }),
           rootPolicy,
           ...(execution.runtimeHost === undefined ? {} : { runtimeHost: execution.runtimeHost }),
         }, {
@@ -1179,6 +1196,10 @@ async function executeProjectsInWorkers(
       ? {}
       : { selectedProjectConfigPaths: options.selectedProjectConfigPaths }),
   });
+  const rootConfigPath = await canonicalWorkspaceRelativePath(
+    discoveredConfigs.workspaceRoot,
+    discoveredConfigs.root.configPath,
+  );
   const rootConfig = discoveredConfigs.root.config;
   const rootPolicy = cloneJsonValue(rootConfig);
   const cliOverrides =
@@ -1192,21 +1213,21 @@ async function executeProjectsInWorkers(
   try {
     const spawned = await Promise.allSettled(
       discoveredConfigs.configPaths.map(async (configPath, index) => {
-        const projectRoot = posix.dirname(configPath) || '.';
+        const executionPaths =
+          await resolveCanonicalWorkspaceProjectExecutionPaths(
+            discoveredConfigs.workspaceRoot,
+            rootConfig,
+            configPath,
+          );
         return spawnProjectWorker(
           {
             protocolVersion: '1',
             requestId: `project:${index + 1}`,
             operation,
             workspaceRoot: discoveredConfigs.workspaceRoot,
-            rootConfigPath: discoveredConfigs.root.configPath,
-            configPath,
-            projectRoot,
-            runtimeResolutionBase: projectRoot,
+            rootConfigPath,
+            ...executionPaths,
             ...(options.explain === true ? { explain: true } : {}),
-            ...(rootConfig.tsconfigPath === undefined
-              ? {}
-              : { tsconfigPath: rootConfig.tsconfigPath }),
             rootPolicy,
             ...(cliOverrides === undefined ? {} : { cliOverrides }),
             ...(execution.runtimeHost === undefined
@@ -1301,7 +1322,7 @@ async function executeProjectsInWorkers(
       options.runtimeProvenance ??
       (await createWorkerRuntimeProvenance(
         discoveredConfigs.workspaceRoot,
-        rootConfig.tsconfigPath !== undefined,
+        sessions.some((session) => session.request.tsconfigPath !== undefined),
         execution.runtimeHost,
         runtimePackages,
       ));
@@ -1477,6 +1498,12 @@ function buildWorkerIndex(
       ...(discovered.root.config.tsconfigPath === undefined
         ? {}
         : { tsconfigPath: discovered.root.config.tsconfigPath }),
+      ...(discovered.root.config.projectConfigOverrides === undefined
+        ? {}
+        : {
+            projectConfigOverrides:
+              discovered.root.config.projectConfigOverrides,
+          }),
       ...(discovered.root.config.sourceUsage === undefined
         ? {}
         : { sourceUsage: discovered.root.config.sourceUsage }),
@@ -2058,7 +2085,13 @@ async function planWorkspaceRun(
           ? "disabled"
           : "configured",
       projectConfigs:
-        discovered.root.config.tsconfigPath === undefined
+        discovered.projects.every(
+          (project) =>
+            resolveWorkspaceProjectExecutionPaths(
+              discovered.root.config,
+              project.configPath,
+            ).tsconfigPath === undefined,
+        )
           ? "disabled"
           : "configured",
     }

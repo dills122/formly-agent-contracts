@@ -12,7 +12,8 @@ complete. The `CTX-2A` through `CTX-2C` synthetic MVP checkpoint is implemented,
 while aggregate `CTX-2` remains in progress for rich value authority and the
 remaining intent operations. Executable wrapper prerequisites and hostile-input
 hardening for the standalone plan-hash helper are explicit fast follows; no
-CTX-2 pivot is currently required. `HOST-1`, `ANG-0`, and `FAC-1` are dependency-ready;
+CTX-2 pivot is currently required. `HOST-1` and `HOST-2` are complete, while
+`HOST-3`, `ANG-0`, and `FAC-1` are dependency-ready;
 aggregate `DRV-0` remains incomplete because `DRV-0C2` follows the validated
 plan/call ABI from `CTX-2`; `BHV-0` and `AUTH-0` await explicit approval of
 ADRs 0010 and 0011; and `LIN-0` is blocked on its sanitized representative

@@ -96,6 +96,13 @@ export default defineConfig({
   projectConfigs: ["apps/**/formly-contracts.project.ts", "libs/**/formly-contracts.project.ts"],
   excludeProjectConfigs: ["apps/legacy/**"],
   tsconfigPath: "tsconfig.base.json",
+  projectConfigOverrides: {
+    "configs/claims.project.ts": {
+      projectRoot: "apps/claims",
+      runtimeResolutionBase: "apps/claims",
+      tsconfigPath: "apps/claims/tsconfig.app.json",
+    },
+  },
   sourceUsage: {
     convention: "direct-root-call-v1",
     tsconfigPath: "apps/claims/tsconfig.app.json",
@@ -107,9 +114,18 @@ export default defineConfig({
 });
 ```
 
+`projectConfigOverrides` is an optional exact-path map for centralized project
+configs. Each entry may override `projectRoot`, `runtimeResolutionBase`, and
+`tsconfigPath`; no globs are accepted. Each field resolves independently:
+exact project override, then project-config-directory default for the two root
+fields or root `tsconfigPath` for loader config, then absence for tsconfig.
+Override keys must match discovered configs. Every effective path is
+workspace-relative, realpath-checked in parent and child, and serialized to the
+worker in canonical form.
+
 `sourceUsage` is optional and does not change Form Contract or workspace-index
-schema versions. When enabled, the root `tsconfigPath` is required and remains
-the resolver configuration used to load project configs. The runner creates a
+schema versions. When enabled, root `tsconfigPath` is required as source-usage
+authority and is the default resolver configuration for project configs. The runner creates a
 narrow authority Program from that config's compiler/module-resolution options
 and roots it only at discovered project configs. It also resolves every
 authority import or re-export used by the registered chain through the same
@@ -504,6 +520,7 @@ Keep the contracted descriptor data-only beside the custom field library:
 
 ```ts
 import {
+  aliasContractedFormlyType,
   buildFieldTypeProfileRegistry,
   defineContractedFormlyType,
   radioChoice,
@@ -515,10 +532,15 @@ export const COOL_RADIO_TYPE = defineContractedFormlyType({
   behavior: radioChoice(),
 });
 
+export const LEGACY_COOL_RADIO_TYPE = aliasContractedFormlyType(
+  COOL_RADIO_TYPE,
+  "legacy-cool-radio-btn-grp",
+);
+
 export const CLAIMS_FIELD_TYPE_PROFILES = buildFieldTypeProfileRegistry({
   id: "claims.field-types",
   version: 1,
-  types: [COOL_RADIO_TYPE],
+  types: [COOL_RADIO_TYPE, LEGACY_COOL_RADIO_TYPE],
 });
 ```
 
@@ -528,19 +550,23 @@ Bind the Angular component only in the runtime module:
 import { toFormlyTypeRegistration } from "@formly-contract/schema/field-type-authoring";
 
 FormlyModule.forChild({
-  types: [toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponent)],
+  types: [
+    toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponent),
+    toFormlyTypeRegistration(LEGACY_COOL_RADIO_TYPE, CoolRadioComponent),
+  ],
 });
 ```
 
 `radioChoice()` defaults to `props.options` with `label` and `value` paths. Its
 optional collection, label, value, disabled, and completeness settings accept
 only validated data paths and closed values. Lowering is deterministic and
-rejects duplicate type names or profile identities. The definition helper
-snapshots and runtime-freezes validated data, so later caller-side mutation
-cannot drift the registration name from the generated profile. Projects still attach the
-generated registry through `fieldTypeProfiles`; that repeated attachment is a
-transitional MVP constraint until named environments aggregate shared field
-libraries once.
+rejects duplicate type names. Exact aliases may reuse a profile identity only
+when their lowered profiles are identical; conflicting semantics fail closed.
+Definition and alias helpers snapshot and runtime-freeze validated data, so
+later caller-side mutation cannot drift the registration name from the
+generated profile. Projects still attach the generated registry through
+`fieldTypeProfiles`; that repeated attachment is a transitional MVP constraint
+until named environments aggregate shared field libraries once.
 
 ### Legacy project-owned registry input
 

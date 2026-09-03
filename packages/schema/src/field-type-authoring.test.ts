@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  aliasContractedFormlyType,
   autocompleteChoice,
   buildFieldTypeProfileRegistry,
   choiceControl,
@@ -218,7 +219,55 @@ describe('compact field-type authoring', () => {
     ]);
   });
 
-  it('rejects duplicate Formly names and duplicate profile identities', () => {
+  it('deduplicates byte-identical profile aliases and emits every exact registration', () => {
+    class CoolRadioComponent {}
+
+    const primary = createRadioType(
+      'cool-radio-btn-grp',
+      'fixture.shared-profile',
+    );
+    const alias = aliasContractedFormlyType(primary, 'legacy-radio-btn-grp');
+    const first = buildFieldTypeProfileRegistry({
+      id: 'fixture.aliased-fields',
+      version: 1,
+      types: [primary, alias],
+    });
+    const second = buildFieldTypeProfileRegistry({
+      id: 'fixture.aliased-fields',
+      version: 1,
+      types: [alias, primary],
+    });
+
+    expect(first).toEqual(second);
+    expect(parseFieldTypeProfileRegistry(first)).toBe(first);
+    expect(first.profiles).toHaveLength(1);
+    expect(first.profiles[0]?.identity).toEqual({
+      id: 'fixture.shared-profile',
+      version: 1,
+    });
+    expect(first.registrations).toEqual([
+      {
+        formlyType: 'cool-radio-btn-grp',
+        defaultProfile: { id: 'fixture.shared-profile', version: 1 },
+        variants: [],
+      },
+      {
+        formlyType: 'legacy-radio-btn-grp',
+        defaultProfile: { id: 'fixture.shared-profile', version: 1 },
+        variants: [],
+      },
+    ]);
+    expect(toFormlyTypeRegistration(alias, CoolRadioComponent).name).toBe(
+      'legacy-radio-btn-grp',
+    );
+    expect(alias.profile).toEqual(primary.profile);
+    expect(alias.behavior).toEqual(primary.behavior);
+    expect(Object.isFrozen(alias)).toBe(true);
+    expect(Object.isFrozen(alias.profile)).toBe(true);
+    expect(Object.isFrozen(alias.behavior)).toBe(true);
+  });
+
+  it('rejects duplicate Formly names and conflicting profile aliases', () => {
     expect(() =>
       buildFieldTypeProfileRegistry({
         id: 'fixture.duplicate-name',
@@ -236,10 +285,20 @@ describe('compact field-type authoring', () => {
         version: 1,
         types: [
           createRadioType('first-radio', 'fixture.shared-profile'),
-          createRadioType('second-radio', 'fixture.shared-profile'),
+          defineContractedFormlyType({
+            name: 'second-radio',
+            profile: { id: 'fixture.shared-profile', version: 1 },
+            behavior: radioChoice({ labelPath: 'text' }),
+          }),
         ],
       }),
-    ).toThrow('duplicates profile identity "fixture.shared-profile@1"');
+    ).toThrow(
+      'registry.types assigns conflicting semantics to profile identity "fixture.shared-profile@1" for Formly types "first-radio" and "second-radio"',
+    );
+
+    expect(() =>
+      aliasContractedFormlyType(createRadioType(), 'not/a/type'),
+    ).toThrow('alias.name must be a stable token');
   });
 
   it('rejects malformed registry, type, profile, and option-path identities', () => {

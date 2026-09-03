@@ -12,9 +12,10 @@ project-owned cross-field effect registries, and deterministic resolution of
 validated effects into form artifacts and workspace indexes. It also includes
 two opt-in workplace MVP slices: typed form definitions with explicit
 `lineage.rootSymbol` anchors plus a `direct-root-call-v1` TypeScript producer,
-and compact `radioChoice()` custom-type authoring that lowers reviewed semantics
-to the canonical field-profile registry while sharing the Formly registration
-name. Canonical Angular-fixture goldens plus linked and packed consumers verify
+and compact custom-type authoring for reviewed choice, input, collection, and
+structural behaviors. Exact Formly aliases may share one identical lowered
+profile while retaining separate registrations. Canonical Angular-fixture
+goldens plus linked and packed consumers verify
 the generic pilot outside package-source imports. The authoring command follows
 the same exact source lineage to a real factory declaration without adding a
 second target registry.
@@ -41,8 +42,7 @@ config runtime, and all three views must agree before a link is exact. The produ
 `static-convention` evidence that joins an exact form ID and generated contract
 hash; it does not execute call arguments or prove that Angular renders the
 component, that a route reaches it, or that a business journey traverses it.
-The compact custom-type helper currently covers one reviewed radio-choice happy
-path and performs no Angular template or DOM inference.
+Compact custom-type helpers perform no Angular template or DOM inference.
 
 The long-term architecture below remains the intended direction. Broader
 source lineage and fragment/change-impact analysis, journey and route
@@ -250,7 +250,11 @@ serializable runtime-host protocol:
 1. The parent loads only a Node-safe root config, expands project config paths,
    and creates a validated request containing the project config path, project
    root, runtime package-resolution base, effective tsconfig, root policy, and a
-   parent-selected runtime-host module descriptor.
+   parent-selected runtime-host module descriptor. Exact root
+   `projectConfigOverrides` entries take precedence field-by-field over the
+   config-directory defaults and root tsconfig; unmatched keys, traversal, and
+   realpath escapes fail before spawn. The child repeats confinement checks
+   before host or config evaluation.
 2. One fresh child process per project imports the trusted host module by its
    already resolved file URL, evaluates the project config, inventories IDs, and
    waits. No executable module URL may come from config data.
@@ -492,13 +496,16 @@ allowlist. Angular reflection and source/render analysis belong to the trusted
 build-time authoring host and do not run in the schema or MCP query path.
 
 Reviewed declarations and Angular authoring evidence have different authority.
-The current MVP implements one narrow authoring slice: a browser-safe
-`radioChoice()` contracted-type declaration supplies the same exact Formly type
-name to production registration and to deterministic lowering into the
-canonical `FieldTypeProfileRegistry`. It does not inspect a component or infer
-semantics from Angular metadata, templates, or rendered DOM. Other custom-field
-families still require a legacy reviewed registry or remain explicitly
-unmapped.
+The current implementation exposes browser-safe behavior presets for choices,
+typed inputs, autocomplete, row selection, repeaters, and steppers. One
+contracted-type declaration supplies the same exact Formly type name to
+production registration and deterministic lowering into the canonical
+`FieldTypeProfileRegistry`. Multiple exact type aliases may reuse one profile
+identity only when independently lowered semantics match exactly; conflicts
+fail closed. These helpers do not inspect a component or infer semantics from
+Angular metadata, templates, or rendered DOM. Custom-field families outside
+the closed preset vocabulary still require a legacy reviewed registry or
+remain explicitly unmapped.
 
 [ADR 0011](decisions/0011-named-formly-environments-and-contracted-field-adapters.md)
 proposes the broader end state: reusable field libraries author compact
@@ -513,14 +520,14 @@ deterministically lowers them to the existing canonical
 The generated registry remains the compiler and contract compatibility
 boundary; Angular metadata, source/template candidates, rendered roles and
 parts, coverage, drift, and migration scaffolds remain evidence. They cannot
-approve semantics, choose a codec, or register a driver. The MVP radio-choice
-path is declared semantic metadata, not Angular conformance. The broader model
+approve semantics, choose a codec, or register a driver. Compact presets are
+declared semantic metadata, not Angular conformance. The broader model
 will require a profile's exact registration, declaration, driver capability,
 and required conformance to agree before it is actionable. Display/assertion-only
 components require an explicit non-interactive disposition and remain
 non-executable or unknown until the schema defines their no-driver/assertion
 surface. Current project-owned raw registries remain the explicit legacy
-authoring path for controls outside the compact radio-choice slice rather than
+authoring path for controls outside the compact preset vocabulary rather than
 the intended final UX.
 
 One Formly field may map to multiple interactive controls. For example, a date range has start and end parts, while an address lookup may expose a search box, suggestions, and a confirmed structured value.

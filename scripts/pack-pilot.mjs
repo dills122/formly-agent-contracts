@@ -1,6 +1,14 @@
 import { createHash } from "node:crypto";
 import { execFile as execFileCallback } from "node:child_process";
-import { mkdir, readFile, writeFile } from "node:fs/promises";
+import {
+  copyFile,
+  mkdir,
+  mkdtemp,
+  readFile,
+  rm,
+  writeFile,
+} from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { basename, dirname, join, relative, resolve } from "node:path";
 import { promisify } from "node:util";
 import { fileURLToPath } from "node:url";
@@ -16,10 +24,12 @@ import {
 
 const execFile = promisify(execFileCallback);
 const PILOT_PACKAGE_NAMES = [
+  "@formly-contract/angular",
   "@formly-contract/schema",
   "@formly-contract/compiler",
   "@formly-contract/workspace",
 ];
+const PILOT_PNPMFILE = "formly-contract-pilot.pnpmfile.cjs";
 const WORKSPACE_PACKAGE_DIRECTORY = "packages/workspace";
 
 export function createPilotBundleManifest(packages) {
@@ -30,10 +40,13 @@ export function createPilotBundleManifest(packages) {
     JSON.stringify(sorted.map(({ name }) => name).sort()) !==
     JSON.stringify([...PILOT_PACKAGE_NAMES].sort())
   ) {
-    throw new Error("Pilot bundle requires schema, compiler, and workspace");
+    throw new Error(
+      "Pilot bundle requires angular, compiler, schema, and workspace"
+    );
   }
+  const pnpmfileBytes = createPilotPnpmfile(sorted);
   return {
-    schemaVersion: "1",
+    schemaVersion: "2",
     packages: sorted.map(({ filename, name, sha256, version }) => ({
       name,
       version,
@@ -42,9 +55,125 @@ export function createPilotBundleManifest(packages) {
     })),
     install: {
       packageManager: "pnpm",
-      arguments: ["add", ...sorted.map(({ filename }) => `./${filename}`)],
+      pnpmfile: {
+        filename: PILOT_PNPMFILE,
+        sha256: `sha256:${createHash("sha256")
+          .update(pnpmfileBytes)
+          .digest("hex")}`,
+      },
+      arguments: [
+        `--config.pnpmfile=./${PILOT_PNPMFILE}`,
+        "add",
+        ...sorted.map(({ filename }) => `./${filename}`),
+      ],
     },
   };
+}
+
+export function createPilotPnpmfile(packages) {
+  const references = Object.fromEntries(
+    packages.map(({ filename, name }) => [name, `file:./${filename}`])
+  );
+  return `"use strict";
+
+const bundledDependencies = Object.freeze(${JSON.stringify(references, null, 2)});
+const hasOwn = (value, key) => Object.prototype.hasOwnProperty.call(value, key);
+
+module.exports = {
+  hooks: {
+    readPackage(package_) {
+      if (!hasOwn(bundledDependencies, package_.name)) return package_;
+      for (const [name, reference] of Object.entries(bundledDependencies)) {
+        for (const field of ["dependencies", "optionalDependencies"]) {
+          if (package_[field] !== undefined && hasOwn(package_[field], name)) {
+            package_[field][name] = reference;
+          }
+        }
+        if (
+          package_.peerDependencies !== undefined &&
+          hasOwn(package_.peerDependencies, name)
+        ) {
+          delete package_.peerDependencies[name];
+          package_.dependencies = { ...package_.dependencies, [name]: reference };
+        }
+      }
+      return package_;
+    },
+  },
+};
+`;
+}
+
+async function verifyPilotBundleConsumer(manifest, bundleDirectory) {
+  const consumerRoot = await mkdtemp(
+    join(tmpdir(), "formly-contract-pilot-consumer-")
+  );
+  try {
+    await writeFile(
+      join(consumerRoot, "package.json"),
+      `${JSON.stringify(
+        {
+          name: "formly-contract-pilot-consumer-smoke",
+          version: "0.0.0",
+          private: true,
+          type: "module",
+        },
+        null,
+        2
+      )}\n`
+    );
+    for (const package_ of manifest.packages) {
+      await copyFile(
+        join(bundleDirectory, package_.filename),
+        join(consumerRoot, package_.filename)
+      );
+    }
+    const pnpmfilePath = join(
+      bundleDirectory,
+      manifest.install.pnpmfile.filename
+    );
+    const pnpmfileBytes = await readFile(pnpmfilePath);
+    const pnpmfileSha256 = `sha256:${createHash("sha256")
+      .update(pnpmfileBytes)
+      .digest("hex")}`;
+    if (pnpmfileSha256 !== manifest.install.pnpmfile.sha256) {
+      throw new Error("Pilot pnpm hook does not match its manifest checksum");
+    }
+    await copyFile(
+      pnpmfilePath,
+      join(consumerRoot, manifest.install.pnpmfile.filename)
+    );
+
+    await execFile(PNPM_EXECUTABLE, manifest.install.arguments, {
+      cwd: consumerRoot,
+      maxBuffer: 10 * 1024 * 1024,
+    });
+    const imported = await execFile(
+      process.execPath,
+      [
+        "--input-type=module",
+        "--eval",
+        "const module = await import('@formly-contract/angular/jit'); if (typeof module.runAngularWorkspace !== 'function') process.exit(1);",
+      ],
+      { cwd: consumerRoot }
+    );
+    if (imported.stderr !== "") {
+      throw new Error(
+        `Angular JIT import smoke wrote to stderr: ${imported.stderr}`
+      );
+    }
+
+    const cli = await execFile(
+      PNPM_EXECUTABLE,
+      ["exec", "formly-contracts-angular", "--help"],
+      { cwd: consumerRoot, maxBuffer: 10 * 1024 * 1024 }
+    );
+    if (!cli.stdout.startsWith("Usage: formly-contracts <command>")) {
+      throw new Error("Angular pilot CLI smoke did not print expected help");
+    }
+  } finally {
+    await rm(consumerRoot, { force: true, recursive: true });
+  }
 }
 
 async function packPackage(
@@ -127,22 +256,46 @@ export async function packPilotBundle({ destinationDirectory, rootDirectory } = 
     );
   }
   const manifest = createPilotBundleManifest(packages);
+  await writeFile(
+    join(destination, manifest.install.pnpmfile.filename),
+    createPilotPnpmfile(manifest.packages)
+  );
   const manifestPath = join(destination, "formly-contract-pilot.json");
   await writeFile(manifestPath, `${JSON.stringify(manifest, null, 2)}\n`);
+  await verifyPilotBundleConsumer(manifest, destination);
   return { manifest, manifestPath };
 }
 
 function parseArguments(arguments_) {
+  if (arguments_.length === 0) {
+    return {};
+  }
   if (arguments_.length !== 2 || arguments_[0] !== "--destination") {
-    throw new Error("Usage: pack-pilot.mjs --destination <directory>");
+    throw new Error("Usage: pack-pilot.mjs [--destination <directory>]");
   }
   return { destinationDirectory: arguments_[1] };
 }
 
 async function main() {
   const { destinationDirectory } = parseArguments(process.argv.slice(2));
-  const result = await packPilotBundle({ destinationDirectory });
-  console.log(`Packed pilot bundle: ${result.manifestPath}`);
+  const temporaryDirectory =
+    destinationDirectory === undefined
+      ? await mkdtemp(join(tmpdir(), "formly-contract-pilot-check-"))
+      : undefined;
+  try {
+    const result = await packPilotBundle({
+      destinationDirectory: destinationDirectory ?? temporaryDirectory,
+    });
+    console.log(
+      destinationDirectory === undefined
+        ? "Verified four-package pilot bundle and Angular consumer."
+        : `Packed pilot bundle: ${result.manifestPath}`
+    );
+  } finally {
+    if (temporaryDirectory !== undefined) {
+      await rm(temporaryDirectory, { force: true, recursive: true });
+    }
+  }
 }
 
 const scriptPath = process.argv[1];
