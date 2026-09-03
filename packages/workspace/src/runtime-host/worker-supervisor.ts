@@ -1,4 +1,6 @@
 import { spawn, type ChildProcess } from 'node:child_process';
+import { existsSync, realpathSync } from 'node:fs';
+import { dirname, parse, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import type { JsonValue } from '@formly-contract/schema';
@@ -19,6 +21,7 @@ export type ProjectWorkerSupervisorErrorCode =
   | 'WORKER_ABORTED'
   | 'WORKER_CRASHED'
   | 'WORKER_FAILURE'
+  | 'WORKER_ISOLATION_UNAVAILABLE'
   | 'WORKER_MESSAGE_INVALID'
   | 'WORKER_REQUEST_MISMATCH'
   | 'WORKER_TIMEOUT';
@@ -67,9 +70,13 @@ export class ProjectWorkerSupervisorError extends Error {
 export interface SpawnProjectWorkerOptions {
   readonly workerModuleUrl: string;
   readonly timeoutMs?: number;
-  readonly execPath?: string;
+  readonly executionProfile?: ProjectWorkerExecutionProfile;
   readonly spawnProcess?: typeof spawn;
 }
+
+export type ProjectWorkerExecutionProfile =
+  | 'trusted-local-v1'
+  | 'isolated-ci-v1';
 
 export interface ProjectWorkerSession {
   readonly request: ProjectExecutionRequest;
@@ -118,6 +125,55 @@ function workerPath(moduleUrl: string): string {
   return fileURLToPath(parsed);
 }
 
+function nearestContainingPath(
+  startPath: string,
+  marker: string,
+): string | undefined {
+  let current = dirname(startPath);
+  const root = parse(current).root;
+  for (;;) {
+    if (existsSync(resolve(current, marker))) return current;
+    if (current === root) return undefined;
+    current = dirname(current);
+  }
+}
+
+function trustedReadRoots(
+  request: ProjectExecutionRequest,
+  modulePath: string,
+): readonly string[] {
+  const modulePaths = [
+    modulePath,
+    ...(request.runtimeHost === undefined
+      ? []
+      : [fileURLToPath(request.runtimeHost.moduleUrl)]),
+  ];
+  const roots = new Set<string>([realpathSync(request.workspaceRoot)]);
+  for (const path of modulePaths) {
+    const realPath = realpathSync(path);
+    roots.add(nearestContainingPath(realPath, 'package.json') ?? dirname(realPath));
+    const workspaceRoot = nearestContainingPath(realPath, 'pnpm-workspace.yaml');
+    if (workspaceRoot !== undefined) roots.add(workspaceRoot);
+  }
+  return [...roots].sort();
+}
+
+function workerArguments(
+  request: ProjectExecutionRequest,
+  modulePath: string,
+): readonly string[] {
+  if (!process.allowedNodeEnvironmentFlags.has('--permission')) {
+    return [modulePath];
+  }
+  return [
+    '--permission',
+    ...trustedReadRoots(request, modulePath).map(
+      (path) => `--allow-fs-read=${path}`,
+    ),
+    modulePath,
+  ];
+}
+
 function send(child: ChildProcess, value: object): Promise<void> {
   return new Promise((resolve, reject) => {
     if (!child.connected) {
@@ -150,6 +206,17 @@ class WorkerChannel {
   readonly request: ProjectExecutionRequest;
   readonly timeoutMs: number;
   #settled = false;
+  #phase: RuntimeHostFailurePhase = 'inventory';
+  #terminalError: ProjectWorkerSupervisorError | undefined;
+  #termination: Promise<void> | undefined;
+  #pending:
+    | {
+        readonly expectedKind: 'inventory' | 'result';
+        readonly resolve: (message: RuntimeHostWorkerMessage) => void;
+        readonly reject: (error: ProjectWorkerSupervisorError) => void;
+        readonly timeout: NodeJS.Timeout;
+      }
+    | undefined;
 
   constructor(
     child: ChildProcess,
@@ -159,108 +226,147 @@ class WorkerChannel {
     this.child = child;
     this.request = request;
     this.timeoutMs = timeoutMs;
+    this.child.on('message', this.#onMessage);
+    this.child.once('exit', this.#onExit);
+    this.child.once('error', this.#onError);
   }
 
-  async next(expectedKind: RuntimeHostWorkerMessage['kind']): Promise<RuntimeHostWorkerMessage> {
-    if (this.#settled) {
-      throw new ProjectWorkerSupervisorError(
-        'WORKER_ABORTED',
-        this.request.requestId,
+  #cleanup(): void {
+    this.child.off('message', this.#onMessage);
+    this.child.off('exit', this.#onExit);
+    this.child.off('error', this.#onError);
+    if (this.#pending !== undefined) {
+      clearTimeout(this.#pending.timeout);
+      this.#pending = undefined;
+    }
+  }
+
+  #terminate(): Promise<void> {
+    this.#termination ??= terminate(this.child);
+    return this.#termination;
+  }
+
+  #fail(
+    code: ProjectWorkerSupervisorErrorCode,
+    cause?: unknown,
+    workerFailure?: Extract<
+      RuntimeHostWorkerMessage,
+      { readonly kind: 'failure' }
+    >,
+  ): void {
+    if (this.#settled) return;
+    const error = new ProjectWorkerSupervisorError(
+      code,
+      this.request.requestId,
+      cause,
+      {
+        configPath: this.request.configPath,
+        ...(workerFailure === undefined ? {} : { workerFailure }),
+        phase: this.#phase,
+      },
+    );
+    this.#terminalError = error;
+    this.#settled = true;
+    const pending = this.#pending;
+    this.#cleanup();
+    pending?.reject(error);
+    void this.#terminate();
+  }
+
+  #onMessage = (input: unknown): void => {
+    if (this.#settled) return;
+    let message: RuntimeHostWorkerMessage;
+    try {
+      message = parseRuntimeHostWorkerMessage(input);
+    } catch (error) {
+      this.#fail('WORKER_MESSAGE_INVALID', error);
+      return;
+    }
+    if (message.requestId !== this.request.requestId) {
+      this.#fail('WORKER_REQUEST_MISMATCH');
+      return;
+    }
+    if (message.kind === 'failure') {
+      this.#fail(
+        'WORKER_FAILURE',
+        undefined,
+        this.request.explain === true
+          ? message
+          : {
+              protocolVersion: message.protocolVersion,
+              kind: message.kind,
+              requestId: message.requestId,
+              code: message.code,
+              phase: message.phase,
+            },
+      );
+      return;
+    }
+    const pending = this.#pending;
+    if (pending === undefined) {
+      this.#fail('WORKER_MESSAGE_INVALID');
+      return;
+    }
+    if (message.kind !== pending.expectedKind) {
+      this.#fail('WORKER_MESSAGE_INVALID');
+      return;
+    }
+    clearTimeout(pending.timeout);
+    this.#pending = undefined;
+    if (message.kind === 'inventory') {
+      this.#phase = 'compile';
+    } else {
+      this.#settled = true;
+      this.#cleanup();
+    }
+    pending.resolve(message);
+  };
+
+  #onExit = (): void => this.#fail('WORKER_CRASHED');
+
+  #onError = (error: Error): void => this.#fail('WORKER_CRASHED', error);
+
+  next(expectedKind: 'inventory' | 'result'): Promise<RuntimeHostWorkerMessage> {
+    if (this.#terminalError !== undefined) {
+      return Promise.reject(this.#terminalError);
+    }
+    if (this.#settled || this.#pending !== undefined) {
+      return Promise.reject(
+        new ProjectWorkerSupervisorError(
+          'WORKER_ABORTED',
+          this.request.requestId,
+        ),
       );
     }
     return new Promise((resolve, reject) => {
-      let completed = false;
-      const finish = (
-        outcome:
-          | { readonly ok: true; readonly message: RuntimeHostWorkerMessage }
-          | { readonly ok: false; readonly error: ProjectWorkerSupervisorError },
-      ) => {
-        if (completed) return;
-        completed = true;
-        clearTimeout(timeout);
-        this.child.off('message', onMessage);
-        this.child.off('exit', onExit);
-        this.child.off('error', onError);
-        if (outcome.ok) resolve(outcome.message);
-        else reject(outcome.error);
-      };
-      const fail = (
-        code: ProjectWorkerSupervisorErrorCode,
-        cause?: unknown,
-        workerFailure?: Extract<
-          RuntimeHostWorkerMessage,
-          { readonly kind: 'failure' }
-        >,
-      ) => {
-        this.#settled = true;
-        finish({
-          ok: false,
-          error: new ProjectWorkerSupervisorError(
-            code,
-            this.request.requestId,
-            cause,
-            {
-              configPath: this.request.configPath,
-              ...(workerFailure === undefined ? {} : { workerFailure }),
-              phase: expectedKind === 'result' ? 'compile' : 'inventory',
-            },
-          ),
-        });
-        void terminate(this.child);
-      };
-      const onMessage = (input: unknown) => {
-        let message: RuntimeHostWorkerMessage;
-        try {
-          message = parseRuntimeHostWorkerMessage(input);
-        } catch (error) {
-          fail('WORKER_MESSAGE_INVALID', error);
-          return;
-        }
-        if (message.requestId !== this.request.requestId) {
-          fail('WORKER_REQUEST_MISMATCH');
-          return;
-        }
-        if (message.kind === 'failure') {
-          fail(
-            'WORKER_FAILURE',
-            undefined,
-            this.request.explain === true
-              ? message
-              : {
-                  protocolVersion: message.protocolVersion,
-                  kind: message.kind,
-                  requestId: message.requestId,
-                  code: message.code,
-                  phase: message.phase,
-                },
-          );
-          return;
-        }
-        if (message.kind !== expectedKind) {
-          fail('WORKER_MESSAGE_INVALID');
-          return;
-        }
-        finish({ ok: true, message });
-      };
-      const onExit = () => fail('WORKER_CRASHED');
-      const onError = (error: Error) => fail('WORKER_CRASHED', error);
-      const timeout = setTimeout(() => fail('WORKER_TIMEOUT'), this.timeoutMs);
+      const timeout = setTimeout(
+        () => this.#fail('WORKER_TIMEOUT'),
+        this.timeoutMs,
+      );
       timeout.unref();
-      this.child.once('message', onMessage);
-      this.child.once('exit', onExit);
-      this.child.once('error', onError);
+      this.#pending = { expectedKind, resolve, reject, timeout };
     });
   }
 
   async approve(): Promise<JsonValue> {
-    await send(this.child, {
-      protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
-      kind: 'approve',
-      requestId: this.request.requestId,
-    });
-    const message = await this.next('result');
-    this.#settled = true;
-    await terminate(this.child);
+    const result = this.next('result');
+    try {
+      await send(this.child, {
+        protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
+        kind: 'approve',
+        requestId: this.request.requestId,
+      });
+    } catch (error) {
+      this.#fail('WORKER_CRASHED', error);
+    }
+    let message: RuntimeHostWorkerMessage;
+    try {
+      message = await result;
+    } catch (error) {
+      await this.#terminate();
+      throw error;
+    }
+    await this.#terminate();
     if (message.kind !== 'result') {
       throw new ProjectWorkerSupervisorError(
         'WORKER_MESSAGE_INVALID',
@@ -276,8 +382,24 @@ class WorkerChannel {
   }
 
   async abort(): Promise<void> {
-    if (this.#settled) return;
+    if (this.#settled) {
+      await this.#termination;
+      return;
+    }
+    const pending = this.#pending;
     this.#settled = true;
+    this.#cleanup();
+    pending?.reject(
+      new ProjectWorkerSupervisorError(
+        'WORKER_ABORTED',
+        this.request.requestId,
+        undefined,
+        {
+          configPath: this.request.configPath,
+          phase: this.#phase,
+        },
+      ),
+    );
     try {
       await send(this.child, {
         protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
@@ -285,7 +407,7 @@ class WorkerChannel {
         requestId: this.request.requestId,
       });
     } finally {
-      await terminate(this.child);
+      await this.#terminate();
     }
   }
 }
@@ -295,14 +417,24 @@ export async function spawnProjectWorker(
   options: SpawnProjectWorkerOptions,
 ): Promise<ProjectWorkerSession> {
   const request = parseProjectExecutionRequest(input);
+  const executionProfile = options.executionProfile ?? 'trusted-local-v1';
+  if (executionProfile === 'isolated-ci-v1') {
+    throw new ProjectWorkerSupervisorError(
+      'WORKER_ISOLATION_UNAVAILABLE',
+      request.requestId,
+      undefined,
+      { configPath: request.configPath, phase: 'inventory' },
+    );
+  }
   const timeoutMs = options.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   if (!Number.isSafeInteger(timeoutMs) || timeoutMs <= 0) {
     throw new TypeError('timeoutMs must be a positive safe integer.');
   }
   const spawnProcess = options.spawnProcess ?? spawn;
+  const modulePath = workerPath(options.workerModuleUrl);
   const child = spawnProcess(
-    options.execPath ?? process.execPath,
-    [workerPath(options.workerModuleUrl)],
+    process.execPath,
+    [...workerArguments(request, modulePath)],
     {
       cwd: request.workspaceRoot,
       env: createProjectWorkerEnvironment(),
@@ -312,12 +444,13 @@ export async function spawnProjectWorker(
   );
   const channel = new WorkerChannel(child, request, timeoutMs);
   try {
+    const inventory = channel.next('inventory');
     await send(child, {
       protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
       kind: 'initialize',
       request,
     });
-    const message = await channel.next('inventory');
+    const message = await inventory;
     if (message.kind !== 'inventory') {
       throw new ProjectWorkerSupervisorError(
         'WORKER_MESSAGE_INVALID',

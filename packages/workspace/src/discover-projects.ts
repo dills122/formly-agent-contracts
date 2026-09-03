@@ -5,7 +5,9 @@ import picomatch from 'picomatch';
 import { glob } from 'tinyglobby';
 
 import {
+  resolveWorkspaceProjectExecutionPaths,
   WORKSPACE_CONFIG_SCHEMA_VERSION,
+  type ResolvedWorkspaceProjectExecutionPaths,
   type FormContractProjectConfig,
   type WorkspaceRootConfig,
 } from './config.js';
@@ -16,6 +18,7 @@ import {
 import type { WorkspaceConfigLoaderOptions } from './config-loader.js';
 import {
   DEFAULT_OUTPUT_DIRECTORY,
+  canonicalWorkspaceRelativePath,
   compareCodeUnits,
   errnoCode,
   isWithinWorkspace,
@@ -38,7 +41,9 @@ export type WorkspaceDiscoveryErrorCode =
   | 'CONFIG_PATH_OUTSIDE_WORKSPACE'
   | 'DUPLICATE_PROJECT_ID'
   | 'DUPLICATE_SOURCE_ID'
+  | 'PROJECT_CONFIG_OVERRIDE_NOT_FOUND'
   | 'PROJECT_CONFIG_NOT_FOUND'
+  | 'PROJECT_EXECUTION_PATH_INVALID'
   | 'PROJECT_CONFIG_SYMLINK_UNSUPPORTED'
   | 'PROJECT_SELECTION_INVALID';
 
@@ -366,6 +371,74 @@ function selectProjectConfigPaths(
   return normalizedSelections;
 }
 
+function assertProjectConfigOverridesDiscovered(
+  rootConfig: WorkspaceRootConfig,
+  discoveredPaths: readonly string[],
+): void {
+  const available = new Set(discoveredPaths);
+  const missing = Object.keys(rootConfig.projectConfigOverrides ?? {})
+    .map(
+      (configPath) =>
+        resolveWorkspaceProjectExecutionPaths(rootConfig, configPath)
+          .configPath,
+    )
+    .sort(compareCodeUnits)
+    .find((configPath) => !available.has(configPath));
+  if (missing !== undefined) {
+    throw new WorkspaceDiscoveryError(
+      'PROJECT_CONFIG_OVERRIDE_NOT_FOUND',
+      `Project config override does not match a discovered config: ${missing}`,
+      [missing],
+    );
+  }
+}
+
+/** @internal Canonicalizes parent-owned execution paths before worker IPC. */
+export async function resolveCanonicalWorkspaceProjectExecutionPaths(
+  workspaceRoot: string,
+  rootConfig: WorkspaceRootConfig,
+  configPath: string,
+): Promise<ResolvedWorkspaceProjectExecutionPaths> {
+  const resolved = resolveWorkspaceProjectExecutionPaths(
+    rootConfig,
+    configPath,
+  );
+  try {
+    const [canonicalConfigPath, projectRoot, runtimeResolutionBase, tsconfigPath] =
+      await Promise.all([
+        canonicalWorkspaceRelativePath(workspaceRoot, resolved.configPath),
+        canonicalWorkspaceRelativePath(workspaceRoot, resolved.projectRoot),
+        canonicalWorkspaceRelativePath(
+          workspaceRoot,
+          resolved.runtimeResolutionBase,
+        ),
+        resolved.tsconfigPath === undefined
+          ? undefined
+          : canonicalWorkspaceRelativePath(
+              workspaceRoot,
+              resolved.tsconfigPath,
+            ),
+      ]);
+    return {
+      configPath: canonicalConfigPath,
+      projectRoot,
+      runtimeResolutionBase,
+      ...(tsconfigPath === undefined ? {} : { tsconfigPath }),
+    };
+  } catch (error) {
+    const outsideWorkspace = error instanceof RangeError;
+    throw new WorkspaceDiscoveryError(
+      outsideWorkspace
+        ? 'CONFIG_PATH_OUTSIDE_WORKSPACE'
+        : 'PROJECT_EXECUTION_PATH_INVALID',
+      outsideWorkspace
+        ? `Project execution path resolves outside the workspace: ${configPath}`
+        : `Project execution path is unavailable: ${configPath}`,
+      [configPath],
+    );
+  }
+}
+
 function selectProjectsById(
   projects: readonly DiscoveredWorkspaceProject[],
   selectedIds: readonly string[] | undefined,
@@ -405,16 +478,21 @@ export async function discoverWorkspaceProjects(
   const { workspaceRoot, configPaths: projectConfigPaths } = discoveredConfigs;
   const { configPath: rootConfigPath, config: rootConfig } =
     discoveredConfigs.root;
-  const tsconfigPath =
-    rootConfig.tsconfigPath === undefined
-      ? undefined
-      : resolve(workspaceRoot, rootConfig.tsconfigPath);
 
   const projects: DiscoveredWorkspaceProject[] = [];
   const failures: WorkspaceProjectDiscoveryFailure[] = [];
   for (const configPath of projectConfigPaths) {
     try {
-      const absoluteConfigPath = resolve(workspaceRoot, configPath);
+      const executionPaths =
+        await resolveCanonicalWorkspaceProjectExecutionPaths(
+          workspaceRoot,
+          rootConfig,
+          configPath,
+        );
+      const absoluteConfigPath = resolve(
+        workspaceRoot,
+        executionPaths.configPath,
+      );
       await rejectProjectConfigSymlink(absoluteConfigPath, configPath);
       await assertPathWithinWorkspace(
         workspaceRoot,
@@ -423,7 +501,14 @@ export async function discoverWorkspaceProjects(
       );
       const config = await loadWorkspaceProjectConfig(
         absoluteConfigPath,
-        tsconfigPath === undefined ? {} : { tsconfigPath },
+        executionPaths.tsconfigPath === undefined
+          ? {}
+          : {
+              tsconfigPath: resolve(
+                workspaceRoot,
+                executionPaths.tsconfigPath,
+              ),
+            },
       );
       projects.push({
         configPath,
@@ -519,6 +604,10 @@ export async function discoverWorkspaceProjectConfigs(
       workspaceRoot,
     )),
   ].sort(compareCodeUnits);
+  assertProjectConfigOverridesDiscovered(
+    rootConfig,
+    discoveredProjectConfigPaths,
+  );
   const configPaths = selectProjectConfigPaths(
     discoveredProjectConfigPaths,
     options.selectedProjectConfigPaths,
@@ -527,6 +616,11 @@ export async function discoverWorkspaceProjectConfigs(
     const absoluteConfigPath = resolve(workspaceRoot, configPath);
     await rejectProjectConfigSymlink(absoluteConfigPath, configPath);
     await assertPathWithinWorkspace(workspaceRoot, absoluteConfigPath, configPath);
+    await resolveCanonicalWorkspaceProjectExecutionPaths(
+      workspaceRoot,
+      rootConfig,
+      configPath,
+    );
   }
 
   return {

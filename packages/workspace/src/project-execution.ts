@@ -13,6 +13,7 @@ import {
 import {
   resolveWorkspaceProjectConfig,
   toPluginIdentity,
+  WORKSPACE_CONFIG_SCHEMA_VERSION,
   type FormContractProjectConfig,
   type ResolvedWorkspaceProjectConfig,
   type WorkspaceCliOverrides,
@@ -68,6 +69,11 @@ export interface ProjectExecutionResult {
     readonly name: string;
     readonly version: string;
   }[];
+}
+
+export interface ExpectedProjectExecutionResult {
+  readonly configPath: string;
+  readonly inventory: ProjectExecutionInventory;
 }
 
 export interface InventoriedProjectExecution {
@@ -222,33 +228,228 @@ export async function inventoryProjectExecution(input: {
   };
 }
 
-export function parseProjectExecutionResult(input: unknown): ProjectExecutionResult {
+const PROJECT_RESULT_KEYS = new Set(['forms', 'project', 'runtimePackages']);
+const PROJECT_KEYS = new Set([
+  'configPath',
+  'crossFieldEffectRegistry',
+  'effectCyclePolicy',
+  'failOn',
+  'fieldTypeProfileRegistry',
+  'outputDirectory',
+  'plugins',
+  'projectId',
+  'schemaVersion',
+  'sourceIds',
+  'testIdAttributes',
+]);
+const FORM_RESULT_KEYS = new Set(['contract', 'formId', 'sourceId']);
+const PLUGIN_KEYS = new Set([
+  'configSchemaVersion',
+  'id',
+  'options',
+  'version',
+]);
+const REGISTRY_IDENTITY_KEYS = new Set([
+  'contentHash',
+  'id',
+  'schemaVersion',
+  'version',
+]);
+const RUNTIME_PACKAGE_KEYS = new Set(['name', 'version']);
+const CONTRACT_DIAGNOSTIC_SEVERITIES = new Set([
+  'error',
+  'warning',
+]);
+const SHA256_PATTERN = /^sha256:[a-f0-9]{64}$/u;
+
+function resultRecord(input: unknown, path: string): Record<string, unknown> {
+  if (typeof input !== 'object' || input === null || Array.isArray(input)) {
+    throw new TypeError(`${path} must be an object.`);
+  }
+  return input as Record<string, unknown>;
+}
+
+function rejectResultKeys(
+  record: Readonly<Record<string, unknown>>,
+  allowed: ReadonlySet<string>,
+  path: string,
+): void {
+  const unknown = Object.keys(record).find((key) => !allowed.has(key));
+  if (unknown !== undefined) {
+    throw new TypeError(`${path}.${unknown} is not supported.`);
+  }
+}
+
+function resultString(input: unknown, path: string): string {
+  if (typeof input !== 'string' || input.length === 0) {
+    throw new TypeError(`${path} must be a non-empty string.`);
+  }
+  return input;
+}
+
+function resultStringArray(input: unknown, path: string): string[] {
+  if (!Array.isArray(input)) {
+    throw new TypeError(`${path} must be an array.`);
+  }
+  const values = input.map((value, index) =>
+    resultString(value, `${path}[${index}]`),
+  );
+  if (new Set(values).size !== values.length) {
+    throw new TypeError(`${path} must not contain duplicates.`);
+  }
+  return values;
+}
+
+function parseRegistryIdentity(input: unknown, path: string): void {
+  const record = resultRecord(input, path);
+  rejectResultKeys(record, REGISTRY_IDENTITY_KEYS, path);
+  resultString(record.schemaVersion, `${path}.schemaVersion`);
+  resultString(record.id, `${path}.id`);
+  if (!Number.isSafeInteger(record.version) || Number(record.version) < 1) {
+    throw new TypeError(`${path}.version must be a positive safe integer.`);
+  }
+  if (
+    typeof record.contentHash !== 'string' ||
+    !SHA256_PATTERN.test(record.contentHash)
+  ) {
+    throw new TypeError(`${path}.contentHash must be a SHA-256 digest.`);
+  }
+}
+
+function sameStrings(
+  actual: readonly string[],
+  expected: readonly string[],
+): boolean {
+  return (
+    canonicalStringify([...actual].sort(compareCodeUnits)) ===
+    canonicalStringify([...expected].sort(compareCodeUnits))
+  );
+}
+
+export function parseProjectExecutionResult(
+  input: unknown,
+  expected?: ExpectedProjectExecutionResult,
+): ProjectExecutionResult {
   const canonical = canonicalStringify(input);
   const value = JSON.parse(canonical) as unknown;
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) {
-    throw new TypeError('projectResult must be an object.');
-  }
-  const record = value as Record<string, unknown>;
+  const record = resultRecord(value, 'projectResult');
+  rejectResultKeys(record, PROJECT_RESULT_KEYS, 'projectResult');
   if (!Array.isArray(record.forms)) {
     throw new TypeError('projectResult.forms must be an array.');
   }
   for (const [index, form] of record.forms.entries()) {
-    if (typeof form !== 'object' || form === null || Array.isArray(form)) {
-      throw new TypeError(`projectResult.forms[${index}] must be an object.`);
-    }
-    const formRecord = form as Record<string, unknown>;
+    const formPath = `projectResult.forms[${index}]`;
+    const formRecord = resultRecord(form, formPath);
+    rejectResultKeys(formRecord, FORM_RESULT_KEYS, formPath);
     const contract = parseFormContract(formRecord.contract);
     formRecord.contract = contract;
-    if (
-      typeof formRecord.sourceId !== 'string' ||
-      typeof formRecord.formId !== 'string' ||
-      contract.formId !== formRecord.formId
-    ) {
-      throw new TypeError(`projectResult.forms[${index}] identity is invalid.`);
+    resultString(formRecord.sourceId, `${formPath}.sourceId`);
+    const formId = resultString(formRecord.formId, `${formPath}.formId`);
+    if (contract.formId !== formId) {
+      throw new TypeError(`${formPath} identity is invalid.`);
     }
   }
-  if (typeof record.project !== 'object' || record.project === null) {
-    throw new TypeError('projectResult.project must be an object.');
+
+  const project = resultRecord(record.project, 'projectResult.project');
+  rejectResultKeys(project, PROJECT_KEYS, 'projectResult.project');
+  if (project.schemaVersion !== WORKSPACE_CONFIG_SCHEMA_VERSION) {
+    throw new TypeError('projectResult.project.schemaVersion is unsupported.');
+  }
+  const configPath = resultString(
+    project.configPath,
+    'projectResult.project.configPath',
+  );
+  const projectId = resultString(
+    project.projectId,
+    'projectResult.project.projectId',
+  );
+  const sourceIds = resultStringArray(
+    project.sourceIds,
+    'projectResult.project.sourceIds',
+  );
+  resultString(project.outputDirectory, 'projectResult.project.outputDirectory');
+  resultStringArray(
+    project.testIdAttributes,
+    'projectResult.project.testIdAttributes',
+  );
+  const failOn = resultStringArray(
+    project.failOn,
+    'projectResult.project.failOn',
+  );
+  if (failOn.some((severity) => !CONTRACT_DIAGNOSTIC_SEVERITIES.has(severity))) {
+    throw new TypeError('projectResult.project.failOn is invalid.');
+  }
+  if (
+    typeof project.effectCyclePolicy !== 'string' ||
+    !CONTRACT_DIAGNOSTIC_SEVERITIES.has(project.effectCyclePolicy)
+  ) {
+    throw new TypeError('projectResult.project.effectCyclePolicy is invalid.');
+  }
+  if (!Array.isArray(project.plugins)) {
+    throw new TypeError('projectResult.project.plugins must be an array.');
+  }
+  for (const [index, plugin] of project.plugins.entries()) {
+    const pluginPath = `projectResult.project.plugins[${index}]`;
+    const pluginRecord = resultRecord(plugin, pluginPath);
+    rejectResultKeys(pluginRecord, PLUGIN_KEYS, pluginPath);
+    resultString(pluginRecord.id, `${pluginPath}.id`);
+    resultString(pluginRecord.version, `${pluginPath}.version`);
+    resultString(
+      pluginRecord.configSchemaVersion,
+      `${pluginPath}.configSchemaVersion`,
+    );
+  }
+  if (project.fieldTypeProfileRegistry !== undefined) {
+    parseRegistryIdentity(
+      project.fieldTypeProfileRegistry,
+      'projectResult.project.fieldTypeProfileRegistry',
+    );
+  }
+  if (project.crossFieldEffectRegistry !== undefined) {
+    parseRegistryIdentity(
+      project.crossFieldEffectRegistry,
+      'projectResult.project.crossFieldEffectRegistry',
+    );
+  }
+
+  if (record.runtimePackages !== undefined) {
+    if (!Array.isArray(record.runtimePackages)) {
+      throw new TypeError('projectResult.runtimePackages must be an array.');
+    }
+    for (const [index, runtimePackage] of record.runtimePackages.entries()) {
+      const packagePath = `projectResult.runtimePackages[${index}]`;
+      const packageRecord = resultRecord(runtimePackage, packagePath);
+      rejectResultKeys(packageRecord, RUNTIME_PACKAGE_KEYS, packagePath);
+      resultString(packageRecord.name, `${packagePath}.name`);
+      resultString(packageRecord.version, `${packagePath}.version`);
+    }
+  }
+
+  if (expected !== undefined) {
+    if (
+      configPath !== expected.configPath ||
+      projectId !== expected.inventory.projectId ||
+      !sameStrings(sourceIds, expected.inventory.sourceIds)
+    ) {
+      throw new TypeError('projectResult.project does not match inventory.');
+    }
+    const formIds = record.forms.map(
+      (form) => (form as Record<string, unknown>).formId as string,
+    );
+    if (!sameStrings(formIds, expected.inventory.formIds)) {
+      throw new TypeError('projectResult.forms do not match inventory.');
+    }
+    const sourceIdSet = new Set(expected.inventory.sourceIds);
+    if (
+      record.forms.some(
+        (form) =>
+          !sourceIdSet.has(
+            (form as Record<string, unknown>).sourceId as string,
+          ),
+      )
+    ) {
+      throw new TypeError('projectResult form source does not match inventory.');
+    }
   }
   return value as ProjectExecutionResult;
 }

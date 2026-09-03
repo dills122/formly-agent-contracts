@@ -1,3 +1,4 @@
+import { realpath } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 import { parseRootConfig, type WorkspaceCliOverrides } from './config.js';
@@ -9,6 +10,7 @@ import {
 import {
   createWorkspaceRuntimeBootstrapContext,
   loadWorkspaceRuntimeHost,
+  WorkspaceRuntimeHostLoadError,
 } from './runtime-host/bootstrap.js';
 import { createRuntimeHostFailureExplanation } from './runtime-host/failure-explanation.js';
 import {
@@ -17,6 +19,7 @@ import {
   type ProjectExecutionRequest,
   type RuntimeHostFailureCode,
 } from './runtime-host/protocol.js';
+import { canonicalWorkspaceRelativePath } from './workspace-paths.js';
 
 let request: ProjectExecutionRequest | undefined;
 let project: InventoriedProjectExecution | undefined;
@@ -50,6 +53,44 @@ function failure(code: RuntimeHostFailureCode, cause?: unknown): never {
 
 async function initialize(nextRequest: ProjectExecutionRequest): Promise<void> {
   request = nextRequest;
+  try {
+    const workspaceRoot = await realpath(resolve(nextRequest.workspaceRoot));
+    const [
+      rootConfigPath,
+      configPath,
+      projectRoot,
+      runtimeResolutionBase,
+      tsconfigPath,
+    ] = await Promise.all([
+      canonicalWorkspaceRelativePath(
+        workspaceRoot,
+        nextRequest.rootConfigPath,
+      ),
+      canonicalWorkspaceRelativePath(workspaceRoot, nextRequest.configPath),
+      canonicalWorkspaceRelativePath(workspaceRoot, nextRequest.projectRoot),
+      canonicalWorkspaceRelativePath(
+        workspaceRoot,
+        nextRequest.runtimeResolutionBase,
+      ),
+      nextRequest.tsconfigPath === undefined
+        ? undefined
+        : canonicalWorkspaceRelativePath(
+            workspaceRoot,
+            nextRequest.tsconfigPath,
+          ),
+    ]);
+    request = {
+      ...nextRequest,
+      workspaceRoot,
+      rootConfigPath,
+      configPath,
+      projectRoot,
+      runtimeResolutionBase,
+      ...(tsconfigPath === undefined ? {} : { tsconfigPath }),
+    };
+  } catch (error) {
+    failure('PROTOCOL_INVALID', error);
+  }
   let nativeModules: readonly string[] | undefined;
   try {
     if (request.runtimeHost !== undefined) {
@@ -75,7 +116,12 @@ async function initialize(nextRequest: ProjectExecutionRequest): Promise<void> {
       runtimePackages = bootstrap?.runtimePackages;
     }
   } catch (error) {
-    failure('HOST_LOAD_FAILED', error);
+    failure(
+      error instanceof WorkspaceRuntimeHostLoadError
+        ? error.code
+        : 'HOST_LOAD_FAILED',
+      error,
+    );
   }
 
   phase = 'inventory';

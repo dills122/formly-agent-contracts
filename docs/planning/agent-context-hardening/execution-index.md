@@ -93,10 +93,17 @@ the portable provenance foundation consumed by `HOST-1`.
 
 | ID       | Workspace-plan mapping | Scope                                                                         | Primary owner        | Depends on         | Status  | Exit gate                                                                                                            |
 | -------- | ---------------------- | ----------------------------------------------------------------------------- | -------------------- | ------------------ | ------- | -------------------------------------------------------------------------------------------------------------------- |
-| `HOST-1` | Task 7A.2              | Framework-neutral runtime-host protocol and public/private package boundaries | `packages/workspace` | `CTX-0A`           | ready   | Strict IPC/host DTOs, Angular-free public composition, packed private worker, and non-hoisted consumer checks pass   |
-| `HOST-2` | Task 7B.1              | Discovery and inventory before project evaluation                             | `packages/workspace` | `HOST-1`           | pending | Import-free discovery, parent-selected host requests, duplicate rejection, and list-without-factory tests pass       |
-| `HOST-3` | Task 7B.2              | Trusted-local worker lifecycle                                                | `packages/workspace` | `HOST-2`           | pending | Scrubbed spawn, validated IPC, bounded teardown, failure controls, and no-publication authority tests pass           |
-| `HOST-4` | Task 7B.3              | Failure-safe aggregation and publication                                      | `packages/workspace` | `HOST-3`, `CTX-0A` | pending | Parent revalidation, deterministic aggregation, atomic index-last publication, fault injection, and rerun tests pass |
+| `HOST-1` | Task 7A.2              | Framework-neutral runtime-host protocol and public/private package boundaries | `packages/workspace` | `CTX-0A`           | complete | Strict IPC/host DTOs, Angular-free public composition, packed private worker, and non-hoisted consumer checks pass  |
+| `HOST-2` | Task 7B.1              | Discovery and inventory before project evaluation                             | `packages/workspace` | `HOST-1`           | complete | Import-free discovery, canonical exact override requests, duplicate rejection, and list-without-factory tests pass  |
+| `HOST-3` | Task 7B.2              | Trusted-local worker lifecycle                                                | `packages/workspace` | `HOST-2`           | complete | Scrubbed spawn, validated IPC, bounded teardown, failure controls, and no-publication authority tests pass          |
+| `HOST-4` | Task 7B.3              | Failure-safe aggregation and publication                                      | `packages/workspace` | `HOST-3`, `CTX-0A` | complete | Parent revalidation, deterministic aggregation, atomic index-last publication, fault injection, and rerun tests pass |
+
+September 2 continuation completes `HOST-1` through `HOST-4`. Trusted worker
+results are strictly revalidated against inventory; fail-closed aggregation
+cancels and awaits peers; generation rechecks lock ownership, lockfile bytes,
+and runtime tool versions at index commit. Reversed completion, dependency
+drift, artifact/index faults, prior-index authority, idempotent recovery, full
+tests/builds, Angular host smoke, and linked/packed consumers pass.
 
 ## Angular custom-field and scenario producer
 
@@ -104,14 +111,21 @@ the portable provenance foundation consumed by `HOST-1`.
 | ---------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------- | -------------------------------------------------------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `ANG-0`    | Schema-owned Angular host compatibility result                                                                                                             | `packages/schema`                                             | `CTX-0A`                                                 | ready   | Strict pass/fail result, environment identity, canonical/refinement tests                                                                                                             |
 | `ANG-1`    | Retained Angular CLI/Nx application-target compatibility gate                                                                                              | fixtures/research                                             | `ANG-0`                                                  | pending | Partial library, resources, standalone/NgModule, scopes, popup/model/teardown cases pass                                                                                              |
-| `ANG-2`    | Task 7A.3 dependency-light Angular package shell                                                                                                           | future `@formly-contract/angular`                             | `ANG-1` go, `HOST-1`                                     | pending | Node-safe `./jit` and `./authoring` package entry points build; generic discovery stays Angular-free                                                                                  |
+| `ANG-2`    | Task 7A.3 dependency-light Angular package shell                                                                                                           | `packages/angular`                                            | `ANG-1` go, `HOST-1`                                     | pending | Node-safe `./jit` and `./authoring` package entry points build; generic discovery stays Angular-free                                                                                  |
 | `ANG-2P`   | Task 7D Angular source-group providers plus Node-safe named-environment descriptors and exact project selection                                            | future `@formly-contract/angular`; workspace config           | `ANG-2`, `CTX-0A`, `AUTH-0` accepted                     | pending | Provider catalogs and confined environment/catalog pointers validate without importing Angular from generic discovery                                                                 |
 | `ANG-2R`   | Task 8B.1 schema-owned environment, compact adapter/preset, generated-registry manifest, report, scaffold, and conformance contracts                       | `packages/schema`                                             | `CTX-0A`, `ANG-1` go, `AUTH-0` accepted                  | pending | Strict schemas, dispositions, exact references, evidence, coverage, canonicalization, conformance states, and mutation tests pass                                                     |
-| `ANG-3`    | Task 7C guarded trusted config/JIT host capability only                                                                                                    | Angular/workspace worker                                      | `ANG-2`, `HOST-4`                                        | pending | Short-lived policy/time/output controls and deterministic teardown; no scenario semantics or publication                                                                              |
+| `ANG-3`    | Task 7C guarded trusted config/JIT host capability only                                                                                                    | `packages/angular` plus workspace worker                      | `ANG-2`, `HOST-4`                                        | pending | Short-lived policy/time/output controls and deterministic teardown; no scenario semantics or publication                                                                              |
 | `ANG-4`    | Task 8B.2 isolated AOT authoring browser host and exact named-environment/Formly scope inventory                                                           | future `@formly-contract/angular`                             | `ANG-2`, `ANG-2P`, `ANG-2R`                              | pending | Fresh contexts, public APIs, exact registration/scope coverage, explicit refusals                                                                                                     |
 | `ANG-5`    | Deterministic adapter aggregation and lowering, controlled-example conformance, generated canonical registry publication, and optional migration scaffolds | future `@formly-contract/angular` plus pure compiler lowering | `ANG-4`; `LIN-2` only for optional source/template joins | pending | Exact environment bundle and registry hashes, required actionability conformance, fail-closed gaps/conflicts, stable optional scaffolds, and no observation-based authority promotion |
 | `ANG-GATE` | Workplace custom-field value pilot                                                                                                                         | maintainer/research                                           | `ANG-5`                                                  | pending | Coverage, configuration effort, ambiguity, review time, and saved work measured                                                                                                       |
 | `ANG-6`    | Optional expanded registry-bound drift and browser-parity conformance beyond the required adapter publication gate                                         | future `@formly-contract/angular`                             | `ANG-GATE` go, `BHV-4`                                   | pending | Reviewed parts/roles/codecs/scenarios match rendered behavior without authority promotion                                                                                             |
+
+Angular statuses do not advance in this reconciliation. A bounded
+`@formly-contract/angular` package and guarded JIT worker now exist, but the
+schema-owned `ANG-0` compatibility result and full `ANG-1` application-target
+matrix do not. `ANG-2` also lacks its retained peer/install matrix, while
+`ANG-3` lacks Task 7C's complete resolver, alias, private-copy, and compatibility
+fixture matrix. Shipped pilot evidence must not bypass those prerequisites.
 
 ## Behavior and scenario semantics
 
@@ -152,9 +166,9 @@ construction. Its CTX-2A/B/C MVP checkpoint is complete; executable wrapper
 preconditions, CTX-2V/2D2, and browser/runtime parity are explicit fast
 follows, with no pivot currently required. Hostile-input hardening for the
 standalone plan-hash helper is complete and preserves valid canonical hashes
-while keeping revalidation as the semantic authority boundary. `HOST-1`,
-`ANG-0`, and `FAC-1` are also
-dependency-ready, but they remain separate producer task packets and must not
+while keeping revalidation as the semantic authority boundary. `HOST-1` through
+`HOST-4` are complete; `ANG-0` and `FAC-1` are dependency-ready, but they remain
+separate producer task packets and must not
 freeze named-environment or adapter-authority APIs beyond the accepted
 `AUTH-PILOT` surface before `AUTH-0` is accepted. `LIN-PILOT` is complete;
 `LIN-0` remains blocked on its representative workplace run. `BHV-0` and the

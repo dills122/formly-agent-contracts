@@ -125,10 +125,12 @@ does not depend on Playwright or invoke a browser despite its package name.
 
 If a sibling checkout is not portable to the work machine, run
 `pnpm pilot:pack` in Formly Contract and copy `artifacts/pilot/` for the
-compiler/workspace portion of the pilot. Its `formly-contract-pilot.json`
-records the schema, compiler, and workspace tarballs, SHA-256 digests, and
-exact pnpm install arguments. The separate Playwright experiment is not part of
-that compiler bundle.
+portable pilot. Its `formly-contract-pilot.json` records the schema, compiler,
+workspace, and Angular tarballs, SHA-256 digests, and exact pnpm install
+arguments. Keep the checksummed `formly-contract-pilot.pnpmfile.cjs` beside the
+tarballs; it redirects only dependencies among the four bundled packages so
+pnpm does not fall back to unpublished registry entries. The separate
+Playwright experiment is not part of that compiler bundle.
 
 Install with the workplace repository's normal pnpm workflow, then verify the
 linked binary:
@@ -136,9 +138,10 @@ linked binary:
 ```sh
 pnpm install
 pnpm exec formly-contracts --help
+pnpm exec formly-contracts-angular --help
 ```
 
-The binary accepts `list`, `generate`, `check`, and the read-only
+Both binaries accept `list`, `generate`, `check`, and the read-only
 `author-factory-inputs` command. A successful help check starts with
 `Usage: formly-contracts <command> [options]`.
 
@@ -446,15 +449,16 @@ The pilot workspace CLI currently generates declared artifacts only;
 Angular scenarios. Record required scenario artifacts as a follow-up rather
 than adding private runtime values to a declared source.
 
-## 5. Contract one custom radio type once
+## 5. Contract custom field types once
 
 Unknown Formly types remain visible, but Formly Contract will not guess their
-DOM role or operation. For the MVP radio path, define one compact reviewed type
-beside the custom component using the browser-safe authoring subpath:
+DOM role or operation. Define compact reviewed types beside custom components
+using the browser-safe authoring subpath:
 
 ```ts
 // libs/forms-kit/src/lib/field-type-profiles.ts (data only)
 import {
+  aliasContractedFormlyType,
   buildFieldTypeProfileRegistry,
   defineContractedFormlyType,
   radioChoice,
@@ -466,10 +470,15 @@ export const COOL_RADIO_TYPE = defineContractedFormlyType({
   behavior: radioChoice({ disabledPath: "disabled" }),
 });
 
+export const LEGACY_COOL_RADIO_TYPE = aliasContractedFormlyType(
+  COOL_RADIO_TYPE,
+  "legacy-cool-radio-btn-grp",
+);
+
 export const WORKPLACE_FIELD_TYPE_PROFILES = buildFieldTypeProfileRegistry({
   id: "claims.field-types",
   version: 1,
-  types: [COOL_RADIO_TYPE],
+  types: [COOL_RADIO_TYPE, LEGACY_COOL_RADIO_TYPE],
 });
 ```
 
@@ -480,7 +489,10 @@ component without exposing it through the Node-oriented contracts entry point:
 import { toFormlyTypeRegistration } from "@formly-contract/schema/field-type-authoring";
 
 FormlyModule.forChild({
-  types: [toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponent)],
+  types: [
+    toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponent),
+    toFormlyTypeRegistration(LEGACY_COOL_RADIO_TYPE, CoolRadioComponent),
+  ],
 });
 ```
 
@@ -498,10 +510,13 @@ The generated profile declares `radiogroup`/`radio` parts, `check`, a generic
 choice driver, and possible values projected from reviewed property paths.
 Static options are exact; function-, expression-, or async-backed options stay
 dynamic unless a trusted scenario resolves them. The helper never inspects a
-template or infers behavior from the type name. `radioChoice()` is the only
-compact MVP preset; other widgets still need the verbose legacy registry or
-remain non-actionable. Repeated project attachment is transitional until named
-global Formly environments exist.
+template or infers behavior from the type name. `radioChoice()` is the compact
+radio preset; typed inputs, other choice presentations, autocomplete, row
+selection, repeaters, and steppers have their own reviewed presets. Exact
+aliases lower to one profile only when their semantics match; conflicts fail
+closed. Widgets outside the closed vocabulary still need the verbose legacy
+registry or remain non-actionable. Repeated project attachment is transitional
+until named global Formly environments exist.
 
 ## 6. Generate and inspect artifacts
 
@@ -689,7 +704,7 @@ use the more specific `CONFIG_*` classifications named below.
 | Symptom or code                                                        | What to check                                                                                                                                                                                                                                                                                                                                          |
 | ---------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `formly-contracts: command not found`                                  | Build `@formly-contract/workspace`, confirm `packages/workspace/dist/cli-main.js` exists, then reinstall the workplace links.                                                                                                                                                                                                                          |
-| An existing checkout tries to load `@formly-agent-contracts/workspace` | A pre-rename pnpm bin shim is stale. From the Formly Contract root, run `pnpm install --force --frozen-lockfile` once, then rebuild the three packages. Fresh clones do not need this recovery step.                                                                                                                                                   |
+| An existing checkout tries to load `@formly-agent-contracts/workspace` | A pre-rename pnpm bin shim is stale. From the Formly Contract root, run `pnpm install --force --frozen-lockfile` once, then run `pnpm build:demo`. Fresh clones do not need this recovery step.                                                                                                                                                       |
 | `WORKSPACE_DISCOVERY_FAILED`                                           | Confirm `--workspace-root`, `--config`, filename casing, project globs, exclusions, duplicate project/source IDs, and project-config symlinks. The config path is relative to the supplied workspace root.                                                                                                                                             |
 | Underlying `CONFIG_NOT_FOUND`                                          | Confirm the root/project config exists and its casing matches.                                                                                                                                                                                                                                                                                         |
 | Underlying `CONFIG_LOAD_FAILED`                                        | Check imported aliases, Node-safe entry points, and `tsconfigPath`. The CLI prints the same safe guidance without exposing private import details. If an Angular browser barrel triggers JIT compilation, use a secondary contracts entry point or the tool-only shim pattern above.                                                                   |

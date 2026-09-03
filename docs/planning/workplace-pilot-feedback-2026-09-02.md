@@ -1,7 +1,9 @@
 # Workplace Pilot Feedback Record — 2026-09-02
 
 - Status: investigation complete; worker diagnostics follow-up implemented on
-  `codex/document-workplace-feedback`
+  `codex/document-workplace-feedback`; profile alias, four-package pilot
+  bundle, and scheduler reconciliation follow-ups implemented on
+  `codex/project-fixup-continuation`
 - Repository baseline: `7242045145a77590b87ed8243a194d63a721ec3b`
 - Baseline relationship: local `main` and `origin/main` were identical before
   this record was created
@@ -30,10 +32,10 @@ be completed outside this repository, and some became stale after
 | Angular browser barrels cannot be loaded (historical #1) | Narrowed, not universally solved. PR #120 supplies a guarded Angular worker and preloads the selected project's compiler. The reported `Cannot access ... before initialization` failure is now an application module-graph temporal-dead-zone failure, not the earlier missing-JIT-compiler failure. | Give contract discovery its own Node-safe import graph. Repair genuine Angular self-reference defects, but do not require the contract tool to evaluate the complete browser barrel. |
 | Project failures hide their cause | Confirmed and addressed on this branch. The worker, supervisor, workspace result, and CLI now preserve stable code/phase data. | Use the redacted default for normal runs and opt into bounded local `--explain` output during diagnosis; never put explanation data in artifacts. |
 | Phone, date, number, stepper, and other custom types remain unmapped (historical #3/#4) | Compact authoring primitives now exist in PR #120: typed input, choice, autocomplete, row selection, repeater, and stepper. The consuming repository still has to adopt them for its actual type names. | Migrate the application's type catalog to the compact presets and verify every registration with generated-contract and Angular conformance tests. |
-| Many Formly aliases cannot share one authored profile (historical #5) | Confirmed authoring limitation. The canonical registry can register several Formly names to one profile, but `buildFieldTypeProfileRegistry` currently rejects a repeated profile identity. | Permit repeated identity only when the lowered profile is byte-identical, deduplicate the profile, emit one registration per Formly name, and reject semantic conflicts. |
+| Many Formly aliases cannot share one authored profile (historical #5) | Addressed on this branch. `aliasContractedFormlyType` snapshots reviewed semantics under another exact name; registry lowering deduplicates identical profiles and rejects identity conflicts. | Retain exact positive, negative, and input-order tests; migrate consuming aliases without weakening profile review. |
 | Dynamic option domains are not enumerable (historical #6) | Confirmed product-value gap for declared-only workspace output. The low-level scenario compiler can resolve synchronous options, but workspace generation does not execute `definition.scenarios`. | Implement the planned portable named-case and trusted resolved-scenario producer instead of subscribing generically to arbitrary application streams. |
 | Function-valued expressions are not actionable (historical #7) | Partly overstated. Supported declared function expressions are retained as `dynamicRules`; `UNSUPPORTED_RULE` is emitted when a target or construct is outside the supported grammar. The remaining gap is causal, portable rule meaning. | Inspect exact warning node IDs/source paths, use named cases for outcomes, and add a closed declared rule AST before making causal execution claims. |
-| Consumption depends on a sibling checkout (historical #8) | Partly stale. `pnpm pilot:pack` already creates a copied tarball bundle and manifest. The current bundle contains schema, compiler, and workspace, but omits the Angular package required for `formly-contracts-angular`. | Add Angular to the pilot bundle and exercise install/import/bin smoke tests; use a registry release as the durable distribution path. |
+| Consumption depends on a sibling checkout (historical #8) | Addressed on this branch for the supported pilot packages. `pnpm pilot:pack` includes schema, compiler, workspace, and Angular with a checked install manifest. | Retain install/import/bin smoke tests; use a registry release as the durable distribution path. |
 
 ## Detailed findings
 
@@ -168,12 +170,12 @@ profile and register the same profile with Angular. Clearing an
 `UNMAPPED_FIELD_TYPE` warning is valid only after the profile's role, parts,
 value codec, and interaction behavior match the rendered component.
 
-### Alias authoring is the remaining profile ergonomics gap
+### Alias authoring reuses only identical reviewed semantics
 
 [`buildFieldTypeProfileRegistry`](../../packages/schema/src/field-type-authoring.ts)
-currently rejects duplicate profile identities while validating authored
-types. That makes an application with many aliases repeat the same large
-profile. This is an authoring limitation, not a canonical schema limitation.
+now accepts duplicate profile identities only when independently lowered
+profiles are identical. `aliasContractedFormlyType` supplies the compact path
+for applications whose exact Formly names share reviewed behavior.
 
 The safe rule is content-addressed reuse:
 
@@ -220,29 +222,26 @@ cannot prove why it occurred. Portable causal behavior requires the closed
 condition/effect grammar planned by ADR 0010; model-generated callback
 interpretations remain review proposals, not executable authority.
 
-### The pilot bundle is real but incomplete for Angular use
+### The pilot bundle now covers Angular use
 
-[`pack-pilot.mjs`](../../scripts/pack-pilot.mjs) currently requires exactly
-`@formly-contract/schema`, `@formly-contract/compiler`, and
-`@formly-contract/workspace`. `pnpm release:check` also validates
-`@formly-contract/angular`, but `pnpm pilot:pack` does not copy that tarball or
-include it in the install manifest.
+[`pack-pilot.mjs`](../../scripts/pack-pilot.mjs) requires
+`@formly-contract/schema`, `@formly-contract/compiler`,
+`@formly-contract/workspace`, and `@formly-contract/angular`. It validates the
+Angular tarball like other public packages, then uses a temporary consumer to
+install the manifest arguments, import `@formly-contract/angular/jit`, and run
+`formly-contracts-angular --help`. Publishing to a registry remains the normal
+long-term distribution mechanism.
 
-The bounded fix is to make the pilot manifest a four-package bundle, validate
-the Angular tarball like the other public packages, and add a temporary
-consumer smoke that installs the manifest arguments, imports
-`@formly-contract/angular/jit`, and runs `formly-contracts-angular --help`.
-This produces a portable pilot bundle; publishing to a registry remains the
-normal long-term distribution mechanism.
+### Scheduler state is reconciled against exit gates
 
-### Scheduler state needs a reconciliation pass
-
-The canonical hardening index still marks several runtime-host and Angular
-host items pending even though PRs #119 and #120 implemented substantial parts
-of those descriptions. Status must be reconciled against every exit-gate clause
-rather than marked complete from PR titles. This documentation update records
-the mismatch but intentionally does not promote scheduler state without that
-gate audit.
+The continuation completes `HOST-3` and `HOST-4`. Trusted-local worker
+guardrails, lifecycle IPC, result revalidation, peer cancellation, final
+lock/dependency/package checks, deterministic aggregation, publication faults,
+recovery, and packed-consumer coverage pass. Angular status does not advance: `ANG-0` and
+`ANG-1` compatibility artifacts are absent, `ANG-2` lacks the retained peer
+install matrix, and `ANG-3` lacks Task 7C's complete resolver/private-copy
+matrix. Existing worker and JIT paths are retained partial evidence, not
+grounds to bypass scheduler dependencies.
 
 ## Recommended delivery order
 
@@ -251,9 +250,12 @@ gate audit.
 2. Establish the consumer-owned Node-safe contracts entry point described
    below.
 3. Add profile alias reuse and migrate the application's custom types to the
-   compact presets.
+   compact presets. **Alias reuse completed on this branch; consumer migration
+   remains.**
 4. Include Angular in the pilot tarball bundle and its install smoke.
+   **Completed on this branch.**
 5. Reconcile `HOST-*` and `ANG-*` scheduler statuses against their exit gates.
+   **Completed on this branch.**
 6. Approve ADR 0010's authority model, then implement the portable named-case
    and trusted resolved-scenario producer for dynamic domains.
 7. Add closed causal rule authoring only after the scenario/evidence boundary
@@ -574,6 +576,11 @@ investigation:
 - `pnpm release:check`, covering the four public packages;
 - `pnpm pilot:pack`, confirming the current manifest contains only schema,
   compiler, and workspace.
+
+That last bullet records the audited baseline. The follow-up on
+`codex/project-fixup-continuation` now verifies a checksummed four-package
+bundle through a temporary install, Angular JIT import, and Angular CLI help
+smoke.
 
 The report's exact application artifacts were not available in this repository.
 Before changing rule support or profiles, retain the relevant sanitized

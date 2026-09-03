@@ -38,6 +38,7 @@ Compact custom-field authoring must use its dedicated browser-safe entry point:
 
 ```ts
 import {
+  aliasContractedFormlyType,
   defineContractedFormlyType,
   radioChoice,
 } from '@formly-contract/schema/field-type-authoring';
@@ -47,8 +48,12 @@ The Node-oriented package root is not a browser entry point and does not
 re-export these helpers.
 
 The browser-safe subpath exports the complete compact authoring surface:
-`radioChoice`, `defineContractedFormlyType`, `toFormlyTypeRegistration`, and
-`buildFieldTypeProfileRegistry`, plus their input/output types. See the
+behavior presets for choices, typed inputs, autocomplete, row selection,
+repeaters, and steppers; `defineContractedFormlyType`,
+`aliasContractedFormlyType`, `defineContractedFormlyWrapper`,
+`toFormlyTypeRegistration`, and `buildFieldTypeProfileRegistry`; plus their
+input/output types. Exact aliases may share one profile identity only when their
+lowered profiles are identical. See the
 [public API reference](../../apps/docs/src/content/docs/reference/api.md#browser-safe-field-type-authoring)
 for one end-to-end registration example.
 

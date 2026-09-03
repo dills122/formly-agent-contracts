@@ -45,6 +45,7 @@ const SCHEMA_AUTHORING_EXPORT = {
   types: './dist/field-type-authoring.d.ts',
   default: './dist/field-type-authoring.js',
 };
+const WORKSPACE_PRIVATE_WORKER_FILE = 'dist/project-worker.js';
 
 export function verifyPackedPackage({
   packedFiles,
@@ -93,6 +94,19 @@ export function verifyPackedPackage({
     if (!filePaths.includes(requiredFile)) {
       throw new Error(
         `${releasePackage.directory} tarball is missing ${requiredFile}`,
+      );
+    }
+  }
+
+  if (releasePackage.directory === 'packages/workspace') {
+    if (!filePaths.includes(WORKSPACE_PRIVATE_WORKER_FILE)) {
+      throw new Error(
+        `${releasePackage.directory} tarball is missing ${WORKSPACE_PRIVATE_WORKER_FILE}`,
+      );
+    }
+    if (packedManifest.exports?.['./project-worker'] !== undefined) {
+      throw new Error(
+        `${releasePackage.directory} tarball must not export its private worker`,
       );
     }
   }
@@ -146,6 +160,7 @@ const REQUIRED_EXPORTS_BY_PACKAGE_NAME = {
 
 const FORBIDDEN_ROOT_EXPORTS_BY_PACKAGE_NAME = {
   '@formly-contract/schema': [
+    'aliasContractedFormlyType',
     'buildFieldTypeProfileRegistry',
     'defineContractedFormlyWrapper',
     'defineContractedFormlyType',
@@ -160,6 +175,7 @@ const REQUIRED_SUBPATH_EXPORTS_BY_PACKAGE_NAME = {
     {
       specifier: '@formly-contract/schema/field-type-authoring',
       requiredExports: [
+        'aliasContractedFormlyType',
         'buildFieldTypeProfileRegistry',
         'defineContractedFormlyWrapper',
         'defineContractedFormlyType',

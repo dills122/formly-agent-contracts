@@ -27,6 +27,7 @@ export {
 export {
   createWorkspaceRuntimeBootstrapContext,
   loadWorkspaceRuntimeHost,
+  WorkspaceRuntimeHostLoadError,
 } from './bootstrap.js';
 export type {
   RuntimePackageResolution,
@@ -34,8 +35,10 @@ export type {
   WorkspaceRuntimeBootstrapResult,
   WorkspaceRuntimeHost,
   WorkspaceRuntimeHostFactory,
+  WorkspaceRuntimeHostLoadErrorCode,
 } from './bootstrap.js';
 export type {
+  ProjectWorkerExecutionProfile,
   ProjectWorkerSession,
   ProjectWorkerSupervisorErrorCode,
   SpawnProjectWorkerOptions,

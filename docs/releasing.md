@@ -127,10 +127,16 @@ immutable even when unpublished.
 - `pnpm release:pack` builds the workspace packages and retains verified
   tarballs in the ignored `artifacts/releases/` directory for manual
   inspection.
-- `pnpm pilot:pack` builds and retains schema, compiler, and the private
-  workspace CLI under `artifacts/pilot/`, with SHA-256 metadata and a pnpm
-  install argument list. It is a portable pilot handoff, not a public release
-  or an offline third-party dependency bundle.
+- `pnpm pilot:check` packs schema, compiler, workspace, and Angular into a
+  temporary bundle, seeds its smoke consumer with the pinned Angular `20.3.29`
+  and Formly `6.1.8` compatibility stack, installs the manifest's exact pnpm
+  arguments, imports `@formly-contract/angular/jit`, and runs
+  `formly-contracts-angular --help`.
+- `pnpm pilot:pack` performs the same checks and retains the four tarballs under
+  `artifacts/pilot/`, with SHA-256 metadata, a checked pnpm hook that redirects
+  only bundled internal dependencies to local tarballs, and a pnpm install
+  argument list. It is a portable pilot handoff, not a public release or an
+  offline third-party dependency bundle.
 
 ## Failure and retry behavior
 

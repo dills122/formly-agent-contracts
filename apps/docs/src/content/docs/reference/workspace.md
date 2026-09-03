@@ -16,6 +16,13 @@ export default defineConfig({
   projectConfigs: ["apps/**/formly-contracts.project.ts", "libs/**/formly-contracts.project.ts"],
   excludeProjectConfigs: ["apps/legacy/**"],
   tsconfigPath: "tsconfig.base.json",
+  projectConfigOverrides: {
+    "configs/claims.project.ts": {
+      projectRoot: "apps/claims",
+      runtimeResolutionBase: "apps/claims",
+      tsconfigPath: "apps/claims/tsconfig.app.json",
+    },
+  },
   sourceUsage: {
     convention: "direct-root-call-v1",
     tsconfigPath: "apps/claims/tsconfig.app.json",
@@ -34,8 +41,14 @@ export default defineConfig({
 - `diagnostics.failOn` defaults to `['error']`
 - `effects.cyclePolicy` defaults to `'error'`
 
+`projectConfigOverrides` handles centralized configs through exact discovered
+config paths; glob keys and stale keys are rejected. `projectRoot` and
+`runtimeResolutionBase` otherwise default independently to the project config
+directory. `tsconfigPath` falls back to root `tsconfigPath`, then absence.
+Parent and worker realpath-check every effective path inside the workspace.
+
 `sourceUsage` is optional. When enabled, root `tsconfigPath` is required as the
-project-config resolver configuration. The current `direct-root-call-v1` pilot
+source-usage authority and default project-config resolver configuration. The current `direct-root-call-v1` pilot
 uses those options for a project-config-only authority Program, compares its
 traversed authority imports and re-exports with the exact Jiti config runtime,
 and accepts one leaf application `sourceUsage.tsconfigPath` for direct `call`
@@ -117,6 +130,14 @@ The worker wire protocol is strict and package-lockstep rather than an
 independently compatible plugin API. Custom worker modules must use the exact
 `@formly-contract/workspace` version as the parent because unknown optional
 fields are rejected.
+
+Programmatic worker execution defaults to `trusted-local-v1`: direct Node
+spawn, no shell, scrubbed environment, strict IPC, bounded teardown, and
+read-only filesystem permissions when the current Node runtime supports them.
+Filesystem writes, child processes, and worker threads are not granted, but
+network access is not blocked; this remains a trusted-code guardrail rather
+than an untrusted-code sandbox. Selecting `isolated-ci-v1` fails closed before
+project import until its external provider is installed.
 
 Use the [workspace API reference](./api.md#workspace) for programmatic
 discovery, generation, checking, authoring inspection, and index parsing. Use

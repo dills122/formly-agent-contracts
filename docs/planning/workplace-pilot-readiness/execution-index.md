@@ -101,8 +101,7 @@ source-linkage hashes under `pnpm check:workspace-consumers`. A separate
 retained tarball bundle would duplicate that proof before a consumer need is
 known.
 
-If the workplace repository cannot use sibling links, add a bounded
-`pilot:pack` follow-up that retains all three tarballs and generates the
-required pnpm overrides. Keep it separate from `release:pack`, which correctly
-excludes the private workspace package, and do not describe it as an offline
+The later `pilot:pack` follow-up now retains schema, compiler, workspace, and
+Angular tarballs plus a checksummed pnpm hook for bundled internal dependency
+resolution. It remains separate from `release:pack` and is not an offline
 bundle because third-party dependencies still require a registry or cache.

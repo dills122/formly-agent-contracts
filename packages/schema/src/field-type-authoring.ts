@@ -789,6 +789,22 @@ export function defineContractedFormlyType<
   }) as TDefinition;
 }
 
+export function aliasContractedFormlyType<
+  const TDefinition extends ContractedFormlyTypeDefinition,
+  const TName extends string,
+>(
+  type: TDefinition,
+  name: TName,
+): Omit<TDefinition, 'name'> & { readonly name: TName } {
+  const validated = validateContractedType(type, 'type');
+  const aliasName = requireStableToken(name, 'alias.name') as TName;
+  return defineContractedFormlyType({
+    name: aliasName,
+    profile: validated.profile,
+    behavior: validated.behavior,
+  }) as Omit<TDefinition, 'name'> & { readonly name: TName };
+}
+
 export function toFormlyTypeRegistration<
   TComponent extends FormlyTypeComponentConstructor,
 >(
@@ -1254,7 +1270,6 @@ export function buildFieldTypeProfileRegistry(
     ),
   );
   const names = new Set<string>();
-  const profileIdentities = new Set<string>();
   for (const type of types) {
     if (names.has(type.name)) {
       throw new TypeError(
@@ -1262,14 +1277,41 @@ export function buildFieldTypeProfileRegistry(
       );
     }
     names.add(type.name);
+  }
+
+  const profilesByIdentity = new Map<
+    string,
+    {
+      readonly formlyType: string;
+      readonly profile: GeneratedFieldTypeProfile;
+      readonly serialized: string;
+    }
+  >();
+  for (const type of [...types].sort((left, right) =>
+    compareText(left.name, right.name),
+  )) {
     const profileIdentity = `${type.profile.id}@${type.profile.version}`;
-    if (profileIdentities.has(profileIdentity)) {
+    const profile = lowerContractedType(type);
+    // Lowerers construct closed profile fields in deterministic order. Comparing
+    // those bytes keeps this browser-safe entry point free of Node canonicalizers.
+    const serialized = JSON.stringify(profile);
+    const existing = profilesByIdentity.get(profileIdentity);
+    if (existing === undefined) {
+      profilesByIdentity.set(profileIdentity, {
+        formlyType: type.name,
+        profile,
+        serialized,
+      });
+      continue;
+    }
+    if (existing.serialized !== serialized) {
       throw new TypeError(
-        `registry.types duplicates profile identity "${profileIdentity}"`,
+        `registry.types assigns conflicting semantics to profile identity "${profileIdentity}" for Formly types "${existing.formlyType}" and "${type.name}"`,
       );
     }
-    profileIdentities.add(profileIdentity);
   }
+
+  const profileIdentities = new Set(profilesByIdentity.keys());
   const wrapperNames = new Set<string>();
   for (const wrapper of wrappers) {
     if (wrapperNames.has(wrapper.name)) {
@@ -1287,8 +1329,8 @@ export function buildFieldTypeProfileRegistry(
     profileIdentities.add(profileIdentity);
   }
 
-  const profiles = types
-    .map(lowerContractedType)
+  const profiles = [...profilesByIdentity.values()]
+    .map(({ profile }) => profile)
     .sort(
       (left, right) =>
         compareText(left.identity.id, right.identity.id) ||

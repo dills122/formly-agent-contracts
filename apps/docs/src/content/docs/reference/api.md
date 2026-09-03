@@ -116,12 +116,14 @@ Node-oriented schema root:
 | `autocompleteChoice(options?)` / `rowSelection(options?)` | Declare overlay autocomplete and row-selection interactions. |
 | `repeater(options?)` / `stepper(options?)` | Declare structural add/expand and multi-step navigation interactions. |
 | `defineContractedFormlyType(definition)` | Validate and freeze one compact Formly type declaration. |
+| `aliasContractedFormlyType(type, name)` | Snapshot one reviewed declaration under another exact Formly type name. |
 | `defineContractedFormlyWrapper(definition)` | Declare an optional reviewed wrapper activation precondition. |
 | `toFormlyTypeRegistration(type, component)` | Bind the same declared type name to the real Angular component registration. |
 | `buildFieldTypeProfileRegistry(input)` | Lower reviewed declarations into the canonical profile registry consumed by generation. |
 
 ```ts
 import {
+  aliasContractedFormlyType,
   buildFieldTypeProfileRegistry,
   defineContractedFormlyType,
   radioChoice,
@@ -134,20 +136,27 @@ export const COOL_RADIO = defineContractedFormlyType({
   behavior: radioChoice(),
 });
 
+export const LEGACY_COOL_RADIO = aliasContractedFormlyType(
+  COOL_RADIO,
+  'legacy-cool-radio-btn-grp',
+);
+
 export const fieldTypeProfiles = buildFieldTypeProfileRegistry({
   id: 'claims.field-types',
   version: 1,
-  types: [COOL_RADIO],
+  types: [COOL_RADIO, LEGACY_COOL_RADIO],
 });
 
-const formlyRegistration = toFormlyTypeRegistration(
-  COOL_RADIO,
-  CoolRadioComponent,
-);
+const formlyRegistrations = [
+  toFormlyTypeRegistration(COOL_RADIO, CoolRadioComponent),
+  toFormlyTypeRegistration(LEGACY_COOL_RADIO, CoolRadioComponent),
+];
 ```
 
 The compact helpers validate declared intent; they do not inspect component
-templates or invent interaction semantics.
+templates or invent interaction semantics. Identical aliases produce one
+canonical profile and one exact registration per Formly name. Reusing an
+`id@version` with different lowered semantics fails closed.
 
 ## Compiler
 
@@ -211,6 +220,7 @@ authority.
 | `defineFormContractSource(source)` | Group one or more explicitly registered complete form roots. |
 | `defineFormContractDefinition(definition)` | Assign a stable form ID, fresh factory, scenarios, and optional root lineage. |
 | `parseRootConfig(value)` / `parseProjectConfig(value)` | Strictly validate unknown configuration values. |
+| `resolveWorkspaceProjectExecutionPaths(root, configPath)` | Resolve exact project loader overrides and config-directory/root defaults. |
 
 These descriptors are trusted executable configuration. Complete forms are
 registered explicitly; fragments remain lineage/dependencies unless they are
@@ -244,12 +254,20 @@ import {
 const options = {
   workspaceRoot: process.cwd(),
   rootConfigPath: 'formly-contracts.config.ts',
+  projectExecution: {
+    kind: 'workers' as const,
+    executionProfile: 'trusted-local-v1' as const,
+  },
 };
 
 const discovered = await discoverWorkspaceProjects(options);
 const generated = await runWorkspace(options);
 const checked = await checkWorkspace(options);
 ```
+
+`trusted-local-v1` uses a direct, read-only-guarded Node worker and records
+`network: not-enforced`; it is not an untrusted-code sandbox. The reserved
+`isolated-ci-v1` profile currently fails closed before importing project code.
 
 ### Read-only factory-input authoring
 

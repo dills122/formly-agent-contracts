@@ -12,9 +12,10 @@ project-owned cross-field effect registries, and deterministic resolution of
 validated effects into form artifacts and workspace indexes. It also includes
 two opt-in workplace MVP slices: typed form definitions with explicit
 `lineage.rootSymbol` anchors plus a `direct-root-call-v1` TypeScript producer,
-and compact `radioChoice()` custom-type authoring that lowers reviewed semantics
-to the canonical field-profile registry while sharing the Formly registration
-name. Canonical Angular-fixture goldens plus linked and packed consumers verify
+and compact custom-type authoring for reviewed choice, input, collection, and
+structural behaviors. Exact Formly aliases may share one identical lowered
+profile while retaining separate registrations. Canonical Angular-fixture
+goldens plus linked and packed consumers verify
 the generic pilot outside package-source imports. The authoring command follows
 the same exact source lineage to a real factory declaration without adding a
 second target registry.
@@ -41,8 +42,7 @@ config runtime, and all three views must agree before a link is exact. The produ
 `static-convention` evidence that joins an exact form ID and generated contract
 hash; it does not execute call arguments or prove that Angular renders the
 component, that a route reaches it, or that a business journey traverses it.
-The compact custom-type helper currently covers one reviewed radio-choice happy
-path and performs no Angular template or DOM inference.
+Compact custom-type helpers perform no Angular template or DOM inference.
 
 The long-term architecture below remains the intended direction. Broader
 source lineage and fragment/change-impact analysis, journey and route
@@ -250,17 +250,25 @@ serializable runtime-host protocol:
 1. The parent loads only a Node-safe root config, expands project config paths,
    and creates a validated request containing the project config path, project
    root, runtime package-resolution base, effective tsconfig, root policy, and a
-   parent-selected runtime-host module descriptor.
-2. One fresh child process per project imports the trusted host module by its
-   already resolved file URL, evaluates the project config, inventories IDs, and
-   waits. No executable module URL may come from config data.
+   parent-selected runtime-host module descriptor. Exact root
+   `projectConfigOverrides` entries take precedence field-by-field over the
+   config-directory defaults and root tsconfig; unmatched keys, traversal, and
+   realpath escapes fail before spawn. The child repeats confinement checks
+   before host or config evaluation.
+2. One fresh `process.execPath` child per project starts without a shell, with a
+   scrubbed environment and read-only Node permissions when supported. It
+   imports the trusted host module by its already resolved file URL, evaluates
+   the project config, inventories IDs, and waits. No executable module URL may
+   come from config data.
 3. The parent rejects cross-project duplicate identities before allowing form
    factories to run. Children then compile and return only JSON-safe artifacts,
    diagnostics, and provenance; live configs, injectors, modules, and functions
    never cross IPC.
-4. The parent validates and hashes every result, sorts independently of worker
-   completion order, and performs content-addressed artifact publication with
-   the workspace index replaced last.
+4. The parent strictly reparses every result, verifies content hashes and
+   retained inventory identity, sorts independently of worker completion
+   order, and performs content-addressed artifact publication with the workspace
+   index replaced last. Before that final replace it rechecks generation-lock
+   ownership, dependency-lock bytes, and runtime tool package versions.
 
 Worker failures retain a validated stable code and `bootstrap`, `inventory`, or
 `compile` phase across IPC and aggregation. Default CLI output exposes only
@@ -268,6 +276,11 @@ that safe classification and the workspace-relative project config. The
 opt-in `--explain` path asks the worker for at most three bounded cause summaries
 and five workspace-relative stack frames. Those local diagnostics never enter
 contract artifacts, workspace indexes, hashes, or raw child stderr.
+The first worker failure in a fail-closed run cancels and awaits remaining
+project children; continue-on-error runs retain independently valid results. A
+publication failure leaves the prior index authoritative; temporary files are
+removed, while completed content-addressed artifacts may remain unreferenced
+and are safely adopted by an exact-byte idempotent rerun.
 
 This runtime-host protocol is strict and package-lockstep. Its version labels
 the IPC shape shipped together inside one `@formly-contract/workspace`
@@ -298,13 +311,15 @@ until a retained compatibility gate proves otherwise.
 
 A project child contains compiler-facade/module-cache state, crashes, timeouts,
 and failed-import contamination, but it is not a hostile-code or network
-sandbox. Trusted local execution uses a scrubbed environment and records that
-network denial is not enforced. Reproducible CI generation requires a configured
-external isolation provider and fails closed when network denial is requested
-but unavailable. Portable provenance records exact tool/loader/runtime versions,
-the worker and execution-profile versions, and a canonical dependency-lock
-digest; machine paths, module URLs, PIDs, timings, and raw environment never
-enter hashes.
+sandbox. Trusted-local execution grants no filesystem-write, child-process, or
+worker-thread permission when Node's permission model is available; it keeps
+one persistent validated channel across inventory, approval, and compile so a
+failure or exit between phases cannot be lost. Network denial is not enforced.
+Requesting the unavailable `isolated-ci-v1` external provider fails before any
+project config import. Portable provenance records exact tool/loader/runtime
+versions, the worker and execution-profile versions, and a canonical
+dependency-lock digest; machine paths, module URLs, PIDs, timings, and raw
+environment never enter hashes.
 
 The portable contract starts at runtime-provenance schema `1.0.0`. It records
 the worker ID/version/protocol, adapter ID/version/mode, exact workspace,
@@ -492,13 +507,16 @@ allowlist. Angular reflection and source/render analysis belong to the trusted
 build-time authoring host and do not run in the schema or MCP query path.
 
 Reviewed declarations and Angular authoring evidence have different authority.
-The current MVP implements one narrow authoring slice: a browser-safe
-`radioChoice()` contracted-type declaration supplies the same exact Formly type
-name to production registration and to deterministic lowering into the
-canonical `FieldTypeProfileRegistry`. It does not inspect a component or infer
-semantics from Angular metadata, templates, or rendered DOM. Other custom-field
-families still require a legacy reviewed registry or remain explicitly
-unmapped.
+The current implementation exposes browser-safe behavior presets for choices,
+typed inputs, autocomplete, row selection, repeaters, and steppers. One
+contracted-type declaration supplies the same exact Formly type name to
+production registration and deterministic lowering into the canonical
+`FieldTypeProfileRegistry`. Multiple exact type aliases may reuse one profile
+identity only when independently lowered semantics match exactly; conflicts
+fail closed. These helpers do not inspect a component or infer semantics from
+Angular metadata, templates, or rendered DOM. Custom-field families outside
+the closed preset vocabulary still require a legacy reviewed registry or
+remain explicitly unmapped.
 
 [ADR 0011](decisions/0011-named-formly-environments-and-contracted-field-adapters.md)
 proposes the broader end state: reusable field libraries author compact
@@ -513,14 +531,14 @@ deterministically lowers them to the existing canonical
 The generated registry remains the compiler and contract compatibility
 boundary; Angular metadata, source/template candidates, rendered roles and
 parts, coverage, drift, and migration scaffolds remain evidence. They cannot
-approve semantics, choose a codec, or register a driver. The MVP radio-choice
-path is declared semantic metadata, not Angular conformance. The broader model
+approve semantics, choose a codec, or register a driver. Compact presets are
+declared semantic metadata, not Angular conformance. The broader model
 will require a profile's exact registration, declaration, driver capability,
 and required conformance to agree before it is actionable. Display/assertion-only
 components require an explicit non-interactive disposition and remain
 non-executable or unknown until the schema defines their no-driver/assertion
 surface. Current project-owned raw registries remain the explicit legacy
-authoring path for controls outside the compact radio-choice slice rather than
+authoring path for controls outside the compact preset vocabulary rather than
 the intended final UX.
 
 One Formly field may map to multiple interactive controls. For example, a date range has start and end parts, while an address lookup may expose a search box, suggestions, and a confirmed structured value.

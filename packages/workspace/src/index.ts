@@ -29,6 +29,7 @@ export {
   defineFormContractProject,
   parseProjectConfig,
   parseRootConfig,
+  resolveWorkspaceProjectExecutionPaths,
   resolveWorkspaceProjectConfig,
   WORKSPACE_CONFIG_SCHEMA_VERSION,
   WORKSPACE_SOURCE_USAGE_CONVENTION,
@@ -39,12 +40,14 @@ export type {
   ResolvedCrossFieldEffectRegistry,
   ResolvedWorkspacePluginIdentity,
   ResolvedWorkspaceProjectConfig,
+  ResolvedWorkspaceProjectExecutionPaths,
   WorkspaceCliOverrides,
   WorkspaceDiagnosticConfig,
   WorkspaceEffectConfig,
   WorkspaceLocatorConfig,
   WorkspaceOutputConfig,
   WorkspacePlugin,
+  WorkspaceProjectConfigOverride,
   WorkspaceRootConfig,
   WorkspaceSourceUsageConfig,
 } from "./config.js";
@@ -154,9 +157,12 @@ export {
   createProjectWorkerEnvironment,
   ProjectWorkerSupervisorError,
   spawnProjectWorker,
+  WorkspaceRuntimeHostLoadError,
 } from './runtime-host/index.js';
 export type {
+  ProjectWorkerExecutionProfile,
   ProjectWorkerSession,
   ProjectWorkerSupervisorErrorCode,
   SpawnProjectWorkerOptions,
+  WorkspaceRuntimeHostLoadErrorCode,
 } from './runtime-host/index.js';

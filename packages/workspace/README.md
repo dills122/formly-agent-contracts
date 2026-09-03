@@ -44,8 +44,31 @@ projects still produce a deterministic index. Set `explain: true` through the
 programmatic runner or pass `--explain` to `list`, `generate`, or `check` to
 request bounded cause summaries and workspace-only frames. Explanations are
 local runtime results only and never enter artifacts or hashes. A single-writer
-lock spans generation through index-last publication, and the selected pnpm
-lockfile is rechecked immediately before commit.
+lock spans generation through index-last publication. Immediately before the
+index commit, the parent rechecks lock ownership, the selected pnpm lockfile,
+and runtime tool package versions.
+
+Worker results are parsed again in the parent, their contract hashes are
+verified, and their project/source/form identities must match retained
+inventory. A fail-closed worker run cancels and awaits peers before returning;
+`continueOnProjectError` instead retains independently valid project results.
+Filesystem failures keep the prior index authoritative. Temporary files are
+removed; a promoted content-addressed artifact may remain unreferenced and an
+idempotent rerun adopts it only when its canonical bytes match exactly.
+
+Centralized project configs can use root `projectConfigOverrides`, keyed by an
+exact discovered config path, to set `projectRoot`, `runtimeResolutionBase`, or
+`tsconfigPath`. Fields fall back independently to config-directory defaults or
+root `tsconfigPath`; parent and child canonicalize and confine effective paths.
+
+Worker execution defaults to `trusted-local-v1`. It spawns `process.execPath`
+directly with a scrubbed environment, strict IPC, bounded teardown, and—when
+the current Node runtime supports it—read-only filesystem permissions for the
+workspace and trusted package roots. It grants no filesystem-write,
+child-process, or worker-thread permission. This is a trusted-code guardrail,
+not a hostile-code sandbox: network access remains `not-enforced` in portable
+provenance. Requesting `isolated-ci-v1` fails closed until an external isolation
+provider is available.
 
 The runtime-host protocol is a strict package-lockstep IPC contract, not an
 independently compatible plugin protocol. Optional fields are additive only for

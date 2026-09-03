@@ -19,8 +19,9 @@ mean “available in the package.”
 - Optional `direct-root-call-v1` source indexing for explicit form definitions,
   direct factory calls/constructors, exact form ID/hash resolution, and a
   portable `source-usage-catalog.json`.
-- Browser-safe compact authoring for contracted radio-choice Formly types,
-  shared by production registration and canonical profile generation.
+- Browser-safe compact authoring for reviewed choice, input, collection, and
+  structural Formly behaviors, including exact alias reuse shared by production
+  registration and canonical profile generation.
 - `formly-contracts list`, `generate`, non-mutating `check`, and read-only
   `author-factory-inputs` commands.
 - Programmatic workspace discovery, local factory-input inspection, generation,
@@ -48,7 +49,8 @@ mean “available in the package.”
 - Browser observation and declared/resolved/observed parity reports.
 - Broader interprocedural source discovery, route/render proof, and complete
   runtime lineage.
-- Compact contracted-type presets beyond the current radio-choice happy path.
+- Compact contracted-type presets beyond the current closed behavior
+  vocabulary.
 - Journey contracts for routes, authentication, fixtures, submit behavior, and
   application outcomes.
 

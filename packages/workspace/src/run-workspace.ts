@@ -23,22 +23,25 @@ import {
   readFile,
   realpath,
   rename,
+  type FileHandle,
   unlink,
   writeFile,
 } from "node:fs/promises";
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 import { relative, resolve } from "node:path";
 import { posix } from "node:path";
 
 import {
   discoverWorkspaceProjectConfigs,
   discoverWorkspaceProjects,
+  resolveCanonicalWorkspaceProjectExecutionPaths,
   type DiscoverWorkspaceProjectsOptions,
   type DiscoveredWorkspace,
   type DiscoveredWorkspaceProject,
 } from "./discover-projects.js";
 import {
   resolveWorkspaceProjectConfig,
+  resolveWorkspaceProjectExecutionPaths,
   toPluginIdentity,
   WORKSPACE_CONFIG_SCHEMA_VERSION,
   type ResolvedWorkspaceProjectConfig,
@@ -52,7 +55,10 @@ import {
   type FormContractSource,
 } from "./source.js";
 import { WorkspaceConfigValidationError } from "./validation-error.js";
-import { readRuntimeToolVersions } from "./runtime-tool-versions.js";
+import {
+  readRuntimeToolVersions,
+  type RuntimeToolVersions,
+} from "./runtime-tool-versions.js";
 import { createWorkspaceSourceProgram } from "./source-program.js";
 import {
   indexWorkspaceSourceUsages,
@@ -74,6 +80,7 @@ import {
 } from "./workspace-index.js";
 import {
   DEFAULT_OUTPUT_DIRECTORY,
+  canonicalWorkspaceRelativePath,
   compareCodeUnits,
   errnoCode,
   isWithinWorkspace,
@@ -108,6 +115,7 @@ export type WorkspaceGenerationErrorCode =
   | "DEPENDENCY_SNAPSHOT_CHANGED"
   | "GENERATION_LOCKED"
   | "RUNTIME_PROVENANCE_UNAVAILABLE"
+  | "WORKER_ISOLATION_UNAVAILABLE"
   | "OUTPUT_PATH_OUTSIDE_WORKSPACE"
   | "OUTPUT_SYMLINK_UNSUPPORTED"
   | "OUTPUT_WRITE_FAILED";
@@ -143,6 +151,8 @@ const ERROR_MESSAGES: Readonly<Record<WorkspaceGenerationErrorCode, string>> = {
   GENERATION_LOCKED: "Another workspace generation is already active.",
   RUNTIME_PROVENANCE_UNAVAILABLE:
     "Runtime toolchain provenance could not be determined.",
+  WORKER_ISOLATION_UNAVAILABLE:
+    "The requested worker isolation profile is unavailable.",
   OUTPUT_PATH_OUTSIDE_WORKSPACE: "An output path is outside the workspace.",
   OUTPUT_SYMLINK_UNSUPPORTED: "Symlinked output paths are not supported.",
   OUTPUT_WRITE_FAILED: "Workspace contract output could not be written.",
@@ -188,6 +198,9 @@ export interface RunWorkspaceOptions extends DiscoverWorkspaceProjectsOptions {
   /** Opt-in disposable project workers; selected by trusted composition code. */
   readonly projectExecution?: {
     readonly kind: 'workers';
+    readonly executionProfile?:
+      | 'trusted-local-v1'
+      | 'isolated-ci-v1';
     readonly runtimeHost?: RuntimeHostModuleDescriptor;
     readonly timeoutMs?: number;
     readonly workerModuleUrl?: string;
@@ -204,6 +217,20 @@ export interface WorkspaceRunResult {
 }
 
 export type WorkspaceProjectExecutionFailure = WorkspaceProjectFailure;
+
+function assertWorkerExecutionProfileAvailable(
+  execution: NonNullable<RunWorkspaceOptions['projectExecution']>,
+): void {
+  if (
+    execution.executionProfile !== undefined &&
+    execution.executionProfile !== 'trusted-local-v1'
+  ) {
+    throw new WorkspaceGenerationError(
+      'WORKER_ISOLATION_UNAVAILABLE',
+      'inventory',
+    );
+  }
+}
 
 export interface WorkspaceCheckDifference {
   readonly path: string;
@@ -286,12 +313,38 @@ async function findPnpmDependencySnapshot(
   }
 }
 
+interface GenerationLock {
+  assertOwned(): Promise<void>;
+}
+
+async function ownsGenerationLock(
+  handle: FileHandle,
+  lockPath: string,
+  owner: string,
+): Promise<boolean> {
+  try {
+    const [handleStats, pathStats, contents] = await Promise.all([
+      handle.stat(),
+      lstat(lockPath),
+      readFile(lockPath, 'utf8'),
+    ]);
+    return (
+      handleStats.dev === pathStats.dev &&
+      handleStats.ino === pathStats.ino &&
+      contents === owner
+    );
+  } catch {
+    return false;
+  }
+}
+
 async function withGenerationLock<T>(
   workspaceRoot: string,
-  action: () => Promise<T>,
+  action: (lock: GenerationLock) => Promise<T>,
 ): Promise<T> {
   const lockPath = resolve(workspaceRoot, '.formly-contract-generation.lock');
-  let handle;
+  const owner = `${process.pid}:${randomUUID()}\n`;
+  let handle: FileHandle;
   try {
     handle = await open(lockPath, 'wx');
   } catch (error) {
@@ -305,7 +358,7 @@ async function withGenerationLock<T>(
     }, error);
   }
   try {
-    await handle.writeFile(`${process.pid}\n`, { encoding: 'utf8' });
+    await handle.writeFile(owner, { encoding: 'utf8' });
   } catch (error) {
     await handle.close();
     await unlink(lockPath).catch(() => undefined);
@@ -314,13 +367,24 @@ async function withGenerationLock<T>(
     }, error);
   }
   try {
-    return await action();
+    return await action({
+      async assertOwned() {
+        if (!(await ownsGenerationLock(handle, lockPath, owner))) {
+          throw new WorkspaceGenerationError('GENERATION_LOCKED', 'output', {
+            outputPath: '.formly-contract-generation.lock',
+          });
+        }
+      },
+    });
   } finally {
+    const owned = await ownsGenerationLock(handle, lockPath, owner);
     await handle.close();
-    try {
-      await unlink(lockPath);
-    } catch (error) {
-      if (errnoCode(error) !== 'ENOENT') throw error;
+    if (owned) {
+      try {
+        await unlink(lockPath);
+      } catch (error) {
+        if (errnoCode(error) !== 'ENOENT') throw error;
+      }
     }
   }
 }
@@ -332,6 +396,33 @@ function assertDependencySnapshotUnchanged(
   if (canonicalStringify(before) !== canonicalStringify(after)) {
     throw new WorkspaceGenerationError(
       'DEPENDENCY_SNAPSHOT_CHANGED',
+      'output',
+    );
+  }
+}
+
+async function snapshotRuntimeToolVersions(
+  phase: 'inventory' | 'output',
+): Promise<RuntimeToolVersions> {
+  try {
+    return await readRuntimeToolVersions();
+  } catch (error) {
+    throw new WorkspaceGenerationError(
+      'RUNTIME_PROVENANCE_UNAVAILABLE',
+      phase,
+      {},
+      error,
+    );
+  }
+}
+
+function assertRuntimeToolVersionsUnchanged(
+  before: RuntimeToolVersions,
+  after: RuntimeToolVersions,
+): void {
+  if (canonicalStringify(before) !== canonicalStringify(after)) {
+    throw new WorkspaceGenerationError(
+      'RUNTIME_PROVENANCE_UNAVAILABLE',
       'output',
     );
   }
@@ -980,6 +1071,12 @@ function buildIndex(
       ...(discovered.root.config.tsconfigPath === undefined
         ? {}
         : { tsconfigPath: discovered.root.config.tsconfigPath }),
+      ...(discovered.root.config.projectConfigOverrides === undefined
+        ? {}
+        : {
+            projectConfigOverrides:
+              discovered.root.config.projectConfigOverrides,
+          }),
       ...(discovered.root.config.sourceUsage === undefined
         ? {}
         : {
@@ -1051,30 +1148,42 @@ export async function discoverWorkspaceProjectsInWorkers(
   if (execution?.kind !== 'workers') {
     throw new TypeError('Worker project execution was not selected.');
   }
+  assertWorkerExecutionProfileAvailable(execution);
   const discoveredConfigs = await discoverWorkspaceProjectConfigs({
     workspaceRoot: options.workspaceRoot,
     rootConfigPath: options.rootConfigPath,
     ...(options.rootLoaderOptions === undefined ? {} : { rootLoaderOptions: options.rootLoaderOptions }),
     ...(options.selectedProjectConfigPaths === undefined ? {} : { selectedProjectConfigPaths: options.selectedProjectConfigPaths }),
   });
+  const rootConfigPath = await canonicalWorkspaceRelativePath(
+    discoveredConfigs.workspaceRoot,
+    discoveredConfigs.root.configPath,
+  );
   const rootPolicy = cloneJsonValue(discoveredConfigs.root.config);
   const workerModuleUrl = execution.workerModuleUrl ?? new URL('./project-worker.js', import.meta.url).href;
   const sessions: ProjectWorkerSession[] = [];
   try {
     const spawned = await Promise.allSettled(
-      discoveredConfigs.configPaths.map((configPath, index) => {
-        const projectRoot = posix.dirname(configPath) || '.';
+      discoveredConfigs.configPaths.map(async (configPath, index) => {
+        const executionPaths =
+          await resolveCanonicalWorkspaceProjectExecutionPaths(
+            discoveredConfigs.workspaceRoot,
+            discoveredConfigs.root.config,
+            configPath,
+          );
         return spawnProjectWorker({
           protocolVersion: '1', requestId: `inventory:${index + 1}`, operation: 'inventory',
           workspaceRoot: discoveredConfigs.workspaceRoot,
-          rootConfigPath: discoveredConfigs.root.configPath,
-          configPath, projectRoot, runtimeResolutionBase: projectRoot,
+          rootConfigPath,
+          ...executionPaths,
           ...(options.explain === true ? { explain: true } : {}),
-          ...(discoveredConfigs.root.config.tsconfigPath === undefined ? {} : { tsconfigPath: discoveredConfigs.root.config.tsconfigPath }),
           rootPolicy,
           ...(execution.runtimeHost === undefined ? {} : { runtimeHost: execution.runtimeHost }),
         }, {
           workerModuleUrl,
+          ...(execution.executionProfile === undefined
+            ? {}
+            : { executionProfile: execution.executionProfile }),
           ...(execution.timeoutMs === undefined ? {} : { timeoutMs: execution.timeoutMs }),
         });
       }),
@@ -1169,6 +1278,7 @@ async function executeProjectsInWorkers(
   if (execution?.kind !== 'workers') {
     throw new TypeError('Worker project execution was not selected.');
   }
+  assertWorkerExecutionProfileAvailable(execution);
   const discoveredConfigs = await discoverWorkspaceProjectConfigs({
     workspaceRoot: options.workspaceRoot,
     rootConfigPath: options.rootConfigPath,
@@ -1179,6 +1289,10 @@ async function executeProjectsInWorkers(
       ? {}
       : { selectedProjectConfigPaths: options.selectedProjectConfigPaths }),
   });
+  const rootConfigPath = await canonicalWorkspaceRelativePath(
+    discoveredConfigs.workspaceRoot,
+    discoveredConfigs.root.configPath,
+  );
   const rootConfig = discoveredConfigs.root.config;
   const rootPolicy = cloneJsonValue(rootConfig);
   const cliOverrides =
@@ -1192,21 +1306,21 @@ async function executeProjectsInWorkers(
   try {
     const spawned = await Promise.allSettled(
       discoveredConfigs.configPaths.map(async (configPath, index) => {
-        const projectRoot = posix.dirname(configPath) || '.';
+        const executionPaths =
+          await resolveCanonicalWorkspaceProjectExecutionPaths(
+            discoveredConfigs.workspaceRoot,
+            rootConfig,
+            configPath,
+          );
         return spawnProjectWorker(
           {
             protocolVersion: '1',
             requestId: `project:${index + 1}`,
             operation,
             workspaceRoot: discoveredConfigs.workspaceRoot,
-            rootConfigPath: discoveredConfigs.root.configPath,
-            configPath,
-            projectRoot,
-            runtimeResolutionBase: projectRoot,
+            rootConfigPath,
+            ...executionPaths,
             ...(options.explain === true ? { explain: true } : {}),
-            ...(rootConfig.tsconfigPath === undefined
-              ? {}
-              : { tsconfigPath: rootConfig.tsconfigPath }),
             rootPolicy,
             ...(cliOverrides === undefined ? {} : { cliOverrides }),
             ...(execution.runtimeHost === undefined
@@ -1215,6 +1329,9 @@ async function executeProjectsInWorkers(
           },
           {
             workerModuleUrl,
+            ...(execution.executionProfile === undefined
+              ? {}
+              : { executionProfile: execution.executionProfile }),
             ...(execution.timeoutMs === undefined
               ? {}
               : { timeoutMs: execution.timeoutMs }),
@@ -1257,7 +1374,31 @@ async function executeProjectsInWorkers(
         .map((session) => session.abort()),
     );
     const compiled = await Promise.allSettled(
-      selected.map((session) => session.approve()),
+      selected.map(async (session) => {
+        try {
+          return parseProjectExecutionResult(await session.approve(), {
+            configPath: session.request.configPath,
+            inventory: session.inventory,
+          });
+        } catch (error) {
+          if (options.continueOnProjectError !== true) {
+            await Promise.allSettled(
+              selected.map((candidate) => candidate.abort()),
+            );
+          }
+          throw error instanceof ProjectWorkerSupervisorError
+            ? error
+            : new ProjectWorkerSupervisorError(
+                'WORKER_MESSAGE_INVALID',
+                session.request.requestId,
+                error,
+                {
+                  configPath: session.request.configPath,
+                  phase: 'compile',
+                },
+              );
+        }
+      }),
     );
     compiled.forEach((outcome, index) => {
       if (outcome.status === 'rejected') {
@@ -1276,15 +1417,14 @@ async function executeProjectsInWorkers(
     if (failedCompile !== undefined && options.continueOnProjectError !== true) {
       throw failedCompile.reason;
     }
-    const rawResults = compiled.flatMap((outcome) =>
+    const results = compiled.flatMap((outcome) =>
       outcome.status === 'fulfilled' ? [outcome.value] : [],
-    );
-    if (rawResults.length === 0 && failedCompile !== undefined) {
-      throw failedCompile.reason;
-    }
-    const results = rawResults.map(parseProjectExecutionResult).sort((left, right) =>
+    ).sort((left, right) =>
       compareCodeUnits(left.project.configPath, right.project.configPath),
     );
+    if (results.length === 0 && failedCompile !== undefined) {
+      throw failedCompile.reason;
+    }
     const runtimePackageRepresentations = new Set(
       results.map((result) =>
         canonicalStringify(result.runtimePackages ?? []),
@@ -1301,7 +1441,7 @@ async function executeProjectsInWorkers(
       options.runtimeProvenance ??
       (await createWorkerRuntimeProvenance(
         discoveredConfigs.workspaceRoot,
-        rootConfig.tsconfigPath !== undefined,
+        sessions.some((session) => session.request.tsconfigPath !== undefined),
         execution.runtimeHost,
         runtimePackages,
       ));
@@ -1477,6 +1617,12 @@ function buildWorkerIndex(
       ...(discovered.root.config.tsconfigPath === undefined
         ? {}
         : { tsconfigPath: discovered.root.config.tsconfigPath }),
+      ...(discovered.root.config.projectConfigOverrides === undefined
+        ? {}
+        : {
+            projectConfigOverrides:
+              discovered.root.config.projectConfigOverrides,
+          }),
       ...(discovered.root.config.sourceUsage === undefined
         ? {}
         : { sourceUsage: discovered.root.config.sourceUsage }),
@@ -1828,7 +1974,8 @@ async function publishOutputs(
   artifacts: readonly PendingArtifact[],
   retiredPaths: readonly string[],
   indexPath: string,
-  index: WorkspaceContractIndex
+  index: WorkspaceContractIndex,
+  beforeIndexCommit: () => Promise<void>,
 ): Promise<void> {
   const allPaths = [
     ...artifacts.map(({ relativePath }) => relativePath),
@@ -1869,6 +2016,7 @@ async function publishOutputs(
     for (const retiredPath of retiredPaths) {
       await removeOutput(workspaceRoot, retiredPath);
     }
+    await beforeIndexCommit();
     await atomicWrite(
       workspaceRoot,
       indexPath,
@@ -2058,7 +2206,13 @@ async function planWorkspaceRun(
           ? "disabled"
           : "configured",
       projectConfigs:
-        discovered.root.config.tsconfigPath === undefined
+        discovered.projects.every(
+          (project) =>
+            resolveWorkspaceProjectExecutionPaths(
+              discovered.root.config,
+              project.configPath,
+            ).tsconfigPath === undefined,
+        )
           ? "disabled"
           : "configured",
     }
@@ -2244,28 +2398,38 @@ export async function runWorkspace(
       error,
     );
   }
-  return withGenerationLock(workspaceRoot, async () => {
+  return withGenerationLock(workspaceRoot, async (lock) => {
     const dependencySnapshotBefore =
       options.runtimeProvenance === undefined
         ? await findPnpmDependencySnapshot(workspaceRoot)
         : undefined;
+    const runtimeToolVersionsBefore =
+      await snapshotRuntimeToolVersions('inventory');
     const planned = await planWorkspaceRun(
       { ...options, workspaceRoot },
       'generate',
     );
-    if (dependencySnapshotBefore !== undefined) {
-      const dependencySnapshotAfter = await findPnpmDependencySnapshot(workspaceRoot);
-      assertDependencySnapshotUnchanged(
-        dependencySnapshotBefore,
-        dependencySnapshotAfter,
-      );
-    }
     await publishOutputs(
       planned.workspaceRoot,
       planned.artifacts,
       planned.retiredPaths,
       planned.indexPath,
       planned.index,
+      async () => {
+        if (dependencySnapshotBefore !== undefined) {
+          const dependencySnapshotAfter =
+            await findPnpmDependencySnapshot(workspaceRoot);
+          assertDependencySnapshotUnchanged(
+            dependencySnapshotBefore,
+            dependencySnapshotAfter,
+          );
+        }
+        assertRuntimeToolVersionsUnchanged(
+          runtimeToolVersionsBefore,
+          await snapshotRuntimeToolVersions('output'),
+        );
+        await lock.assertOwned();
+      },
     );
     return {
       indexPath: planned.indexPath,

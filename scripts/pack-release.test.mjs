@@ -90,6 +90,44 @@ const schemaPackedFiles = [
   { path: 'dist/field-type-authoring.js' },
 ];
 
+const workspaceReleasePackage = {
+  directory: 'packages/workspace',
+  name: '@formly-contract/workspace',
+  version: '0.1.0',
+};
+
+function createWorkspacePackedManifest(overrides = {}) {
+  return createPackedManifest({
+    name: workspaceReleasePackage.name,
+    version: workspaceReleasePackage.version,
+    repository: {
+      type: 'git',
+      url: 'git+https://github.com/dills122/formly-contract.git',
+      directory: workspaceReleasePackage.directory,
+    },
+    exports: {
+      '.': {
+        types: './dist/index.d.ts',
+        default: './dist/index.js',
+      },
+      './runtime-host': {
+        types: './dist/runtime-host/index.d.ts',
+        default: './dist/runtime-host/index.js',
+      },
+      './cli': {
+        types: './dist/cli.d.ts',
+        default: './dist/cli.js',
+      },
+    },
+    ...overrides,
+  });
+}
+
+const workspacePackedFiles = [
+  ...packedFiles,
+  { path: 'dist/project-worker.js' },
+];
+
 describe('verifyPackedPackage', () => {
   it('accepts a complete package with rewritten workspace dependencies', () => {
     expect(() =>
@@ -213,6 +251,37 @@ describe('verifyPackedPackage', () => {
       }),
     ).toThrow('is missing dist/field-type-authoring.d.ts');
   });
+
+  it('includes the workspace worker without exporting its private entry', () => {
+    expect(() =>
+      verifyPackedPackage({
+        packedFiles: workspacePackedFiles,
+        packedManifest: createWorkspacePackedManifest(),
+        releasePackage: workspaceReleasePackage,
+      }),
+    ).not.toThrow();
+
+    expect(() =>
+      verifyPackedPackage({
+        packedFiles,
+        packedManifest: createWorkspacePackedManifest(),
+        releasePackage: workspaceReleasePackage,
+      }),
+    ).toThrow('is missing dist/project-worker.js');
+
+    expect(() =>
+      verifyPackedPackage({
+        packedFiles: workspacePackedFiles,
+        packedManifest: createWorkspacePackedManifest({
+          exports: {
+            ...createWorkspacePackedManifest().exports,
+            './project-worker': './dist/project-worker.js',
+          },
+        }),
+        releasePackage: workspaceReleasePackage,
+      }),
+    ).toThrow('must not export its private worker');
+  });
 });
 
 describe('getPackedPackageSmokeImports', () => {
@@ -222,6 +291,7 @@ describe('getPackedPackageSmokeImports', () => {
         specifier: '@formly-contract/schema',
         requiredExports: ['parseFormContract'],
         forbiddenExports: [
+          'aliasContractedFormlyType',
           'buildFieldTypeProfileRegistry',
           'defineContractedFormlyWrapper',
           'defineContractedFormlyType',
@@ -233,6 +303,7 @@ describe('getPackedPackageSmokeImports', () => {
       {
         specifier: '@formly-contract/schema/field-type-authoring',
         requiredExports: [
+          'aliasContractedFormlyType',
           'buildFieldTypeProfileRegistry',
           'defineContractedFormlyWrapper',
           'defineContractedFormlyType',

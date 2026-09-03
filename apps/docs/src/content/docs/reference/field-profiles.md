@@ -8,13 +8,14 @@ string alone. A field-type profile is serializable, reviewed metadata that
 describes what the control means and how a future validated driver may operate
 it.
 
-## Compact authoring for radio choices
+## Compact field-type authoring
 
-The current happy-path authoring API generates the canonical registry from one
-browser-safe contracted type definition:
+The browser-safe authoring API generates the canonical registry from compact,
+reviewed type definitions:
 
 ```ts
 import {
+  aliasContractedFormlyType,
   buildFieldTypeProfileRegistry,
   defineContractedFormlyType,
   radioChoice,
@@ -27,29 +28,39 @@ export const COOL_RADIO_TYPE = defineContractedFormlyType({
   behavior: radioChoice(),
 });
 
+export const LEGACY_COOL_RADIO_TYPE = aliasContractedFormlyType(
+  COOL_RADIO_TYPE,
+  'legacy-cool-radio-btn-grp',
+);
+
 export const CLAIM_FIELD_PROFILES = buildFieldTypeProfileRegistry({
   id: 'claims.fields',
   version: 1,
-  types: [COOL_RADIO_TYPE],
+  types: [COOL_RADIO_TYPE, LEGACY_COOL_RADIO_TYPE],
 });
 
-// Use the same definition in the production Formly registration.
-const formlyType = toFormlyTypeRegistration(
-  COOL_RADIO_TYPE,
-  CoolRadioComponent,
-);
+// Use every exact definition in the production Formly registration.
+const formlyTypes = [
+  toFormlyTypeRegistration(COOL_RADIO_TYPE, CoolRadioComponent),
+  toFormlyTypeRegistration(LEGACY_COOL_RADIO_TYPE, CoolRadioComponent),
+];
 ```
 
-The shared definition therefore owns both the production Formly type name and
-the generated canonical profile registration. It does not inspect the Angular
-component or infer behavior. The helper snapshots and runtime-freezes the
-validated declaration so later mutation of caller-owned input cannot make the
-registration and generated profile disagree.
+Each shared definition owns both a production Formly type name and its generated
+canonical profile registration. `aliasContractedFormlyType()` snapshots the
+same reviewed semantics under another exact type name. Registry lowering emits
+one profile for identical aliases and one registration per name; the same
+`id@version` with different semantics is rejected.
 
-`radioChoice()` is the only compact behavior preset currently shipped. Other
-custom controls still require the legacy reviewed registry or remain unmapped
-with explicit unknowns; do not model autocomplete, repeaters, or application
-drivers as radio choices merely to obtain metadata.
+Definitions do not inspect Angular components or infer behavior. Helpers
+snapshot and runtime-freeze validated declarations so later caller-owned
+mutation cannot make registrations and generated profiles disagree.
+
+Compact behavior presets cover radio and other single/multi choice controls,
+typed inputs, autocomplete, row selection, repeaters, and steppers. Use only a
+preset that matches reviewed component behavior. Custom semantics outside that
+vocabulary still require the legacy reviewed registry or remain mapped with
+explicit unknowns.
 
 ## Profile anatomy
 
@@ -124,8 +135,8 @@ profile from overpromising behavior.
 
 The verbose registry shape below the compact helper remains the canonical
 portable artifact and a legacy authoring surface. Consumers should prefer the
-contracted type helper for supported radio controls so schema details are
-generated consistently.
+contracted type helpers for supported controls so schema details are generated
+consistently.
 
 :::note[Canonical sources]
 Use the [v0.4 metadata specification](https://github.com/dills122/formly-contract/blob/main/docs/v0.4-e2e-authoring-metadata-spec.md),

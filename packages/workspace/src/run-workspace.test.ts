@@ -26,8 +26,19 @@ import {
 } from "./run-workspace.js";
 
 const outputRenameFault = vi.hoisted(() => ({
+  contractFailureAt: 0,
+  contractRenamesSeen: 0,
   workspaceIndexFailuresRemaining: 0,
 }));
+const runtimeToolVersionFault = vi.hoisted(() => ({
+  callCount: 0,
+  changeOnCall: 0,
+}));
+
+const orderedWorker = new URL(
+  './runtime-host/fixtures/ordered-worker.mjs',
+  import.meta.url,
+).href;
 
 vi.mock("node:fs/promises", async () => {
   const actual = await vi.importActual<typeof import("node:fs/promises")>(
@@ -36,6 +47,22 @@ vi.mock("node:fs/promises", async () => {
   return {
     ...actual,
     rename: async (...args: Parameters<typeof actual.rename>) => {
+      if (
+        outputRenameFault.contractFailureAt > 0 &&
+        String(args[1]).endsWith('.contract.json')
+      ) {
+        outputRenameFault.contractRenamesSeen += 1;
+        if (
+          outputRenameFault.contractRenamesSeen ===
+          outputRenameFault.contractFailureAt
+        ) {
+          outputRenameFault.contractFailureAt = 0;
+          throw Object.assign(
+            new Error('injected contract artifact rename failure'),
+            { code: 'EACCES' },
+          );
+        }
+      }
       if (
         outputRenameFault.workspaceIndexFailuresRemaining > 0 &&
         String(args[1]).endsWith("/workspace-index.json")
@@ -49,6 +76,25 @@ vi.mock("node:fs/promises", async () => {
         );
       }
       return actual.rename(...args);
+    },
+  };
+});
+
+vi.mock('./runtime-tool-versions.js', async () => {
+  const actual = await vi.importActual<
+    typeof import('./runtime-tool-versions.js')
+  >('./runtime-tool-versions.js');
+  return {
+    ...actual,
+    async readRuntimeToolVersions(
+      ...args: Parameters<typeof actual.readRuntimeToolVersions>
+    ) {
+      runtimeToolVersionFault.callCount += 1;
+      const versions = await actual.readRuntimeToolVersions(...args);
+      return runtimeToolVersionFault.changeOnCall ===
+        runtimeToolVersionFault.callCount
+        ? { ...versions, workspaceVersion: `${versions.workspaceVersion}-changed` }
+        : versions;
     },
   };
 });
@@ -286,7 +332,11 @@ async function pathExists(path: string): Promise<boolean> {
 }
 
 afterEach(async () => {
+  outputRenameFault.contractFailureAt = 0;
+  outputRenameFault.contractRenamesSeen = 0;
   outputRenameFault.workspaceIndexFailuresRemaining = 0;
+  runtimeToolVersionFault.callCount = 0;
+  runtimeToolVersionFault.changeOnCall = 0;
   await Promise.all(
     temporaryDirectories
       .splice(0)
@@ -943,6 +993,74 @@ describe("runWorkspace", () => {
     ).resolves.toEqual(previousIndex);
   });
 
+  it('keeps the prior index authoritative and adopts an unreferenced artifact on rerun', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\n",
+    );
+    const writeProject = async (name: string, label: string) => {
+      await writeModule(
+        workspaceRoot,
+        `${name}.config.mjs`,
+        `export default { projectConfigs: ['projects/${name}.project.mjs'] };`,
+      );
+      await writeModule(
+        workspaceRoot,
+        `projects/${name}.project.mjs`,
+        `export default {
+          projectId: 'forms',
+          sources: [{ sourceId: 'forms', list: () => [
+            { id: 'claims.alpha', create: () => ({ fields: [{ key: 'alpha', type: 'input', props: { label: '${label} alpha' } }] }) },
+            { id: 'claims.beta', create: () => ({ fields: [{ key: 'beta', type: 'input', props: { label: '${label} beta' } }] }) }
+          ] }]
+        };`,
+      );
+    };
+    await writeProject('original', 'Original');
+    await writeProject('changed', 'Changed');
+    const originalOptions = {
+      workspaceRoot,
+      rootConfigPath: 'original.config.mjs',
+    } as const;
+    const changedOptions = {
+      workspaceRoot,
+      rootConfigPath: 'changed.config.mjs',
+    } as const;
+    const original = await runWorkspace(originalOptions);
+    const priorIndex = await readFile(
+      join(workspaceRoot, original.indexPath),
+    );
+    outputRenameFault.contractRenamesSeen = 0;
+    outputRenameFault.contractFailureAt = 2;
+
+    await expect(runWorkspace(changedOptions)).rejects.toMatchObject({
+      code: 'OUTPUT_WRITE_FAILED',
+      phase: 'output',
+    });
+
+    await expect(
+      readFile(join(workspaceRoot, original.indexPath)),
+    ).resolves.toEqual(priorIndex);
+    const outputRoot = join(workspaceRoot, 'dist/formly-contracts');
+    const filesAfterFailure = await readdir(outputRoot, { recursive: true });
+    expect(
+      filesAfterFailure.filter((path) => path.endsWith('.contract.json')),
+    ).toHaveLength(3);
+    expect(filesAfterFailure.some((path) => path.includes('.tmp-'))).toBe(false);
+
+    const recovered = await runWorkspace(changedOptions);
+    expect(
+      recovered.artifactPaths.filter((path) =>
+        filesAfterFailure.some((file) => path.endsWith(file)),
+      ),
+    ).toHaveLength(1);
+    await expect(checkWorkspace(changedOptions)).resolves.toMatchObject({
+      differences: [],
+    });
+  });
+
   it("snapshots source authority before form factories execute and fails closed when a factory mutates it", async () => {
     const workspaceRoot = await createTemporaryWorkspace();
     await seedSourceUsageWorkspace(workspaceRoot, {
@@ -1299,6 +1417,209 @@ describe("runWorkspace", () => {
       })
     );
     expect(await pathExists(join(workspaceRoot, "dist"))).toBe(false);
+  });
+
+  it('keeps validated project ordering stable when worker completion reverses', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\n",
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/alpha.project.mjs',
+      `throw new Error('ordered fixture worker owns project evaluation');`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/beta.project.mjs',
+      `throw new Error('ordered fixture worker owns project evaluation');`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.mjs',
+      `export default {
+        projectConfigs: ['projects/*.project.mjs'],
+        plugins: [{
+          id: 'fixture/order',
+          version: '1',
+          configSchemaVersion: '1',
+          options: {}
+        }]
+      };`,
+    );
+    const options = {
+      workspaceRoot,
+      rootConfigPath: 'formly-contracts.config.mjs',
+      projectExecution: {
+        kind: 'workers' as const,
+        workerModuleUrl: orderedWorker,
+      },
+    };
+
+    const forward = await runWorkspace(options);
+    const forwardBytes = await readFile(
+      join(workspaceRoot, forward.indexPath),
+    );
+    await writeModule(workspaceRoot, '.ordered-worker-reverse', 'reverse\n');
+    const reverse = await runWorkspace(options);
+    const reverseBytes = await readFile(
+      join(workspaceRoot, reverse.indexPath),
+    );
+    const identities = (result: typeof forward) =>
+      result.index.projects.map(({ configPath, projectId }) => ({
+        configPath,
+        projectId,
+      }));
+
+    expect(identities(forward)).toEqual([
+      { configPath: 'projects/alpha.project.mjs', projectId: 'alpha' },
+      { configPath: 'projects/beta.project.mjs', projectId: 'beta' },
+    ]);
+    expect(identities(reverse)).toEqual(identities(forward));
+    expect(reverseBytes).toEqual(forwardBytes);
+    expect(forward.index.runtimeProvenance.executionProfile).toEqual({
+      id: 'trusted-local-v1',
+      version: '1',
+      network: 'not-enforced',
+    });
+  });
+
+  it('isolates a worker result that does not match retained inventory', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\n",
+    );
+    await writeModule(
+      workspaceRoot,
+      'formly-contracts.config.mjs',
+      `export default {
+        projectConfigs: ['projects/*.project.mjs'],
+        plugins: [{
+          id: 'fixture/order',
+          version: '1',
+          configSchemaVersion: '1',
+          options: { mismatchProject: 'alpha' }
+        }]
+      };`,
+    );
+    for (const id of ['alpha', 'beta']) {
+      await writeModule(
+        workspaceRoot,
+        `projects/${id}.project.mjs`,
+        `throw new Error('ordered fixture worker owns project evaluation');`,
+      );
+    }
+
+    const result = await runWorkspace({
+      workspaceRoot,
+      rootConfigPath: 'formly-contracts.config.mjs',
+      continueOnProjectError: true,
+      projectExecution: {
+        kind: 'workers',
+        workerModuleUrl: orderedWorker,
+      },
+    });
+
+    expect(result.index.projects.map(({ projectId }) => projectId)).toEqual([
+      'beta',
+    ]);
+    expect(result.projectFailures).toEqual([
+      {
+        code: 'WORKER_MESSAGE_INVALID',
+        configPath: 'projects/alpha.project.mjs',
+        phase: 'compile',
+      },
+    ]);
+  });
+
+  it('cancels and awaits a slow peer after a late worker failure', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\n",
+    );
+    for (const id of ['alpha', 'beta']) {
+      await writeModule(
+        workspaceRoot,
+        `projects/${id}.project.mjs`,
+        `throw new Error('ordered fixture worker owns project evaluation');`,
+      );
+    }
+    const writeRoot = (name: string, options: string) =>
+      writeModule(
+        workspaceRoot,
+        `${name}.config.mjs`,
+        `export default {
+          projectConfigs: ['projects/*.project.mjs'],
+          plugins: [{
+            id: 'fixture/order',
+            version: '1',
+            configSchemaVersion: '1',
+            options: ${options}
+          }]
+        };`,
+      );
+    const runOptions = (rootConfigPath: string) => ({
+      workspaceRoot,
+      rootConfigPath,
+      projectExecution: {
+        kind: 'workers' as const,
+        workerModuleUrl: orderedWorker,
+        timeoutMs: 5_000,
+      },
+    });
+    await writeRoot('stable', '{}');
+    const stable = await runWorkspace(runOptions('stable.config.mjs'));
+    const priorIndex = await readFile(join(workspaceRoot, stable.indexPath));
+    await writeRoot(
+      'failed',
+      `{ lateFailureProject: 'alpha', slowProject: 'beta' }`,
+    );
+    const started = Date.now();
+
+    await expect(
+      runWorkspace(runOptions('failed.config.mjs')),
+    ).rejects.toMatchObject({
+      code: 'WORKER_FAILURE',
+      workerFailureCode: 'PROJECT_COMPILE_FAILED',
+      workerFailurePhase: 'compile',
+    });
+
+    expect(Date.now() - started).toBeLessThan(1_000);
+    await expect(
+      readFile(join(workspaceRoot, stable.indexPath)),
+    ).resolves.toEqual(priorIndex);
+  });
+
+  it('fails closed before project import when isolated CI is unavailable', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await seedRoot(workspaceRoot);
+    await writeModule(
+      workspaceRoot,
+      'projects/forms.project.mjs',
+      `throw new Error('project config must not load without isolation');`,
+    );
+
+    await expect(
+      runWorkspace({
+        ...runnerOptions(workspaceRoot),
+        projectExecution: {
+          kind: 'workers',
+          executionProfile: 'isolated-ci-v1',
+          workerModuleUrl: orderedWorker,
+        },
+      }),
+    ).rejects.toMatchObject({
+      name: 'WorkspaceGenerationError',
+      code: 'WORKER_ISOLATION_UNAVAILABLE',
+      phase: 'inventory',
+    });
+    expect(await pathExists(join(workspaceRoot, 'dist'))).toBe(false);
   });
 
   it.each([
@@ -1726,6 +2047,82 @@ describe("runWorkspace", () => {
     expect(await readFile(join(workspaceRoot, '.formly-contract-generation.lock'), 'utf8')).toBe('owner\n');
   });
 
+  it('rechecks lock ownership before index commit and preserves a replacement lock', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\n",
+    );
+    await writeModule(
+      workspaceRoot,
+      'stable.config.mjs',
+      `export default { projectConfigs: ['projects/stable.project.mjs'] };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/stable.project.mjs',
+      `export default {
+        projectId: 'forms',
+        sources: [{ sourceId: 'forms', list: () => [{
+          id: 'claims.form',
+          create: () => ({ fields: [{ key: 'name', type: 'input' }] })
+        }] }]
+      };`,
+    );
+    const stableOptions = {
+      workspaceRoot,
+      rootConfigPath: 'stable.config.mjs',
+    } as const;
+    const stable = await runWorkspace(stableOptions);
+    const priorIndex = await readFile(join(workspaceRoot, stable.indexPath));
+    await writeModule(
+      workspaceRoot,
+      'changed.config.mjs',
+      `export default { projectConfigs: ['projects/changed.project.mjs'] };`,
+    );
+    await writeModule(
+      workspaceRoot,
+      'projects/changed.project.mjs',
+      `import { writeFileSync } from 'node:fs';
+export default {
+  projectId: 'forms',
+  sources: [{ sourceId: 'forms', list: () => [{
+    id: 'claims.form',
+    create: () => {
+      writeFileSync(new URL('../.formly-contract-generation.lock', import.meta.url), 'replacement-owner\\n');
+      return { fields: [{ key: 'name', type: 'input', props: { label: 'Changed' } }] };
+    }
+  }] }]
+};`,
+    );
+
+    await expect(
+      runWorkspace({
+        workspaceRoot,
+        rootConfigPath: 'changed.config.mjs',
+      }),
+    ).rejects.toMatchObject({
+      code: 'GENERATION_LOCKED',
+      phase: 'output',
+      outputPath: '.formly-contract-generation.lock',
+    });
+    await expect(
+      readFile(join(workspaceRoot, stable.indexPath)),
+    ).resolves.toEqual(priorIndex);
+    await expect(
+      readFile(
+        join(workspaceRoot, '.formly-contract-generation.lock'),
+        'utf8',
+      ),
+    ).resolves.toBe('replacement-owner\n');
+
+    await rm(join(workspaceRoot, '.formly-contract-generation.lock'));
+    await expect(runWorkspace(stableOptions)).resolves.toMatchObject({
+      indexPath: stable.indexPath,
+    });
+  });
+
   it('refuses publication when the dependency snapshot changes during factory execution', async () => {
     const workspaceRoot = await createTemporaryWorkspace();
     await seedRoot(workspaceRoot);
@@ -1753,5 +2150,56 @@ export default {
     await expect(lstat(join(workspaceRoot, '.formly-contract-generation.lock'))).rejects.toEqual(
       expect.objectContaining({ code: 'ENOENT' }),
     );
+  });
+
+  it('rechecks runtime package metadata before the index commit', async () => {
+    const workspaceRoot = await createTemporaryWorkspace();
+    await writeModule(
+      workspaceRoot,
+      'pnpm-lock.yaml',
+      "lockfileVersion: '9.0'\n",
+    );
+    const writeRun = async (name: string, label: string) => {
+      await writeModule(
+        workspaceRoot,
+        `${name}.config.mjs`,
+        `export default { projectConfigs: ['projects/${name}.project.mjs'] };`,
+      );
+      await writeModule(
+        workspaceRoot,
+        `projects/${name}.project.mjs`,
+        `export default {
+          projectId: 'forms',
+          sources: [{ sourceId: 'forms', list: () => [{
+            id: 'claims.form',
+            create: () => ({ fields: [{ key: 'name', type: 'input', props: { label: '${label}' } }] })
+          }] }]
+        };`,
+      );
+      return {
+        workspaceRoot,
+        rootConfigPath: `${name}.config.mjs`,
+      } as const;
+    };
+    const stableOptions = await writeRun('stable', 'Stable');
+    const stable = await runWorkspace(stableOptions);
+    const priorIndex = await readFile(join(workspaceRoot, stable.indexPath));
+    const changedOptions = await writeRun('changed', 'Changed');
+    runtimeToolVersionFault.callCount = 0;
+    runtimeToolVersionFault.changeOnCall = 3;
+
+    await expect(runWorkspace(changedOptions)).rejects.toMatchObject({
+      code: 'RUNTIME_PROVENANCE_UNAVAILABLE',
+      phase: 'output',
+    });
+    await expect(
+      readFile(join(workspaceRoot, stable.indexPath)),
+    ).resolves.toEqual(priorIndex);
+
+    runtimeToolVersionFault.callCount = 0;
+    runtimeToolVersionFault.changeOnCall = 0;
+    await expect(runWorkspace(changedOptions)).resolves.toMatchObject({
+      indexPath: stable.indexPath,
+    });
   });
 });

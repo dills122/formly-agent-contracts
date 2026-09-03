@@ -32,6 +32,13 @@ Generation validates and writes form artifacts before replacing the workspace
 index. Readers therefore see either the prior complete index or the new one;
 the index is not published first with paths to unfinished contracts.
 
+One generation lock covers discovery through publication. Lock ownership, the
+pnpm lock digest, and runtime tool package versions are rechecked before the
+index replace. If artifact promotion or index replacement fails, the prior
+index remains authoritative and temporary files are removed. A completed
+content-addressed artifact may remain unreferenced; rerunning generation adopts
+it only when its canonical bytes match, then commits the new index last.
+
 `formly-contracts check` regenerates expected canonical bytes in memory and
 reports missing or stale paths without writing.
 
