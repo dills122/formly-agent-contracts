@@ -3,6 +3,7 @@ import { NgModule } from '@angular/core';
 import { ReactiveFormsModule } from '@angular/forms';
 import { FormlyKitModule } from '@fixture/formly-kit';
 import { FormlyModule } from '@ngx-formly/core';
+import { toFormlyTypeRegistration } from '@formly-contract/schema/field-type-authoring';
 
 import { CoolRadioButtonGroupComponent } from './custom-fields/cool-radio-button-group.component.js';
 import { DateRangeComponent } from './custom-fields/date-range.component.js';
@@ -11,6 +12,10 @@ import { EntityAutocompleteComponent } from './custom-fields/entity-autocomplete
 import { ExpandableRepeaterComponent } from './custom-fields/expandable-repeater.component.js';
 import { TableSelectComponent } from './custom-fields/table-select.component.js';
 import { FixtureExpansionPanelWrapperComponent } from './fixture-expansion-panel.wrapper.js';
+import {
+  FIXTURE_COOL_RADIO_TYPE,
+  FIXTURE_EXPANSION_PANEL_WRAPPER,
+} from './field-type-profiles.js';
 
 @NgModule({
   declarations: [
@@ -28,10 +33,10 @@ import { FixtureExpansionPanelWrapperComponent } from './fixture-expansion-panel
     FormlyKitModule,
     FormlyModule.forChild({
       types: [
-        {
-          name: 'cool-radio-btn-grp',
-          component: CoolRadioButtonGroupComponent,
-        },
+        toFormlyTypeRegistration(
+          FIXTURE_COOL_RADIO_TYPE,
+          CoolRadioButtonGroupComponent,
+        ),
         { name: 'date-range', component: DateRangeComponent },
         { name: 'dependent-select', component: DependentSelectComponent },
         { name: 'entity-autocomplete', component: EntityAutocompleteComponent },
@@ -43,7 +48,7 @@ import { FixtureExpansionPanelWrapperComponent } from './fixture-expansion-panel
       ],
       wrappers: [
         {
-          name: 'fixture-expansion-panel',
+          name: FIXTURE_EXPANSION_PANEL_WRAPPER.name,
           component: FixtureExpansionPanelWrapperComponent,
         },
       ],

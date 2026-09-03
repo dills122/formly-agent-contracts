@@ -238,8 +238,9 @@ Available today:
 - declared extraction and trusted scenario compilation for Formly 6.x;
 - deterministic multi-project discovery and artifact generation;
 - explicit form registration and optional direct-call source indexing;
-- custom-field profiles, cross-field effect metadata, and a browser-safe
-  radio-choice authoring helper;
+- custom-field profiles, cross-field effect metadata, and browser-safe compact
+  authoring for reviewed choice, input, autocomplete, row-selection, repeater,
+  stepper, and wrapper behavior;
 - pure agent-context queries plus strict typed test-intent validation and
   source-bound canonical plans over caller-assembled artifacts; and
 - Angular CLI, Nx, and browser-rendered synthetic examples.
@@ -251,8 +252,7 @@ Not shipped:
 - browser-executing field drivers or live DOM observation;
 - automatic route/render discovery or complete interprocedural source tracing;
   and
-- compact authoring presets for custom controls beyond the current radio-choice
-  path.
+- compact authoring presets beyond the current closed behavior vocabulary.
 
 The optional source index recognizes a deliberately narrow direct-call
 convention and fails closed when it cannot prove an exact link. It does not
@@ -262,13 +262,14 @@ precise capability boundary.
 
 ## Supported environment
 
-The intended consumer range is Angular 20 or newer with Formly 6.x. The deepest
-compatibility coverage uses Angular `20.3.29` with Formly `6.1.8`; validate other
-version combinations in the consuming application.
+The complete Angular runtime-host package supports Angular 20.x with Formly
+6.x. The deepest compatibility coverage uses Angular `20.3.29` with Formly
+`6.1.8`; validate other minor or patch combinations in the consuming
+application. The compiler itself peers only on Formly 6.x.
 
 The compiler and workspace packages are Node-side tooling and should not enter
-an Angular browser bundle. Production custom-field registration may use the
-schema package's dedicated browser-safe
+an Angular browser bundle. Paired custom-field declarations and production
+type registration use the schema package's dedicated browser-safe
 `@formly-contract/schema/field-type-authoring` entry point.
 
 ## Examples and documentation

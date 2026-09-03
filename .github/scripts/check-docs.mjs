@@ -158,6 +158,9 @@ function validateLocalLink({
 function pageRoute(file, siteContentRoot) {
   const path = relative(siteContentRoot, file).split(sep).join('/');
   if (path === 'index.md') return '/';
+  if (path.endsWith('/index.md')) {
+    return `/${path.slice(0, -'/index.md'.length)}/`;
+  }
   return `/${path.replace(/\.md$/u, '')}/`;
 }
 
@@ -235,13 +238,27 @@ export function validateDocumentation(directory = '.') {
     });
 
     for (const match of contents.matchAll(inlineLink)) {
-      validateLocalLink({
-        file,
-        target: match[1],
-        root,
-        failures,
-        contentsByFile,
-      });
+      const target = match[1];
+      if (
+        isInside(siteContentRoot, file) &&
+        !/^(?:https?:|mailto:|tel:)/u.test(target)
+      ) {
+        validateSiteHref({
+          file,
+          target,
+          siteContentRoot,
+          failures,
+          contentsByFile,
+        });
+      } else {
+        validateLocalLink({
+          file,
+          target,
+          root,
+          failures,
+          contentsByFile,
+        });
+      }
     }
 
     if (isInside(siteContentRoot, file)) {

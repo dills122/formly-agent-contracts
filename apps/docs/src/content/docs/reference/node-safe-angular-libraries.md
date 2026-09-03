@@ -176,31 +176,49 @@ import {
   typedInput,
 } from '@formly-contract/schema/field-type-authoring';
 
-export const FORMS_KIT_FIELD_TYPE_PROFILES =
-  buildFieldTypeProfileRegistry({
-    id: 'claims.forms-kit-fields',
-    version: 1,
-    types: [
-      defineContractedFormlyType({
-        name: 'application-number',
-        profile: { id: 'claims.application-number', version: 1 },
-        behavior: typedInput({
-          semanticType: 'number',
-          role: 'spinbutton',
-        }),
-      }),
-      defineContractedFormlyType({
-        name: 'application-select',
-        profile: { id: 'claims.application-select', version: 1 },
-        behavior: choiceControl({ presentation: 'select' }),
-      }),
-    ],
-  });
+export const APPLICATION_NUMBER_TYPE = defineContractedFormlyType({
+  name: 'application-number',
+  profile: { id: 'claims.application-number', version: 1 },
+  behavior: typedInput({
+    semanticType: 'number',
+    role: 'spinbutton',
+  }),
+});
+
+export const APPLICATION_SELECT_TYPE = defineContractedFormlyType({
+  name: 'application-select',
+  profile: { id: 'claims.application-select', version: 1 },
+  behavior: choiceControl({ presentation: 'select' }),
+});
+
+export const FORMS_KIT_FIELD_TYPE_PROFILES = buildFieldTypeProfileRegistry({
+  id: 'claims.forms-kit-fields',
+  version: 1,
+  types: [APPLICATION_NUMBER_TYPE, APPLICATION_SELECT_TYPE],
+});
 ```
 
-The Angular module separately registers the exact same Formly type names with
-their components. A browser/AOT conformance test proves that the reviewed
-profile matches the component; Node discovery does not instantiate it.
+The Angular module derives its type registrations from those same values:
+
+```ts title="libs/forms-kit/src/lib/forms-kit.module.ts"
+import {
+  toFormlyTypeRegistration,
+} from '@formly-contract/schema/field-type-authoring';
+
+FormlyModule.forChild({
+  types: [
+    toFormlyTypeRegistration(APPLICATION_NUMBER_TYPE, NumberComponent),
+    toFormlyTypeRegistration(APPLICATION_SELECT_TYPE, SelectComponent),
+  ],
+});
+```
+
+This is still a data-only contract boundary: the definition carries a Formly
+name and reviewed serializable behavior, not the Angular component. Browser
+code imports the definition to bind its component; Node discovery imports the
+definition to generate its profile. A browser/AOT conformance test should prove
+that the reviewed profile matches the component; Node discovery does not
+instantiate it.
 
 ## 4. Define the source without importing the browser entry point
 

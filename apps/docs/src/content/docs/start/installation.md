@@ -6,16 +6,17 @@ description: Install and verify Formly Contract as build-time tooling beside an 
 The compiler and workspace packages are Node-side build/test tooling and must
 not enter the Angular browser bundle. The schema package has one explicit
 browser-safe entry point, `@formly-contract/schema/field-type-authoring`, for
-production custom-field registration.
+paired custom-field declarations and production type registration.
 
 ## Supported baseline
 
 - Node.js `>=22.13.0 <23`; repository reference `22.22.1`
 - pnpm `10.23.0`
-- Angular 20 or newer
+- Angular 20.x for `@formly-contract/angular`
 - Formly 6.x
 
 The compatibility suite is pinned to Angular `20.3.29` and Formly `6.1.8`.
+Compiler-only consumers do not load Angular and peer only on Formly 6.x.
 
 ## Evaluate the GitHub pilot release candidate
 
@@ -111,7 +112,7 @@ forms library separate browser, pure-factory, and contracts entry points:
 ```
 
 Project configs import only `/contracts`; browser code never imports it. See
-[Node-safe Angular libraries](../reference/node-safe-angular-libraries.md) for
+[Node-safe Angular libraries](../../reference/node-safe-angular-libraries/) for
 the complete layout, configuration, verification, and temporary-shim pattern.
 :::
 

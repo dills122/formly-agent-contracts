@@ -15,8 +15,8 @@ selectors.
 
 ## The shortest honest evaluation
 
-1. Confirm the [supported toolchain](./installation.md#supported-baseline).
-2. Read the [product status](./product-status.md) before assuming an MCP or
+1. Confirm the [supported toolchain](./installation/#supported-baseline).
+2. Read the [product status](./product-status/) before assuming an MCP or
    Playwright generator exists.
 3. Run the maintained demo from the repository root:
 
@@ -25,12 +25,12 @@ selectors.
    pnpm demo
    ```
 
-4. Follow [one maintained Formly form end to end](./end-to-end.md), from its
+4. Follow [one maintained Formly form end to end](./end-to-end/), from its
    Angular code through repeatable contract generation and inspection.
 
-The strongest tested pairing is Angular `20.3.29` with Formly `6.1.8`. Angular
-20+ and Formly 6.x are the intended range, but other combinations do not carry
-the same compatibility evidence.
+The strongest tested pairing is Angular `20.3.29` with Formly `6.1.8`. The full
+Angular runtime host supports Angular 20.x and Formly 6.x; other minor or patch
+combinations do not carry the same compatibility evidence.
 
 ## What a contract answers
 
@@ -56,8 +56,8 @@ is the canonical private-repository evaluation path.
 
 ## Choose your next path
 
-- First integration: [choose a GitHub pilot RC or local install](./installation.md).
-- Real monorepo wiring: [follow one form end to end](./end-to-end.md).
-- Programmatic integration: [choose a public API entry point](../reference/api.md).
-- Architecture review: [understand the evidence model](../concepts/architecture.md).
-- Current versus future: [read the capability matrix](./product-status.md).
+- First integration: [choose a GitHub pilot RC or local install](./installation/).
+- Real monorepo wiring: [follow one form end to end](./end-to-end/).
+- Programmatic integration: [choose a public API entry point](../reference/api/).
+- Architecture review: [understand the evidence model](../concepts/architecture/).
+- Current versus future: [read the capability matrix](./product-status/).

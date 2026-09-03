@@ -94,7 +94,7 @@ entire runtime dependency closure—not only its top-level file—must remain sa
 to evaluate under Node. Type-only imports are erased, but an ordinary import in
 a nested form factory can still pull the browser graph into the worker.
 
-Use the [Node-safe Angular libraries](./node-safe-angular-libraries.md) guide for
+Use the [Node-safe Angular libraries](../node-safe-angular-libraries/) guide for
 a complete factory, descriptor, path-alias, project-config, and verification
 example.
 

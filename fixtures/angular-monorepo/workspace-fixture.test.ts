@@ -17,6 +17,13 @@ import {
 } from '@formly-contract/compiler';
 import { describe, expect, it } from 'vitest';
 import type { RuntimeProvenance } from '@formly-contract/schema';
+import { buildFieldTypeProfileRegistry } from '@formly-contract/schema/field-type-authoring';
+
+import {
+  FIXTURE_COOL_RADIO_TYPE,
+  FIXTURE_EXPANSION_PANEL_WRAPPER,
+  FIXTURE_FIELD_TYPE_PROFILES,
+} from './libs/forms-kit/src/lib/field-type-profiles.js';
 
 const fixtureRoot = fileURLToPath(new URL('./', import.meta.url));
 const fixtureTsconfig = resolve(fixtureRoot, 'tsconfig.json');
@@ -177,6 +184,23 @@ function extractFixtureDefinition(
 }
 
 describe('Angular monorepo workspace fixture', () => {
+  it('generates the walkthrough type and wrapper profiles from shared declarations', () => {
+    const generated = buildFieldTypeProfileRegistry({
+      id: 'fixture.angular-fields',
+      version: 1,
+      types: [FIXTURE_COOL_RADIO_TYPE],
+      wrappers: [FIXTURE_EXPANSION_PANEL_WRAPPER],
+    });
+
+    expect(FIXTURE_FIELD_TYPE_PROFILES.profiles[0]).toEqual(
+      generated.profiles[0],
+    );
+    expect(FIXTURE_FIELD_TYPE_PROFILES.registrations[0]).toEqual(
+      generated.registrations[0],
+    );
+    expect(FIXTURE_FIELD_TYPE_PROFILES.wrappers).toEqual(generated.wrappers);
+  });
+
   it('loads one root and four independently owned project descriptors', async () => {
     const root = parseRootConfig(
       await loadWorkspaceConfigModule(

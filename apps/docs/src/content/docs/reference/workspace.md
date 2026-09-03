@@ -117,7 +117,7 @@ config and move discovery exports out of Angular browser barrels. Preloading
 the Angular compiler makes compatible partially compiled Angular libraries
 loadable; it cannot repair arbitrary JavaScript initialization cycles or make
 browser integrations safe under Node. Follow the
-[Node-safe Angular library setup](./node-safe-angular-libraries.md) when a
+[Node-safe Angular library setup](../node-safe-angular-libraries/) when a
 project owns reusable Angular/Formly components.
 
 Project failure results retain a stable worker failure code, its
@@ -139,9 +139,9 @@ network access is not blocked; this remains a trusted-code guardrail rather
 than an untrusted-code sandbox. Selecting `isolated-ci-v1` fails closed before
 project import until its external provider is installed.
 
-Use the [workspace API reference](./api.md#workspace) for programmatic
+Use the [workspace API reference](../api/#workspace) for programmatic
 discovery, generation, checking, authoring inspection, and index parsing. Use
-the [CLI reference](./cli-api.md) for command options and refusal behavior.
+the [CLI reference](../cli-api/) for command options and refusal behavior.
 
 :::note[Canonical reference]
 The complete option, validation, trust, provenance, and publication semantics

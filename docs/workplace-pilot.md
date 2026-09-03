@@ -64,8 +64,9 @@ The strongest tested reference environment is:
 - Angular `20.3.29`; and
 - Formly `6.1.8`.
 
-Other Angular 20+ and Formly 6.x combinations may work, but record their exact
-versions in the pilot report.
+Other Angular 20.x and Formly 6.x combinations may work, but record their exact
+versions in the pilot report. `@formly-contract/angular` does not currently
+claim compatibility with Angular 21 or newer.
 
 From a private parent directory beside the workplace repository:
 
@@ -834,7 +835,10 @@ values outside this repository. Inspect the workspace structure and existing
 form registries/factory maps, then propose the smallest root config, project
 configs, and Node-safe contracts entry points. Start with one representative
 form and one custom field profile. Use the compact radio helper only when it
-matches reviewed behavior; record other types as unknown. Add one colocated form
+matches reviewed behavior; use another shipped compact preset only when it
+matches losslessly, otherwise retain an explicit reviewed profile or unknowns.
+Declare wrapper activation with the wrapper helper and reuse exact declaration
+names in Formly registration. Add one colocated form
 definition with an explicit root symbol, one direct component call under a
 discovered project root, and the leaf Angular source-usage tsconfig. Generate,
 inspect the index/catalog/contracts, query by source path and form ID, rerun for

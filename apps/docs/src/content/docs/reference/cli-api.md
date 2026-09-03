@@ -104,7 +104,7 @@ authoring run.
 
 ## Programmatic use
 
-The [public API reference](./api.md) documents workspace discovery,
+The [public API reference](../api/) documents workspace discovery,
 factory-input inspection, generation/checking, portable parsers, direct
 compiler APIs, and the pure agent-context query core. Use the CLI for normal
 repository adoption unless another trusted build tool needs typed results.

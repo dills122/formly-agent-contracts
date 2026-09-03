@@ -110,7 +110,10 @@ revalidates.
 ### Browser-safe field-type authoring
 
 Production Angular registration must use the dedicated subpath rather than the
-Node-oriented schema root:
+Node-oriented schema root. A Formly `{ name, component }` registration does not
+contain enough semantic evidence to generate a profile by itself; the shared
+contracted definition is the source for both registration and registry
+lowering:
 
 | API | Purpose |
 | --- | --- |
@@ -159,7 +162,9 @@ const formlyRegistrations = [
 The compact helpers validate declared intent; they do not inspect component
 templates or invent interaction semantics. Identical aliases produce one
 canonical profile and one exact registration per Formly name. Reusing an
-`id@version` with different lowered semantics fails closed.
+`id@version` with different lowered semantics fails closed. See
+[Custom field profiles](../field-profiles/) for the complete Angular,
+project-registry, wrapper, and legacy-profile flow.
 
 ## Compiler
 
@@ -290,7 +295,7 @@ const result = await inspectWorkspaceFactoryInputs({
 });
 ```
 
-See the [CLI reference](./cli-api.md) for the matching
+See the [CLI reference](../cli-api/) for the matching
 `author-factory-inputs` command and its refusal behavior.
 
 ## Angular runtime host
@@ -311,7 +316,7 @@ Selected Angular and Formly peers resolve from each project's runtime base.
 The child boundary isolates module/cache state, crashes, and timeouts; it does
 not sandbox hostile code or block network access. See the
 [Angular package README](https://github.com/dills122/formly-contract/blob/main/packages/angular/README.md)
-and [Node-safe Angular libraries](./node-safe-angular-libraries.md) before
+and [Node-safe Angular libraries](../node-safe-angular-libraries/) before
 loading application-owned configuration.
 
 ## Private Playwright experiment
