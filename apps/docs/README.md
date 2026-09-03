@@ -13,8 +13,9 @@ pnpm install --frozen-lockfile
 pnpm docs:dev
 ```
 
-Use `pnpm check:docs` for Markdown validation plus a production build, and
-`pnpm docs:preview` to inspect the generated static files.
+Use `pnpm check:docs` for rendered-route-aware Markdown validation plus a
+production build, and `pnpm docs:preview` to inspect the generated static
+files.
 
 The site is the concise user-facing layer. Canonical specifications, ADRs,
 research, and planning have distinct roles under `docs/`; read the root

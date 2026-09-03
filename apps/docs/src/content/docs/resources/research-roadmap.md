@@ -46,5 +46,5 @@ exports.
 
 The [agent-context delivery plan](https://github.com/dills122/formly-contract/blob/main/docs/planning/v0.4-e2e-authoring/agent-context-delivery-plan.md)
 describes bounded pilots and stop/go gates for future MCP and Playwright work.
-Use the [product status page](../start/product-status.md) to check what is
+Use the [product status page](../../start/product-status/) to check what is
 actually available before integrating.

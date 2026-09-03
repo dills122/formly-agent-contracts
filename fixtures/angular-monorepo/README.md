@@ -29,6 +29,10 @@ after the hard parts of real Angular/Formly workspaces.
   entrypoints remain safe for the Node-based loader.
 - Reusable fragments, declared effects, wrappers, and custom profiles produce
   deterministic artifacts across library boundaries.
+- The walkthrough radio type and expansion wrapper lower from compact shared
+  declarations; Angular registration reuses those exact names, while richer
+  fixture controls retain explicit reviewed profiles where compact presets
+  would change their semantics.
 - Generated output matches committed canonical goldens and the composed Angular
   application still builds.
 

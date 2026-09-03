@@ -57,7 +57,7 @@ Apply that change only when the failing edge is the component self-reference;
 `forwardRef` is not a generic repair for every circular import. Then keep the
 contract worker out of the broader browser graph by importing a dedicated
 `@work/forms-kit/contracts` entry point. The
-[Node-safe Angular libraries](../reference/node-safe-angular-libraries.md)
+[Node-safe Angular libraries](../../reference/node-safe-angular-libraries/)
 guide shows the full boundary and a temporary leaf-import shim.
 
 ## Discovery finds the wrong files
@@ -144,11 +144,39 @@ out-of-grammar call is not guaranteed to produce a per-call diagnostic.
 ## A custom field is unmapped
 
 `UNMAPPED_FIELD_TYPE` means extraction preserved the field but had no reviewed
-operational profile. Add a project-owned profile or keep the diagnostic. Do not
-map the type to the nearest native widget by appearance.
+operational profile. Formly's `{ name, component }` registration cannot supply
+that meaning by itself.
 
-If a profile exists, confirm its registration matches the exact Formly `type`
-and any selected variant. Wrappers need their own reviewed profiles.
+When a shipped preset matches the component, define one contracted type, derive
+its Formly registration, and lower the same definition into the project
+registry:
+
+```ts
+export const MONEY_INPUT_TYPE = defineContractedFormlyType({
+  name: 'money-input',
+  profile: { id: 'claims.money-input', version: 1 },
+  behavior: typedInput({ semanticType: 'currency', role: 'spinbutton' }),
+});
+
+toFormlyTypeRegistration(MONEY_INPUT_TYPE, MoneyInputComponent);
+
+export const FIELD_PROFILES = buildFieldTypeProfileRegistry({
+  id: 'claims.fields',
+  version: 1,
+  types: [MONEY_INPUT_TYPE],
+});
+```
+
+Attach `FIELD_PROFILES` as the owning project's `fieldTypeProfiles`. If a
+profile already exists, confirm its generated registration matches the exact
+field `type` and selected variant. Declare wrapper behavior with
+`defineContractedFormlyWrapper(...)`, include it in the builder's `wrappers`,
+and reuse its exact `name` in Formly's ordinary wrapper registration.
+
+If no preset matches losslessly, keep an explicit reviewed legacy profile or
+the diagnostic. Do not map a type to the nearest native widget by appearance.
+See [Custom field profiles](../../reference/field-profiles/) for the complete
+paired flow and shipped preset list.
 
 ## Dynamic options are empty
 

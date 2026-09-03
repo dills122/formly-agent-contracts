@@ -1,56 +1,44 @@
 import type { FormContractProjectConfig } from '@formly-contract/workspace';
+import {
+  buildFieldTypeProfileRegistry,
+  defineContractedFormlyType,
+  defineContractedFormlyWrapper,
+  radioChoice,
+} from '@formly-contract/schema/field-type-authoring';
 
 type FixtureFieldTypeProfiles = NonNullable<
   FormContractProjectConfig['fieldTypeProfiles']
 >;
+
+export const FIXTURE_COOL_RADIO_TYPE = defineContractedFormlyType({
+  name: 'cool-radio-btn-grp',
+  profile: { id: 'fixture.cool-radio', version: 1 },
+  behavior: radioChoice(),
+});
+
+export const FIXTURE_EXPANSION_PANEL_WRAPPER = defineContractedFormlyWrapper({
+  name: 'fixture-expansion-panel',
+  profile: { id: 'fixture.expansion-panel-wrapper', version: 1 },
+  activation: {
+    part: 'wrapper-expand',
+    operation: 'click',
+    role: 'button',
+  },
+});
+
+const generatedWalkthroughProfiles = buildFieldTypeProfileRegistry({
+  id: 'fixture.angular-fields',
+  version: 1,
+  types: [FIXTURE_COOL_RADIO_TYPE],
+  wrappers: [FIXTURE_EXPANSION_PANEL_WRAPPER],
+});
 
 export const FIXTURE_FIELD_TYPE_PROFILES: FixtureFieldTypeProfiles = {
   schemaVersion: '0.4.0',
   id: 'fixture.angular-fields',
   version: 1,
   profiles: [
-    {
-      identity: { id: 'fixture.cool-radio', version: 1 },
-      semanticType: 'single-choice',
-      valueShape: 'scalar',
-      evidence: 'declared',
-      parts: [
-        {
-          name: 'group',
-          role: 'radiogroup',
-          cardinality: 'one',
-          evidence: 'declared',
-        },
-        {
-          name: 'option',
-          role: 'radio',
-          cardinality: 'many',
-          evidence: 'declared',
-        },
-      ],
-      interaction: {
-        kind: 'choice',
-        operation: 'check',
-        optionPart: 'option',
-      },
-      valueDomain: {
-        kind: 'projected',
-        source: 'adapter',
-        completeness: 'complete',
-        collectionPath: 'props.options',
-        labelPath: 'label',
-        valuePath: 'value',
-        evidence: 'declared',
-      },
-      driver: {
-        kind: 'generic',
-        id: 'generic.choice',
-        version: 1,
-        capabilities: ['check'],
-      },
-      effectCapabilities: { targetProperties: ['options'], readiness: [] },
-      unknowns: [],
-    },
+    ...generatedWalkthroughProfiles.profiles,
     {
       identity: { id: 'fixture.dependent-select', version: 1 },
       semanticType: 'single-choice',
@@ -255,11 +243,7 @@ export const FIXTURE_FIELD_TYPE_PROFILES: FixtureFieldTypeProfiles = {
     },
   ],
   registrations: [
-    {
-      formlyType: 'cool-radio-btn-grp',
-      defaultProfile: { id: 'fixture.cool-radio', version: 1 },
-      variants: [],
-    },
+    ...generatedWalkthroughProfiles.registrations,
     {
       formlyType: 'dependent-select',
       defaultProfile: { id: 'fixture.dependent-select', version: 1 },
@@ -281,28 +265,5 @@ export const FIXTURE_FIELD_TYPE_PROFILES: FixtureFieldTypeProfiles = {
       variants: [],
     },
   ],
-  wrappers: [
-    {
-      identity: { id: 'fixture.expansion-panel-wrapper', version: 1 },
-      wrapperName: 'fixture-expansion-panel',
-      evidence: 'declared',
-      parts: [
-        {
-          name: 'wrapper-expand',
-          role: 'button',
-          cardinality: 'one',
-          evidence: 'declared',
-        },
-      ],
-      preconditions: [
-        {
-          kind: 'activate',
-          part: 'wrapper-expand',
-          operation: 'click',
-          evidence: 'declared',
-        },
-      ],
-      unknowns: [],
-    },
-  ],
+  wrappers: generatedWalkthroughProfiles.wrappers,
 };

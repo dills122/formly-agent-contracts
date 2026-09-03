@@ -15,7 +15,7 @@ The site follows the reader’s decision sequence:
 4. **Resources** — troubleshoot, navigate research, and contribute.
 
 The primary learning vertical is
-[one maintained Formly form from source to contract](../start/end-to-end.md).
+[one maintained Formly form from source to contract](../../start/end-to-end/).
 It leads with the rendered form, then reveals workspace wiring, repeatable
 generation, contract anatomy, and the current execution boundary. Other pages
 support that path rather than simulate a complete API encyclopedia.
@@ -50,6 +50,8 @@ Local builds omit `site` and `base`, so development stays at `/`. CI derives
 the standard values from GitHub context and accepts `DOCS_SITE_URL` and
 `DOCS_SITE_BASE` repository variables for a future custom domain. Internal
 links are relative or Starlight-managed so both hosting modes remain valid.
+Documentation checks resolve Markdown links as rendered routes and reject
+source-style `.md` URLs that would pass a filesystem check but break in Pages.
 
 This fits the pnpm TypeScript monorepo, follows the project owner’s Astro
 preference, and leaves product packages independent of the docs runtime.
@@ -78,7 +80,7 @@ release tags; do not copy today's pages into `v0` directories earlier.
 
 ## API reference policy
 
-The current [public API reference](../reference/api.md) is a curated map from
+The current [public API reference](../../reference/api/) is a curated map from
 supported use cases to package entry points. It is intentionally smaller than
 the generated TypeScript declarations, which remain exhaustive.
 

@@ -8,7 +8,7 @@ suite. Each uses the same public configuration, source, schema, compiler, and
 workspace APIs that a consumer uses.
 
 :::tip[Start with one form, not the fixture matrix]
-The [end-to-end walkthrough](../start/end-to-end.md) follows one maintained
+The [end-to-end walkthrough](../../start/end-to-end/) follows one maintained
 Formly fragment through its source, project, workspace, generated index, and
 contract anatomy. Return here when you need to choose a repository layout.
 :::
@@ -85,7 +85,7 @@ byte-identical repeated generation.
 
 The forms-kit library is also the maintained example for the recommended
 browser/factory/contracts split. See
-[Node-safe Angular libraries](./node-safe-angular-libraries.md) for the setup
+[Node-safe Angular libraries](../node-safe-angular-libraries/) for the setup
 explained as a consumer workflow.
 
 ## Reading support claims

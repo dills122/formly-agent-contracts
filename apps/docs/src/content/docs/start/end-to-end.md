@@ -182,17 +182,69 @@ export class CoolRadioButtonGroupComponent extends FieldType<
 > {}
 ```
 
+### Declare the alias and its contract together
+
+Formly registration tells Formly which component renders an alias. It does
+**not** tell Formly Contract whether that component is a radio group, what its
+model value looks like, or which reviewed interaction is safe. Declare those
+semantics once with the browser-safe authoring entry point, then derive both
+the Formly type registration and canonical contract profile from that
+declaration:
+
+```ts title="field-type-profiles.ts (maintained fixture)"
+import {
+  buildFieldTypeProfileRegistry,
+  defineContractedFormlyType,
+  defineContractedFormlyWrapper,
+  radioChoice,
+} from '@formly-contract/schema/field-type-authoring';
+
+export const FIXTURE_COOL_RADIO_TYPE = defineContractedFormlyType({
+  name: 'cool-radio-btn-grp',
+  profile: { id: 'fixture.cool-radio', version: 1 },
+  behavior: radioChoice(),
+});
+
+export const FIXTURE_EXPANSION_PANEL_WRAPPER = defineContractedFormlyWrapper({
+  name: 'fixture-expansion-panel',
+  profile: { id: 'fixture.expansion-panel-wrapper', version: 1 },
+  activation: {
+    part: 'wrapper-expand',
+    operation: 'click',
+    role: 'button',
+  },
+});
+```
+
+`radioChoice()` is a reviewed behavior declaration, not component
+introspection. It lowers to the complete radio-group profile shown later,
+including projected `props.options`, `generic.choice`, and the `check`
+operation. The wrapper declaration lowers to the required activation
+precondition. If the component behaves differently, choose a matching preset
+or keep an explicit reviewed profile with unknowns.
+
 ### Register custom UI where Angular boots
 
-Registration creates the alias used by JSON-style field configuration. Keep
-one root Formly setup for the chosen UI package, then register application-owned
-types and wrappers at the feature boundary that owns them.
+Registration still happens in ordinary Angular/Formly code. The shared type
+definition supplies the exact alias to `toFormlyTypeRegistration(...)`. Formly
+does not have an equivalent contracted-wrapper registration helper, so the
+wrapper registration remains the normal Formly object while reusing the
+declaration's exact `name`.
 
-This repository's Angular fixture is NgModule-based, so its feature library
-uses `FormlyModule.forChild(...)`. The application calls `forRoot(...)` once;
-feature libraries use `forChild(...)` for their aliases:
+This maintained fixture supports Formly 6.x and is NgModule-based. Its
+application calls `FormlyModule.forRoot(...)` once; the feature library uses
+`FormlyModule.forChild(...)` for its aliases:
 
 ```ts title="forms-kit.module.ts (maintained fixture, focused excerpt)"
+import {
+  toFormlyTypeRegistration,
+} from '@formly-contract/schema/field-type-authoring';
+
+import {
+  FIXTURE_COOL_RADIO_TYPE,
+  FIXTURE_EXPANSION_PANEL_WRAPPER,
+} from './field-type-profiles.js';
+
 @NgModule({
   declarations: [
     CoolRadioButtonGroupComponent,
@@ -202,14 +254,14 @@ feature libraries use `forChild(...)` for their aliases:
     ReactiveFormsModule,
     FormlyModule.forChild({
       types: [
-        {
-          name: 'cool-radio-btn-grp',
-          component: CoolRadioButtonGroupComponent,
-        },
+        toFormlyTypeRegistration(
+          FIXTURE_COOL_RADIO_TYPE,
+          CoolRadioButtonGroupComponent,
+        ),
       ],
       wrappers: [
         {
-          name: 'fixture-expansion-panel',
+          name: FIXTURE_EXPANSION_PANEL_WRAPPER.name,
           component: FixtureExpansionPanelWrapperComponent,
         },
       ],
@@ -219,40 +271,7 @@ feature libraries use `forChild(...)` for their aliases:
 export class FormsKitModule {}
 ```
 
-For a new standalone Formly v7 application, the equivalent split is
-`provideFormlyCore(...)` once at the root and `provideFormlyConfig(...)` for
-feature-owned aliases:
-
-```ts title="app.config.ts (standalone equivalent)"
-import { ApplicationConfig } from '@angular/core';
-import {
-  provideFormlyConfig,
-  provideFormlyCore,
-} from '@ngx-formly/core';
-import { withFormlyBootstrap } from '@ngx-formly/bootstrap';
-
-export const appConfig: ApplicationConfig = {
-  providers: [
-    provideFormlyCore(withFormlyBootstrap()),
-    provideFormlyConfig({
-      types: [
-        {
-          name: 'cool-radio-btn-grp',
-          component: CoolRadioButtonGroupComponent,
-        },
-      ],
-      wrappers: [
-        {
-          name: 'fixture-expansion-panel',
-          component: FixtureExpansionPanelWrapperComponent,
-        },
-      ],
-    }),
-  ],
-};
-```
-
-Both approaches produce the same aliases used by the field definition:
+The result supplies the same aliases used by the field definition:
 
 ```ts
 {
@@ -261,18 +280,20 @@ Both approaches produce the same aliases used by the field definition:
 }
 ```
 
-If every use of a custom type always needs the same wrapper, put
-`wrappers: ['fixture-expansion-panel']` on the **type registration** instead.
-Keep it on the individual field, as this fixture does, when wrapping is a
-per-usage decision. Formly's API also accepts the component class directly,
-but stable string aliases are the useful case for shared or JSON-powered field
-configuration—and they are what Formly Contract can record as declared
-evidence.
+If every use of a custom type always needs the same wrapper, extend the derived
+Formly type registration with
+`wrappers: [FIXTURE_EXPANSION_PANEL_WRAPPER.name]`. Keep the wrapper on the
+individual field, as this fixture does, when wrapping is a per-usage decision.
+Formly's API also accepts the component class directly, but stable string
+aliases are the useful case for shared or JSON-powered field configuration—and
+they are what Formly Contract can record as declared evidence.
 
-See Formly's official guides for the underlying
-[custom type](https://formly.dev/docs/guide/custom-formly-field/) and
-[custom wrapper](https://formly.dev/docs/guide/custom-formly-wrapper/)
-patterns.
+See Formly 6's official guides for the underlying
+[custom type](https://v6.formly.dev/docs/guide/custom-formly-field/) and
+[custom wrapper](https://v6.formly.dev/docs/guide/custom-formly-wrapper/)
+patterns. Formly 7 has different standalone provider APIs; this package's
+published peer range is Formly 6.x, so this walkthrough does not present the
+v7 provider surface as an equivalent supported setup.
 
 :::caution[Keep the boundary Node-safe]
 Contract discovery evaluates the project and source import graph in Node. Keep
@@ -334,105 +355,36 @@ export default defineFormContractProject({
 });
 ```
 
-The custom `cool-radio-btn-grp` is meaningful only because the project also
-declares its interaction profile **and maps the Formly alias to it**. The
-wrapper name needs its own profile because it contributes a required activation
-step. The maintained fixture predates the compact contracted-type helper, so it
-uses the verbose legacy registry shown here with unrelated fixture entries
-omitted:
+The custom `cool-radio-btn-grp` becomes meaningful when the project attaches
+the registry generated from the same declarations used above. The maintained
+fixture combines this generated walkthrough slice with explicit profiles for
+other controls whose richer semantics do not fit the current compact presets:
 
-```ts title="field-type-profiles.ts (complete join for this field)"
-import type { FormContractProjectConfig } from '@formly-contract/workspace';
+```ts title="field-type-profiles.ts (registry lowering)"
+const generatedWalkthroughProfiles = buildFieldTypeProfileRegistry({
+  id: 'fixture.angular-fields',
+  version: 1,
+  types: [FIXTURE_COOL_RADIO_TYPE],
+  wrappers: [FIXTURE_EXPANSION_PANEL_WRAPPER],
+});
 
-type FieldTypeProfiles = NonNullable<
-  FormContractProjectConfig['fieldTypeProfiles']
->;
-
-export const FIXTURE_FIELD_TYPE_PROFILES: FieldTypeProfiles = {
+export const FIXTURE_FIELD_TYPE_PROFILES = {
   schemaVersion: '0.4.0',
   id: 'fixture.angular-fields',
   version: 1,
   profiles: [
-    {
-      identity: { id: 'fixture.cool-radio', version: 1 },
-      semanticType: 'single-choice',
-      valueShape: 'scalar',
-      evidence: 'declared',
-      parts: [
-        {
-          name: 'group',
-          role: 'radiogroup',
-          cardinality: 'one',
-          evidence: 'declared',
-        },
-        {
-          name: 'option',
-          role: 'radio',
-          cardinality: 'many',
-          evidence: 'declared',
-        },
-      ],
-      interaction: {
-        kind: 'choice',
-        operation: 'check',
-        optionPart: 'option',
-      },
-      driver: {
-        kind: 'generic',
-        id: 'generic.choice',
-        version: 1,
-        capabilities: ['check'],
-      },
-      valueDomain: {
-        kind: 'projected',
-        source: 'adapter',
-        completeness: 'complete',
-        collectionPath: 'props.options',
-        labelPath: 'label',
-        valuePath: 'value',
-        evidence: 'declared',
-      },
-      effectCapabilities: { targetProperties: ['options'], readiness: [] },
-      unknowns: [],
-    },
-    // Other maintained fixture profiles are omitted here.
+    ...generatedWalkthroughProfiles.profiles,
+    // Other maintained explicit profiles are omitted here.
   ],
   registrations: [
-    {
-      formlyType: 'cool-radio-btn-grp',
-      defaultProfile: { id: 'fixture.cool-radio', version: 1 },
-      variants: [],
-    },
-    // Other maintained fixture registrations are omitted here.
+    ...generatedWalkthroughProfiles.registrations,
+    // Other maintained explicit registrations are omitted here.
   ],
-  wrappers: [
-    {
-      identity: { id: 'fixture.expansion-panel-wrapper', version: 1 },
-      wrapperName: 'fixture-expansion-panel',
-      evidence: 'declared',
-      parts: [
-        {
-          name: 'wrapper-expand',
-          role: 'button',
-          cardinality: 'one',
-          evidence: 'declared',
-        },
-      ],
-      preconditions: [
-        {
-          kind: 'activate',
-          part: 'wrapper-expand',
-          operation: 'click',
-          evidence: 'declared',
-        },
-      ],
-      unknowns: [],
-    },
-  ],
+  wrappers: generatedWalkthroughProfiles.wrappers,
 };
 ```
 
-That registry makes both joins explicit:
+The builder generates both joins:
 
 1. `type: 'cool-radio-btn-grp'` → `registrations[].formlyType` →
    `fixture.cool-radio` → the single-choice profile.
@@ -445,13 +397,13 @@ the wrapper profile, the contract cannot preserve the required expansion step.
 Profiles describe reviewed semantics; they are not executable Playwright
 implementations.
 
-:::tip[Prefer one declaration for new radio controls]
-For a new radio-style custom type, use
-`defineContractedFormlyType({ behavior: radioChoice() })`, build the registry
-with `buildFieldTypeProfileRegistry(...)`, and register the same definition in
-Angular with `toFormlyTypeRegistration(...)`. That removes the duplicated type
-name and profile reference. Wrapper profiles still use the explicit registry
-surface today. See [Custom field profiles](../reference/field-profiles.md).
+:::tip[This is the primary custom-field flow]
+Define the contracted type first, derive its Formly registration, and lower the
+same definition into the project registry. Use
+`defineContractedFormlyWrapper(...)` for reviewed wrapper semantics while
+reusing its name in Formly's ordinary wrapper registration. See
+[Custom field profiles](../../reference/field-profiles/) for every shipped
+preset, aliases, variants, and the legacy escape hatch.
 :::
 
 ### Let the root discover projects

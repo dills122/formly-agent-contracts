@@ -18,11 +18,12 @@ use the GitHub pilot RC or build and link it from a sibling checkout. After npm
 publication, installation will use
 `pnpm add --save-dev @formly-contract/compiler`.
 
-The package declares peer compatibility with `@ngx-formly/core` 6.x and is
-intended for Angular 20 or newer applications. The compatibility suite is
-pinned to Angular `20.3.29` with Formly `6.1.8`, so that exact pairing has the
-strongest test evidence. Validate other Angular major and Formly minor or patch
-combinations in the consuming application; mileage may vary.
+The package declares peer compatibility with `@ngx-formly/core` 6.x and does
+not peer directly on Angular. The complete `@formly-contract/angular` runtime
+host supports Angular 20.x with Formly 6.x. The compatibility suite is pinned
+to Angular `20.3.29` with Formly `6.1.8`, so that exact pairing has the strongest
+test evidence. Validate other minor or patch combinations in the consuming
+application.
 
 ```ts
 import { extractFormContract } from '@formly-contract/compiler';

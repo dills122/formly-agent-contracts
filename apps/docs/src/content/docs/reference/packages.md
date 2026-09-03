@@ -17,7 +17,7 @@ Use for portable data and validation:
 It does not load Formly, Angular, application configs, or browser code.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/schema/README.md)
 documents the browser-safe authoring subpath and contributor checks. The
-[public API reference](./api.md#schema) groups its primary parsers, canonical
+[public API reference](../api/#schema) groups its primary parsers, canonical
 operations, registries, query surface, and authoring helpers.
 
 ## `@formly-contract/compiler`
@@ -36,7 +36,7 @@ the authoring harness type has no runtime implementation or factory-execution
 authority.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/compiler/README.md)
 documents extraction boundaries and focused checks. See the
-[compiler API](./api.md#compiler) for declared and scenario entry points.
+[compiler API](../api/#compiler) for declared and scenario entry points.
 
 ## `@formly-contract/workspace`
 
@@ -58,7 +58,7 @@ Program and lineage but does not call the registered form factory or write the
 suggested file.
 Its [package README](https://github.com/dills122/formly-contract/blob/main/packages/workspace/README.md)
 maps configuration, discovery, generation, source indexing, and CLI ownership.
-The [workspace API](./api.md#workspace) and [CLI reference](./cli-api.md) are
+The [workspace API](../api/#workspace) and [CLI reference](../cli-api/) are
 the current consumer lookup surfaces.
 
 ## `@formly-contract/angular`
@@ -72,7 +72,7 @@ It does not make every application browser barrel safe to evaluate under Node.
 A consuming forms library must still expose a Node-safe contracts entry point
 whose runtime imports exclude Angular components, browser integrations, and
 eager application initialization. Follow
-[Node-safe Angular libraries](./node-safe-angular-libraries.md) for the complete
+[Node-safe Angular libraries](../node-safe-angular-libraries/) for the complete
 consumer setup and [the Angular package
 README](https://github.com/dills122/formly-contract/blob/main/packages/angular/README.md)
 for the programmatic host boundary.
@@ -89,7 +89,7 @@ It does **not** currently depend on Playwright, launch a browser, generate tests
 invoke drivers, or provide the planned browser execution vertical. It is not a
 published user capability. See its
 [package README](https://github.com/dills122/formly-contract/blob/main/packages/playwright/README.md)
-and [private API boundary](./api.md#private-playwright-experiment) before
+and [private API boundary](../api/#private-playwright-experiment) before
 contributing there.
 
 ## Applications and fixtures
@@ -104,7 +104,7 @@ contributing there.
   forms, custom fields, source-usage linkage, effects, and deterministic
   generation.
 
-See [Maintained examples](./examples.md) for the exact support evidence
+See [Maintained examples](../examples/) for the exact support evidence
 and shared compliance command.
 
 For repository navigation, the
@@ -121,6 +121,6 @@ is published in the current repository.
 :::note[Canonical package contracts]
 Use the package entry points and
 [architecture overview](https://github.com/dills122/formly-contract/blob/main/docs/architecture-overview.md)
-as authority. The [public API reference](./api.md) is curated from those entry
+as authority. The [public API reference](../api/) is curated from those entry
 points; generated TypeScript declarations remain exhaustive.
 :::
