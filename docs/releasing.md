@@ -75,6 +75,14 @@ baseline. Immediately before publication, the workflow installs exact npm
 `11.19.0`, satisfying trusted publishing's npm `11.5.1` and Node `22.14.0`
 minimums without violating the workspace's engine-strict Node range.
 
+The high-severity audit covers the complete workspace dependency graph.
+`pnpm-workspace.yaml` narrowly ignores CVE-2025-71329 and CVE-2025-71330:
+unpatched `image-size` parser denial-of-service findings reachable only through
+the root dev-test chain `vitest > vite > less`. Production dependencies audit
+clean, and repository builds do not process untrusted ICNS, JXL, or HEIF
+inputs. Do not broaden those exceptions; remove them when the upstream chain
+ships a fix.
+
 ## Before the first release
 
 npm only allows trusted publishing to be configured for an existing package.
@@ -144,6 +152,8 @@ bundle rebuilt on another machine, remain the npm bootstrap authority.
 
 - `pnpm changeset status` shows pending changesets and the version bumps they
   imply, without writing anything.
+- `pnpm audit --audit-level=high` checks the complete workspace graph using the
+  two reviewed, exact CVE exceptions documented above.
 - `pnpm release:check` validates public/private package boundaries and
   metadata for every publishable package.
 - `pnpm pack:check` expects built `dist` directories, packs every published
