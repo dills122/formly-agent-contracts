@@ -9,9 +9,9 @@ runtime/dependency provenance foundation.
 
 The RH-01 through RH-05 research packets are approved planning evidence, not
 implemented product behavior. `RH06-DOC` and `CTX-0A` through `CTX-0D` are
-complete. Under the reconciled dependency order, `CTX-1`, `DRV-0`, and Task
-7B.3 (`HOST-4`) are ready; Tasks 7A.2 (`HOST-1`), 7B.1 (`HOST-2`), and 7B.2
-(`HOST-3`) are complete. `AUTH-0` is also ready for explicit maintainer
+complete. Under the reconciled dependency order, `CTX-1` and Tasks 7A.2
+(`HOST-1`) through 7B.3 (`HOST-4`) are complete. `DRV-0` and `AUTH-0` are ready;
+the latter requires explicit maintainer
 approval of proposed ADR 0011; AUTH-dependent implementation remains gated
 until that approval. Each other producer's exact prerequisites and status
 remain in the execution index. Application
@@ -267,7 +267,7 @@ contains explicit effects only.
 
 | Requirement                                                                                                     | Decision                                                                                                                                                                                     | Tasks                                                                                                              | Verification                                                                                                                                                                                                                   | Status                                                                                                                               |
 | --------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------ |
-| `REQ-CONFIG-01` Repository-aware deterministic discovery                                                        | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host                                                                                    | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3                                                                   | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks                                                                        | Implemented through `HOST-3`; `HOST-4` is ready                                                                                    |
+| `REQ-CONFIG-01` Repository-aware deterministic discovery                                                        | Root policy plus project-local ownership; framework-specific evaluation composes through the generic host                                                                                    | Tasks 1–6B and `HOST-1`–`HOST-4`/Tasks 7A.2–7B.3                                                                   | Existing loader/config/source/discovery/runner/index tests plus strict protocol, lifecycle, failure-safe publication, and linked/packed consumer checks                                                                        | Implemented through `HOST-4`                                                                                                       |
 | `REQ-PROFILE-01` Custom types expose reviewed, serializable interaction semantics                               | The implemented canonical registry remains the compiler IR; proposed ADR 0011 makes compact library-owned adapters the normal semantic authoring authority; executable drivers stay separate | Tasks 3A–3B plus `AUTH-0`, adapter lowering, and environment publication                                           | Existing strict DTO/resolution/hash tests plus compact-to-canonical parity, conflict, exact environment binding, and conformance tests                                                                                         | Tasks 3A–3B and Tasks 5.0–5.1 implemented for the canonical/legacy boundary; `AUTH-0` is ready and the new authoring path is pending |
 | `REQ-AUTHOR-01` Angular reduces profile-authoring work without becoming semantic authority                      | A schema-owned compatibility result and retained AOT gate precede named-environment inventory; reviewed adapters remain semantic authority and required conformance gates actionability      | `AUTH-0`, `ANG-0`, `ANG-1`, `ANG-2`/Task 7A.3, `ANG-2P`/Task 7D, `ANG-2R`/Task 8B.1, `ANG-4`–`ANG-6`/Tasks 8B.2–8C | Angular CLI/Nx application-target gate, strict environment/adapter/registry/report schemas, configured-scope coverage, compact-lowering parity, required controlled conformance, negative inference, and workplace value pilot | Proposed ADR 0011 plus approved retained Angular research; production gates pending                                                  |
 | `REQ-EFFECTS-01` Ordering/effects are represented without function-source guessing                              | Explicit declared graph; derived references/deltas remain non-authoritative evidence                                                                                                         | Tasks 3C and 5A                                                                                                    | Strict DTO, endpoint/capability/readiness/SCC tests, retained 11-test spike                                                                                                                                                    | Implemented with schema/config/compiler/workspace/anchor-fixture evidence                                                            |
@@ -1129,27 +1129,27 @@ isolated CI fails before project import.
 
 #### Task 7B.3 (`HOST-4`): Make aggregation and publication failure-safe
 
-**Current status:** Ready. Generation locking, dependency
-snapshot checks, deterministic sorting, atomic index-last writes, and selected
-rollback tests exist, but the complete artifact/index fault-injection, orphan
-cleanup, and rerun matrix has not passed.
+**Current status:** Complete. Parent result/inventory validation, contract hash
+verification, deterministic reversed completion, fail-closed peer cancellation,
+owner-token locking, final lock/dependency/package rechecks, artifact/index
+fault injection, temporary-file cleanup, and idempotent rerun recovery pass.
 
 **Acceptance criteria:**
 
-- [ ] One generation lock spans discovery through publication; lock/package
+- [x] One generation lock spans discovery through publication; lock/package
       metadata snapshots are rechecked before commit.
-- [ ] The parent validates/rehashes child results and sorts independently of
+- [x] The parent validates/rehashes child results and sorts independently of
       completion order.
-- [ ] Content-addressed artifacts publish before an atomic index-last replace;
+- [x] Content-addressed artifacts publish before an atomic index-last replace;
       worker failure cannot change the prior index.
-- [ ] Filesystem failure may leave only unreferenced artifacts. Prior index
+- [x] Filesystem failure may leave only unreferenced artifacts. Prior index
       authority, cleanup, and idempotent rerun behavior are documented/tested.
 
 **Verification:**
 
-- [ ] Concurrent generation, mid-run dependency mutation, artifact/index fault
+- [x] Concurrent generation, mid-run dependency mutation, artifact/index fault
       injection, orphan cleanup, and rerun tests preserve the prior index.
-- [ ] Node-safe form-artifact bytes remain unchanged; provenance-versioned
+- [x] Node-safe form-artifact bytes remain unchanged; provenance-versioned
       index/configuration goldens migrate intentionally and remain canonical.
 
 **Dependencies:** `HOST-3` (Task 7B.2) and `CTX-0A`. Angular-specific hosts

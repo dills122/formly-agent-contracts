@@ -208,6 +208,7 @@ class WorkerChannel {
   #settled = false;
   #phase: RuntimeHostFailurePhase = 'inventory';
   #terminalError: ProjectWorkerSupervisorError | undefined;
+  #termination: Promise<void> | undefined;
   #pending:
     | {
         readonly expectedKind: 'inventory' | 'result';
@@ -240,6 +241,11 @@ class WorkerChannel {
     }
   }
 
+  #terminate(): Promise<void> {
+    this.#termination ??= terminate(this.child);
+    return this.#termination;
+  }
+
   #fail(
     code: ProjectWorkerSupervisorErrorCode,
     cause?: unknown,
@@ -264,7 +270,7 @@ class WorkerChannel {
     const pending = this.#pending;
     this.#cleanup();
     pending?.reject(error);
-    void terminate(this.child);
+    void this.#terminate();
   }
 
   #onMessage = (input: unknown): void => {
@@ -353,8 +359,14 @@ class WorkerChannel {
     } catch (error) {
       this.#fail('WORKER_CRASHED', error);
     }
-    const message = await result;
-    await terminate(this.child);
+    let message: RuntimeHostWorkerMessage;
+    try {
+      message = await result;
+    } catch (error) {
+      await this.#terminate();
+      throw error;
+    }
+    await this.#terminate();
     if (message.kind !== 'result') {
       throw new ProjectWorkerSupervisorError(
         'WORKER_MESSAGE_INVALID',
@@ -370,9 +382,24 @@ class WorkerChannel {
   }
 
   async abort(): Promise<void> {
-    if (this.#settled) return;
+    if (this.#settled) {
+      await this.#termination;
+      return;
+    }
+    const pending = this.#pending;
     this.#settled = true;
     this.#cleanup();
+    pending?.reject(
+      new ProjectWorkerSupervisorError(
+        'WORKER_ABORTED',
+        this.request.requestId,
+        undefined,
+        {
+          configPath: this.request.configPath,
+          phase: this.#phase,
+        },
+      ),
+    );
     try {
       await send(this.child, {
         protocolVersion: RUNTIME_HOST_PROTOCOL_VERSION,
@@ -380,7 +407,7 @@ class WorkerChannel {
         requestId: this.request.requestId,
       });
     } finally {
-      await terminate(this.child);
+      await this.#terminate();
     }
   }
 }

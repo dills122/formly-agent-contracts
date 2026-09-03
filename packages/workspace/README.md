@@ -44,8 +44,17 @@ projects still produce a deterministic index. Set `explain: true` through the
 programmatic runner or pass `--explain` to `list`, `generate`, or `check` to
 request bounded cause summaries and workspace-only frames. Explanations are
 local runtime results only and never enter artifacts or hashes. A single-writer
-lock spans generation through index-last publication, and the selected pnpm
-lockfile is rechecked immediately before commit.
+lock spans generation through index-last publication. Immediately before the
+index commit, the parent rechecks lock ownership, the selected pnpm lockfile,
+and runtime tool package versions.
+
+Worker results are parsed again in the parent, their contract hashes are
+verified, and their project/source/form identities must match retained
+inventory. A fail-closed worker run cancels and awaits peers before returning;
+`continueOnProjectError` instead retains independently valid project results.
+Filesystem failures keep the prior index authoritative. Temporary files are
+removed; a promoted content-addressed artifact may remain unreferenced and an
+idempotent rerun adopts it only when its canonical bytes match exactly.
 
 Centralized project configs can use root `projectConfigOverrides`, keyed by an
 exact discovered config path, to set `projectRoot`, `runtimeResolutionBase`, or

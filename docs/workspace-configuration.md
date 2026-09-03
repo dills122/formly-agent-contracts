@@ -386,6 +386,18 @@ advertises a partially generated artifact set. Existing content-addressed
 artifacts must already contain identical canonical bytes; the runner does not
 silently overwrite a hash-addressed contract with different content.
 
+For worker runs, the parent strictly reparses every result, verifies each
+contract content hash, and requires project/source/form identities to equal the
+retained inventory. A fail-closed worker run cancels and awaits remaining
+peers; `continueOnProjectError` retains independently valid results instead.
+Generation holds one owner-token lock through publication and rechecks its
+inode and token, the selected pnpm lock digest, and runtime tool package
+versions immediately before replacing the index. A failed artifact promotion
+or index replace leaves the prior index authoritative and removes temporary
+files. It may leave a completed content-addressed artifact unreferenced; rerun
+is the supported cleanup path and adopts that artifact only when its bytes
+match the expected canonical contract.
+
 Run generation and checking against a quiescent checkout. Discovery must load
 trusted root/project configuration before the source-usage Programs can be
 created; the authority and application Programs are then created before source

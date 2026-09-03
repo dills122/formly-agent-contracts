@@ -190,6 +190,22 @@ describe('project worker supervisor', () => {
     },
   );
 
+  it('rejects an in-flight approval after bounded abort teardown', async () => {
+    const session = await spawnProjectWorker(request('slow-result'), {
+      workerModuleUrl: fixtureWorker,
+      timeoutMs: 5_000,
+    });
+    const approval = expect(session.approve()).rejects.toMatchObject({
+      code: 'WORKER_ABORTED',
+      workerFailurePhase: 'compile',
+    });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    await session.abort();
+
+    await approval;
+  });
+
   it('classifies malformed, crashed, and timed-out workers', async () => {
     await expect(
       spawnProjectWorker(request('malformed'), {

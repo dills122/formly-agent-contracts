@@ -1,3 +1,5 @@
+import { existsSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { setTimeout } from 'node:timers';
 
 const protocolVersion = '1';
@@ -8,7 +10,9 @@ function projectId(configPath) {
 }
 
 function delay(request) {
-  const reverse = request.rootPolicy?.plugins?.[0]?.options?.reverse === true;
+  const reverse =
+    request.rootPolicy?.plugins?.[0]?.options?.reverse === true ||
+    existsSync(resolve(request.workspaceRoot, '.ordered-worker-reverse'));
   const alpha = projectId(request.configPath) === 'alpha';
   return reverse === alpha ? 35 : 5;
 }
@@ -32,8 +36,21 @@ process.on('message', (message) => {
     return;
   }
   if (message.kind === 'approve') {
+    const id = projectId(currentRequest.configPath);
+    const options = currentRequest.rootPolicy?.plugins?.[0]?.options;
+    const compileDelay = options?.slowProject === id ? 2_000 : delay(currentRequest);
     setTimeout(() => {
-      const id = projectId(currentRequest.configPath);
+      if (options?.lateFailureProject === id) {
+        process.send?.({
+          protocolVersion,
+          kind: 'failure',
+          requestId: message.requestId,
+          code: 'PROJECT_COMPILE_FAILED',
+          phase: 'compile',
+        });
+        return;
+      }
+      const mismatchProject = options?.mismatchProject;
       process.send?.({
         protocolVersion,
         kind: 'result',
@@ -42,7 +59,7 @@ process.on('message', (message) => {
           project: {
             schemaVersion: '0.2.0',
             configPath: currentRequest.configPath,
-            projectId: id,
+            projectId: mismatchProject === id ? `${id}.mismatch` : id,
             sourceIds: [],
             outputDirectory: 'dist/formly-contracts',
             testIdAttributes: ['data-testid'],
@@ -59,7 +76,7 @@ process.on('message', (message) => {
           forms: [],
         },
       });
-    }, delay(currentRequest));
+    }, compileDelay);
     return;
   }
   if (message.kind === 'abort') process.exit(0);

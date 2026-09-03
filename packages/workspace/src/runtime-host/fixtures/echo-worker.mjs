@@ -104,6 +104,17 @@ process.on('message', (message) => {
     return;
   }
   if (message.kind === 'approve') {
+    if (currentRequest?.rootPolicy?.fixture === 'slow-result') {
+      setTimeout(() => {
+        process.send?.({
+          protocolVersion,
+          kind: 'result',
+          requestId: message.requestId,
+          result: { artifacts: [] },
+        });
+      }, 2_000);
+      return;
+    }
     if (currentRequest?.rootPolicy?.fixture === 'compile-failure') {
       process.send?.({
         protocolVersion,

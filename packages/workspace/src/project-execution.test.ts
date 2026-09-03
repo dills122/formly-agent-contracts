@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import { inventoryProjectExecution } from './project-execution.js';
+import {
+  inventoryProjectExecution,
+  parseProjectExecutionResult,
+} from './project-execution.js';
 
 describe('project worker execution phases', () => {
   it('inventories definitions without invoking factories and compiles from the retained graph', async () => {
@@ -40,5 +43,65 @@ describe('project worker execution phases', () => {
     })).rejects.toThrow(/Duplicate form ID/u);
     expect(first).not.toHaveBeenCalled();
     expect(second).not.toHaveBeenCalled();
+  });
+
+  it('strictly revalidates compiled results against retained inventory', async () => {
+    const project = await inventoryProjectExecution({
+      configPath: 'projects/forms.project.ts',
+      rootConfig: { projectConfigs: ['projects/*.project.ts'] },
+      projectConfig: {
+        projectId: 'fixture-project',
+        sources: [
+          {
+            sourceId: 'fixture-source',
+            list: () => [
+              {
+                id: 'fixture.form',
+                create: () => ({ fields: [{ key: 'name', type: 'input' }] }),
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const result = project.compile();
+    const expected = {
+      configPath: 'projects/forms.project.ts',
+      inventory: project.inventory,
+    };
+
+    expect(parseProjectExecutionResult(result, expected)).toEqual(result);
+    expect(() =>
+      parseProjectExecutionResult({ ...result, unexpected: true }, expected),
+    ).toThrow(/unexpected/u);
+    expect(() =>
+      parseProjectExecutionResult(
+        {
+          ...result,
+          project: { ...result.project, projectId: 'other-project' },
+        },
+        expected,
+      ),
+    ).toThrow(/does not match inventory/u);
+    expect(() =>
+      parseProjectExecutionResult({ ...result, forms: [] }, expected),
+    ).toThrow(/forms do not match inventory/u);
+    expect(() =>
+      parseProjectExecutionResult(
+        {
+          ...result,
+          forms: [
+            {
+              ...result.forms[0]!,
+              contract: {
+                ...result.forms[0]!.contract,
+                formId: 'tampered.form',
+              },
+            },
+          ],
+        },
+        expected,
+      ),
+    ).toThrow(/contentHash/u);
   });
 });

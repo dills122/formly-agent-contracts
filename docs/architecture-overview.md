@@ -264,9 +264,11 @@ serializable runtime-host protocol:
    factories to run. Children then compile and return only JSON-safe artifacts,
    diagnostics, and provenance; live configs, injectors, modules, and functions
    never cross IPC.
-4. The parent validates and hashes every result, sorts independently of worker
-   completion order, and performs content-addressed artifact publication with
-   the workspace index replaced last.
+4. The parent strictly reparses every result, verifies content hashes and
+   retained inventory identity, sorts independently of worker completion
+   order, and performs content-addressed artifact publication with the workspace
+   index replaced last. Before that final replace it rechecks generation-lock
+   ownership, dependency-lock bytes, and runtime tool package versions.
 
 Worker failures retain a validated stable code and `bootstrap`, `inventory`, or
 `compile` phase across IPC and aggregation. Default CLI output exposes only
@@ -274,6 +276,11 @@ that safe classification and the workspace-relative project config. The
 opt-in `--explain` path asks the worker for at most three bounded cause summaries
 and five workspace-relative stack frames. Those local diagnostics never enter
 contract artifacts, workspace indexes, hashes, or raw child stderr.
+The first worker failure in a fail-closed run cancels and awaits remaining
+project children; continue-on-error runs retain independently valid results. A
+publication failure leaves the prior index authoritative; temporary files are
+removed, while completed content-addressed artifacts may remain unreferenced
+and are safely adopted by an exact-byte idempotent rerun.
 
 This runtime-host protocol is strict and package-lockstep. Its version labels
 the IPC shape shipped together inside one `@formly-contract/workspace`
