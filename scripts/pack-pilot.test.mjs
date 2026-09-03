@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createPilotBundleManifest,
+  createPilotConsumerManifest,
   createPilotPnpmfile,
 } from "./pack-pilot.mjs";
 
@@ -67,5 +68,21 @@ describe("createPilotBundleManifest", () => {
     expect(() => createPilotBundleManifest(packages.slice(1))).toThrow(
       "requires angular, compiler, schema, and workspace"
     );
+  });
+});
+
+describe("createPilotConsumerManifest", () => {
+  it("pins the tested Angular and Formly compatibility stack", () => {
+    expect(createPilotConsumerManifest().dependencies).toEqual({
+      "@angular/common": "20.3.29",
+      "@angular/compiler": "20.3.29",
+      "@angular/core": "20.3.29",
+      "@angular/forms": "20.3.29",
+      "@angular/platform-browser": "20.3.29",
+      "@ngx-formly/core": "6.1.8",
+      rxjs: "7.8.2",
+      tslib: "2.8.1",
+      "zone.js": "0.15.1",
+    });
   });
 });

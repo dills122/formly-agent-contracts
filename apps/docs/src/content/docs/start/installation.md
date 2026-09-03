@@ -77,11 +77,12 @@ Copy `artifacts/pilot/` to the consumer, then run the `pnpm` command described
 by `formly-contract-pilot.json`. The pilot remains a retained evaluation
 handoff even though workspace and Angular are now on the public release path.
 The manifest contains schema, compiler, workspace, and Angular and is checked
-by installing those exact arguments, importing `@formly-contract/angular/jit`,
-and running `formly-contracts-angular --help` in a temporary consumer. Its
-checksummed pnpm hook redirects only dependencies among those four unpublished
-packages to bundled tarballs; inspect and retain that file beside the tarballs
-when copying the bundle.
+in a temporary consumer predeclared with the compatibility suite's pinned
+Angular `20.3.29` and Formly `6.1.8` runtime stack. The check installs the exact
+manifest arguments, imports `@formly-contract/angular/jit`, and runs
+`formly-contracts-angular --help`. Its checksummed pnpm hook redirects only
+dependencies among those four unpublished packages to bundled tarballs;
+inspect and retain that file beside the tarballs when copying the bundle.
 Third-party Angular, Formly, TypeScript, and pnpm dependencies still require the
 consumer's normal registry or package cache; this is not an offline dependency
 bundle.

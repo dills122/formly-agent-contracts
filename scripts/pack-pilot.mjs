@@ -31,6 +31,27 @@ const PILOT_PACKAGE_NAMES = [
 ];
 const PILOT_PNPMFILE = "formly-contract-pilot.pnpmfile.cjs";
 const WORKSPACE_PACKAGE_DIRECTORY = "packages/workspace";
+const PILOT_CONSUMER_DEPENDENCIES = Object.freeze({
+  "@angular/common": "20.3.29",
+  "@angular/compiler": "20.3.29",
+  "@angular/core": "20.3.29",
+  "@angular/forms": "20.3.29",
+  "@angular/platform-browser": "20.3.29",
+  "@ngx-formly/core": "6.1.8",
+  rxjs: "7.8.2",
+  tslib: "2.8.1",
+  "zone.js": "0.15.1",
+});
+
+export function createPilotConsumerManifest() {
+  return {
+    name: "formly-contract-pilot-consumer-smoke",
+    version: "0.0.0",
+    private: true,
+    type: "module",
+    dependencies: { ...PILOT_CONSUMER_DEPENDENCIES },
+  };
+}
 
 export function createPilotBundleManifest(packages) {
   const sorted = [...packages].sort((left, right) =>
@@ -111,16 +132,7 @@ async function verifyPilotBundleConsumer(manifest, bundleDirectory) {
   try {
     await writeFile(
       join(consumerRoot, "package.json"),
-      `${JSON.stringify(
-        {
-          name: "formly-contract-pilot-consumer-smoke",
-          version: "0.0.0",
-          private: true,
-          type: "module",
-        },
-        null,
-        2
-      )}\n`
+      `${JSON.stringify(createPilotConsumerManifest(), null, 2)}\n`
     );
     for (const package_ of manifest.packages) {
       await copyFile(
